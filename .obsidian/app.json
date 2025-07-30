@@ -1,0 +1,10 @@
+{
+  "newFileLocation": "folder",
+  "newFileFolderPath": "Projects",
+  "attachmentFolderPath": "Sources/Images",
+  "userIgnoreFilters": [
+    "Templates/",
+    "Sources/",
+    "Class/"
+  ]
+}
