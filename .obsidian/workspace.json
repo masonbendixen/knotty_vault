@@ -61,7 +61,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Projects/Getting started with Obsidian.md",
+                "file": "Sources/Obsidian Help Properties.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -76,7 +76,271 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Getting started with Obsidian"
+              "title": "Obsidian Help Properties"
+            }
+          },
+          {
+            "id": "9f53fef6f0e112c2",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Obsidian Help Properties.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Obsidian Help Properties"
+            }
+          },
+          {
+            "id": "f0fc3a0cded9074f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Projects/Core Template Plugin Documentation.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Core Template Plugin Documentation"
+            }
+          },
+          {
+            "id": "1dcfd498ecca494a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Projects/Core Template Plugin Documentation.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Core Template Plugin Documentation"
+            }
+          },
+          {
+            "id": "f423ca5e6068a8cd",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Projects/Core Template Plugin Documentation.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Core Template Plugin Documentation"
+            }
+          },
+          {
+            "id": "f7bfcd0d6ae60fd0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Dataview Plugin.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Dataview Plugin"
+            }
+          },
+          {
+            "id": "07c034470f4d12c4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Supercharge your Obsidian Daily Notes.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Supercharge your Obsidian Daily Notes"
+            }
+          },
+          {
+            "id": "3428b1bfcdb32597",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Quickly Organize Notes in Obsidian.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Quickly Organize Notes in Obsidian"
+            }
+          },
+          {
+            "id": "fc0942683118d42f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Dataview Query Builder.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Dataview Query Builder"
+            }
+          },
+          {
+            "id": "eb21bf62f971e8be",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Obsidian Example Vault for Dataview Queries.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Obsidian Example Vault for Dataview Queries"
+            }
+          },
+          {
+            "id": "377bf6dcea474087",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Editing Dataview Tables with the Metadata Menu plugin.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Editing Dataview Tables with the Metadata Menu plugin"
+            }
+          },
+          {
+            "id": "a4f3d975102d6b3e",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Creating a Today View in Obsidian.md",
+                "mode": "source",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Creating a Today View in Obsidian"
             }
           },
           {
@@ -133,7 +397,31 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Sources/Dataview Plugin.md",
+                "file": "Projects/Getting started with Obsidian.md",
+                "mode": "source",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Getting started with Obsidian"
+            }
+          },
+          {
+            "id": "13ab2707cd0b1792",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Obsidian tasks.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -148,11 +436,107 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Dataview Plugin"
+              "title": "Obsidian tasks"
+            }
+          },
+          {
+            "id": "58809ab5ff2bbeec",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/How to Manage Tasks in Obsidian-The Complete Guide.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "How to Manage Tasks in Obsidian-The Complete Guide"
+            }
+          },
+          {
+            "id": "05dd66c4c2de84b0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Projects/Getting started with Obsidian.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Getting started with Obsidian"
+            }
+          },
+          {
+            "id": "9ecfc40b93a54939",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Obsidian Templater Snippets I Wish I Knew Sooner.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Obsidian Templater Snippets I Wish I Knew Sooner"
+            }
+          },
+          {
+            "id": "88c03032526240fd",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sources/Templater Github Page.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Templater Github Page"
             }
           }
         ],
-        "currentTab": 5
+        "currentTab": 21
       },
       {
         "id": "a203d79e4a5faf42",
@@ -343,29 +727,34 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "d2c004d397a19b13",
+  "active": "88c03032526240fd",
   "lastOpenFiles": [
+    "Sources/Obsidian Templater Snippets I Wish I Knew Sooner.md",
+    "Sources/Templater Github Page.md",
     "Projects/Getting started with Obsidian.md",
+    "Sources/Five Pro Tips for Obsidian Properties.md",
+    "Templates/Documentation.md",
+    "Templates/Research.md",
+    "Sources/Obsidian Help Properties.md",
+    "Projects/Core Template Plugin Documentation.md",
+    "Sources/Obsidian Help Templates.md",
+    "Projects/Dataview documentation.md",
     "Sources/Dataview Plugin.md",
-    "Sources/Maps of Content.md",
+    "Sources/Dataview Plugin Documentation.md",
     "Projects/My Obsidian Vault Setup.md",
+    "Sources/Supercharge your Obsidian Daily Notes.md",
+    "Sources/Quickly Organize Notes in Obsidian.md",
+    "Sources/Dataview Query Builder.md",
+    "Sources/Obsidian Example Vault for Dataview Queries.md",
+    "Sources/Editing Dataview Tables with the Metadata Menu plugin.md",
+    "Sources/Creating a Today View in Obsidian.md",
+    "Sources/How to Manage Tasks in Obsidian-The Complete Guide.md",
+    "Sources/Obsidian tasks.md",
+    "Sources/Maps of Content.md",
+    "Class/Project.md",
     "Templates/Source.md",
     "Templates/Implementation.md",
     "Templates/Event.md",
-    "Templates/Documentation.md",
-    "Projects/My documentation.md",
-    "Templates/Research.md",
-    "Sources/My new source.md",
-    "Projects/My event.md",
-    "Projects/My implementation.md",
-    "Sources/My source.md",
-    "Projects/My research.md",
-    "Projects/My planning.md",
-    "Projects/My Event.md",
-    "My documentation.md",
-    "Templates/Planning.md",
-    "Class/Project.md",
-    "Welcome.md",
     "Projects",
     "Sources/Images",
     "Sources",
