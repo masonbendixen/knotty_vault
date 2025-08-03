@@ -517,7 +517,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Sources/Templater Github Page.md",
+                "file": "Dashboard.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -532,7 +532,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Templater Github Page"
+              "title": "Dashboard"
             }
           }
         ],
@@ -729,8 +729,13 @@
   },
   "active": "88c03032526240fd",
   "lastOpenFiles": [
-    "Sources/Obsidian Templater Snippets I Wish I Knew Sooner.md",
+    "Sources/My new source.md",
+    "Dashboard.md",
+    "Sources/Dataview Plugin.md",
+    "Sources/Dataview Plugin Documentation.md",
+    "Projects/Dataview documentation.md",
     "Sources/Templater Github Page.md",
+    "Sources/Obsidian Templater Snippets I Wish I Knew Sooner.md",
     "Projects/Getting started with Obsidian.md",
     "Sources/Five Pro Tips for Obsidian Properties.md",
     "Templates/Documentation.md",
@@ -738,9 +743,6 @@
     "Sources/Obsidian Help Properties.md",
     "Projects/Core Template Plugin Documentation.md",
     "Sources/Obsidian Help Templates.md",
-    "Projects/Dataview documentation.md",
-    "Sources/Dataview Plugin.md",
-    "Sources/Dataview Plugin Documentation.md",
     "Projects/My Obsidian Vault Setup.md",
     "Sources/Supercharge your Obsidian Daily Notes.md",
     "Sources/Quickly Organize Notes in Obsidian.md",
@@ -753,8 +755,6 @@
     "Sources/Maps of Content.md",
     "Class/Project.md",
     "Templates/Source.md",
-    "Templates/Implementation.md",
-    "Templates/Event.md",
     "Projects",
     "Sources/Images",
     "Sources",
