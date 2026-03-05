@@ -199,9 +199,33 @@
               "icon": "lucide-file",
               "title": "Adding an instructor page with photos"
             }
+          },
+          {
+            "id": "e04e51e2a3e518b5",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Prework for adding classes.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Prework for adding classes"
+            }
           }
         ],
-        "currentTab": 7
+        "currentTab": 8
       },
       {
         "id": "b93333724901e982",
@@ -528,10 +552,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "d511b19f12319089",
+  "active": "e04e51e2a3e518b5",
   "lastOpenFiles": [
-    "Projects/Work for Tyler.md",
     "Claude/Adding an instructor page with photos.md",
+    "Claude/Prework for adding classes.md",
+    "Projects/Work for Tyler.md",
     "Dashboard.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Payment Design Document.md",
@@ -560,7 +585,6 @@
     "Projects/Untitled.base",
     "Projects/Payment Support.md",
     "Projects/Using Claude Code in my project.md",
-    "Claude/Convert database ids from SERIAL to BIGSERIAL and in C++ from int to int64_t.md",
     "Claude/~$rchase creation with server-side pricing.docx",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Product browsing and quoting endpoints.md.tmp.41476.1770328435854",
