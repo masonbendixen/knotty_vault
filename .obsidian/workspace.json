@@ -158,54 +158,6 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Projects/Work for Tyler.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Work for Tyler"
-            }
-          },
-          {
-            "id": "d511b19f12319089",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Adding an instructor page with photos.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Adding an instructor page with photos"
-            }
-          },
-          {
-            "id": "e04e51e2a3e518b5",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
                 "file": "Claude/Adding an instructor page with photos.md",
                 "mode": "source",
                 "source": false,
@@ -225,7 +177,7 @@
             }
           }
         ],
-        "currentTab": 8
+        "currentTab": 6
       },
       {
         "id": "b93333724901e982",
@@ -278,30 +230,6 @@
               },
               "icon": "lucide-file",
               "title": "Payment Support"
-            }
-          },
-          {
-            "id": "b714f0f63af99c9f",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Purchase creation with server-side pricing.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Purchase creation with server-side pricing"
             }
           },
           {
@@ -552,43 +480,43 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e04e51e2a3e518b5",
+  "active": "f84b220f22b460a0",
   "lastOpenFiles": [
     "Projects/Work for Tyler.md",
     "Dashboard.md",
-    "Claude/Prework for adding classes.md",
-    "Claude/Adding an instructor page with photos.md",
-    "Claude/Subscriptions- Recurring billing and card management.md",
-    "Claude/Payment Design Document.md",
-    "Claude/Scheduling thin slice.md",
-    "Claude/Dashboard cleanup work items.md",
-    "Claude/Nested item implementation.md",
-    "Claude/Recurring billing and card management.md",
-    "Claude/Support for scheduled purchases.md",
-    "Claude/Square credentials and Sandbox setup.md",
-    "Claude/Product browsing and quoting endpoints.md",
-    "Claude/Purchase creation with server-side pricing.md",
-    "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
-    "Claude/Payment base table helpers.md",
-    "Claude/Server codebase refactor.md",
-    "Projects/Completing Core Functionality.md",
-    "Claude/Scheduling thin slice.md.tmp.45848.1772486171105",
-    "Projects/Nested item support.md",
-    "Claude/Payment base SQL Tables.md",
-    "Claude/Adding support for images.md",
-    "Projects/Image support.md",
-    "Projects/Dashboard cleanup.md",
+    "Templates/Claude.md",
+    "Sources/mailio.md",
+    "Sources/libsodium.md",
+    "Sources/Images/register.component.html",
+    "Sources/Images",
+    "Projects/Wiring up client and server.md",
+    "Projects/Using Claude Code.md",
+    "Projects/Using Claude Code in my project.md",
     "Projects/Rich create, edit, view support for items.md",
+    "Projects/Payment Support.md",
+    "Projects/Pagination support.md",
+    "Projects/Nested item support.md",
+    "Projects/Image support.md",
+    "Projects/HTTPS Support.md",
+    "Projects/Error handling for the server.md",
+    "Projects/Dashboard cleanup.md",
+    "Projects/Completing Core Functionality.md",
+    "Projects/Client Side Authentication and Security.md",
+    "Projects/Authentication, security.md",
+    "Claude/Support for scheduled purchases.md",
+    "Claude/Subscriptions- Recurring billing and card management.md",
+    "Claude/Square credentials and Sandbox setup.md",
+    "Claude/Server codebase refactor.md",
+    "Claude/Scheduling thin slice.md",
+    "Claude/Purchase creation with server-side pricing.md",
+    "Claude/Purchase creation with server-side pricing.docx",
+    "Claude/Product browsing and quoting endpoints.md",
+    "Claude/Payment Design Document.docx",
+    "Claude/md_to_docx.py",
+    "Claude",
+    "Claude/Scheduling thin slice.md.tmp.45848.1772486171105",
     "Projects/Untitled 3.base",
     "Projects/Untitled 2.base",
-    "Projects/Untitled 1.base",
-    "Projects/Untitled.base",
-    "Projects/Payment Support.md",
-    "Projects/Using Claude Code in my project.md",
-    "Claude/~$rchase creation with server-side pricing.docx",
-    "Claude/Purchase creation with server-side pricing.docx",
-    "Claude/Product browsing and quoting endpoints.md.tmp.41476.1770328435854",
-    "Claude/~$yment Design Document.docx",
-    "Claude/md_to_docx.py"
+    "Projects/Untitled 1.base"
   ]
 }
