@@ -124,25 +124,25 @@ Please use the codebase and this document to generate your plan. Please create p
 ## Phase 4: Endpoint Layer
 
 ### 4.1 Create the `get_instructors` endpoint
-- [ ] Create `server/knottyyoga_server/src/endpoints/get_instructors.h`
+- [x] Create `server/knottyyoga_server/src/endpoints/get_instructors.h`
   - Declare `Json::Value GetInstructors(EndpointAuthHelper&, const crow::request&, crow::response&)`
-- [ ] Create `server/knottyyoga_server/src/endpoints/get_instructors.cpp`
+- [x] Create `server/knottyyoga_server/src/endpoints/get_instructors.cpp`
   - Route: `GET /api/get_instructors`
   - No auth required (public endpoint)
   - Calls `InstructorHelper::GetInstructorsForPublicDisplay()`
   - Converts to JSON via `InstructorInfoToKeyValueTable` → `SqlUtil::KeyValueTableToJson`
   - Returns `{ "items": [ { instructor_id, person_id, first_name, last_name, bio, has_photo }, ... ] }`
-- [ ] Register in `web_app.cpp`:
+- [x] Register in `web_app.cpp`:
   - Add `#include "get_instructors.h"`
   - Add `auto g_GetInstructors = &Endpoints::GetInstructors;`
-- [ ] Add `.h` and `.cpp` to `endpoints/CMakeLists.txt`
+- [x] Add `.h` and `.cpp` to `endpoints/CMakeLists.txt`
 
 ### 4.2 Create endpoint tests
-- [ ] Create `server/knottyyoga_server/src/endpoints/get_instructors_test.cpp`
+- [x] Create `server/knottyyoga_server/src/endpoints/get_instructors_test.cpp`
   - Test: returns empty array when no instructors
   - Test: returns instructors with name and bio data
   - Test: has_photo flag is correct
-- [ ] Add test file to test `CMakeLists.txt`
+- [x] Add test file to test `CMakeLists.txt`
 
 ---
 
