@@ -19,6 +19,7 @@ Status: Active
 	- You can use this as an example of how to do your Claude prompting by looking at the overview.
 - Adding classes
 	- [[Prework for adding classes]]
+		- This is done
 
 # Tasks
 - List of tasks here with status

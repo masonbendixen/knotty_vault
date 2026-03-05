@@ -158,7 +158,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Prework for adding classes.md",
+                "file": "Projects/Work for Tyler.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,7 +173,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Prework for adding classes"
+              "title": "Work for Tyler"
             }
           }
         ],
@@ -482,6 +482,7 @@
   },
   "active": "f84b220f22b460a0",
   "lastOpenFiles": [
+    "Claude/Prework for adding classes.md",
     "Projects/Work for Tyler.md",
     "Dashboard.md",
     "Claude/Adding an instructor page with photos.md",
@@ -509,7 +510,6 @@
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Server codebase refactor.md",
-    "Claude/Scheduling thin slice.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
