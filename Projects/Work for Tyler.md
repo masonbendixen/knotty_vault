@@ -8,7 +8,8 @@ Status: Active
 
 
 # Running the system
-- After database schema changes, you must close the server and build/run knottyyoga_database_helper.exe. This rese
+- After database schema changes, you must close the server and build/run knottyyoga_database_helper.exe. This resets the database to a known state.
+- 
 # What I'm working on with status
 - List of things that I'm working on
 
