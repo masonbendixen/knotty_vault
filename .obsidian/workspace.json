@@ -482,6 +482,8 @@
   },
   "active": "f84b220f22b460a0",
   "lastOpenFiles": [
+    "Class/Project.md",
+    "Claude/Adding an instructor page with photos.md",
     "Projects/Work for Tyler.md",
     "Dashboard.md",
     "Templates/Claude.md",
@@ -508,9 +510,7 @@
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Server codebase refactor.md",
     "Claude/Scheduling thin slice.md",
-    "Claude/Purchase creation with server-side pricing.md",
     "Claude/Purchase creation with server-side pricing.docx",
-    "Claude/Product browsing and quoting endpoints.md",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
     "Claude",
