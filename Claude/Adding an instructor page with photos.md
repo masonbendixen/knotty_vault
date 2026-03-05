@@ -185,14 +185,14 @@ Please use the codebase and this document to generate your plan. Please create p
 ## Phase 6: Frontend — Instructors Page Component
 
 ### 6.1 Create the Instructors component
-- [ ] Create directory `ui/src/app/pages/public/instructors/`
-- [ ] Create `instructors.component.ts`:
+- [x] Create directory `ui/src/app/pages/public/instructors/`
+- [x] Create `instructors.component.ts`:
   - Standalone component importing `SharedModule`, `CommonModule`
   - Inject `ServerAccess` via `SERVER_ACCESS_TOKEN`
   - On init, call `getInstructors()` and store result
   - Build photo URLs: `/api/get_scaled_photo/instructors/{instructor_id}/256/256`
   - Fallback for instructors without photos (generic avatar/placeholder)
-- [ ] Create `instructors.component.html`:
+- [x] Create `instructors.component.html`:
   - Page title: "Instructors"
   - For each instructor, a card with:
     - Photo on the left (256x256), using the scaled photo endpoint
@@ -200,18 +200,18 @@ Please use the codebase and this document to generate your plan. Please create p
     - Bio below the name in normal text
     - Use `innerHTML` binding for bio since it's HTML content (`long-text-html` control)
   - Responsive layout: cards stack on mobile
-- [ ] Create `instructors.component.scss`:
+- [x] Create `instructors.component.scss`:
   - Card border styling (per project convention: `border: 1px solid #d1d5db`)
   - Photo sizing and spacing
   - Responsive breakpoints
 
 ### 6.2 Register the route
-- [ ] Update `ui/src/app/pages/public/public.routes.ts`:
+- [x] Update `ui/src/app/pages/public/public.routes.ts`:
   - Add import for `InstructorsComponent`
   - Add route: `{ path: 'instructors', component: InstructorsComponent }`
 
 ### 6.3 Add to the About dropdown in navigation
-- [ ] Update `ui/src/app/shared/services/header/mockHeaderResponse.ts`:
+- [x] Update `ui/src/app/shared/services/header/mockHeaderResponse.ts`:
   - Add to the `aboutDropdown.menu` array:
     ```typescript
     {
@@ -222,7 +222,7 @@ Please use the codebase and this document to generate your plan. Please create p
     ```
 
 ### 6.4 Update the mobile menu
-- [ ] Check `header-mobile-menu.component.html` — the mobile menu likely uses the same `headerData.menu` structure, so the About dropdown addition should automatically appear. Verify and adjust if needed.
+- [x] Check `header-mobile-menu.component.html` — the mobile menu uses the same `headerData.menu` structure, so the About dropdown addition automatically appears in both desktop and mobile.
 
 ---
 
