@@ -3,5 +3,6 @@
   "theme": "obsidian",
   "enabledCssSnippets": [
     "mermaid-fit"
-  ]
+  ],
+  "nativeMenus": false
 }
