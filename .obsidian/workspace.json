@@ -4,17 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "bf3535de9dd94aba",
+        "id": "a387adff22a2710e",
         "type": "tabs",
-        "dimension": 50.27075812274368,
         "children": [
           {
-            "id": "9fa48f51b38b8dfa",
+            "id": "4a799f325e1da2f5",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Projects/Rich create, edit, view support for items.md",
+                "file": "Projects/Completing Core Functionality.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -29,11 +28,11 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Rich create, edit, view support for items"
+              "title": "Completing Core Functionality"
             }
           },
           {
-            "id": "edc9304285f71387",
+            "id": "3f0814fbf7a03bd6",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -55,269 +54,9 @@
               "icon": "lucide-file",
               "title": "Image support"
             }
-          },
-          {
-            "id": "6cbfbc7a88ade4b2",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Nested item implementation.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Nested item implementation"
-            }
-          },
-          {
-            "id": "074ce5ec0cbf99e8",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Support for scheduled purchases.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Support for scheduled purchases"
-            }
-          },
-          {
-            "id": "2550e3882c3c9a72",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Payment Design Document.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Design Document"
-            }
-          },
-          {
-            "id": "116e1292b5ad2e52",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Subscriptions- Recurring billing and card management.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Subscriptions- Recurring billing and card management"
-            }
           }
         ],
-        "currentTab": 5
-      },
-      {
-        "id": "b93333724901e982",
-        "type": "tabs",
-        "dimension": 49.72924187725632,
-        "children": [
-          {
-            "id": "339f41db73b280f2",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Payment Support.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Support"
-            }
-          },
-          {
-            "id": "4a17c008a0296d55",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Payment Support.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Support"
-            }
-          },
-          {
-            "id": "b714f0f63af99c9f",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Purchase creation with server-side pricing.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Purchase creation with server-side pricing"
-            }
-          },
-          {
-            "id": "039b98639b8dadcd",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Class/Project.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Project"
-            }
-          },
-          {
-            "id": "4087922054d12d43",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Authentication, security.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Authentication, security"
-            }
-          },
-          {
-            "id": "6e60df995e31980a",
-            "type": "leaf",
-            "state": {
-              "type": "release-notes",
-              "state": {
-                "currentVersion": "1.9.14"
-              },
-              "icon": "lucide-book-up",
-              "title": "Release Notes 1.9.14"
-            }
-          },
-          {
-            "id": "15404aeb66fd9a33",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Sources/mailio.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "mailio"
-            }
-          }
-        ],
-        "currentTab": 2
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -470,6 +209,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "obsidian-git:Open Git source control": false,
       "bases:Create new base": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
@@ -479,43 +219,43 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "116e1292b5ad2e52",
+  "active": "3f0814fbf7a03bd6",
   "lastOpenFiles": [
-    "Claude/Payment Design Document.md",
+    "Projects/Completing Core Functionality.md",
+    "Projects/Image support.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
-    "Claude/Scheduling thin slice.md",
-    "Claude/Dashboard cleanup work items.md",
-    "Claude/Nested item implementation.md",
-    "Claude/Recurring billing and card management.md",
+    "Projects/Using Claude Code in my project.md",
+    "Templates/Documentation.md",
+    "Projects/Getting started with Obsidian.md",
+    "Templates/Claude.md",
+    "Sources/mailio.md",
+    "Sources/libsodium.md",
+    "Sources/Images/register.component.html",
+    "Sources/Images",
+    "Projects/Wiring up client and server.md",
     "Claude/Support for scheduled purchases.md",
     "Claude/Square credentials and Sandbox setup.md",
-    "Claude/Product browsing and quoting endpoints.md",
-    "Claude/Purchase creation with server-side pricing.md",
-    "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
-    "Claude/Payment base table helpers.md",
     "Claude/Server codebase refactor.md",
-    "Projects/Completing Core Functionality.md",
-    "Dashboard.md",
-    "Claude/Scheduling thin slice.md.tmp.45848.1772486171105",
-    "Projects/Nested item support.md",
+    "Claude/Scheduling thin slice.md",
+    "Claude/Purchase creation with server-side pricing.md",
+    "Claude/Purchase creation with server-side pricing.docx",
+    "Claude/Product browsing and quoting endpoints.md",
+    "Claude/Payment Design Document.docx",
+    "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
+    "Claude/Payment Design Document.md",
+    "Claude/Payment base table helpers.md",
     "Claude/Payment base SQL Tables.md",
-    "Claude/Adding support for images.md",
-    "Projects/Image support.md",
-    "Projects/Dashboard cleanup.md",
-    "Projects/Rich create, edit, view support for items.md",
-    "Projects/Untitled 3.base",
-    "Projects/Untitled 2.base",
-    "Projects/Untitled 1.base",
-    "Projects/Untitled.base",
-    "Projects/Payment Support.md",
-    "Projects/Using Claude Code in my project.md",
+    "Claude/Nested item implementation.md",
+    "Claude/md_to_docx.py",
+    "Claude/JSON Error Response Handling.md",
+    "Claude/HTTPS Strategy.md",
     "Claude/Convert database ids from SERIAL to BIGSERIAL and in C++ from int to int64_t.md",
     "Claude/Customer user scenarios.md",
-    "Projects/Wiring up client and server.md",
-    "Claude/~$rchase creation with server-side pricing.docx",
-    "Claude/Purchase creation with server-side pricing.docx",
-    "Claude/Product browsing and quoting endpoints.md.tmp.41476.1770328435854",
-    "Claude/~$yment Design Document.docx",
-    "Claude/md_to_docx.py"
+    "Claude/Dashboard cleanup work items.md",
+    "Claude",
+    "Projects",
+    "Sources",
+    "Templates",
+    "Class"
   ]
 }
