@@ -89,7 +89,7 @@ Please use the codebase and this document to generate your plan. Please create p
 ## Phase 3: Business Logic Layer
 
 ### 3.1 Create instructor helper in `business_logic/auth/`
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper.h`
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper.h`
   - Struct `InstructorInfo`:
     - `int64_t instructorId`
     - `int64_t personId`
@@ -100,24 +100,24 @@ Please use the codebase and this document to generate your plan. Please create p
   - Class `InstructorHelper`:
     - Constructor taking `DatabaseHelper`
     - `std::vector<InstructorInfo> GetInstructorsForPublicDisplay(Transaction&)` — joins instructors + people to get names, checks photo existence
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper.cpp`
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper.cpp`
   - Implementation: query all instructors, for each one look up the person row for first/last name, check `ImageHelper::HasPhoto` for the instructors table
-- [ ] Add both files to `business_logic/auth/CMakeLists.txt`
+- [x] Add both files to `business_logic/auth/CMakeLists.txt`
 
 ### 3.2 Create instructor key-value table conversion
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table.h`
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table.h`
   - `KeyValueTable InstructorInfoToKeyValueTable(const InstructorInfo&)`
   - `std::vector<KeyValueTable> InstructorInfosToKeyValueTableArray(const std::vector<InstructorInfo>&)`
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table.cpp`
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table.cpp`
   - Maps fields: `instructor_id`, `person_id`, `first_name`, `last_name`, `bio`, `has_photo`
-- [ ] Add both files to `business_logic/auth/CMakeLists.txt`
+- [x] Add both files to `business_logic/auth/CMakeLists.txt`
 
 ### 3.3 Create tests
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper_test.cpp`
-  - Test GetInstructorsForPublicDisplay with instructors that have/don't have photos
-- [ ] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table_test.cpp`
-  - Test InstructorInfoToKeyValueTable conversion
-- [ ] Add test files to test `CMakeLists.txt`
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_helper_test.cpp`
+  - Tests: empty, basic (single instructor with name/bio/no photo), multiple instructors, empty bio
+- [x] Create `server/knottyyoga_server/src/business_logic/auth/instructor_key_value_table_test.cpp`
+  - Tests: basic conversion, no-photo flag, array conversion, empty array
+- [x] Add test files to `business_logic/auth/CMakeLists.txt`
 
 ---
 
