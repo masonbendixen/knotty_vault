@@ -149,7 +149,7 @@ Please use the codebase and this document to generate your plan. Please create p
 ## Phase 5: Frontend — Types and Network Layer
 
 ### 5.1 Add instructor types
-- [ ] Create `ui/src/app/shared/types/instructor.types.ts`
+- [x] Create `ui/src/app/shared/types/instructor.types.ts`
   ```typescript
   export interface Instructor {
     instructor_id: number;
@@ -162,22 +162,22 @@ Please use the codebase and this document to generate your plan. Please create p
   ```
 
 ### 5.2 Add `getInstructors()` to the ServerAccess interface
-- [ ] Update `ui/src/app/shared/types/ServerAccess.ts`:
+- [x] Update `ui/src/app/shared/types/ServerAccess.ts`:
   - Add import for `Instructor`
   - Add method: `getInstructors(): Observable<Instructor[]>`
   - Add re-export for `Instructor` type
 
 ### 5.3 Implement in ServerAccessNetwork
-- [ ] Update `ui/src/app/shared/services/network/ServerAccessNetwork.ts`:
+- [x] Update `ui/src/app/shared/services/network/ServerAccessNetwork.ts`:
   - Add `getInstructors(): Observable<Instructor[]>` — `GET /api/get_instructors`, maps `response.items`
 
 ### 5.4 Implement in ServerAccessMock
-- [ ] Update `ui/src/app/shared/services/network/ServerAccess.mock.ts`:
+- [x] Update `ui/src/app/shared/services/network/ServerAccess.mock.ts`:
   - Add mock instructor data (a couple of sample instructors)
   - Implement `getInstructors()` returning the mock data
 
 ### 5.5 Update ServerAccessProxy
-- [ ] Update `ui/src/app/shared/services/network/ServerAccess.ts`:
+- [x] Update `ui/src/app/shared/services/network/ServerAccess.ts`:
   - Add `getInstructors()` delegation to implementation
 
 ---
