@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Templates/Documentation.md",
+                "file": "Claude/Subscriptions- Recurring billing and card management.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -28,7 +28,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Documentation"
+              "title": "Subscriptions- Recurring billing and card management"
             }
           }
         ]
@@ -184,6 +184,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "obsidian-git:Open Git source control": false,
       "bases:Create new base": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
@@ -195,6 +196,8 @@
   },
   "active": "4a799f325e1da2f5",
   "lastOpenFiles": [
+    "Projects/Using Claude Code in my project.md",
+    "Templates/Documentation.md",
     "Projects/Getting started with Obsidian.md",
     "Templates/Claude.md",
     "Sources/mailio.md",
@@ -225,8 +228,6 @@
     "Claude/Adding support for images.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Claude",
-    "Sources/Obsidian tasks.md",
-    "Sources/How to Manage Tasks in Obsidian-The Complete Guide.md",
     "Projects",
     "Sources",
     "Templates",
