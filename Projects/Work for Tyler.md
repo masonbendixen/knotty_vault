@@ -16,6 +16,7 @@ Status: Active
 # What I'm working on with status
 - Adding an Instructors page with name, bio, and a picture
 	- [[Adding an instructor page with photos]]
+	- You can use this as an example of how to do your Claude prompting by looking at the overview.
 - Adding classes
 	- [[Prework for adding classes]]
 

@@ -158,7 +158,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Adding an instructor page with photos.md",
+                "file": "Claude/Prework for adding classes.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,7 +173,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Adding an instructor page with photos"
+              "title": "Prework for adding classes"
             }
           }
         ],
@@ -482,10 +482,10 @@
   },
   "active": "f84b220f22b460a0",
   "lastOpenFiles": [
-    "Class/Project.md",
-    "Claude/Adding an instructor page with photos.md",
     "Projects/Work for Tyler.md",
     "Dashboard.md",
+    "Claude/Adding an instructor page with photos.md",
+    "Class/Project.md",
     "Templates/Claude.md",
     "Sources/mailio.md",
     "Sources/libsodium.md",
