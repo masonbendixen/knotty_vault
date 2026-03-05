@@ -15,6 +15,8 @@ We need to add instructors to the system with photo support. We need to create a
 
 We need a public endpoint to enumerate the instructors with first name, last name, and an id for the photo to be able to request a scaled photo. This should be callable to all users and called get_instructors.
 
-I want to add Instructors to the About dropdown in the main menu. It should bring up a page that says Instructors and then has a set of cards for each instructor with a decent sized photo to the left (maybe )
+I want to add Instructors to the About dropdown in the main menu. It should bring up a page that says Instructors and then has a set of cards for each instructor with a decent sized photo to the left (maybe 256x256 pixels), their full name in larger print, and then their bio below their name with normal text.
+
+Please use the codebase and this document to generate your plan. Please create phases of implementation with check boxes next to them. Please do the layered architecture with database schema changes, CRUD table helpers, business logic changes (this could probably be added to PersonHelper), the endpoint. Then the client stuff with the types, network access layer, components, and then wiring into the system.
 
 # Add plan here
