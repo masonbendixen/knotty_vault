@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Subscriptions- Recurring billing and card management.md",
+                "file": "Projects/Completing Core Functionality.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -28,10 +28,35 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Subscriptions- Recurring billing and card management"
+              "title": "Completing Core Functionality"
+            }
+          },
+          {
+            "id": "3f0814fbf7a03bd6",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Projects/Image support.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Image support"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -194,8 +219,11 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "4a799f325e1da2f5",
+  "active": "3f0814fbf7a03bd6",
   "lastOpenFiles": [
+    "Projects/Completing Core Functionality.md",
+    "Projects/Image support.md",
+    "Claude/Subscriptions- Recurring billing and card management.md",
     "Projects/Using Claude Code in my project.md",
     "Templates/Documentation.md",
     "Projects/Getting started with Obsidian.md",
@@ -206,7 +234,6 @@
     "Sources/Images",
     "Projects/Wiring up client and server.md",
     "Claude/Support for scheduled purchases.md",
-    "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Server codebase refactor.md",
     "Claude/Scheduling thin slice.md",
@@ -225,8 +252,6 @@
     "Claude/Convert database ids from SERIAL to BIGSERIAL and in C++ from int to int64_t.md",
     "Claude/Customer user scenarios.md",
     "Claude/Dashboard cleanup work items.md",
-    "Claude/Adding support for images.md",
-    "Claude/Add unique constraint for multiple columns on table.md",
     "Claude",
     "Projects",
     "Sources",
