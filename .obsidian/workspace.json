@@ -175,9 +175,33 @@
               "icon": "lucide-file",
               "title": "Work for Tyler"
             }
+          },
+          {
+            "id": "0ba508ddd4f9b43f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Tyler Work Item - Adding Classes page.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Tyler Work Item - Adding Classes page"
+            }
           }
         ],
-        "currentTab": 6
+        "currentTab": 7
       },
       {
         "id": "b93333724901e982",
@@ -480,12 +504,13 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "f84b220f22b460a0",
+  "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
-    "Claude/Prework for adding classes.md",
     "Projects/Work for Tyler.md",
-    "Dashboard.md",
     "Claude/Adding an instructor page with photos.md",
+    "Claude/Tyler Work Item - Adding Classes page.md",
+    "Dashboard.md",
+    "Claude/Prework for adding classes.md",
     "Class/Project.md",
     "Templates/Claude.md",
     "Sources/mailio.md",
@@ -509,7 +534,6 @@
     "Claude/Support for scheduled purchases.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Square credentials and Sandbox setup.md",
-    "Claude/Server codebase refactor.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",

@@ -20,6 +20,6 @@ Status: Active
 - Adding classes
 	- [[Prework for adding classes]]
 		- This is done
-
+	- [[Tyler Work Item - Adding Classes page]]
 # Tasks
 - List of tasks here with status
