@@ -9,7 +9,7 @@ tags:
 ---
 # Overview
 
-What I'm trying to accomplish with this change.
+We are going to be adding classes as more of a first class entity to the system. 
 
 # Steps
 - List of steps to accomplish this task.

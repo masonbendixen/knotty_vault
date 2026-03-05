@@ -15,7 +15,9 @@ Status: Active
 - Browse the the URL
 # What I'm working on with status
 - Adding an Instructors page with name, bio, and a picture
-	- 
+	- [[Adding an instructor page with photos]]
+- Adding classes
+	- [[Prework for adding classes]]
 
 # Tasks
 - List of tasks here with status
