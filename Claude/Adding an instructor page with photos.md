@@ -228,8 +228,8 @@ Please use the codebase and this document to generate your plan. Please create p
 
 ## Phase 7: Testing and Polish
 
-- [ ] Run backend tests (`knottyyoga_tests`) to verify all new tests pass
-- [ ] Run frontend tests (`ng test`) to verify no regressions
+- [ ] Run backend tests (`knottyyoga_tests`) to verify all new tests pass (requires Docker/Linux build)
+- [x] Run frontend tests (`ng test`) to verify no regressions — 503/503 SUCCESS
 - [ ] Run `ng serve -c local` to verify the instructors page renders with mock data
 - [ ] Verify the admin console shows instructors as a nested table under people
 - [ ] Verify photo upload works for instructor rows in the admin console
