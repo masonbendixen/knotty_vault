@@ -1,7 +1,8 @@
 {
-  "cssTheme": "Minimal",
-  "theme": "moonstone",
+  "cssTheme": "",
+  "theme": "obsidian",
   "enabledCssSnippets": [
     "mermaid-fit"
-  ]
+  ],
+  "nativeMenus": false
 }
