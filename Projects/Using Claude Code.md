@@ -1,0 +1,100 @@
+---
+fileClass: Project
+Category: Research
+Status: Active
+---
+# Overview
+enter overview text here
+
+# Sources
+- Install Claude code
+	- npm install -g @anthropic-ai/claude-code
+- https://code.claude.com/docs
+- Claude code best practices
+	- https://www.anthropic.com/engineering/claude-code-best-practices
+- https://anthropic.skilljar.com/claude-code-in-action/
+	- Class to help ramp up
+- We want to use the Opus 4.5 model
+- There is a $17/mo plan but I probably need the $100 or $200 plan
+- /model lets you choose the model that should be Opus 4.5
+- /resume - resume a conversation
+- /review - review a PR
+- /rewind (checkpoint) - restore code or conversation to a previous point
+- /sandbox - what does this do?
+- /security-review does a security review of the pending changes
+- /stats shows Claude Code usage stats
+- /status show Claude Code status
+- /statusline - setup Claude Code's status line UI
+- /tasks - lists your background tasks
+- /allowed-tools - customize tool permissions
+- /config - turn on notifications
+- /terminal-setup - let's you use shift+enter to enter newlines
+- /theme - enable light or dark mode
+- SHIFT + TAB twice goes to plan mode
+- Keyboard shortcuts
+	- SHIFT+TAB to auto accept edits
+	- \# to create a memory
+		- This will get added to CLAUDE.md automatically
+	- @ to add a file/folder to context
+	- ! to enter bash mode
+	- ESC to cancel
+	- Double ESC to jump back in history, --resume to resume
+	- CTRL+r for verbose output
+	- /vibe
+- Claude SDK
+	- claude - p "What did I do this week?" --allowedTools Bash\(git log:\*\) -output-format json
+- Can use piping like:
+	- git status | claude -p "What are my changes?" --output-format=json | jq '.result'
+- There are plugins you can say
+	- https://github.com/anthropics/claude-code/tree/main/plugins
+	- /plugin marketplace add anthropics/claude-code
+	- /plugin install frontend-design@claude-code-plugins
+		- Improves the look and feel of front ends
+		- https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
+	- /plugin install explanatory-output-style@claude-code-plugins
+		- Gives insight about your code base. Can increase your cost
+	- /plugin install feature-dev@claude-code-plugins
+		- Does a seven stage process for doing new features
+		- https://github.com/anthropics/claude-code/tree/main/plugins/feature-dev
+	- /plugin install learning-output-style@claude-code-plugins
+		- Combines explanatory-output-style with additional insight
+		- Can be expensive but is interesting
+		- https://github.com/anthropics/claude-code/tree/main/plugins/learning-output-style
+	- /plugin install ralph-wiggum@claude-code-plugins
+		- https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum
+		- An ongoing AI loop to iteratively solve a problem
+- Can drag an image into the Claude terminal, copy paste, or give it a file path
+- Giving Claude more context
+	- \<enterprise root\>/CLAUDE.md - shared across all projects
+	- You can run these through the prompt improver to help make them better
+	- ~/.claude/CLAUDE.md - shared across all projects
+	- project-root/CLAUDE.md - checked in
+	- project-root/CLAUDE.local.md - Not checked in
+	- nested-directory/CLAUDE.md - Gives Claude context for this directory
+	- What you put in these files
+		- Style guide
+		- BASH commands
+		- Important files
+		- Keep it minimal
+	- project/.claude/commands/foo.md
+		- Can invoke with /project:foo to run this command
+		- project/a/commands/foo.md
+			- Can invoke with @a/foo.py (wouldn't need the extension for a md file)
+		- Look at the built in commands to see how to create them
+		- In your md file, you can put {{my_argument}} and then run them from the command line like claude my-command --my_argument "The argument". Can also do {{my_argument | "None specified"}}
+		- Can also do positional arguments like {{1}} {{2}} and do claude my-command "argument1" "argument2"
+	- ChatGPT will write this for me
+- Plan mode
+	- Creates a user-editable plan.md
+- Start with asking questions about your code
+	- Ask how things are used?
+	- Ask questions that get resolved from searching through the git history
+	- What changes did I make last week
+	- Have it brainstorm and make a plan
+	- Have it propose fixes
+	- You can tell Claude code how to use your tools
+	- You can give it a screenshot to guide it
+	- 
+
+# Things to investigate
+- List of things that need further investigation

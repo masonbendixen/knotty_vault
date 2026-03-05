@@ -65,3 +65,12 @@ WHERE Category = "Event"
 SORT file.mtime DESC
 LIMIT 10
 ```
+
+```dataview
+TABLE WITHOUT ID
+file.link AS Claude
+FROM "Claude"
+WHERE Category = "Claude"
+SORT file.mtime DESC
+LIMIT 10
+```

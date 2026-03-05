@@ -1,0 +1,59 @@
+<div
+   class="max-w-[420px] p-6 flex flex-col gap-8 mx-auto my-8 border border-gray-300 rounded-lg"
+>
+  <h1 class="text-center text-2xl">Create Account</h1>
+
+  <form [formGroup]="form" (ngSubmit)="onRegister()" class="flex flex-col gap-4">
+    <mat-form-field appearance="outline">
+      <mat-label>Email</mat-label>
+      <input id="email" matInput type="email" formControlName="email" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>First name</mat-label>
+      <input id="first_name" matInput type="text" formControlName="first_name" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Last name</mat-label>
+      <input id="last_name" matInput type="text" formControlName="last_name" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Password</mat-label>
+      <input id="password" matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password" />
+      <button type="button"
+              matSuffix
+              (click)="togglePasswordVisibility()"
+              class="mr-2">
+        <mat-icon>
+          {{
+    hidePassword ? "visibility_off" : "visibility"
+          }}
+        </mat-icon>
+      </button>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Reenter password</mat-label>
+      <input id="password2" matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password2" />
+      <button type="button"
+              matSuffix
+              (click)="togglePasswordVisibility()"
+              class="mr-2">
+        <mat-icon>
+          {{
+    hidePassword ? "visibility_off" : "visibility"
+          }}
+        </mat-icon>
+      </button>
+      <mat-error *ngIf="showPasswordMismatch()">
+        Passwords do not match.
+      </mat-error>
+    </mat-form-field>
+
+    <button id="Register" mat-raised-button color="primary" type="submit">
+      Register
+    </button>
+  </form>
+</div>

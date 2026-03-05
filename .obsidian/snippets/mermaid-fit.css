@@ -1,0 +1,15 @@
+/* Scale Mermaid diagrams to fit note width */
+.markdown-preview-view .mermaid svg,
+.markdown-source-view.mod-cm6 .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+/* Allow Mermaid to scale down, but scroll if truly too wide */
+.markdown-preview-view .mermaid {
+  overflow-x: auto;
+}
+
+.markdown-preview-view .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

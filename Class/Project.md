@@ -12,6 +12,7 @@ fields:
         "5": Implementation
         "6": Event
         "7": Source
+        "8": Claude
     path: ""
     id: c1rHRN
   - name: Status
@@ -26,6 +27,18 @@ fields:
         "5": Delayed
     path: ""
     id: AXChJl
-version: "2.3"
+version: "2.8"
 mapWithTag: true
+limit: 20
+icon: package
+tagNames:
+filesPaths:
+bookmarksGroups:
+excludes:
+extends:
+savedViews: []
+favoriteView:
+fieldsOrder:
+  - AXChJl
+  - c1rHRN
 ---
