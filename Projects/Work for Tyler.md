@@ -9,7 +9,10 @@ Status: Active
 
 # Running the system
 - After database schema changes, you must close the server and build/run knottyyoga_database_helper.exe. This resets the database to a known state.
-- Run the server, (note you don't need to run knottyy)
+- Run the server, (note you don't need to run knottyyoga_database_helper.exe unless the database schema has been updated or you want the content of the tables reset). You run knottyyoga_the_server.exe to run the server.
+- Run the client Angular server with:
+	- ng serve -c development
+- 
 # What I'm working on with status
 - List of things that I'm working on
 
