@@ -65,24 +65,24 @@ Please use the codebase and this document to generate your plan. Please create p
 ## Phase 2: Table Helpers (CRUD Layer)
 
 ### 2.1 Create the `instructors` table helper
-- [ ] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors.h`
+- [x] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors.h`
   - Class `Instructors` with constructor taking `DatabaseHelper`
   - Methods:
     - `int64_t AddInstructor(Transaction&, int64_t personId, std::string_view bio)` — returns new ID
     - `std::optional<KeyValueTable> GetInstructorById(Transaction&, int64_t id)`
     - `std::optional<KeyValueTable> GetInstructorByPersonId(Transaction&, int64_t personId)`
-    - `std::vector<KeyValueTable> GetAllInstructors(Transaction&)` — returns all rows
-    - `bool UpdateInstructorBio(Transaction&, int64_t id, std::string_view bio)`
-    - `bool DeleteInstructor(Transaction&, int64_t id)`
-- [ ] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors.cpp`
-  - Implement using `DbCrud::AddRowToTable`, `DbCrud::GetRowByColumnValue`, `DbCrud::GetTableRows`, `DbCrud::UpdateRow`, `DbCrud::DeleteRow` (following patterns from existing helpers like `permissions.cpp`)
-- [ ] Add both files to `sql_util/table_helpers/CMakeLists.txt`
+    - `KeyValueTableArray GetAllInstructors(Transaction&)` — returns all rows
+    - `void UpdateInstructorBio(Transaction&, int64_t id, std::string_view bio)`
+    - `void DeleteInstructor(Transaction&, int64_t id)`
+- [x] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors.cpp`
+  - Implement using `DbCrud::AddRowToTableFetchInt64PrimaryKey`, `DbCrud::LookupRowByValue`, `DbCrud::GetTableRows`, `DbCrud::UpdateRow`, `DbCrud::DeleteRow` (following patterns from existing helpers like `permissions.cpp`)
+- [x] Add both files to `sql_util/table_helpers/CMakeLists.txt`
 
 ### 2.2 Create tests for the table helper
-- [ ] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors_test.cpp`
+- [x] Create `server/knottyyoga_server/src/sql_util/table_helpers/instructors_test.cpp`
   - Tests for AddInstructor, GetInstructorById, GetInstructorByPersonId, GetAllInstructors, UpdateInstructorBio, DeleteInstructor
-  - Follow existing pattern: create stored procedures, admin_alerts, people table, then instructors table
-- [ ] Add test file to test `CMakeLists.txt`
+  - Follow existing pattern: use `testDb.MakeTestPeopleTable()` for FK dependency, then create instructors table
+- [x] Add test file to test `CMakeLists.txt`
 
 ---
 
