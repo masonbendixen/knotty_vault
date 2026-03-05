@@ -175,9 +175,33 @@
               "icon": "lucide-file",
               "title": "Work for Tyler"
             }
+          },
+          {
+            "id": "d511b19f12319089",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Adding an instructor page with photos.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Adding an instructor page with photos"
+            }
           }
         ],
-        "currentTab": 6
+        "currentTab": 7
       },
       {
         "id": "b93333724901e982",
@@ -504,10 +528,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "f84b220f22b460a0",
+  "active": "d511b19f12319089",
   "lastOpenFiles": [
-    "Dashboard.md",
     "Projects/Work for Tyler.md",
+    "Claude/Adding an instructor page with photos.md",
+    "Dashboard.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Payment Design Document.md",
     "Claude/Scheduling thin slice.md",
@@ -536,7 +561,6 @@
     "Projects/Payment Support.md",
     "Projects/Using Claude Code in my project.md",
     "Claude/Convert database ids from SERIAL to BIGSERIAL and in C++ from int to int64_t.md",
-    "Claude/Customer user scenarios.md",
     "Claude/~$rchase creation with server-side pricing.docx",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Product browsing and quoting endpoints.md.tmp.41476.1770328435854",

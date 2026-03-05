@@ -12,9 +12,10 @@ Status: Active
 - Run the server, (note you don't need to run knottyyoga_database_helper.exe unless the database schema has been updated or you want the content of the tables reset). You run knottyyoga_the_server.exe to run the server.
 - Run the client Angular server with:
 	- ng serve -c development
-- 
+- Browse the the URL
 # What I'm working on with status
-- List of things that I'm working on
+- Adding an Instructors page with name, bio, and a picture
+	- 
 
 # Tasks
 - List of tasks here with status
