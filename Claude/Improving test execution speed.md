@@ -339,6 +339,7 @@ Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort 
 |-----|-------------|-----------|----------------|--------|
 | 1 | Baseline — no optimizations | 643,287 | 10:43 | — |
 | 2 | Phase 1 — session-level PG tuning | 604,558 | 10:05 | -6.0% |
+| 3 | Phase 1+2 — UNLOGGED tables | 686,733 | 11:27 | +6.8% (regression) |
 
 ---
 
