@@ -269,13 +269,12 @@ I recommend a phased approach, starting with the easiest wins and building towar
 - [x] Verify these settings take effect (write a test that checks `SHOW synchronous_commit`)
 - [x] Measure before/after test suite timing
 
-## Phase 2: UNLOGGED Tables for Tests (Moderate Win)
-- [x] Add global `SetUnloggedMode(bool)` / `IsUnloggedMode()` to `DbOps` namespace in `db_and_table_operations.h/cpp`
-- [x] When unlogged mode is on, `GenerateCreateTableSql` generates `CREATE UNLOGGED TABLE` instead of `CREATE TABLE`
-- [x] Enable unlogged mode in `GlobalDatabaseTestSupport::InitializeInternal()` via `DbOps::SetUnloggedMode(true)`
-- [x] Update SQL-string-checking tests to save/restore unlogged mode, add `GenerateCreateTableSqlUnlogged` test
-- [ ] Verify all tests still pass with UNLOGGED tables
-- [ ] Measure before/after
+## Phase 2: UNLOGGED Tables for Tests — ABANDONED (Regression)
+- [x] Implemented and tested
+- [x] **Result: 686,733ms — a 6.8% regression from Phase 1 (604,558ms) and worse than baseline (643,287ms)**
+- [x] **Reverted all changes**
+
+**Lesson learned**: UNLOGGED tables skip WAL writes, but WAL isn't the bottleneck in our test workload. Since every test transaction is aborted (never committed), PostgreSQL already avoids most WAL flush overhead. The UNLOGGED designation likely adds its own bookkeeping cost that outweighs any WAL savings in an abort-only workload. This strategy would be more effective for committed transactions with real data persistence, not our create-and-abort pattern.
 
 ## Phase 3: Committed Table Setup at Startup (Big Win — Strategy 7)
 This is the highest-impact change: create all tables once in a committed transaction during `GlobalDatabaseTestSupport::Initialize()`, then let the per-test abort pattern clean up only data.
@@ -339,7 +338,7 @@ Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort 
 |-----|-------------|-----------|----------------|--------|
 | 1 | Baseline — no optimizations | 643,287 | 10:43 | — |
 | 2 | Phase 1 — session-level PG tuning | 604,558 | 10:05 | -6.0% |
-| 3 | Phase 1+2 — UNLOGGED tables | 686,733 | 11:27 | +6.8% (regression) |
+| 3 | Phase 1+2 — UNLOGGED tables | 686,733 | 11:27 | +6.8% (regression, reverted) |
 
 ---
 
