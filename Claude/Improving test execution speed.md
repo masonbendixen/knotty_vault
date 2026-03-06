@@ -259,8 +259,8 @@ void MakePaymentTables(Transaction& transaction, TestDatabaseUtil& testDb) {
 I recommend a phased approach, starting with the easiest wins and building toward the biggest gains. Each phase is independently valuable.
 
 ## Phase 1: Session-Level PostgreSQL Tuning (Easy Win)
-- [ ] Add performance-oriented `SET` commands after test database connection in `GlobalDatabaseTestSupport::InitializeInternal()`
-- [ ] Commands to add:
+- [x] Add performance-oriented `SET` commands after test database connection in `GlobalDatabaseTestSupport::InitializeInternal()`
+- [x] Commands to add:
   ```sql
   SET synchronous_commit = OFF;
   SET work_mem = '256MB';
@@ -330,6 +330,14 @@ Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort 
 5. **The `CREATE OR REPLACE FUNCTION` change**: PostgreSQL supports this natively for functions. The stored procedures (`now_us()` and `get_admin_alerts_in_window()`) can be changed from `CREATE FUNCTION` to `CREATE OR REPLACE FUNCTION` with no behavioral difference.
 
 6. **Backward compatibility**: All phases maintain backward compatibility — existing test code continues to work. Phase 3 specifically uses `IF NOT EXISTS` so that tests calling `MakePaymentTables` see no change in behavior, just faster execution.
+
+---
+
+# Execution Time Log
+
+| Run | Description | Time (ms) | Time (min:sec) | Change |
+|-----|-------------|-----------|----------------|--------|
+| 1 | Baseline — no optimizations | 643,287 | 10:43 | — |
 
 ---
 
