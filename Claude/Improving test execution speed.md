@@ -15,5 +15,4 @@ Going back to improving the execution speed of my tests, I was curious if there 
 
 Please use the codebase and this document to generate your plan. Please create phases of implementation with check boxes next to them.
 
-# Steps
-- List of steps to accomplish this task.
+# Place plan here
