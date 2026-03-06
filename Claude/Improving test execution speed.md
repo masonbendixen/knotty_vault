@@ -276,15 +276,50 @@ I recommend a phased approach, starting with the easiest wins and building towar
 
 **Lesson learned**: UNLOGGED tables skip WAL writes, but WAL isn't the bottleneck in our test workload. Since every test transaction is aborted (never committed), PostgreSQL already avoids most WAL flush overhead. The UNLOGGED designation likely adds its own bookkeeping cost that outweighs any WAL savings in an abort-only workload. This strategy would be more effective for committed transactions with real data persistence, not our create-and-abort pattern.
 
-## Phase 3: Committed Table Setup at Startup (Big Win — Strategy 7)
+## Phase 3: Migrate Custom Table Definitions (Prerequisite Cleanup)
+Tests with custom table definitions (using non-standard column names like `person_id` instead of `id`) won't benefit from pre-created tables in Phase 4. Migrating them now means more tests benefit from the big optimization later. Tests that intentionally need custom schemas (negative tests, DDL generation tests) stay as-is.
+
+### 3.1 Migrate `database_crud_helpers_test.cpp`
+- [ ] Replace custom `MakePeopleTable` (person_id, first_name, last_name, email) with `MakeTestPeopleTable` or standard `DbSchema::MakePeopleTable`
+- [ ] Replace custom `MakePeopleTableWithTimestamp` — standard people table already has `created_at`/`modified_at`
+- [ ] Replace custom `MakeOrdersTable` — use a standard table with FK to people (e.g., `purchases`) or rename the custom table to avoid collision (e.g., `test_orders`)
+- [ ] Update all assertions to use standard column names (`id` instead of `person_id`, etc.)
+- [ ] Verify all tests pass
+
+### 3.2 Migrate `database_metadata_test.cpp`
+- [ ] Replace custom `MakePeopleTable` and `MakeOrdersTable` with standard schemas or rename to non-colliding names (e.g., `test_people`, `test_orders`)
+- [ ] Update expected metadata values (column names, types, nullable flags) to match the standard or renamed schemas
+- [ ] Verify all tests pass
+
+### 3.3 Migrate `transaction_impl_test.cpp`
+- [ ] Replace custom `MakePeopleTable` and `MakeOrdersTable` with standard schemas or rename to non-colliding names
+- [ ] Update assertions for standard column names
+- [ ] Verify all tests pass
+
+### 3.4 Evaluate `database_util_test.cpp`
+- [ ] Review which tests can use standard `DbSchema::MakePeopleTable` vs. which are tightly coupled to custom schema
+- [ ] Migrate or rename where possible; leave custom where the meta-database tests require it
+- [ ] Verify all tests pass
+
+### 3.5 Leave intentionally custom (no changes needed)
+- `database_rest_helper_test.cpp` — negative test with intentionally malformed table (no PK)
+- `db_and_table_operations_test.cpp` — DDL generation tests that need precise control over table definitions
+
+### 3.6 Measure
+- [ ] Verify full test suite passes after all migrations
+- [ ] Measure before/after (migrations alone may not change timing, but they enable Phase 4 to cover more tests)
+
+---
+
+## Phase 4: Committed Table Setup at Startup (Big Win — Strategy 7)
 This is the highest-impact change: create all tables once in a committed transaction during `GlobalDatabaseTestSupport::Initialize()`, then let the per-test abort pattern clean up only data.
 
-### 3.1 Make DDL idempotent
+### 4.1 Make DDL idempotent
 - [ ] Change `GenerateCreateTableSql()` to support `IF NOT EXISTS` (add parameter or always use it in test mode)
 - [ ] Change stored procedure creation (`CreateNowUs`, `CreateGetAdminAlertsInWindow`) to use `CREATE OR REPLACE FUNCTION`
 - [ ] Verify existing tests still pass with `IF NOT EXISTS` / `CREATE OR REPLACE`
 
-### 3.2 Add committed setup transaction to GlobalDatabaseTestSupport
+### 4.2 Add committed setup transaction to GlobalDatabaseTestSupport
 - [ ] Add a new method `SetupAllTables()` to `GlobalDatabaseTestSupport` that:
   1. Opens a `pqxx::work` transaction (NOT aborted — will be committed)
   2. Calls `StoredProcedures::CreateStoredProceduresBeforeTables`
@@ -297,17 +332,17 @@ This is the highest-impact change: create all tables once in a committed transac
 - [ ] Call `SetupAllTables()` from `InitializeInternal()` after creating the database connection
 - [ ] Verify all tests pass (existing `MakePaymentTables` calls are harmless with `IF NOT EXISTS`)
 
-### 3.3 Measure and document improvement
+### 4.3 Measure and document improvement
 - [ ] Time full test suite before and after
 - [ ] Document the new test infrastructure pattern
 
-## Phase 4: Batch DDL Execution (Optional Polish)
+## Phase 5: Batch DDL Execution (Optional Polish)
 - [ ] Modify the startup `SetupAllTables()` to concatenate all DDL into a single SQL statement
 - [ ] Execute as one round-trip instead of 50+
 - [ ] This further reduces the one-time startup cost
 
-## Phase 5: Savepoint Pattern (Advanced — Optional)
-Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort pattern itself is slow.
+## Phase 6: Savepoint Pattern (Advanced — Optional)
+Only pursue this if Phase 4 doesn't provide sufficient speedup, or if the abort pattern itself is slow.
 
 - [ ] Investigate whether `pqxx::subtransaction` (wraps SAVEPOINT) works with the existing `TransactionImpl` abstraction
 - [ ] If viable, modify `DatabaseHelperTest::RunInTransaction` to use savepoints within a long-running transaction instead of creating/aborting full transactions
@@ -376,7 +411,7 @@ Several test files create their own versions of tables (especially `people` and 
 
 ## Recommendation
 
-For Phase 3 (committed table setup), these files should be handled as follows:
+For Phase 4 (committed table setup), these files should be handled as follows:
 - **Migrate where possible** (files 2, 3, 4): Rewrite to use standard `DbSchema` table definitions. This reduces the number of custom table creation calls and lets more tests benefit from pre-created tables.
 - **Leave custom where intentional** (files 5, 6): These tests are testing specific table configurations as part of their purpose.
 - **Evaluate case-by-case** (file 1): Some tests in database_util_test could migrate, others are tightly coupled to the custom schema.
