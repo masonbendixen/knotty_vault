@@ -330,3 +330,83 @@ Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort 
 5. **The `CREATE OR REPLACE FUNCTION` change**: PostgreSQL supports this natively for functions. The stored procedures (`now_us()` and `get_admin_alerts_in_window()`) can be changed from `CREATE FUNCTION` to `CREATE OR REPLACE FUNCTION` with no behavioral difference.
 
 6. **Backward compatibility**: All phases maintain backward compatibility — existing test code continues to work. Phase 3 specifically uses `IF NOT EXISTS` so that tests calling `MakePaymentTables` see no change in behavior, just faster execution.
+
+---
+
+# Tests with Custom Table Definitions
+
+Several test files create their own versions of tables (especially `people` and `orders`) with non-standard columns, rather than using the standard `DbSchema::MakePeopleTable` definitions. These were written before the standard table definitions were established and many could likely be migrated. This matters because a "create all standard tables once at startup" strategy won't cover these custom tables — they need separate handling or migration.
+
+## Files with Custom Table Definitions
+
+### 1. `sql_util/database_access/database_util_test.cpp`
+- **Custom `MakePeopleTable`**: Uses `person_id` as column name (instead of standard `id`), no timestamp columns, no stored procedures. A simplified version for testing low-level database utility operations.
+- **Migration candidate**: Partial — some tests use the custom schema intentionally, but many could work with the standard schema. However, since this file also contains meta-database operations (see below), it may need to stay custom.
+
+### 2. `sql_util/database_access/database_crud_helpers_test.cpp`
+- **Custom `MakePeopleTable`**: Same simplified schema as database_util_test (person_id, first_name, last_name, email).
+- **Custom `MakePeopleTableWithTimestamp`**: Adds created_at/modified_at columns for testing timestamp behavior.
+- **Custom `MakeOrdersTable`**: A simple `orders` table with FK to people, for testing CRUD join operations.
+- **Migration candidate**: Yes — these tests exercise generic CRUD helpers and would likely work with standard DbSchema tables, just with different column names in assertions.
+
+### 3. `sql_util/database_access/database_metadata_test.cpp`
+- **Custom `MakePeopleTable`** and **custom `MakeOrdersTable`**: Simplified schemas for testing database metadata introspection (information_schema queries).
+- **Migration candidate**: Partial — some tests verify specific column names/types in the metadata, so migrating would require updating expected values. But this is straightforward.
+
+### 4. `sql_util/database_access/transaction_impl_test.cpp`
+- **Custom `MakePeopleTable`** and **custom `MakeOrdersTable`**: Same simplified schemas for testing transaction commit/abort/error handling behavior.
+- **Migration candidate**: Yes — these tests care about transaction behavior, not specific table structure.
+
+### 5. `sql_util/database_access/database_rest_helper_test.cpp`
+- **Custom people table without primary key**: Intentionally creates a malformed table for negative testing (testing error handling when PK is missing).
+- **Migration candidate**: No — the custom schema IS the test. This must remain custom.
+
+### 6. `sql_util/database_access/db_and_table_operations_test.cpp`
+- **Minimal test tables**: Creates bare-minimum tables for testing DDL generation (`GenerateCreateTableSql` output verification).
+- **Migration candidate**: No — these tests verify SQL generation for specific table configurations and need precise control over the table definition.
+
+## Recommendation
+
+For Phase 3 (committed table setup), these files should be handled as follows:
+- **Migrate where possible** (files 2, 3, 4): Rewrite to use standard `DbSchema` table definitions. This reduces the number of custom table creation calls and lets more tests benefit from pre-created tables.
+- **Leave custom where intentional** (files 5, 6): These tests are testing specific table configurations as part of their purpose.
+- **Evaluate case-by-case** (file 1): Some tests in database_util_test could migrate, others are tightly coupled to the custom schema.
+
+Even without migration, these tests work fine with `IF NOT EXISTS` — their custom table creation runs in the per-test transaction and gets aborted as usual. They just don't benefit from the pre-created tables optimization. With only ~6 files affected, this is a small fraction of the total test suite.
+
+---
+
+# Meta-Database Operation Tests
+
+These test files perform database-level operations (CREATE DATABASE, DROP DATABASE, information_schema queries) that are fundamentally different from normal CRUD tests. They will remain separate and somewhat slower under any optimization scheme because they need control over the database itself, not just tables within it.
+
+## `sql_util/database_access/database_util_test.cpp` — 4 meta-database tests
+
+These tests use `MakeNoDatabaseHelper()` to get a connection without a specific database, then CREATE/DROP entire databases:
+
+| Test | What It Does |
+|------|-------------|
+| `CreateDatabaseAndDropDatabase` | Creates a test DB, verifies it exists, drops it, verifies it's gone |
+| `CreateDatabaseThatAlreadyExists` | Creates a DB twice, verifies the second call is handled |
+| `DropDatabaseThatDoesNotExist` | Drops a non-existent DB, verifies error handling |
+| `DoesDatabaseExist` | Tests the database existence check function |
+
+These tests **cannot** run inside the normal per-test transaction pattern because `CREATE DATABASE` and `DROP DATABASE` cannot run inside a transaction. They use their own connection management.
+
+## `sql_util/database_access/database_metadata_test.cpp` — 19 metadata introspection tests
+
+These tests query `information_schema` to verify table/column metadata. They create custom tables and then inspect them via metadata functions:
+
+- `DoesTableExist` / `DoesColumnExist` / `DoesConstraintExist`
+- `GetColumnNamesForTable` / `GetForeignKeyInfoForTable`
+- `GetPrimaryKeyColumnName` / `HasPrimaryKey`
+- `GetColumnDbType` / `IsColumnNullable` / `IsColumnAutoIncrement`
+- Various edge cases (table not found, column not found, etc.)
+
+These tests DO run inside transactions (and could benefit from pre-created tables), but they use custom table definitions because they test specific metadata properties (column types, nullable flags, FK relationships). Migrating them to standard tables is possible but would require updating all expected metadata values.
+
+## Impact on Optimization
+
+- **4 meta-database tests** in `database_util_test.cpp` will always be slower — they manage entire databases and can't use the shared transaction infrastructure. This is unavoidable but a tiny fraction of the total test suite.
+- **19 metadata tests** in `database_metadata_test.cpp` could potentially benefit from pre-created tables if migrated to standard schemas, but this is low priority given the small count.
+- **Total**: 23 tests (~2.8% of test suite assuming ~818 total `RunInTransaction` calls) that may not benefit from the Phase 3 optimization. The other 97%+ will see the full speedup.
