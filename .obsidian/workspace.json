@@ -182,7 +182,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Support for scheduled purchases.md",
+                "file": "Claude/Tyler Work Item - Adding Classes page.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -197,7 +197,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Support for scheduled purchases"
+              "title": "Tyler Work Item - Adding Classes page"
             }
           }
         ],
@@ -506,11 +506,12 @@
   },
   "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
+    "Projects/Work for Tyler.md",
+    "Claude/Support for scheduled purchases.md",
     "Claude/Payment Design Document.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Product browsing and quoting endpoints.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
-    "Projects/Work for Tyler.md",
     "Claude/Adding an instructor page with photos.md",
     "Dashboard.md",
     "Claude/Prework for adding classes.md",
@@ -533,7 +534,6 @@
     "Projects/Dashboard cleanup.md",
     "Projects/Completing Core Functionality.md",
     "Projects/Client Side Authentication and Security.md",
-    "Projects/Authentication, security.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
