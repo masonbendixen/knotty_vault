@@ -280,26 +280,28 @@ I recommend a phased approach, starting with the easiest wins and building towar
 Tests with custom table definitions (using non-standard column names like `person_id` instead of `id`) won't benefit from pre-created tables in Phase 4. Migrating them now means more tests benefit from the big optimization later. Tests that intentionally need custom schemas (negative tests, DDL generation tests) stay as-is.
 
 ### 3.1 Migrate `database_crud_helpers_test.cpp`
-- [ ] Replace custom `MakePeopleTable` (person_id, first_name, last_name, email) with `MakeTestPeopleTable` or standard `DbSchema::MakePeopleTable`
-- [ ] Replace custom `MakePeopleTableWithTimestamp` — standard people table already has `created_at`/`modified_at`
-- [ ] Replace custom `MakeOrdersTable` — use a standard table with FK to people (e.g., `purchases`) or rename the custom table to avoid collision (e.g., `test_orders`)
-- [ ] Update all assertions to use standard column names (`id` instead of `person_id`, etc.)
+- [x] Renamed custom `people` table → `test_people` (keeps custom schema with `person_id` PK, avoids collision with standard `people` table)
+- [x] Renamed custom `orders` table → `test_orders`
+- [x] `MakePeopleTableWithTimestamp` also renamed to use `test_people`
+- [x] All SQL assertion strings, function arguments, and helper functions updated via replace_all
 - [ ] Verify all tests pass
 
 ### 3.2 Migrate `database_metadata_test.cpp`
-- [ ] Replace custom `MakePeopleTable` and `MakeOrdersTable` with standard schemas or rename to non-colliding names (e.g., `test_people`, `test_orders`)
-- [ ] Update expected metadata values (column names, types, nullable flags) to match the standard or renamed schemas
+- [x] Renamed custom `people` → `test_people`, `orders` → `test_orders`, `products` → `test_products`
+- [x] All metadata assertion values, SQL strings, and helper functions updated via replace_all
+- [x] Other custom tables (`test_parent`, `test_child*`, `table1`, `table2`, `items`) already have non-colliding names
 - [ ] Verify all tests pass
 
 ### 3.3 Migrate `transaction_impl_test.cpp`
-- [ ] Replace custom `MakePeopleTable` and `MakeOrdersTable` with standard schemas or rename to non-colliding names
-- [ ] Update assertions for standard column names
+- [x] Renamed custom `people` → `test_people`, `orders` → `test_orders`
+- [x] Fixed accidentally renamed `#include "db_schema/people.h"` back to correct path
+- [x] All SQL strings, function arguments, and helpers updated via replace_all
 - [ ] Verify all tests pass
 
 ### 3.4 Evaluate `database_util_test.cpp`
-- [ ] Review which tests can use standard `DbSchema::MakePeopleTable` vs. which are tightly coupled to custom schema
-- [ ] Migrate or rename where possible; leave custom where the meta-database tests require it
-- [ ] Verify all tests pass
+- [x] Reviewed: `MakePeopleTable` only used in `RemoveAndCreateDatabaseBasic` which runs in a separate database (`database_test_ddl`), not `test_knottyyoga` — no collision risk
+- [x] `RunSqlFileBasic` calls `create_table.sql` which already uses `CREATE TABLE IF NOT EXISTS` — safe with pre-created tables
+- [x] **No changes needed** for this file
 
 ### 3.5 Leave intentionally custom (no changes needed)
 - `database_rest_helper_test.cpp` — negative test with intentionally malformed table (no PK)
