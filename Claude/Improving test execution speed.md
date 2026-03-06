@@ -15,4 +15,318 @@ Going back to improving the execution speed of my tests, I was curious if there 
 
 Please use the codebase and this document to generate your plan. Please create phases of implementation with check boxes next to them.
 
-# Place plan here
+# Current State Analysis
+
+## How Tests Work Today
+
+Every test follows this pattern:
+
+1. `TestDatabaseUtil testDb` — gets a handle to the shared `DatabaseHelperTest` (single `pqxx::connection` for entire test run)
+2. `testDb.RunInTransaction(...)` — creates a `pqxx::work` transaction
+3. Inside the lambda: create all needed tables (stored procedures, admin_alerts, people, etc.)
+4. Run the actual test logic (usually a tiny fraction of wall time)
+5. `HandleAbort` destructor calls `trans_.abort()` — all table creation and data is discarded
+
+The database starts completely empty for every test. There is no shared state between tests — the transaction abort wipes everything.
+
+## Key Numbers
+
+- **102 test files** use `RunInTransaction` (818 total calls — many files have multiple tests)
+- **43 test files** call `MakePaymentTables` (354 total calls) — each creates **33+ tables** + 2 stored procedures
+- **24 test files** call `MakeTestPeopleTable` (134 total calls) — each creates 3 tables + 2 stored procedures
+- **42 endpoint test files** create `EndpointTestHelper` (178 total calls) — each additionally creates 3 admin metadata tables + initializes full WebApp routing
+
+## Where Time Goes Per Test
+
+| Step | What Happens | Approx Cost |
+|------|-------------|-------------|
+| Create `pqxx::work` | Transaction start | ~1ms |
+| `CreateStoredProceduresBeforeTables` | `CREATE FUNCTION now_us()` | ~2-5ms |
+| `MakePaymentTables` (33 tables) | 33× (generate SQL string + round-trip to PG + CREATE TABLE) | ~50-150ms |
+| `MakeSchedulingTables` (12 tables) | Additional tables when needed | ~20-50ms |
+| `EndpointTestHelper` constructor | 3 more tables + WebApp init + route registration | ~10-30ms |
+| `CreateStoredProceduresAfterTables` | `CREATE FUNCTION get_admin_alerts_in_window()` | ~2-5ms |
+| Actual test logic | INSERT/SELECT/assertions | ~1-10ms |
+| Transaction abort | Discard everything | ~1-5ms |
+
+**Ratio**: 90-98% of each test's time is setup overhead that gets thrown away.
+
+---
+
+# Optimization Strategies
+
+## Strategy 1: PostgreSQL Session-Level Performance Tuning
+
+**Idea**: After creating the test database connection, execute SQL `SET` commands to disable durability guarantees that aren't needed for tests.
+
+**Applicable SET commands** (all session-scoped, no postgresql.conf changes):
+
+```sql
+SET synchronous_commit = OFF;          -- Don't wait for WAL flush to disk
+SET fsync = OFF;                       -- Skip fsync calls (session-level may not work, but worth trying)
+SET full_page_writes = OFF;            -- Skip full-page writes after checkpoint
+SET wal_level = minimal;               -- Minimal WAL (may not be settable per-session)
+SET work_mem = '256MB';                -- More memory for sorts/hashes
+SET maintenance_work_mem = '256MB';    -- More memory for CREATE INDEX, etc.
+SET max_wal_size = '2GB';              -- Reduce checkpoint frequency
+SET checkpoint_timeout = '30min';      -- Reduce checkpoint frequency
+```
+
+**Implementation**: Add these SET statements in `GlobalDatabaseTestSupport::InitializeInternal()` right after connecting to the test database.
+
+**Pros**: Zero changes to test code, zero changes to production code. Easy to implement.
+**Cons**: Some settings may only be configurable in postgresql.conf (server-level). Moderate speedup — reduces I/O wait but doesn't eliminate the repeated DDL round-trips.
+**Estimated impact**: 10-30% speedup on I/O-bound operations.
+
+---
+
+## Strategy 2: UNLOGGED Tables for Tests
+
+**Idea**: PostgreSQL supports `CREATE UNLOGGED TABLE` which skips WAL (write-ahead log) entirely. These tables are faster to create and write to because they don't generate WAL records.
+
+**Implementation**: Modify `GenerateCreateTableSql()` in `db_and_table_operations.cpp` to accept an option for `UNLOGGED`:
+
+```cpp
+// Option A: Add a bool parameter
+std::string GenerateCreateTableSql(
+    DbSchema::DatabaseInfo databaseInfo,
+    std::string_view tableName,
+    bool unlogged = false);
+// Generates: "CREATE UNLOGGED TABLE ..." when unlogged=true
+
+// Option B: Check if DatabaseHelper::IsTest()
+// Pass databaseHelper to CreateTable and auto-detect
+```
+
+**Pros**: Meaningful speedup for table creation. No WAL overhead for inserts/updates during tests.
+**Cons**: Requires modifying `GenerateCreateTableSql` and `CreateTable` signatures. UNLOGGED tables are wiped on crash recovery (fine for tests). Need to thread the "unlogged" flag through the call chain.
+**Estimated impact**: 20-40% speedup on table creation and data insertion.
+
+---
+
+## Strategy 3: Savepoints Instead of Full Transaction Abort (Checkpoint/Restore Pattern)
+
+**Idea**: Instead of creating and aborting a full transaction per test (which discards all table creation), use a single long-running transaction with SAVEPOINTs. Create all tables once at the start, then for each test:
+
+1. `SAVEPOINT before_test`
+2. Run test (inserts data, etc.)
+3. `ROLLBACK TO SAVEPOINT before_test` (removes test data but keeps tables)
+
+**Implementation**:
+
+```
+GlobalDatabaseTestSupport::Initialize():
+  1. Create test database
+  2. Begin a long-running transaction (never committed)
+  3. Create ALL tables (stored procs, payment tables, scheduling tables, etc.)
+  4. SAVEPOINT baseline
+
+Per test:
+  1. SAVEPOINT test_start
+  2. Run test lambda (only inserts/queries — tables already exist)
+  3. ROLLBACK TO SAVEPOINT test_start
+
+GlobalDatabaseTestSupport::Shutdown():
+  1. Abort the long-running transaction
+```
+
+**Key changes needed**:
+- `GlobalDatabaseTestSupport` holds an open `pqxx::work` and `TransactionImpl`
+- `DatabaseHelperTest::RunInTransaction` no longer creates a new `pqxx::work` — it uses the existing one with savepoints
+- Test helpers (`MakePaymentTables`, `MakeTestPeopleTable`) must detect "tables already exist" or be called once at startup
+- Tests that create specific additional tables (e.g., `instructors`, `sessions`) need handling — either create them all upfront or use `CREATE TABLE IF NOT EXISTS`
+
+**Pros**: Eliminates ~95% of per-test overhead. Tables created once for entire test run. Each test only pays for its own data insertion + savepoint rollback.
+**Cons**: Most complex to implement. Requires reworking `RunInTransaction` and table creation patterns. Tests that create different table subsets need careful handling. A failing CREATE TABLE in one test could corrupt state for subsequent tests (though savepoint rollback prevents this). Single long transaction means PostgreSQL holds more resources.
+**Estimated impact**: 80-95% speedup. The dominant cost (table creation) happens once instead of hundreds of times.
+
+---
+
+## Strategy 4: PostgreSQL Template Database
+
+**Idea**: PostgreSQL has a native feature where you can create a database from a template: `CREATE DATABASE test_knottyyoga TEMPLATE test_knottyyoga_template`. The template database is created once with all tables, and each test run gets an instant copy via filesystem-level copy (much faster than re-running DDL).
+
+**Implementation**:
+
+```
+First run (or explicit setup step):
+  1. Create test_knottyyoga_template database
+  2. Run all table creation DDL (MakePaymentTables + MakeSchedulingTables + admin tables + stored procs)
+  3. This becomes the template
+
+Each test run:
+  1. DROP DATABASE test_knottyyoga
+  2. CREATE DATABASE test_knottyyoga TEMPLATE test_knottyyoga_template
+  3. Connect to test_knottyyoga (all tables already exist)
+
+Per test:
+  1. Begin transaction
+  2. Run test (tables exist, just insert data)
+  3. Abort transaction (data cleaned up, tables remain)
+```
+
+**Key changes**:
+- `GlobalDatabaseTestSupport::InitializeInternal()` checks if template exists. If not, creates it with all tables. Then creates the test DB from template.
+- Test helpers like `MakePaymentTables` become no-ops (or are removed from individual tests)
+- Tests that need specific tables beyond the standard set would need those added to the template
+
+**Pros**: PostgreSQL handles the optimization natively. Fast database creation. Clean per-test isolation (transaction abort only removes data, tables persist). Template database survives across test runs (no re-creation unless schema changes).
+**Cons**: Template must be rebuilt when schema changes (need a mechanism for this — e.g., version stamp, or always rebuild). Requires managing two databases. `CREATE DATABASE ... TEMPLATE` cannot be done inside a transaction. Individual tests still pay for transaction start/abort + data insertion. Doesn't help tests that need different table subsets (but most tests use MakePaymentTables anyway).
+**Estimated impact**: 60-80% speedup. Eliminates per-test-run DDL, but per-test transaction overhead remains.
+
+---
+
+## Strategy 5: Persistent Tables + DELETE/TRUNCATE Between Tests
+
+**Idea**: Create all tables once during `GlobalDatabaseTestSupport::Initialize()` (in a committed transaction), then between tests use `TRUNCATE` or `DELETE` to clear data rather than recreating tables.
+
+**Implementation**:
+
+```
+GlobalDatabaseTestSupport::Initialize():
+  1. Create test database
+  2. Connect, run committed transaction that creates ALL tables
+  3. Tables persist across tests
+
+Per test:
+  1. Begin transaction
+  2. Run test
+  3. Abort transaction (data cleaned up automatically)
+  OR
+  1. Run test (auto-commit)
+  2. TRUNCATE all tables between tests
+```
+
+**With transaction abort approach** (simplest):
+- Create tables once in a committed transaction at startup
+- Each test's `RunInTransaction` + abort pattern still works — it just doesn't need to CREATE tables anymore
+- Test helpers (`MakePaymentTables`, `MakeTestPeopleTable`) are called once at startup instead of per-test
+
+**Key changes**:
+- Add `SetupAllTables()` method to `GlobalDatabaseTestSupport` that commits table creation
+- `MakePaymentTables` and friends either become no-ops when tables exist, or are only called at startup
+- Tests stop calling `MakePaymentTables` / `MakeTestPeopleTable` — they just use the pre-existing tables
+
+**Pros**: Simpler than savepoints. Tables survive test failures. No template database management. Transaction abort still provides per-test data isolation.
+**Cons**: Requires either modifying every test to remove table creation calls, or making `MakePaymentTables` detect existing tables. Tests that need only a subset of tables now get all tables (minor — no real downside). Need to handle tests that create additional tables not in the standard set.
+**Estimated impact**: 70-90% speedup. One committed transaction creates everything, then abort-pattern cleans up data per test.
+
+---
+
+## Strategy 6: Batch DDL Execution
+
+**Idea**: Instead of executing 33+ separate `CREATE TABLE` statements as individual round-trips, concatenate them into a single SQL string and execute once.
+
+**Implementation**: Modify `MakePaymentTables` to build a single SQL batch:
+
+```cpp
+void MakePaymentTables(Transaction& transaction, TestDatabaseUtil& testDb) {
+    auto dbInfo = testDb.GetDatabaseInfo();
+    std::string batchSql;
+    batchSql += GenerateCreateFunctionSql("now_us", ...);
+    batchSql += GenerateCreateTableSql(dbInfo, "admin_alerts") + ";";
+    batchSql += GenerateCreateTableSql(dbInfo, "people") + ";";
+    // ... all 33 tables ...
+    batchSql += GenerateCreateFunctionSql("get_admin_alerts_in_window", ...);
+    transaction.RunSqlStatement(batchSql);
+}
+```
+
+**Pros**: Reduces 35+ network round-trips to 1. Easy to implement alongside other strategies. Works with existing transaction pattern.
+**Cons**: Only reduces network latency, not PostgreSQL's actual DDL execution time. If any statement fails, the entire batch fails (harder to debug). Still creates tables per-test unless combined with a persistence strategy.
+**Estimated impact**: 20-40% speedup (depends on network latency to PostgreSQL — bigger impact in Docker).
+
+---
+
+## Strategy 7: `CREATE TABLE IF NOT EXISTS` + Committed Setup Transaction
+
+**Idea**: A hybrid approach — make table creation idempotent with `IF NOT EXISTS`, create all tables in a committed transaction at startup, and let individual test calls to `MakePaymentTables` be harmless no-ops.
+
+**Implementation**:
+1. Change `GenerateCreateTableSql` to generate `CREATE TABLE IF NOT EXISTS`
+2. In `GlobalDatabaseTestSupport::InitializeInternal()`, after creating the database, run a committed transaction that calls `MakePaymentTables` + `MakeSchedulingTables` + all admin tables + stored procedures
+3. Individual tests still call `MakePaymentTables` etc. but they're instant no-ops because tables already exist
+4. The abort-per-test pattern continues to work (only data is rolled back)
+
+**Pros**: **Minimal test code changes** — existing tests continue to work unmodified. Gradual migration — tests naturally benefit. If schema changes, just re-run the database helper to recreate. Idempotent table creation means tests that create additional tables (instructors, sessions) work fine.
+**Cons**: `IF NOT EXISTS` has a small overhead per call (PostgreSQL still checks). Stored procedures need `CREATE OR REPLACE FUNCTION`. Need a committed transaction at startup (new concept for the test infrastructure).
+**Estimated impact**: 70-85% speedup with minimal code changes.
+
+---
+
+# Recommended Implementation Plan
+
+I recommend a phased approach, starting with the easiest wins and building toward the biggest gains. Each phase is independently valuable.
+
+## Phase 1: Session-Level PostgreSQL Tuning (Easy Win)
+- [ ] Add performance-oriented `SET` commands after test database connection in `GlobalDatabaseTestSupport::InitializeInternal()`
+- [ ] Commands to add:
+  ```sql
+  SET synchronous_commit = OFF;
+  SET work_mem = '256MB';
+  SET maintenance_work_mem = '256MB';
+  ```
+- [ ] Verify these settings take effect (write a test that checks `SHOW synchronous_commit`)
+- [ ] Measure before/after test suite timing
+
+## Phase 2: UNLOGGED Tables for Tests (Moderate Win)
+- [ ] Add `bool unlogged` parameter (default `false`) to `GenerateCreateTableSql()` in `db_and_table_operations.cpp`
+- [ ] When `unlogged` is true, generate `CREATE UNLOGGED TABLE` instead of `CREATE TABLE`
+- [ ] Add `bool unlogged` parameter to `CreateTable()` and `DropIfExistsAndCreateTable()`
+- [ ] In test infrastructure, pass `unlogged=true` when calling `CreateTable` — detect via `DatabaseHelper::IsTest()` or explicit parameter
+- [ ] Verify all tests still pass with UNLOGGED tables
+- [ ] Measure before/after
+
+## Phase 3: Committed Table Setup at Startup (Big Win — Strategy 7)
+This is the highest-impact change: create all tables once in a committed transaction during `GlobalDatabaseTestSupport::Initialize()`, then let the per-test abort pattern clean up only data.
+
+### 3.1 Make DDL idempotent
+- [ ] Change `GenerateCreateTableSql()` to support `IF NOT EXISTS` (add parameter or always use it in test mode)
+- [ ] Change stored procedure creation (`CreateNowUs`, `CreateGetAdminAlertsInWindow`) to use `CREATE OR REPLACE FUNCTION`
+- [ ] Verify existing tests still pass with `IF NOT EXISTS` / `CREATE OR REPLACE`
+
+### 3.2 Add committed setup transaction to GlobalDatabaseTestSupport
+- [ ] Add a new method `SetupAllTables()` to `GlobalDatabaseTestSupport` that:
+  1. Opens a `pqxx::work` transaction (NOT aborted — will be committed)
+  2. Calls `StoredProcedures::CreateStoredProceduresBeforeTables`
+  3. Calls `MakePaymentTables` equivalent (all tables from payment_table_test_helper)
+  4. Calls `MakeSchedulingTables` equivalent
+  5. Creates admin metadata tables (allowed_tables, admin_top_level_tables, admin_nested_tables)
+  6. Creates any other commonly used tables (sessions, device_tokens, email_verifications, instructors)
+  7. Calls `StoredProcedures::CreateStoredProceduresAfterTables`
+  8. **Commits** the transaction
+- [ ] Call `SetupAllTables()` from `InitializeInternal()` after creating the database connection
+- [ ] Verify all tests pass (existing `MakePaymentTables` calls are harmless with `IF NOT EXISTS`)
+
+### 3.3 Measure and document improvement
+- [ ] Time full test suite before and after
+- [ ] Document the new test infrastructure pattern
+
+## Phase 4: Batch DDL Execution (Optional Polish)
+- [ ] Modify the startup `SetupAllTables()` to concatenate all DDL into a single SQL statement
+- [ ] Execute as one round-trip instead of 50+
+- [ ] This further reduces the one-time startup cost
+
+## Phase 5: Savepoint Pattern (Advanced — Optional)
+Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort pattern itself is slow.
+
+- [ ] Investigate whether `pqxx::subtransaction` (wraps SAVEPOINT) works with the existing `TransactionImpl` abstraction
+- [ ] If viable, modify `DatabaseHelperTest::RunInTransaction` to use savepoints within a long-running transaction instead of creating/aborting full transactions
+- [ ] This would eliminate per-test transaction creation overhead entirely
+- [ ] Requires careful handling of test failures (a failed savepoint doesn't corrupt the parent transaction)
+
+---
+
+# Notes and Considerations
+
+1. **Schema migration**: When the database schema changes (new tables, new columns), the committed tables from Phase 3 become stale. The simplest approach: the `GlobalDatabaseTestSupport::Initialize()` always drops and recreates the test database (which it already does), then re-runs `SetupAllTables()`. This is fine since it only happens once per test run.
+
+2. **Tests with unique table needs**: Some tests create tables not in the standard set (e.g., `instructors`, `sessions`). With `IF NOT EXISTS`, these still work — the per-test creation is just a no-op for already-existing tables, and the few tables not pre-created are created normally. Over time, popular tables can be added to `SetupAllTables()`.
+
+3. **No parallel test execution needed**: Since tests are serialized and share one connection, we don't need to worry about concurrent access. This simplifies the savepoint approach considerably.
+
+4. **Docker network latency**: If tests run inside Docker with PostgreSQL in another container, every SQL round-trip pays network overhead. Batch DDL (Phase 4) is especially valuable in this scenario.
+
+5. **The `CREATE OR REPLACE FUNCTION` change**: PostgreSQL supports this natively for functions. The stored procedures (`now_us()` and `get_admin_alerts_in_window()`) can be changed from `CREATE FUNCTION` to `CREATE OR REPLACE FUNCTION` with no behavioral difference.
+
+6. **Backward compatibility**: All phases maintain backward compatibility — existing test code continues to work. Phase 3 specifically uses `IF NOT EXISTS` so that tests calling `MakePaymentTables` see no change in behavior, just faster execution.
