@@ -266,14 +266,14 @@ I recommend a phased approach, starting with the easiest wins and building towar
   SET work_mem = '256MB';
   SET maintenance_work_mem = '256MB';
   ```
-- [ ] Verify these settings take effect (write a test that checks `SHOW synchronous_commit`)
-- [ ] Measure before/after test suite timing
+- [x] Verify these settings take effect (write a test that checks `SHOW synchronous_commit`)
+- [x] Measure before/after test suite timing
 
 ## Phase 2: UNLOGGED Tables for Tests (Moderate Win)
-- [ ] Add `bool unlogged` parameter (default `false`) to `GenerateCreateTableSql()` in `db_and_table_operations.cpp`
-- [ ] When `unlogged` is true, generate `CREATE UNLOGGED TABLE` instead of `CREATE TABLE`
-- [ ] Add `bool unlogged` parameter to `CreateTable()` and `DropIfExistsAndCreateTable()`
-- [ ] In test infrastructure, pass `unlogged=true` when calling `CreateTable` — detect via `DatabaseHelper::IsTest()` or explicit parameter
+- [x] Add global `SetUnloggedMode(bool)` / `IsUnloggedMode()` to `DbOps` namespace in `db_and_table_operations.h/cpp`
+- [x] When unlogged mode is on, `GenerateCreateTableSql` generates `CREATE UNLOGGED TABLE` instead of `CREATE TABLE`
+- [x] Enable unlogged mode in `GlobalDatabaseTestSupport::InitializeInternal()` via `DbOps::SetUnloggedMode(true)`
+- [x] Update SQL-string-checking tests to save/restore unlogged mode, add `GenerateCreateTableSqlUnlogged` test
 - [ ] Verify all tests still pass with UNLOGGED tables
 - [ ] Measure before/after
 
@@ -338,6 +338,7 @@ Only pursue this if Phase 3 doesn't provide sufficient speedup, or if the abort 
 | Run | Description | Time (ms) | Time (min:sec) | Change |
 |-----|-------------|-----------|----------------|--------|
 | 1 | Baseline — no optimizations | 643,287 | 10:43 | — |
+| 2 | Phase 1 — session-level PG tuning | 604,558 | 10:05 | -6.0% |
 
 ---
 
