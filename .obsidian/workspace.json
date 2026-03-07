@@ -206,7 +206,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Improving test execution speed.md",
+                "file": "Claude/Subscriptions- Recurring billing and card management.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -221,7 +221,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Improving test execution speed"
+              "title": "Subscriptions- Recurring billing and card management"
             }
           }
         ],
@@ -530,8 +530,8 @@
   },
   "active": "756a1bc18f8f2ce3",
   "lastOpenFiles": [
-    "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Improving test execution speed.md",
+    "Claude/Tyler Work Item - Adding Classes page.md",
     "Projects/Work for Tyler.md",
     "Claude/Support for scheduled purchases.md",
     "Claude/Payment Design Document.md",
