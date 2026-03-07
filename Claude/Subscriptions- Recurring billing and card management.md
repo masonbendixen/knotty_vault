@@ -115,10 +115,10 @@ User-facing card on file records with friendly names and card metadata from Squa
 
 ### Registration
 
-- [ ] Add both table schemas to `db_schema/CMakeLists.txt`
-- [ ] Add `MakeSquareCustomersTable` and `MakeSavedCardsTable` calls to `make_database_info.cpp`
-- [ ] Add `CreateTable` calls to `create_database.cpp` (square_customers before saved_cards due to no FK dependency, but logical ordering)
-- [ ] Add both tables to `MakePaymentTables` in `payment_table_test_helper.cpp` so endpoint tests can use them
+- [x] Add both table schemas to `db_schema/CMakeLists.txt`
+- [x] Add `MakeSquareCustomersTable` and `MakeSavedCardsTable` calls to `make_database_info.cpp`
+- [x] Add `CreateTable` calls to `create_database.cpp` (square_customers before saved_cards due to no FK dependency, but logical ordering)
+- [x] ~~Add both tables to `MakePaymentTables` in `payment_table_test_helper.cpp`~~ — No longer needed; `MakePaymentTables` is a no-op and tables are pre-created via `MakeDatabaseInfo()` → `SetupAllTables()`
 
 ## 1.2 Table Helpers
 
