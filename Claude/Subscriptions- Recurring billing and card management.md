@@ -463,9 +463,9 @@ Soft-deletes the card (sets `is_active = false`) and calls Square to disable it.
 
 ### Files
 
-- [ ] Create `endpoints/cards.h`, `cards.cpp`, `cards_test.cpp`
-- [ ] Add to `endpoints/CMakeLists.txt`
-- [ ] Register in `web_app.cpp`
+- [x] Create `endpoints/cards.h`, `cards.cpp`, `cards_test.cpp`
+- [x] Add to `endpoints/CMakeLists.txt`
+- [x] Register in `web_app.cpp`
 
 ## 1.6 Client Types
 
