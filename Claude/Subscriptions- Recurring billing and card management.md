@@ -175,8 +175,8 @@ public:
 }
 ```
 
-- [ ] Add to `sql_util/table_helpers/CMakeLists.txt`
-- [ ] Write tests for both helpers
+- [x] Add to `sql_util/table_helpers/CMakeLists.txt`
+- [x] Write tests for both helpers
 
 ## 1.3 Utility Support — Square Client Extensions
 
