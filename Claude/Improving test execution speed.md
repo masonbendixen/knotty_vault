@@ -370,6 +370,15 @@ With pre-created tables at startup, every per-test call to `MakePaymentTables`, 
 - [x] Added inline `test_people` table creation to `get_row_test.cpp` (custom test table not in standard schema)
 - [x] **Result: 80,168ms (1:20) — 87.5% reduction from baseline, 11.6% improvement from Phase 5**
 
+## Phase 7: Remove Debug cerr Tracing (Quick Win)
+Debug `std::cerr` logging had been added to help diagnose issues but was never removed. Every `AddTableValue` and `AddTableValueFetchPrimaryKey` call was printing the table name and all key-value pairs to stderr, and payment email helpers were logging config status and send results. With hundreds of tests exercising these code paths, the cumulative I/O overhead was significant.
+
+- [x] Removed all `std::cerr` debug tracing from `database_rest_helper.cpp` (AddTableValue, AddTableValueFetchPrimaryKey — table/key dumps and DB error logging)
+- [x] Removed all `std::cerr` debug tracing from `add_item.cpp` and `add_item_fetch_primary_key.cpp` (request body and error logging)
+- [x] Removed all `std::cerr` debug tracing from `payment_helper.cpp` (email config status, send success/failure, booking check logging)
+- [x] Removed unused `#include <iostream>` from all 4 files
+- [x] **Result: 74,817ms (1:15) — 88.4% reduction from baseline, 6.7% improvement from Phase 6**
+
 ---
 
 # Notes and Considerations
@@ -398,6 +407,7 @@ With pre-created tables at startup, every per-test call to `MakePaymentTables`, 
 | 4 | Phase 1+4 — committed table setup + IF NOT EXISTS | 89,183 | 1:29 | -86.1% from baseline, -85.2% from Phase 1 |
 | 5 | Phase 1+4+5 — batch DDL startup | 90,675 | 1:31 | -85.9% from baseline (gtest time similar; real win is eliminated startup delay before first test) |
 | 6 | Phase 1+4+5+6 — remove per-test no-op DDL (~27k round-trips eliminated) | 80,168 | 1:20 | -87.5% from baseline, -11.6% from Phase 5 |
+| 7 | Phase 7 — remove debug cerr tracing | 74,817 | 1:15 | -88.4% from baseline, -6.7% from Phase 6 |
 
 ---
 
