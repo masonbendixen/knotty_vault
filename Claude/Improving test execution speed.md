@@ -345,9 +345,12 @@ This is the highest-impact change: create all tables once in a committed transac
 - [x] Matches the estimated 70-85% speedup from Strategy 7
 
 ## Phase 5: Batch DDL Execution (Optional Polish)
-- [ ] Modify the startup `SetupAllTables()` to concatenate all DDL into a single SQL statement
-- [ ] Execute as one round-trip instead of 50+
-- [ ] This further reduces the one-time startup cost
+- [x] Added `GenerateSql()` functions to stored procedure modules (`now_us`, `get_admin_alerts_in_window`) to return SQL strings without executing
+- [x] Added aggregate `GenerateStoredProceduresBeforeTablesSql()` / `GenerateStoredProceduresAfterTablesSql()` to `create_stored_procedures`
+- [x] Modified `SetupAllTables()` to concatenate all DDL (stored procedures + all table creation) into a single SQL string
+- [x] Execute via `trans.exec()` (supports multi-statement SQL) as one round-trip instead of 50+
+- [x] Fixed pre-existing bug: `get_admin_alerts_in_window.cpp` was including `"now_us.h"` instead of its own header
+- [x] **Result: 90,675ms (1:31) — gtest-measured time is comparable to Phase 4 (89,183ms), but the real improvement is in startup: test execution now begins immediately instead of a multi-second delay before the first test runs. The batch DDL eliminated ~50 sequential round-trips during `SetupAllTables()`, which was visible as a startup pause not captured by gtest's timer.**
 
 ## Phase 6: Savepoint Pattern (Advanced — Optional)
 Only pursue this if Phase 4 doesn't provide sufficient speedup, or if the abort pattern itself is slow.
@@ -383,6 +386,7 @@ Only pursue this if Phase 4 doesn't provide sufficient speedup, or if the abort 
 | 2 | Phase 1 — session-level PG tuning | 604,558 | 10:05 | -6.0% |
 | 3 | Phase 1+2 — UNLOGGED tables | 686,733 | 11:27 | +6.8% (regression, reverted) |
 | 4 | Phase 1+4 — committed table setup + IF NOT EXISTS | 89,183 | 1:29 | -86.1% from baseline, -85.2% from Phase 1 |
+| 5 | Phase 1+4+5 — batch DDL startup | 90,675 | 1:31 | -85.9% from baseline (gtest time similar; real win is eliminated startup delay before first test) |
 
 ---
 
