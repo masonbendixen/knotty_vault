@@ -390,11 +390,11 @@ KeyValueTable SavedCardInfoToKeyValueTable(const SavedCardInfo& card);
 KeyValueTableArray SavedCardInfoToKeyValueTableArray(const std::vector<SavedCardInfo>& cards);
 ```
 
-- [ ] Create `card_helper.h/cpp` in `business_logic/payment/`
-- [ ] Add to `business_logic/payment/CMakeLists.txt`
-- [ ] Add `SavedCardInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
-- [ ] Write tests in `card_helper_test.cpp`
-- [ ] Write tests for KV conversion in `payment_key_value_table_test.cpp`
+- [x] Create `card_helper.h/cpp` in `business_logic/payment/`
+- [x] Add to `business_logic/payment/CMakeLists.txt`
+- [x] Add `SavedCardInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
+- [x] Write tests in `card_helper_test.cpp`
+- [x] Write tests for KV conversion in `payment_key_value_table_test.cpp`
 
 ## 1.5 Endpoints
 
