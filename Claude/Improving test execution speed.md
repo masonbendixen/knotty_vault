@@ -317,22 +317,20 @@ Tests with custom table definitions (using non-standard column names like `perso
 This is the highest-impact change: create all tables once in a committed transaction during `GlobalDatabaseTestSupport::Initialize()`, then let the per-test abort pattern clean up only data.
 
 ### 4.1 Make DDL idempotent
-- [ ] Change `GenerateCreateTableSql()` to support `IF NOT EXISTS` (add parameter or always use it in test mode)
-- [ ] Change stored procedure creation (`CreateNowUs`, `CreateGetAdminAlertsInWindow`) to use `CREATE OR REPLACE FUNCTION`
-- [ ] Verify existing tests still pass with `IF NOT EXISTS` / `CREATE OR REPLACE`
+- [x] Added global `g_ifNotExistsMode` flag to `db_and_table_operations.cpp` with `SetIfNotExistsMode()`/`IsIfNotExistsMode()` accessors
+- [x] Modified `GenerateCreateTableSql()` to emit `CREATE TABLE IF NOT EXISTS` when flag is enabled
+- [x] Stored procedures already use `CREATE OR REPLACE FUNCTION` — no changes needed
+- [x] Added `GenerateCreateTableSqlIfNotExists` test, updated existing SQL-string tests to save/restore mode
+- [x] Verified existing tests pass with the new infrastructure
 
 ### 4.2 Add committed setup transaction to GlobalDatabaseTestSupport
-- [ ] Add a new method `SetupAllTables()` to `GlobalDatabaseTestSupport` that:
-  1. Opens a `pqxx::work` transaction (NOT aborted — will be committed)
-  2. Calls `StoredProcedures::CreateStoredProceduresBeforeTables`
-  3. Calls `MakePaymentTables` equivalent (all tables from payment_table_test_helper)
-  4. Calls `MakeSchedulingTables` equivalent
-  5. Creates admin metadata tables (allowed_tables, admin_top_level_tables, admin_nested_tables)
-  6. Creates any other commonly used tables (sessions, device_tokens, email_verifications, instructors)
-  7. Calls `StoredProcedures::CreateStoredProceduresAfterTables`
-  8. **Commits** the transaction
-- [ ] Call `SetupAllTables()` from `InitializeInternal()` after creating the database connection
-- [ ] Verify all tests pass (existing `MakePaymentTables` calls are harmless with `IF NOT EXISTS`)
+- [x] Added `SetupAllTables()` private method to `GlobalDatabaseTestSupport`
+- [x] Implementation uses `DbSchema::MakeDatabaseInfo()` to get complete schema, then iterates `GetAllTables()` to create ALL tables in dependency order (same order as production `create_database.cpp`)
+- [x] Creates stored procedures before and after tables
+- [x] Uses a committed `pqxx::work` transaction (not the test abort pattern)
+- [x] Called from `InitializeInternal()` after session tuning
+- [x] `DbOps::SetIfNotExistsMode(true)` enabled after setup — all per-test `CreateTable` calls become no-ops
+- [ ] Verify all tests pass
 
 ### 4.3 Measure and document improvement
 - [ ] Time full test suite before and after
