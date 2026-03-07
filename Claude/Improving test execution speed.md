@@ -352,13 +352,23 @@ This is the highest-impact change: create all tables once in a committed transac
 - [x] Fixed pre-existing bug: `get_admin_alerts_in_window.cpp` was including `"now_us.h"` instead of its own header
 - [x] **Result: 90,675ms (1:31) — gtest-measured time is comparable to Phase 4 (89,183ms), but the real improvement is in startup: test execution now begins immediately instead of a multi-second delay before the first test runs. The batch DDL eliminated ~50 sequential round-trips during `SetupAllTables()`, which was visible as a startup pause not captured by gtest's timer.**
 
-## Phase 6: Savepoint Pattern (Advanced — Optional)
-Only pursue this if Phase 4 doesn't provide sufficient speedup, or if the abort pattern itself is slow.
+## Phase 6: Remove Per-Test Table Creation No-Ops (Cleanup + Performance)
+With pre-created tables at startup, every per-test call to `MakePaymentTables`, `MakeSchedulingTables`, `MakeTestPeopleTable`, `StoredProcedures::Create*`, and direct `DbOps::CreateTable` for standard tables was a no-op — but each still cost a SQL round-trip (`IF NOT EXISTS` check). With ~818 `RunInTransaction` calls and many tests making 30+ no-op DDL calls each, this added up to ~27,000 unnecessary SQL round-trips.
 
-- [ ] Investigate whether `pqxx::subtransaction` (wraps SAVEPOINT) works with the existing `TransactionImpl` abstraction
-- [ ] If viable, modify `DatabaseHelperTest::RunInTransaction` to use savepoints within a long-running transaction instead of creating/aborting full transactions
-- [ ] This would eliminate per-test transaction creation overhead entirely
-- [ ] Requires careful handling of test failures (a failed savepoint doesn't corrupt the parent transaction)
+- [x] Made `MakePaymentTables` and `MakeSchedulingTables` empty no-op functions (backward compat for any remaining callers)
+- [x] Removed `MakeTestPeopleTable` from `TestDatabaseUtil` (no longer needed — `people` table is pre-created)
+- [x] Changed `TestDatabaseUtil` constructor to use `MakeDatabaseInfo(kTestDatabaseName)` for full schema metadata
+- [x] Removed all per-test table creation calls from ~95+ test files:
+  - All `MakePaymentTables`, `MakeSchedulingTables`, `MakeTestPeopleTable` calls
+  - All local table-creation helper functions (MakeEnumTables, MakeSessionsTable, MakeDeviceTokensTable, MakePhotoTables, etc.)
+  - All direct `DbSchema::Make*Table` + `DbOps::CreateTable` calls for standard tables
+  - All `StoredProcedures::Create*` calls
+  - All now-unnecessary includes
+- [x] Preserved custom table creation in 5 files that use non-standard tables (`test_people`, `test_orders`, no-PK tables)
+- [x] Removed table creation from `EndpointTestHelper` constructor (allowed_tables, admin_top_level_tables, admin_nested_tables are pre-created)
+- [x] Added `TestDatabaseUtil::SchemaMode::Empty` constructor for tests that build custom minimal schemas (7 tests across `db_schema_test.cpp`, `database_rest_helper_test.cpp`)
+- [x] Added inline `test_people` table creation to `get_row_test.cpp` (custom test table not in standard schema)
+- [x] **Result: 80,168ms (1:20) — 87.5% reduction from baseline, 11.6% improvement from Phase 5**
 
 ---
 
@@ -387,6 +397,7 @@ Only pursue this if Phase 4 doesn't provide sufficient speedup, or if the abort 
 | 3 | Phase 1+2 — UNLOGGED tables | 686,733 | 11:27 | +6.8% (regression, reverted) |
 | 4 | Phase 1+4 — committed table setup + IF NOT EXISTS | 89,183 | 1:29 | -86.1% from baseline, -85.2% from Phase 1 |
 | 5 | Phase 1+4+5 — batch DDL startup | 90,675 | 1:31 | -85.9% from baseline (gtest time similar; real win is eliminated startup delay before first test) |
+| 6 | Phase 1+4+5+6 — remove per-test no-op DDL (~27k round-trips eliminated) | 80,168 | 1:20 | -87.5% from baseline, -11.6% from Phase 5 |
 
 ---
 
