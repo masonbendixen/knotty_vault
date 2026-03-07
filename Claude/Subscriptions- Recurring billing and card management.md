@@ -290,11 +290,11 @@ virtual PaymentResult CreatePayment(
     const RetryPolicy& retryPolicy = RetryPolicy::Default()) = 0;
 ```
 
-- [ ] Add structs and method declarations to `square_client.h`
-- [ ] Implement in `square_client.cpp`
-- [ ] Extend `TestSquareClient` in `square_client_test_util.h/cpp`
-- [ ] Add unit tests in `square_client_test.cpp`
-- [ ] Update `CreatePayment` signature (add optional `customerId`)
+- [x] Add structs and method declarations to `square_client.h`
+- [x] Implement in `square_client.cpp`
+- [x] Extend `TestSquareClient` in `square_client_test_util.h/cpp`
+- [x] Add unit tests in `square_client_test.cpp`
+- [x] Update `CreatePayment` signature (add optional `customerId`)
 
 ## 1.4 Business Logic — `CardHelper`
 
