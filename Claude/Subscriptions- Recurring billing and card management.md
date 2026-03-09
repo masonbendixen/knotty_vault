@@ -553,15 +553,15 @@ Update these existing components to use `PaymentMethodComponent`:
 - `EventBookingComponent` (event bookings)
 - Future: `SubscriptionSignupComponent`
 
-- [ ] Create `CardManagementComponent` in portal user area
-- [ ] Create `PaymentMethodComponent` as a shared control
-- [ ] Add card management route to portal routing
-- [ ] Refactor `CheckoutComponent` to use `PaymentMethodComponent`
-- [ ] Refactor `EventBookingComponent` to use `PaymentMethodComponent`
+- [x] Create `CardManagementComponent` in portal user area
+- [x] Create `PaymentMethodComponent` as a shared control
+- [x] Add card management route to portal routing
+- [x] Refactor `CheckoutComponent` to use `PaymentMethodComponent`
+- [x] Refactor `EventBookingComponent` to use `PaymentMethodComponent`
 
 ## 1.9 Wiring
 
-- [ ] Add card management page to portal navigation (under user profile area)
+- [x] Add card management page to portal navigation (under user profile area)
 - [ ] Update `purchase_pay_card` endpoint to accept optional `customer_id` in request body (for saved card payments)
 - [ ] Update `PayCardRequest` struct and `PayWithCard` to pass `customerId` through to `SquareClient::CreatePayment`
 - [ ] Update Angular `PayCardRequest` type to include optional `customer_id`
