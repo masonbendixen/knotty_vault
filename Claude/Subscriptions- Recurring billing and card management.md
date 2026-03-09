@@ -692,13 +692,13 @@ Tracks each billing cycle charge for a subscription. One row per billing period.
 
 ### Registration
 
-- [ ] Create `db_schema/subscriptions.h`, `subscriptions.cpp`
-- [ ] Create `db_schema/subscription_charges.h`, `subscription_charges.cpp`
-- [ ] Add to `db_schema/CMakeLists.txt`
-- [ ] Add to `make_database_info.cpp`
-- [ ] Add to `create_database.cpp` (subscriptions before subscription_charges)
-- [ ] Add to `MakePaymentTables` test helper
-- [ ] Add admin metadata (column friendly names, etc.)
+- [x] Create `db_schema/subscriptions.h`, `subscriptions.cpp`
+- [x] Create `db_schema/subscription_charges.h`, `subscription_charges.cpp`
+- [x] Add to `db_schema/CMakeLists.txt`
+- [x] Add to `make_database_info.cpp`
+- [x] Add to `create_database.cpp` (subscriptions before subscription_charges)
+- [x] `MakePaymentTables` test helper is a no-op — tables are pre-created at startup
+- [x] Add admin metadata (table friendly names added; column friendly names deferred per existing pattern for payment tables)
 
 ## 3.2 Table Helpers
 
