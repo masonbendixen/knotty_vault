@@ -1145,9 +1145,9 @@ Form to create a subscription for any user:
 
 Note: Self-service subscription signup does NOT expose the custom start/end date override — users always select a start month/year and get standard calendar-month periods.
 
-- [ ] Create all Angular components listed above
-- [ ] Add routes to portal routing
-- [ ] Add navigation links in portal sidebar/menu
+- [x] Create all Angular components listed above
+- [x] Add routes to portal routing
+- [x] Add navigation links in portal sidebar/menu
 
 ## 3.8 Wiring — Permission Integration
 
