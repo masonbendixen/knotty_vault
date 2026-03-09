@@ -561,10 +561,16 @@ Update these existing components to use `PaymentMethodComponent`:
 
 ## 1.9 Wiring
 
+**Implementation note**: Instead of passing `customer_id` from the client (which would expose Square internals), we implemented `saved_card_id` — the client sends the database ID of a saved card, and the server resolves the Square card/customer IDs internally. This is more secure and simpler for the client.
+
 - [x] Add card management page to portal navigation (under user profile area)
-- [ ] Update `purchase_pay_card` endpoint to accept optional `customer_id` in request body (for saved card payments)
-- [ ] Update `PayCardRequest` struct and `PayWithCard` to pass `customerId` through to `SquareClient::CreatePayment`
-- [ ] Update Angular `PayCardRequest` type to include optional `customer_id`
+- [x] Update `purchase_pay_card` endpoint to accept optional `saved_card_id` in request body (for saved card payments)
+- [x] Update `PayCardRequest` struct with `savedCardId` field; `PayWithCard` resolves saved card to Square IDs and passes `customerId` to `SquareClient::CreatePayment`
+- [x] Update Angular `PayCardRequest` type to include optional `saved_card_id` (and make `source_id` optional)
+- [x] Update `PaymentSource` type and `getPaymentSource()` in `PaymentMethodComponent` for card-on-file mode
+- [x] Update checkout and event-booking to spread `PaymentSource` into `PayCardRequest`
+- [x] Update `ServerAccessMock` for the new `PayCardRequest` shape
+- [x] Add endpoint tests for saved card payment (success, card not found, card not owned)
 
 ## 1.10 Tests
 
@@ -613,17 +619,17 @@ Add `customerId` field to `PayCardRequest`. Pass it through to `SquareClient::Cr
 
 The book event endpoint internally creates a purchase and payment. It needs the same `customer_id` support.
 
-- [ ] Update `PayCardRequest` struct in `payment_helper.h`
-- [ ] Update `PayWithCard` to pass `customerId` to Square
-- [ ] Update `purchase_pay_card.cpp` to parse `customer_id` from request
-- [ ] Update `book_event.cpp` to accept `customer_id`
-- [ ] Update endpoint tests
+- [x] Update `PayCardRequest` struct in `payment_helper.h` (added `savedCardId`)
+- [x] Update `PayWithCard` to resolve saved card and pass `customerId` to Square
+- [x] Update `purchase_pay_card.cpp` to parse `saved_card_id` from request
+- [ ] Update `book_event.cpp` to accept `saved_card_id` (deferred — book_event doesn't handle payment directly; payment goes through `purchase_pay_card`)
+- [x] Update endpoint tests
 
 ## 2.2 Client Changes
 
-- [ ] Update `PayCardRequest` type in `payment.types.ts` to include optional `customer_id`
-- [ ] Update `purchasePayCard` in `ServerAccess` to pass `customer_id`
-- [ ] Refactor checkout and event booking pages to use `PaymentMethodComponent`
+- [x] Update `PayCardRequest` type in `payment.types.ts` to include optional `saved_card_id`
+- [x] Update `PaymentMethodComponent` to return `saved_card_id` for card-on-file mode
+- [x] Refactor checkout and event booking pages to use `PaymentMethodComponent` (done in 1.8, wiring in 1.9)
 
 ---
 
