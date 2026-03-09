@@ -1018,10 +1018,10 @@ KeyValueTableArray SubscriptionInfoToKeyValueTableArray(const std::vector<Subscr
 }
 ```
 
-- [ ] Create endpoint files for each endpoint
-- [ ] Add to `endpoints/CMakeLists.txt`
-- [ ] Register all in `web_app.cpp`
-- [ ] Write endpoint tests
+- [x] Create endpoint files for each endpoint
+- [x] Add to `endpoints/CMakeLists.txt`
+- [x] Register all in `web_app.cpp`
+- [x] Write endpoint tests
 
 ## 3.5 Client Types
 
@@ -1063,7 +1063,7 @@ export interface CreateSubscriptionResponse {
 }
 ```
 
-- [ ] Add types to `payment.types.ts`
+- [x] Add types to `payment.types.ts`
 
 ## 3.6 Client Network / Service Layer
 
