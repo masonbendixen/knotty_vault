@@ -1078,9 +1078,9 @@ cancelSubscription(id: number, reason?: string): Observable<void>;
 updateSubscription(id: number, updates: { saved_card_id?: number | null }): Observable<Subscription>;
 ```
 
-- [ ] Add to `ServerAccess` interface
-- [ ] Implement in `ServerAccessNetwork`
-- [ ] Implement in `ServerAccessMock`
+- [x] Add to `ServerAccess` interface
+- [x] Implement in `ServerAccessNetwork`
+- [x] Implement in `ServerAccessMock`
 
 ## 3.7 Components
 
