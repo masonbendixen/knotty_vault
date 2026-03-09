@@ -736,9 +736,9 @@ public:
 }
 ```
 
-- [ ] Create table helper files in `sql_util/table_helpers/`
-- [ ] Add to `sql_util/table_helpers/CMakeLists.txt`
-- [ ] Write tests
+- [x] Create table helper files in `sql_util/table_helpers/`
+- [x] Add to `sql_util/table_helpers/CMakeLists.txt`
+- [x] Write tests
 
 ## 3.3 Business Logic — `SubscriptionHelper`
 
