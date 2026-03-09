@@ -511,9 +511,9 @@ updateCard(cardId: number, request: UpdateCardRequest): Observable<SavedCard>;
 deleteCard(cardId: number): Observable<void>;
 ```
 
-- [ ] Add methods to `ServerAccess` interface
-- [ ] Implement in `ServerAccessNetwork`
-- [ ] Implement in `ServerAccessMock`
+- [x] Add methods to `ServerAccess` interface
+- [x] Implement in `ServerAccessNetwork`
+- [x] Implement in `ServerAccessMock`
 
 ## 1.8 Components
 
