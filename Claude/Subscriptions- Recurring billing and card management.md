@@ -930,12 +930,12 @@ KeyValueTable SubscriptionInfoToKeyValueTable(const SubscriptionInfo& sub);
 KeyValueTableArray SubscriptionInfoToKeyValueTableArray(const std::vector<SubscriptionInfo>& subs);
 ```
 
-- [ ] Create `subscription_helper.h/cpp` in `business_logic/payment/`
-- [ ] Add calendar month utilities to `util/date_time_util.h/cpp`
-- [ ] Create email templates for billing and subscription creation
-- [ ] Add KV conversion functions
-- [ ] Add to CMakeLists.txt
-- [ ] Write tests for all of the above
+- [x] Create `subscription_helper.h/cpp` in `business_logic/payment/`
+- [x] Add calendar month utilities to `util/date_time_util.h/cpp`
+- [x] Create email templates for billing and subscription creation
+- [x] Add KV conversion functions
+- [x] Add to CMakeLists.txt
+- [x] Write tests for all of the above
 
 ## 3.4 Endpoints
 
