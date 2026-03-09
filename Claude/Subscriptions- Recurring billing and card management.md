@@ -1191,11 +1191,11 @@ ProductEntitlementRule: Gold Membership
   validity_kind = "calendar_month"
 ```
 
-- [ ] Add seed subscription product + pricing to `create_database.cpp`
-- [ ] Add `"calendar_month"` as a new `validity_kind` value
-- [ ] Update `EntitlementHelper` to handle `validity_kind = "calendar_month"` (valid_from = period start, valid_to = period end — set by subscription helper, not calculated by entitlement helper)
-- [ ] Verify permission computation includes subscription entitlements (should work already)
-- [ ] Add permission display to user profile component
+- [x] Add seed subscription product + pricing to `create_database.cpp`
+- [x] Add `"calendar_month"` as a new `validity_kind` value
+- [x] Update `EntitlementHelper` to handle `validity_kind = "calendar_month"` (valid_from = period start, valid_to = period end — set by subscription helper, not calculated by entitlement helper)
+- [x] Verify permission computation includes subscription entitlements (should work already)
+- [x] Add permission display to user profile component
 
 ## 3.9 Tests
 
