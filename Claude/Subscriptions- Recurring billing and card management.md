@@ -1235,8 +1235,8 @@ Tracks who is allowed to assign entitlement seats to whom.
 
 ### Registration
 
-- [ ] Create `db_schema/gift_permissions.h`, `gift_permissions.cpp`
-- [ ] Add to CMakeLists, make_database_info, create_database, test helper
+- [x] Create `db_schema/gift_permissions.h`, `gift_permissions.cpp`
+- [x] Add to CMakeLists, make_database_info, create_database, test helper
 
 ## 4.2 Table Helpers
 
@@ -1271,8 +1271,8 @@ public:
 }
 ```
 
-- [ ] Create table helper files
-- [ ] Write tests
+- [x] Create table helper files
+- [x] Write tests
 
 ## 4.3 Business Logic — `GiftPermissionHelper`
 
