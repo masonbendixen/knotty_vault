@@ -495,7 +495,7 @@ export interface UpdateCardRequest {
 }
 ```
 
-- [ ] Add types to `payment.types.ts`
+- [x] Add types to `payment.types.ts`
 
 ## 1.7 Client Network / Service Layer
 
