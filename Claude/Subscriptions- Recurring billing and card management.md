@@ -1454,7 +1454,7 @@ revokeGiftPermission(id: number): Observable<void>;
 searchGiftableUsers(query: string): Observable<GiftableUser[]>;
 ```
 
-- [ ] Add to `ServerAccess` interface and implementations
+- [x] Add to `ServerAccess` interface and implementations
 
 ## 4.7 Components
 
