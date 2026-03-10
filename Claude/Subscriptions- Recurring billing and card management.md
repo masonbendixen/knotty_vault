@@ -1513,8 +1513,8 @@ Update `EntitlementHelper::AssignEntitlement` to check gift permissions:
 
 When a seat is assigned to a grantee, the grantee gets the permission via the existing entitlement → permission computation. Their portal should show the permission badge automatically.
 
-- [ ] Add gift permission check to `EntitlementHelper::AssignEntitlement` (or create a new business-level method that wraps the check + assignment)
-- [ ] Verify beneficiary permission display works end-to-end
+- [x] Add gift permission check to `EntitlementHelper::AssignEntitlement` (or create a new business-level method that wraps the check + assignment)
+- [x] Verify beneficiary permission display works end-to-end
 
 ## 4.9 Tests
 
