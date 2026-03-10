@@ -1368,10 +1368,10 @@ Add to `payment_key_value_table.h/cpp`:
 KeyValueTable GiftPermissionInfoToKeyValueTable(const GiftPermissionInfo& info);
 ```
 
-- [ ] Create helper files
-- [ ] Create email template
-- [ ] Add KV conversion
-- [ ] Write tests
+- [x] Create helper files
+- [x] Create email template
+- [x] Add KV conversion
+- [x] Write tests
 
 ## 4.4 Endpoints
 
