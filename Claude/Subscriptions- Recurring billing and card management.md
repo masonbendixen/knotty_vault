@@ -1440,7 +1440,7 @@ export interface GiftableUser {
 }
 ```
 
-- [ ] Add types to `payment.types.ts`
+- [x] Add types to `payment.types.ts`
 
 ## 4.6 Client Network / Service Layer
 
