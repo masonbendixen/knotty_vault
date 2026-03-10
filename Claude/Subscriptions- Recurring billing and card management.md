@@ -1405,9 +1405,9 @@ Returns both "people I can gift to" and "people who can gift to me" sections.
 
 Returns users the logged-in user has accepted gift permission for, matching the query string against first name, last name, or email. Used for autocomplete when assigning entitlement seats.
 
-- [ ] Create endpoint files
-- [ ] Register in web_app.cpp
-- [ ] Write endpoint tests
+- [x] Create endpoint files
+- [x] Register in web_app.cpp
+- [x] Write endpoint tests
 
 ## 4.5 Client Types
 
