@@ -1563,10 +1563,10 @@ struct EntitlementAssignmentInfo {
 
 Update `EntitlementHelper::GetAssignments` to populate person details by looking up each person.
 
-- [ ] Add person fields to `EntitlementAssignmentInfo`
-- [ ] Update `GetAssignments` to populate person details
-- [ ] Add `EntitlementAssignmentInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
-- [ ] Add tests to `payment_key_value_table_test.cpp`
+- [x] Add person fields to `EntitlementAssignmentInfo`
+- [x] Update `GetAssignments` to populate person details
+- [x] Add `EntitlementAssignmentInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
+- [x] Add tests to `payment_key_value_table_test.cpp`
 
 ## 5.2 Business Logic — Subscription Entitlement Lookup
 
@@ -1583,8 +1583,8 @@ std::optional<EntitlementInfo> GetCurrentEntitlementForSubscription(
     int64_t subscriptionId);
 ```
 
-- [ ] Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
-- [ ] Add tests to `subscription_helper_test.cpp`
+- [x] Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
+- [x] Add tests to `subscription_helper_test.cpp`
 
 ## 5.3 Endpoint — Subscription Detail with Entitlement
 
