@@ -206,7 +206,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Subscriptions- Recurring billing and card management.md",
+                "file": "Claude/Scheduling thin slice.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -221,7 +221,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Subscriptions- Recurring billing and card management"
+              "title": "Scheduling thin slice"
             }
           }
         ],
@@ -528,15 +528,16 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "756a1bc18f8f2ce3",
+  "active": "90e27d4ef876844d",
   "lastOpenFiles": [
-    "Dashboard.md",
+    "Claude/Square credentials and Sandbox setup.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
+    "Claude/Support for scheduled purchases.md",
+    "Claude/Payment Design Document.md",
+    "Dashboard.md",
     "Claude/Improving test execution speed.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "Projects/Work for Tyler.md",
-    "Claude/Support for scheduled purchases.md",
-    "Claude/Payment Design Document.md",
     "Claude/Product browsing and quoting endpoints.md",
     "Claude/Adding an instructor page with photos.md",
     "Claude/Prework for adding classes.md",
@@ -557,7 +558,6 @@
     "Projects/HTTPS Support.md",
     "Projects/Error handling for the server.md",
     "Projects/Dashboard cleanup.md",
-    "Projects/Completing Core Functionality.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
