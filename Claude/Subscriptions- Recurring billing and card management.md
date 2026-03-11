@@ -1568,9 +1568,9 @@ Update `EntitlementHelper::GetAssignments` to populate person details by looking
 - [ ] Add `EntitlementAssignmentInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
 - [ ] Add tests to `payment_key_value_table_test.cpp`
 
-## 5.2 Backend — Subscription Entitlement Lookup
+## 5.2 Business Logic — Subscription Entitlement Lookup
 
-The subscription detail endpoint currently returns only the subscription object. To manage seats, the UI needs to know the current entitlement and its assignments.
+The UI needs to know the current entitlement and its assignments to manage seats. Add a method to `SubscriptionHelper` to retrieve the current entitlement for a subscription.
 
 ### Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
 
@@ -1583,9 +1583,14 @@ std::optional<EntitlementInfo> GetCurrentEntitlementForSubscription(
     int64_t subscriptionId);
 ```
 
-### Enrich subscription detail endpoint response
+- [ ] Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
+- [ ] Add tests to `subscription_helper_test.cpp`
 
-Update `GET /api/subscriptions/<int>` to include entitlement + assignments:
+## 5.3 Endpoint — Subscription Detail with Entitlement
+
+The subscription detail endpoint currently returns only the subscription object. Enrich it to include the current entitlement and its seat assignments.
+
+Update `GET /api/subscriptions/<int>` response:
 
 ```json
 {
@@ -1610,11 +1615,10 @@ Update `GET /api/subscriptions/<int>` to include entitlement + assignments:
 }
 ```
 
-- [ ] Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
 - [ ] Update `GET /api/subscriptions/<int>` to include `current_entitlement` with assignments
-- [ ] Add tests for the new method and updated endpoint
+- [ ] Add endpoint tests for the enriched response
 
-## 5.3 Endpoints — Entitlement Seat Assignment
+## 5.4 Endpoints — Entitlement Seat Assignment
 
 ### `POST /api/entitlements/<int>/assign` — Assign a person to a seat
 
@@ -1703,7 +1707,7 @@ Update `GET /api/subscriptions/<int>` to include entitlement + assignments:
 - [ ] Register in `web_app.cpp`
 - [ ] Write endpoint tests
 
-## 5.4 Client Types
+## 5.5 Client Types
 
 **File**: `ui/src/app/shared/types/payment.types.ts`
 
@@ -1735,7 +1739,7 @@ export interface AssignSeatResponse {
 
 - [ ] Add types to `payment.types.ts`
 
-## 5.5 Client Network / Service Layer
+## 5.6 Client Network / Service Layer
 
 Add to `ServerAccess` interface:
 
@@ -1759,7 +1763,7 @@ removeEntitlementAssignment(entitlementId: number, personId: number): Observable
 - [ ] Implement in `ServerAccessMock`
 - [ ] Add tests to `ServerAccess.mock.spec.ts`
 
-## 5.6 Components
+## 5.7 Components
 
 ### Entitlement Seat Assignment Control — `SeatAssignmentComponent`
 
@@ -1831,7 +1835,7 @@ Update `MySubscriptionsComponent` list view to show a brief seat summary for eac
 - [ ] Update `SubscriptionSignupComponent` for post-creation seat assignment
 - [ ] Add routes/navigation as needed
 
-## 5.7 Tests
+## 5.8 Tests
 
 | Layer | Test File | What to Test |
 |-------|-----------|------------|
@@ -1978,11 +1982,12 @@ The recommended implementation order across all parts:
 | 17 | 4.5-4.7 | Client | Gift permission types + network + components | 16 |
 | 18 | 4.8 | Wiring | Entitlement assignment validation | 16, 17 |
 | 19 | 5.1-5.2 | Backend | Entitlement assignment KV + subscription entitlement lookup | 18 |
-| 20 | 5.3 | Endpoints | Entitlement seat assignment endpoints + tests | 19 |
-| 21 | 5.4-5.5 | Client | Seat assignment types + network + mock | 20 |
-| 22 | 5.6 | Components | SeatAssignmentComponent + subscription detail/signup wiring | 21 |
-| 23 | 6.1 | Enhancement | Grace period handling | 9 |
-| 24 | 6.2-6.3 | Enhancement | Expiring card/entitlement notifications | 5, 9 |
+| 20 | 5.3 | Endpoint | Subscription detail with entitlement + assignments | 19 |
+| 21 | 5.4 | Endpoints | Entitlement seat assignment endpoints + tests | 19 |
+| 22 | 5.5-5.6 | Client | Seat assignment types + network + mock | 20, 21 |
+| 23 | 5.7 | Components | SeatAssignmentComponent + subscription detail/signup wiring | 22 |
+| 24 | 6.1 | Enhancement | Grace period handling | 9 |
+| 25 | 6.2-6.3 | Enhancement | Expiring card/entitlement notifications | 5, 9 |
 
 ---
 
