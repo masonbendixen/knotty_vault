@@ -1495,10 +1495,8 @@ Update `MySubscriptionsComponent` to show seat assignments for multi-seat subscr
 - Shows permission granted to each assignee
 
 - [x] Create `GiftPermissionsComponent`
-- [ ] Create `SeatAssignmentComponent`
-- [ ] Extend subscription signup for multi-seat
-- [ ] Extend subscription detail for multi-seat view
 - [x] Add gift permissions route to portal routing
+- Remaining seat assignment work (SeatAssignmentComponent, multi-seat subscription signup/detail) moved to **Part 5**
 
 ## 4.8 Wiring
 
