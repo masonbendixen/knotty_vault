@@ -206,7 +206,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Scheduling thin slice.md",
+                "file": "Claude/Subscriptions- Recurring billing and card management.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -221,7 +221,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Scheduling thin slice"
+              "title": "Subscriptions- Recurring billing and card management"
             }
           }
         ],
@@ -528,13 +528,16 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "90e27d4ef876844d",
+  "active": "756a1bc18f8f2ce3",
   "lastOpenFiles": [
+    "Dashboard.md",
+    "Claude/Add unique constraint for multiple columns on table.md",
+    "Projects/Wiring up client and server.md",
+    "Claude/Support for scheduled purchases.md",
+    "Claude/Scheduling thin slice.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
-    "Claude/Support for scheduled purchases.md",
     "Claude/Payment Design Document.md",
-    "Dashboard.md",
     "Claude/Improving test execution speed.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "Projects/Work for Tyler.md",
@@ -547,7 +550,6 @@
     "Sources/libsodium.md",
     "Sources/Images/register.component.html",
     "Sources/Images",
-    "Projects/Wiring up client and server.md",
     "Projects/Using Claude Code.md",
     "Projects/Using Claude Code in my project.md",
     "Projects/Rich create, edit, view support for items.md",
@@ -556,8 +558,6 @@
     "Projects/Nested item support.md",
     "Projects/Image support.md",
     "Projects/HTTPS Support.md",
-    "Projects/Error handling for the server.md",
-    "Projects/Dashboard cleanup.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
