@@ -1830,10 +1830,10 @@ Update `MySubscriptionsComponent` list view to show a brief seat summary for eac
 
 **Pragmatic approach**: For the list view, just show the subscription status and a "Manage" button. The detail view (which already gets enriched with entitlement info) handles all seat management. This avoids N+1 API calls in the list.
 
-- [ ] Create `SeatAssignmentComponent`
-- [ ] Update `SubscriptionDetailComponent` to use `getSubscriptionDetail` and show `SeatAssignmentComponent`
-- [ ] Update `SubscriptionSignupComponent` for post-creation seat assignment
-- [ ] Add routes/navigation as needed
+- [x] Create `SeatAssignmentComponent`
+- [x] Update `SubscriptionDetailComponent` to use `getSubscriptionDetail` and show `SeatAssignmentComponent`
+- [x] Update `SubscriptionSignupComponent` for post-creation seat assignment
+- [x] Add routes/navigation as needed
 
 ## 5.8 Tests
 
