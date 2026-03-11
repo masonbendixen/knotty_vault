@@ -1526,11 +1526,329 @@ When a seat is assigned to a grantee, the grantee gets the permission via the ex
 
 ---
 
-# Part 5: Non-Thin-Slice Subscription Support
+# Part 5: Entitlement Seat Management
 
-These are the remaining Phase 4 scenarios from Payment Design Document.md not covered by the thin slice (Parts 1-4).
+This part adds the full vertical slice for managing entitlement seat assignments — from backend endpoints through frontend UI. This enables users to assign subscription seats to themselves, to other users they have gift permission for, or even to assign ALL seats to others (e.g., purchasing a membership as a gift).
 
-## 5.1 Grace Period Handling (Scenarios 14, 15)
+**Design principle**: The purchaser does NOT have to occupy a seat. A single-seat Gold membership can be purchased by person A and the seat assigned entirely to person B. A couple's membership can have both seats assigned to people other than the purchaser. This applies to all seat counts.
+
+## 5.1 Backend — KeyValueTable Conversions
+
+Add `EntitlementAssignmentInfo` conversion to `payment_key_value_table.h/cpp`:
+
+```cpp
+KeyValueTable EntitlementAssignmentInfoToKeyValueTable(const EntitlementAssignmentInfo& info);
+KeyValueTableArray EntitlementAssignmentInfoToKeyValueTableArray(
+    const std::vector<EntitlementAssignmentInfo>& assignments);
+```
+
+The assignment KV should include person details (first name, last name, email) for display in the UI. This requires joining with the `people` table. Options:
+- Enrich `EntitlementAssignmentInfo` with person details (add `firstName`, `lastName`, `email` fields)
+- Or do the join in the KV conversion function
+
+**Decision**: Enrich `EntitlementAssignmentInfo` with person details. Add fields:
+
+```cpp
+struct EntitlementAssignmentInfo {
+    int64_t id = 0;
+    int64_t entitlementId = 0;
+    int64_t personId = 0;
+    std::string personFirstName;   // NEW
+    std::string personLastName;    // NEW
+    std::string personEmail;       // NEW
+    std::optional<int64_t> removedUs;
+    std::string removedReason;
+};
+```
+
+Update `EntitlementHelper::GetAssignments` to populate person details by looking up each person.
+
+- [ ] Add person fields to `EntitlementAssignmentInfo`
+- [ ] Update `GetAssignments` to populate person details
+- [ ] Add `EntitlementAssignmentInfoToKeyValueTable` to `payment_key_value_table.h/cpp`
+- [ ] Add tests to `payment_key_value_table_test.cpp`
+
+## 5.2 Backend — Subscription Entitlement Lookup
+
+The subscription detail endpoint currently returns only the subscription object. To manage seats, the UI needs to know the current entitlement and its assignments.
+
+### Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
+
+```cpp
+// Returns the active entitlement for the subscription's current billing period.
+// Looks up the most recent subscription_charge with status="completed" and returns
+// its entitlement.
+std::optional<EntitlementInfo> GetCurrentEntitlementForSubscription(
+    Transaction& transaction,
+    int64_t subscriptionId);
+```
+
+### Enrich subscription detail endpoint response
+
+Update `GET /api/subscriptions/<int>` to include entitlement + assignments:
+
+```json
+{
+    "subscription": { ... },
+    "current_entitlement": {
+        "id": 123,
+        "seats_total": 2,
+        "seats_used": 1,
+        "status": "active",
+        "valid_from_us": ...,
+        "valid_to_us": ...,
+        "assignments": [
+            {
+                "id": 1,
+                "person_id": 42,
+                "person_first_name": "Mason",
+                "person_last_name": "Bendixen",
+                "person_email": "mason@example.com"
+            }
+        ]
+    }
+}
+```
+
+- [ ] Add `GetCurrentEntitlementForSubscription` to `SubscriptionHelper`
+- [ ] Update `GET /api/subscriptions/<int>` to include `current_entitlement` with assignments
+- [ ] Add tests for the new method and updated endpoint
+
+## 5.3 Endpoints — Entitlement Seat Assignment
+
+### `POST /api/entitlements/<int>/assign` — Assign a person to a seat
+
+**Request**:
+```json
+{
+    "person_id": 42
+}
+```
+
+**Response** (200):
+```json
+{
+    "assignment": {
+        "id": 1,
+        "entitlement_id": 123,
+        "person_id": 42,
+        "person_first_name": "Other",
+        "person_last_name": "User",
+        "person_email": "other@example.com"
+    },
+    "entitlement": {
+        "id": 123,
+        "seats_total": 2,
+        "seats_used": 1,
+        ...
+    }
+}
+```
+
+**Auth**: Logged-in user. Uses `AssignEntitlementWithGiftCheck`:
+- Self-assignment always allowed
+- Admin users bypass gift permission checks
+- Otherwise requires accepted gift permission to the assignee
+
+**Validation**:
+- Entitlement must exist and be active
+- Must have available seats (`seats_used < seats_total`)
+- Caller must own the entitlement's purchase OR be an admin
+
+### `DELETE /api/entitlements/<int>/assignments/<int:personId>` — Remove a seat assignment
+
+**Response** (200):
+```json
+{
+    "entitlement": {
+        "id": 123,
+        "seats_total": 2,
+        "seats_used": 0,
+        ...
+    }
+}
+```
+
+**Auth**: Logged-in user. Must own the entitlement's purchase OR be an admin OR be removing themselves.
+
+### `GET /api/entitlements/<int>/assignments` — List seat assignments
+
+**Response** (200):
+```json
+{
+    "entitlement": {
+        "id": 123,
+        "seats_total": 2,
+        "seats_used": 1,
+        ...
+    },
+    "assignments": [
+        {
+            "id": 1,
+            "person_id": 42,
+            "person_first_name": "Mason",
+            "person_last_name": "Bendixen",
+            "person_email": "mason@example.com"
+        }
+    ]
+}
+```
+
+**Auth**: Logged-in user. Must own the entitlement's purchase OR be assigned to it OR be an admin.
+
+### Files
+
+- [ ] Create `endpoints/entitlement_assignments.h`, `entitlement_assignments.cpp`, `entitlement_assignments_test.cpp`
+- [ ] Add to `endpoints/CMakeLists.txt`
+- [ ] Register in `web_app.cpp`
+- [ ] Write endpoint tests
+
+## 5.4 Client Types
+
+**File**: `ui/src/app/shared/types/payment.types.ts`
+
+```typescript
+// ENTITLEMENT SEAT ASSIGNMENT
+export interface EntitlementAssignment {
+    id: number;
+    entitlement_id: number;
+    person_id: number;
+    person_first_name: string;
+    person_last_name: string;
+    person_email: string;
+}
+
+export interface EntitlementWithAssignments extends Entitlement {
+    assignments: EntitlementAssignment[];
+}
+
+export interface SubscriptionDetailResponse {
+    subscription: Subscription;
+    current_entitlement?: EntitlementWithAssignments;
+}
+
+export interface AssignSeatResponse {
+    assignment: EntitlementAssignment;
+    entitlement: Entitlement;
+}
+```
+
+- [ ] Add types to `payment.types.ts`
+
+## 5.5 Client Network / Service Layer
+
+Add to `ServerAccess` interface:
+
+```typescript
+// Entitlement seat management
+getSubscriptionDetail(id: number): Observable<SubscriptionDetailResponse>;
+getEntitlementAssignments(entitlementId: number): Observable<{
+    entitlement: Entitlement;
+    assignments: EntitlementAssignment[];
+}>;
+assignEntitlementSeat(entitlementId: number, personId: number): Observable<AssignSeatResponse>;
+removeEntitlementAssignment(entitlementId: number, personId: number): Observable<{
+    entitlement: Entitlement;
+}>;
+```
+
+**Note**: `getSubscriptionDetail` replaces the existing `getSubscription` method (or could be a new method that returns the richer response). The existing `getSubscription` remains for list views where entitlement details aren't needed.
+
+- [ ] Add methods to `ServerAccess` interface
+- [ ] Implement in `ServerAccessNetwork`
+- [ ] Implement in `ServerAccessMock`
+- [ ] Add tests to `ServerAccess.mock.spec.ts`
+
+## 5.6 Components
+
+### Entitlement Seat Assignment Control — `SeatAssignmentComponent`
+
+**Location**: `ui/src/app/shared/components/seat-assignment/`
+
+A reusable control for assigning and managing entitlement seats. Inputs: entitlement ID, seats_total, seats_used, current assignments.
+
+**Display**:
+- Seat counter: `{seats_used}/{seats_total} seats assigned`
+- Progress bar or visual indicator of seat usage
+- List of current assignments:
+  - Each shows person name and email
+  - Remove button (X) next to each assignment
+- If seats available (`seats_used < seats_total`):
+  - Autocomplete search field for giftable users (calls `searchGiftableUsers`)
+  - "Assign to myself" quick button
+  - The autocomplete results show first name, last name, email
+  - Selecting a user calls `assignEntitlementSeat`
+- If no giftable users exist and user wants to assign to someone else:
+  - Link to gift permissions page ("Set up sharing first")
+- Refresh button to reload assignments (useful after accepting a gift permission)
+
+**Events emitted**:
+- `seatAssigned`: when a seat is assigned
+- `seatRemoved`: when a seat is removed
+
+```typescript
+@Component({
+    selector: 'app-seat-assignment',
+    templateUrl: './seat-assignment.component.html',
+    styleUrls: ['./seat-assignment.component.scss']
+})
+export class SeatAssignmentComponent {
+    @Input() entitlementId!: number;
+    @Input() seatsTotal!: number;
+    @Input() seatsUsed!: number;
+    @Input() assignments: EntitlementAssignment[] = [];
+
+    @Output() seatAssigned = new EventEmitter<AssignSeatResponse>();
+    @Output() seatRemoved = new EventEmitter<void>();
+}
+```
+
+### Subscription Detail — Multi-Seat View
+
+Update `SubscriptionDetailComponent` to:
+- Fetch full subscription detail (with entitlement + assignments) using `getSubscriptionDetail`
+- If the subscription has a current entitlement, show the `SeatAssignmentComponent`
+- For single-seat subscriptions: show seat assignment (user can assign to themselves or gift to another)
+- For multi-seat subscriptions: show seat assignment with full counter and multi-user list
+
+### Subscription Signup — Post-Creation Seat Assignment
+
+Update `SubscriptionSignupComponent` to:
+- After successful subscription creation with `charge_now = true`, show `SeatAssignmentComponent` for the new entitlement
+- For products with `seats_default > 1`, display the seat count in the product info before purchase
+- Show a note like "This membership includes {seats_total} seats that you can assign to yourself and others"
+
+### My Subscriptions — Seat Summary
+
+Update `MySubscriptionsComponent` list view to show a brief seat summary for each subscription:
+- "{seats_used}/{seats_total} seats assigned" badge on each subscription card
+- This requires the list endpoint to include entitlement info, OR a separate call per subscription (batched)
+
+**Pragmatic approach**: For the list view, just show the subscription status and a "Manage" button. The detail view (which already gets enriched with entitlement info) handles all seat management. This avoids N+1 API calls in the list.
+
+- [ ] Create `SeatAssignmentComponent`
+- [ ] Update `SubscriptionDetailComponent` to use `getSubscriptionDetail` and show `SeatAssignmentComponent`
+- [ ] Update `SubscriptionSignupComponent` for post-creation seat assignment
+- [ ] Add routes/navigation as needed
+
+## 5.7 Tests
+
+| Layer | Test File | What to Test |
+|-------|-----------|------------|
+| KV Conversion | `payment_key_value_table_test.cpp` | `EntitlementAssignmentInfoToKeyValueTable` |
+| Business Logic | `subscription_helper_test.cpp` | `GetCurrentEntitlementForSubscription` |
+| Endpoints | `entitlement_assignments_test.cpp` | Assign seat, remove assignment, list assignments, permission checks |
+| Endpoints | `subscriptions_test.cpp` | Updated detail response includes entitlement + assignments |
+| Angular | `seat-assignment.component.spec.ts` | Display, assign, remove, autocomplete |
+| Angular | `ServerAccess.mock.spec.ts` | New entitlement assignment mock methods |
+
+---
+
+# Part 6: Non-Thin-Slice Subscription Support
+
+These are the remaining Phase 4 scenarios from Payment Design Document.md not covered by the thin slice (Parts 1-5).
+
+## 6.1 Grace Period Handling (Scenarios 14, 15)
 
 When a subscription auto-pay charge fails:
 
@@ -1567,7 +1885,7 @@ Update `SubscriptionHelper::ProcessBillingForSubscription`:
 - [ ] Update permission computation for grace period
 - [ ] Tests
 
-## 5.2 Card Management Enhancements (Scenarios 17, 18, 19, 21)
+## 6.2 Card Management Enhancements (Scenarios 17, 18, 19, 21)
 
 Mostly covered by Part 1. Remaining items:
 
@@ -1594,7 +1912,7 @@ Body: Card details, link to update in portal
 - [ ] Create email template
 - [ ] Tests
 
-## 5.3 Subscription Lifecycle (Scenarios 16, 20)
+## 6.3 Subscription Lifecycle (Scenarios 16, 20)
 
 ### Buy next month, get current month free (Scenario 16)
 
@@ -1624,7 +1942,7 @@ Body: Entitlement details, link to renew/subscribe
 - [ ] Create email template
 - [ ] Tests
 
-## 5.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33)
+## 6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33)
 
 These are Post-MVP / Low Priority per the Payment Design Document. Deferring from this planning document.
 
@@ -1659,8 +1977,12 @@ The recommended implementation order across all parts:
 | 16 | 4.3-4.4 | Business + Endpoints | GiftPermissionHelper + endpoints | 15 |
 | 17 | 4.5-4.7 | Client | Gift permission types + network + components | 16 |
 | 18 | 4.8 | Wiring | Entitlement assignment validation | 16, 17 |
-| 19 | 5.1 | Enhancement | Grace period handling | 9 |
-| 20 | 5.2-5.3 | Enhancement | Expiring card/entitlement notifications | 5, 9 |
+| 19 | 5.1-5.2 | Backend | Entitlement assignment KV + subscription entitlement lookup | 18 |
+| 20 | 5.3 | Endpoints | Entitlement seat assignment endpoints + tests | 19 |
+| 21 | 5.4-5.5 | Client | Seat assignment types + network + mock | 20 |
+| 22 | 5.6 | Components | SeatAssignmentComponent + subscription detail/signup wiring | 21 |
+| 23 | 6.1 | Enhancement | Grace period handling | 9 |
+| 24 | 6.2-6.3 | Enhancement | Expiring card/entitlement notifications | 5, 9 |
 
 ---
 
