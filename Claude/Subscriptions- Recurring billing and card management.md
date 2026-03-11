@@ -1737,7 +1737,7 @@ export interface AssignSeatResponse {
 }
 ```
 
-- [ ] Add types to `payment.types.ts`
+- [x] Add types to `payment.types.ts`
 
 ## 5.6 Client Network / Service Layer
 
