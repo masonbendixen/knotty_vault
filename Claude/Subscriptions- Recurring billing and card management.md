@@ -1758,10 +1758,10 @@ removeEntitlementAssignment(entitlementId: number, personId: number): Observable
 
 **Note**: `getSubscriptionDetail` replaces the existing `getSubscription` method (or could be a new method that returns the richer response). The existing `getSubscription` remains for list views where entitlement details aren't needed.
 
-- [ ] Add methods to `ServerAccess` interface
-- [ ] Implement in `ServerAccessNetwork`
-- [ ] Implement in `ServerAccessMock`
-- [ ] Add tests to `ServerAccess.mock.spec.ts`
+- [x] Add methods to `ServerAccess` interface
+- [x] Implement in `ServerAccessNetwork`
+- [x] Implement in `ServerAccessMock`
+- [x] Add tests to `ServerAccess.mock.spec.ts`
 
 ## 5.7 Components
 
