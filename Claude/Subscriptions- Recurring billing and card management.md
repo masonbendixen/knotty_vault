@@ -1615,8 +1615,8 @@ Update `GET /api/subscriptions/<int>` response:
 }
 ```
 
-- [ ] Update `GET /api/subscriptions/<int>` to include `current_entitlement` with assignments
-- [ ] Add endpoint tests for the enriched response
+- [x] Update `GET /api/subscriptions/<int>` to include `current_entitlement` with assignments
+- [x] Add endpoint tests for the enriched response
 
 ## 5.4 Endpoints — Entitlement Seat Assignment
 
@@ -1702,10 +1702,10 @@ Update `GET /api/subscriptions/<int>` response:
 
 ### Files
 
-- [ ] Create `endpoints/entitlement_assignments.h`, `entitlement_assignments.cpp`, `entitlement_assignments_test.cpp`
-- [ ] Add to `endpoints/CMakeLists.txt`
-- [ ] Register in `web_app.cpp`
-- [ ] Write endpoint tests
+- [x] Create `endpoints/entitlement_assignments.h`, `entitlement_assignments.cpp`, `entitlement_assignments_test.cpp`
+- [x] Add to `endpoints/CMakeLists.txt`
+- [x] Register in `web_app.cpp`
+- [x] Write endpoint tests
 
 ## 5.5 Client Types
 
