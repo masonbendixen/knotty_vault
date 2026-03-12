@@ -1882,12 +1882,13 @@ Update `SubscriptionHelper::ProcessBillingForSubscription`:
 - "Payment failed" email (with retry instructions)
 - "Grace period expiring" email (2 days before expiry)
 
-- [ ] Add grace period columns
-- [ ] Update billing logic for failure handling
-- [ ] Add retry endpoint
-- [ ] Create email templates
-- [ ] Update permission computation for grace period
-- [ ] Tests
+- [x] Add grace period columns
+- [x] Update billing logic for failure handling
+- [x] Add retry endpoint
+- [x] Create email templates
+- [x] Update permission computation for grace period
+- [x] Tests
+- [x] Grace period days configurable via secrets
 
 ## 6.2 Card Management Enhancements (Scenarios 17, 18, 19, 21)
 
