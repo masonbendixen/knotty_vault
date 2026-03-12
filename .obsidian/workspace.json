@@ -182,7 +182,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Support for scheduled purchases.md",
+                "file": "Claude/Subscriptions- Recurring billing and card management.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -197,7 +197,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Support for scheduled purchases"
+              "title": "Subscriptions- Recurring billing and card management"
             }
           },
           {
@@ -530,6 +530,7 @@
   },
   "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
+    "Claude/Support for scheduled purchases.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Square credentials and Sandbox setup.md",
@@ -542,7 +543,6 @@
     "Dashboard.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
-    "Claude/Support for scheduled purchases.md",
     "Claude/Scheduling thin slice.md",
     "Claude/Improving test execution speed.md",
     "Projects/Work for Tyler.md",
