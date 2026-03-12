@@ -182,7 +182,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Payment Design Document.md",
+                "file": "Claude/Tyler Work Item - Adding Classes page.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -197,7 +197,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Payment Design Document"
+              "title": "Tyler Work Item - Adding Classes page"
             }
           },
           {
@@ -528,22 +528,25 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "90e27d4ef876844d",
+  "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
     "Claude/Subscriptions- Recurring billing and card management.md",
+    "Claude/Square credentials and Sandbox setup.md",
+    "Claude/Purchase creation with server-side pricing.md",
+    "Claude/Product browsing and quoting endpoints.md",
+    "Claude/Prework for adding classes.md",
+    "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
+    "Claude/Payment Design Document.md",
+    "Claude/Payment base table helpers.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "Dashboard.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
     "Claude/Support for scheduled purchases.md",
     "Claude/Scheduling thin slice.md",
-    "Claude/Square credentials and Sandbox setup.md",
-    "Claude/Payment Design Document.md",
     "Claude/Improving test execution speed.md",
     "Projects/Work for Tyler.md",
-    "Claude/Product browsing and quoting endpoints.md",
     "Claude/Adding an instructor page with photos.md",
-    "Claude/Prework for adding classes.md",
     "Class/Project.md",
     "Templates/Claude.md",
     "Sources/mailio.md",
@@ -555,9 +558,6 @@
     "Projects/Rich create, edit, view support for items.md",
     "Projects/Payment Support.md",
     "Projects/Pagination support.md",
-    "Projects/Nested item support.md",
-    "Projects/Image support.md",
-    "Projects/HTTPS Support.md",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
