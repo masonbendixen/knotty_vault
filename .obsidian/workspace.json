@@ -182,7 +182,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Tyler Work Item - Adding Classes page.md",
+                "file": "Claude/Support for scheduled purchases.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -197,7 +197,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Tyler Work Item - Adding Classes page"
+              "title": "Support for scheduled purchases"
             }
           },
           {
@@ -530,6 +530,7 @@
   },
   "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
+    "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Purchase creation with server-side pricing.md",
@@ -538,7 +539,6 @@
     "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
     "Claude/Payment Design Document.md",
     "Claude/Payment base table helpers.md",
-    "Claude/Tyler Work Item - Adding Classes page.md",
     "Dashboard.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
