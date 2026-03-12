@@ -182,7 +182,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Subscriptions- Recurring billing and card management.md",
+                "file": "Claude/Payment Design Document.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -197,7 +197,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Subscriptions- Recurring billing and card management"
+              "title": "Payment Design Document"
             }
           },
           {
@@ -530,8 +530,8 @@
   },
   "active": "90e27d4ef876844d",
   "lastOpenFiles": [
-    "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
+    "Claude/Tyler Work Item - Adding Classes page.md",
     "Dashboard.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
