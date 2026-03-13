@@ -1949,6 +1949,60 @@ Body: Card details, link to update in portal
 - [x] Table helper query (`SavedCards::GetExpiringCards`)
 - [x] Tests (table helper, email template, business logic notification, endpoint)
 
+### Manual Testing (verified 2026-03-13)
+
+To test the expiring card notification endpoint:
+
+1. Log in as an admin user with `manage_subscriptions` permission
+
+2. Create a saved card expiring this month (or set an existing card's expiration to this month):
+
+```sql
+-- Find your saved cards
+SELECT id, person_id, friendly_name, last4, exp_month, exp_year, is_active FROM saved_cards;
+
+-- Set a card to expire this month (March 2026)
+UPDATE saved_cards SET exp_month = 3, exp_year = 2026, updated_us = (SELECT now_us()) WHERE id = <card_id>;
+```
+
+3. Call the endpoint via curl or the browser console:
+
+```bash
+curl -X POST http://localhost:18080/api/admin/check_expiring_cards \
+  --cookie "session_token=<your_session_token>"
+```
+
+4. The response shows which cards were found and how many emails were sent:
+
+```json
+{
+  "total_expiring": 1,
+  "total_notified": 1,
+  "notifications": [
+    {
+      "card_id": 5,
+      "person_id": 3,
+      "person_email": "user@example.com",
+      "person_first_name": "Alice",
+      "card_friendly_name": "Alice's Visa card",
+      "brand": "VISA",
+      "last4": "4242",
+      "exp_month": 3,
+      "exp_year": 2026
+    }
+  ]
+}
+```
+
+5. The endpoint checks cards expiring in the **current month** and **next month** — so a card expiring in April 2026 would also be found when run in March 2026.
+
+6. To reset after testing:
+
+```sql
+-- Restore the card's real expiration
+UPDATE saved_cards SET exp_month = 12, exp_year = 2028, updated_us = (SELECT now_us()) WHERE id = <card_id>;
+```
+
 ## 6.3 Subscription Lifecycle (Scenarios 16, 20)
 
 ### Buy next month, get current month free (Scenario 16)
@@ -2094,3 +2148,62 @@ The recommended implementation order across all parts:
 ## Single `cards` table vs. `square_customers` + `saved_cards`
 
 Considered merging into a single table, but the Square customer relationship is 1:1 with person (one customer per person) while cards are 1:many. Keeping them separate matches the Square API structure and avoids denormalization.
+
+---
+
+# Scheduled Jobs
+
+All subscription/payment operations are exposed as authenticated admin endpoints (requiring `manage_subscriptions` permission) rather than running on server-side timers. This avoids threading complexity in the Crow server. These endpoints need to be called on a regular schedule by an external process (cron job, watchdog, or scheduled task).
+
+## Implemented
+
+### 1. Run Billing — `POST /api/admin/run_billing`
+
+**Frequency**: Daily (recommended: early morning, e.g. 1:00 AM)
+
+Processes all active subscriptions whose `next_billing_us` is in the past. For each:
+- Creates a purchase and charges the subscriber's saved card
+- On success: creates a new entitlement, advances the subscription to the next period
+- On failure: sets subscription to `past_due`, sets grace period, sends billing failure email
+
+**What happens if not run**: Subscribers aren't charged, entitlements aren't renewed. No harm other than delayed billing — running it catches up on all due subscriptions.
+
+### 2. Check Expiring Cards — `POST /api/admin/check_expiring_cards`
+
+**Frequency**: Monthly (recommended: 1st of the month)
+
+Finds all active saved cards expiring in the current month or next month and sends a notification email to each card's owner.
+
+**What happens if not run**: Users with expiring cards aren't warned. Their subscription billing will fail when the card expires, triggering the grace period flow instead.
+
+### 3. Expire Grace Periods — `SubscriptionHelper::ExpireGracePeriods()`
+
+**Frequency**: Daily (recommended: run after `run_billing`)
+
+**Status**: Business logic implemented but **not yet exposed as an endpoint**. Needs a `POST /api/admin/expire_grace_periods` endpoint to be created.
+
+Finds all `past_due` subscriptions whose `grace_period_ends_us` is in the past and:
+- Sets their status to `expired`
+- Revokes the current entitlement
+
+**What happens if not run**: Users with expired grace periods keep their `past_due` status and active entitlement indefinitely. They retain access beyond the intended grace period.
+
+## Not Yet Implemented
+
+### 4. Check Expiring Entitlements — `POST /api/admin/check_expiring_entitlements`
+
+**Frequency**: Daily or weekly
+
+**Status**: Planned in section 6.3 (Scenario 20), not yet implemented.
+
+Would find entitlements expiring within a configurable window (e.g. 7 days) and send reminder emails. Applies to all entitlements, not just subscription-based ones.
+
+### Watchdog Process
+
+Per the design decision in Q2, the planned approach is a separate watchdog process that:
+- Authenticates as a service account with `manage_subscriptions` permission
+- Calls each scheduled endpoint on its configured interval
+- Optionally health-checks the web server
+- Logs results and alerts on failures
+
+This process does not exist yet and is tracked separately from the subscription feature work.
