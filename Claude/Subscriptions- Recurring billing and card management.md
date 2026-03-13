@@ -2080,12 +2080,124 @@ psql> INSERT INTO secrets (key, value)
 
 ## 6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33)
 
-These are Post-MVP / Low Priority per the Payment Design Document. Deferring from this planning document.
+### Design Overview
 
-**High-level approach when implemented**:
-- **Upgrade**: Cancel current subscription, create new one with upgraded product. If mid-period, prorate the difference.
-- **Downgrade**: Cancel current subscription effective at period end, create new one starting next period.
-- **Reactivate**: Create a new subscription for the same product. Old subscription records remain for audit trail.
+All three scenarios follow a consistent pattern: the old subscription record is preserved for audit trail, and a new subscription is created. This avoids mutating existing financial records.
+
+### Scenario 31 — Upgrade (immediate, prorated)
+
+User switches from a lower-tier product to a higher-tier product mid-period.
+
+**Business logic** (`SubscriptionHelper::ChangeSubscriptionProduct`):
+1. Validate: subscription is active, new product is different and is subscription-type
+2. Calculate proration:
+   - `totalPeriodUs = currentPeriodEndUs - currentPeriodStartUs`
+   - `elapsedUs = nowUs - currentPeriodStartUs`
+   - `remainingFraction = (totalPeriodUs - elapsedUs) / totalPeriodUs`
+   - `proratedAmountCents = ceil(newPriceCents * remainingFraction) - ceil(oldPriceCents * remainingFraction)`
+   - If `proratedAmountCents <= 0`, no charge (effectively a downgrade or same price)
+3. Cancel old subscription immediately (status → `cancelled`, cancellation_effective_us = now, cancel_reason = "Upgraded to {new_product_name}")
+4. Revoke old subscription's current entitlement
+5. Create new subscription for the remainder of the current period (periodStart = now, periodEnd = old periodEnd, saved card carries over, next_billing_us = old periodEnd)
+6. If proration amount > 0 and saved card exists: charge the prorated difference, create purchase + payment + entitlement for remainder
+7. If no saved card or no charge needed: create entitlement without payment for remainder
+8. Send upgrade confirmation email
+
+**Key design decisions**:
+- Old subscription is cancelled (not deleted) — preserves audit trail
+- New subscription inherits the old period end and saved card — next billing cycle charges full price of new product
+- Proration credits unused portion of old product, charges remaining portion of new product
+- If new price <= old price, no charge is made (the user just gets the cheaper product for the remainder). This covers the upgrade-at-same-price case cleanly.
+
+### Scenario 32 — Downgrade (deferred to next period)
+
+User switches to a lower-tier product. Change takes effect at end of current period.
+
+**Business logic** (`SubscriptionHelper::ChangeSubscriptionProduct` — same method, different behavior when `immediate=false`):
+1. Validate: subscription is active, new product is different and is subscription-type
+2. Cancel old subscription end-of-period (same as CancelSubscription: status → `cancelled`, cancellation_effective_us = currentPeriodEndUs, cancel_reason = "Switching to {new_product_name}")
+3. Create new subscription starting at the old period end:
+   - periodStart = old currentPeriodEndUs
+   - periodEnd = end of the month containing periodStart
+   - saved card carries over
+   - next_billing_us = periodStart (will be charged on the billing run)
+   - Status = active but no charge now (will be charged by RunBilling when next_billing_us passes)
+4. Old entitlement remains active until the old period ends naturally
+5. Send downgrade confirmation email
+
+**Key design decisions**:
+- No immediate charge or refund — user keeps current entitlement for the rest of the paid period
+- New subscription starts exactly when old one ends — no gap or overlap
+- RunBilling will charge the new (lower) price when the new period starts
+
+### Scenario 33 — Reactivate
+
+User re-subscribes after cancelling. This is functionally identical to creating a brand-new subscription. The existing `CreateSubscription` already supports this — old cancelled subscription records remain in the database.
+
+**No new code needed** — the user or admin calls the existing `POST /api/subscriptions` or `POST /api/admin/subscriptions` endpoint. The frontend can surface this as a "Reactivate" button that pre-fills the same product.
+
+### New Business Logic Method
+
+```cpp
+struct ChangeSubscriptionResult {
+    bool success = false;
+    std::string errorCode;
+    std::string errorMessage;
+    SubscriptionInfo oldSubscription;  // cancelled
+    SubscriptionInfo newSubscription;  // created
+    std::optional<PaymentInfo> proratedPayment;  // only for immediate upgrade
+    std::optional<EntitlementInfo> newEntitlement;
+};
+
+// immediate=true: upgrade (prorated charge, takes effect now)
+// immediate=false: downgrade (no charge, takes effect at period end)
+ChangeSubscriptionResult ChangeSubscriptionProduct(
+    Transaction& transaction,
+    int64_t subscriptionId,
+    int64_t personId,
+    int64_t newProductId,
+    bool immediate,
+    const std::string& idempotencyKey = "");
+```
+
+### New Endpoint
+
+`POST /api/subscriptions/<id>/change_product`
+
+```json
+Request:
+{
+    "new_product_id": 5,
+    "immediate": true,
+    "idempotency_key": "upgrade_123_456"
+}
+
+Response (200):
+{
+    "old_subscription": { ... },
+    "new_subscription": { ... },
+    "prorated_payment": { ... },  // only if immediate + charge
+    "new_entitlement": { ... }    // only if immediate
+}
+```
+
+### Email Template
+
+`subscription_change_mail.h/cpp` — Confirmation email for product change:
+- Subject: "Knotty Yoga — Your subscription has been updated"
+- Body: old product → new product, effective date, prorated amount (if any), next billing info
+
+### Implementation Checklist
+
+- [ ] `ChangeSubscriptionResult` struct in `subscription_helper.h`
+- [ ] `ChangeSubscriptionProduct()` method in `subscription_helper.cpp`
+- [ ] `subscription_change_mail.h/cpp` — email template
+- [ ] `subscription_change_mail_test.cpp` — email template tests
+- [ ] `subscription_helper_test.cpp` — business logic tests (upgrade prorated, downgrade deferred, validation errors)
+- [ ] Endpoint route + handler in `subscriptions.cpp` — `POST /api/subscriptions/<id>/change_product`
+- [ ] `subscriptions_test.cpp` — endpoint tests
+- [ ] Update `CMakeLists.txt` for new mail files
+- [ ] Update planning document with manual testing instructions
 
 ---
 
@@ -2246,5 +2358,16 @@ Per the design decision in Q2, the planned approach is a separate watchdog proce
 - Calls each scheduled endpoint on its configured interval
 - Optionally health-checks the web server
 - Logs results and alerts on failures
+
+**Recommended Schedule**:
+
+| Endpoint | Frequency | Time | Notes |
+|----------|-----------|------|-------|
+| `run_billing` | Daily | 1:00 AM | Catches up on all due subscriptions |
+| `expire_grace_periods` | Daily | 1:30 AM | Run after billing to clean up failed payments |
+| `check_expiring_entitlements` | Daily | 2:00 AM | Sends reminder emails for entitlements expiring within window |
+| `check_expiring_cards` | Monthly | 1st of month, 3:00 AM | Warns users about cards expiring this/next month |
+
+All endpoints are idempotent — running them multiple times in a day causes no harm (though duplicate emails may be sent for notification endpoints if run more than once per day).
 
 This process does not exist yet and is tracked separately from the subscription feature work.
