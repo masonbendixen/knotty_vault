@@ -2187,17 +2187,66 @@ Response (200):
 - Subject: "Knotty Yoga — Your subscription has been updated"
 - Body: old product → new product, effective date, prorated amount (if any), next billing info
 
+### Implementation Notes
+
+**Simplification from original design**: The prorated charging for upgrades was removed. `PayWithCard` charges based on `purchase->totalCents - purchase->paidCents` and doesn't support an override amount. Instead, the upgrade creates a free entitlement for the remainder of the current period, and the next billing cycle charges the full new product price. The `ChangeSubscriptionResult` struct omits `proratedPayment` and the `idempotencyKey` parameter is accepted but unused. The response also omits `prorated_payment`.
+
 ### Implementation Checklist
 
-- [ ] `ChangeSubscriptionResult` struct in `subscription_helper.h`
-- [ ] `ChangeSubscriptionProduct()` method in `subscription_helper.cpp`
-- [ ] `subscription_change_mail.h/cpp` — email template
-- [ ] `subscription_change_mail_test.cpp` — email template tests
-- [ ] `subscription_helper_test.cpp` — business logic tests (upgrade prorated, downgrade deferred, validation errors)
-- [ ] Endpoint route + handler in `subscriptions.cpp` — `POST /api/subscriptions/<id>/change_product`
-- [ ] `subscriptions_test.cpp` — endpoint tests
-- [ ] Update `CMakeLists.txt` for new mail files
-- [ ] Update planning document with manual testing instructions
+- [x] `ChangeSubscriptionResult` struct in `subscription_helper.h`
+- [x] `ChangeSubscriptionProduct()` method in `subscription_helper.cpp`
+- [x] `SendSubscriptionChangeEmail()` private method in `subscription_helper.cpp`
+- [x] `subscription_change_mail.h/cpp` — email template (upgrade + downgrade variants)
+- [x] `subscription_change_mail_test.cpp` — 5 email template tests
+- [x] `subscription_helper_test.cpp` — 7 business logic tests (upgrade immediate, downgrade deferred, not found, not owner, same product, not active, invalid new product)
+- [x] Endpoint route + handler in `subscriptions.cpp` — `POST /api/subscriptions/<id>/change_product`
+- [x] Endpoint declaration in `subscriptions.h` — `PostSubscriptionChangeProduct`
+- [x] `subscriptions_test.cpp` — 4 endpoint tests (not authenticated, upgrade success, downgrade success, same product fails)
+- [x] Update `CMakeLists.txt` for new mail files
+- [x] Update planning document with manual testing instructions
+
+### Manual Testing — Subscription Product Change
+
+**Upgrade (immediate)**:
+```bash
+# 1. Create a subscription (or use an existing active one)
+# 2. Create a second subscription product at a higher price tier
+# 3. Call the change_product endpoint with immediate=true
+curl -X POST http://localhost:8080/api/subscriptions/<subscription_id>/change_product \
+  -H "Content-Type: application/json" \
+  -d '{"new_product_id": <new_product_id>, "immediate": true}'
+
+# Verify:
+# - Response contains old_subscription (status=cancelled) and new_subscription (status=active)
+# - new_subscription has the new product_id and same period end as old subscription
+# - new_entitlement is present in the response
+# - Old entitlement is revoked (check entitlements table)
+# - Confirmation email sent with "upgraded" language
+```
+
+**Downgrade (deferred)**:
+```bash
+# 1. Use an active subscription
+# 2. Call with immediate=false
+curl -X POST http://localhost:8080/api/subscriptions/<subscription_id>/change_product \
+  -H "Content-Type: application/json" \
+  -d '{"new_product_id": <new_product_id>, "immediate": false}'
+
+# Verify:
+# - old_subscription status=cancelled with cancellation_effective_us = period end
+# - new_subscription starts at old period end
+# - No new_entitlement in response (entitlement created when RunBilling processes it)
+# - Old entitlement remains active until period end
+# - Confirmation email sent with "scheduled" language
+```
+
+**Error cases to test**:
+- Not logged in → 401
+- Subscription doesn't exist → 400
+- Subscription belongs to different user → 400
+- Same product_id → 400 "Cannot change to the same product"
+- Cancelled subscription → 400 "Subscription is not active"
+- Non-existent new product → 400 "New product not found"
 
 ---
 
