@@ -2029,9 +2029,54 @@ Subject: "Your {product_name} access expires in {days} days"
 Body: Entitlement details, link to renew/subscribe
 ```
 
-- [ ] Create expiring entitlement check endpoint
-- [ ] Create email template
-- [ ] Tests
+- [x] Create expiring entitlement check endpoint
+- [x] Create email template
+- [x] Create expire grace periods endpoint
+- [x] Tests (table helper, business logic notification, email template, endpoint)
+
+### Manual Testing
+
+**Expire Grace Periods**:
+```bash
+# 1. Ensure a past_due subscription with expired grace period exists:
+psql> UPDATE subscriptions SET status = 'past_due',
+      grace_period_ends_us = EXTRACT(EPOCH FROM NOW()) * 1000000 - 86400000000
+      WHERE id = <subscription_id>;
+
+# 2. Call the endpoint (requires manage_subscriptions permission):
+curl -X POST http://localhost:8080/api/admin/expire_grace_periods \
+  --cookie "session_token=<admin_session_token>"
+# Response: {"total_expired": 1}
+
+# 3. Verify the subscription is now expired:
+psql> SELECT id, status FROM subscriptions WHERE id = <subscription_id>;
+```
+
+**Check Expiring Entitlements**:
+```bash
+# 1. Create an entitlement expiring within the next 7 days:
+psql> INSERT INTO entitlements (purchase_id, product_id, valid_from_us, valid_to_us,
+      seats_total, status)
+      VALUES (<purchase_id>, <product_id>,
+              EXTRACT(EPOCH FROM NOW()) * 1000000 - 86400000000 * 30,
+              EXTRACT(EPOCH FROM NOW()) * 1000000 + 86400000000 * 3,
+              1, 'active')
+      RETURNING id;
+
+# 2. Assign a person to the entitlement:
+psql> INSERT INTO entitlement_assignments (entitlement_id, person_id)
+      VALUES (<entitlement_id>, <person_id>);
+
+# 3. Call the endpoint:
+curl -X POST http://localhost:8080/api/admin/check_expiring_entitlements \
+  --cookie "session_token=<admin_session_token>"
+# Response: {"total_expiring": 1, "total_notified": 1, "notifications": [...]}
+
+# 4. Optionally configure the reminder window (default 7 days):
+psql> INSERT INTO secrets (key, value)
+      VALUES ('entitlement_expiry_reminder_days', '14')
+      ON CONFLICT (key) DO UPDATE SET value = '14';
+```
 
 ## 6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33)
 
@@ -2176,11 +2221,9 @@ Finds all active saved cards expiring in the current month or next month and sen
 
 **What happens if not run**: Users with expiring cards aren't warned. Their subscription billing will fail when the card expires, triggering the grace period flow instead.
 
-### 3. Expire Grace Periods — `SubscriptionHelper::ExpireGracePeriods()`
+### 3. Expire Grace Periods — `POST /api/admin/expire_grace_periods`
 
 **Frequency**: Daily (recommended: run after `run_billing`)
-
-**Status**: Business logic implemented but **not yet exposed as an endpoint**. Needs a `POST /api/admin/expire_grace_periods` endpoint to be created.
 
 Finds all `past_due` subscriptions whose `grace_period_ends_us` is in the past and:
 - Sets their status to `expired`
@@ -2188,15 +2231,13 @@ Finds all `past_due` subscriptions whose `grace_period_ends_us` is in the past a
 
 **What happens if not run**: Users with expired grace periods keep their `past_due` status and active entitlement indefinitely. They retain access beyond the intended grace period.
 
-## Not Yet Implemented
-
 ### 4. Check Expiring Entitlements — `POST /api/admin/check_expiring_entitlements`
 
 **Frequency**: Daily or weekly
 
-**Status**: Planned in section 6.3 (Scenario 20), not yet implemented.
+Finds all active entitlements expiring within a configurable window (default 7 days, configurable via `entitlement_expiry_reminder_days` secret) and sends reminder emails to each assigned person. Applies to all entitlements, not just subscription-based ones.
 
-Would find entitlements expiring within a configurable window (e.g. 7 days) and send reminder emails. Applies to all entitlements, not just subscription-based ones.
+**What happens if not run**: Users aren't reminded that their entitlement is about to expire. No functional impact — entitlements still expire on schedule.
 
 ### Watchdog Process
 
