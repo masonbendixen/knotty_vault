@@ -2358,6 +2358,7 @@ Considered merging into a single table, but the Square customer relationship is 
 ---
 
 # Scheduled Jobs
+[[Scheduled Jobs]]
 
 All subscription/payment operations are exposed as authenticated admin endpoints (requiring `manage_subscriptions` permission) rather than running on server-side timers. This avoids threading complexity in the Crow server. These endpoints need to be called on a regular schedule by an external process (cron job, watchdog, or scheduled task).
 

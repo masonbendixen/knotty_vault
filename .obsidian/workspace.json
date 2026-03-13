@@ -9,78 +9,6 @@
         "dimension": 50.27075812274368,
         "children": [
           {
-            "id": "9fa48f51b38b8dfa",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Rich create, edit, view support for items.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Rich create, edit, view support for items"
-            }
-          },
-          {
-            "id": "edc9304285f71387",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Image support.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Image support"
-            }
-          },
-          {
-            "id": "6cbfbc7a88ade4b2",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Nested item implementation.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Nested item implementation"
-            }
-          },
-          {
             "id": "074ce5ec0cbf99e8",
             "type": "leaf",
             "state": {
@@ -110,126 +38,6 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Payment Design Document.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Design Document"
-            }
-          },
-          {
-            "id": "116e1292b5ad2e52",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Dashboard.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Dashboard"
-            }
-          },
-          {
-            "id": "f84b220f22b460a0",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Work for Tyler.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Work for Tyler"
-            }
-          },
-          {
-            "id": "0ba508ddd4f9b43f",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Subscriptions- Recurring billing and card management.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Subscriptions- Recurring billing and card management"
-            }
-          },
-          {
-            "id": "756a1bc18f8f2ce3",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Dashboard.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Dashboard"
-            }
-          },
-          {
-            "id": "7582ad5eaf209fc3",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
                 "file": "Claude/Scheduled Jobs.md",
                 "mode": "source",
                 "source": false,
@@ -247,9 +55,57 @@
               "icon": "lucide-file",
               "title": "Scheduled Jobs"
             }
+          },
+          {
+            "id": "116e1292b5ad2e52",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Purchase creation with server-side pricing.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Purchase creation with server-side pricing"
+            }
+          },
+          {
+            "id": "0ba508ddd4f9b43f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Product browsing and quoting endpoints.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Product browsing and quoting endpoints"
+            }
           }
         ],
-        "currentTab": 9
+        "currentTab": 1
       },
       {
         "id": "b93333724901e982",
@@ -552,21 +408,21 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "7582ad5eaf209fc3",
+  "active": "2550e3882c3c9a72",
   "lastOpenFiles": [
-    "Dashboard.md",
+    "Claude/Payment Design Document.md",
+    "Claude/Purchase creation with server-side pricing.md",
     "Claude/Scheduled Jobs.md",
-    "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
+    "Dashboard.md",
+    "Claude/Product browsing and quoting endpoints.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
-    "Claude/6.4 Subscription Upgrades",
     "Claude/Support for scheduled purchases.md",
+    "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
+    "Claude/6.4 Subscription Upgrades",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Square credentials and Sandbox setup.md",
-    "Claude/Purchase creation with server-side pricing.md",
-    "Claude/Product browsing and quoting endpoints.md",
     "Claude/Prework for adding classes.md",
     "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
-    "Claude/Payment Design Document.md",
     "Claude/Payment base table helpers.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
