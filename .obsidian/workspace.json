@@ -54,9 +54,33 @@
               "icon": "lucide-file",
               "title": "Work for Tyler"
             }
+          },
+          {
+            "id": "40064b9e439027a6",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Dashboard.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Dashboard"
+            }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -219,14 +243,14 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "3f0814fbf7a03bd6",
+  "active": "40064b9e439027a6",
   "lastOpenFiles": [
+    "Projects/Work for Tyler.md",
     "Dashboard.md",
     "Claude/Tyler Work Item - Adding Classes page.md",
     "conflict-files-obsidian-git.md",
     "Claude/Improving test execution speed.md",
     "Projects/Image support.md",
-    "Projects/Work for Tyler.md",
     "Claude/Prework for adding classes.md",
     "Claude/Adding an instructor page with photos.md",
     "Claude/Add unique constraint for multiple columns on table.md",
