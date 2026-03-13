@@ -1943,9 +1943,11 @@ Subject: "Your card ending in {last4} is expiring soon"
 Body: Card details, link to update in portal
 ```
 
-- [ ] Create expiring card check endpoint
-- [ ] Create email template
-- [ ] Tests
+- [x] Create expiring card check endpoint (`POST /api/admin/check_expiring_cards`)
+- [x] Create email template (`card_expiring_mail.h/cpp`)
+- [x] Business logic orchestrator (`card_expiring_notification.h/cpp`)
+- [x] Table helper query (`SavedCards::GetExpiringCards`)
+- [x] Tests (table helper, email template, business logic notification, endpoint)
 
 ## 6.3 Subscription Lifecycle (Scenarios 16, 20)
 
