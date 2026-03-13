@@ -1890,6 +1890,36 @@ Update `SubscriptionHelper::ProcessBillingForSubscription`:
 - [x] Tests
 - [x] Grace period days configurable via secrets
 
+### Manual Testing (verified 2026-03-13)
+
+Tested the full grace period flow manually on the local dev environment:
+
+1. Reset the database via `knottyyoga_database_helper` (schema changed: added `grace_period_ends_us` column, removed `grace_period_days` column, added `subscription_grace_period_days` secret)
+2. Started backend (Visual Studio, port 18080) and frontend (`ng serve`, port 4200)
+3. Registered an account, added a saved card, created a subscription with charge_now
+4. Confirmed subscription showed as **Active** on My Subscriptions page
+5. Simulated billing failure by flipping subscription to `past_due` via SQL:
+
+```sql
+UPDATE subscriptions
+SET status = 'past_due',
+    grace_period_ends_us = (SELECT now_us()) + (7::bigint * 24 * 60 * 60 * 1000000),
+    updated_us = (SELECT now_us())
+WHERE id = <subscription_id>;
+```
+
+Note: the `::bigint` cast is required — without it PostgreSQL overflows on the multiplication.
+
+6. Refreshed My Subscriptions — subscription showed **Past Due** badge
+7. Clicked into subscription detail — saw amber "Payment Past Due" notice with grace period end date and **Retry Payment** button
+8. Clicked Retry Payment — subscription returned to **Active**
+
+To test a different grace period duration, update the secret:
+
+```sql
+UPDATE secrets SET value = '14' WHERE name = 'subscription_grace_period_days';
+```
+
 ## 6.2 Card Management Enhancements (Scenarios 17, 18, 19, 21)
 
 Mostly covered by Part 1. Remaining items:
