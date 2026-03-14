@@ -62,7 +62,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Payment Design Document.md",
+                "file": "Claude/Support for scheduled purchases.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -77,7 +77,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Payment Design Document"
+              "title": "Support for scheduled purchases"
             }
           },
           {
@@ -408,11 +408,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "116e1292b5ad2e52",
+  "active": "90e27d4ef876844d",
   "lastOpenFiles": [
+    "Claude/Payment Design Document.md",
     "Claude/Purchase creation with server-side pricing.md",
     "Claude/Product browsing and quoting endpoints.md",
-    "Claude/Payment Design Document.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Scheduling thin slice.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
