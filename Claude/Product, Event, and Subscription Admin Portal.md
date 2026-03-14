@@ -288,18 +288,18 @@ This is more useful than a raw `entitlements` table view because entitlements ar
 ### 1.1 Create `manage_products` Permission
 
 **Backend** (`create_database.cpp`):
-- [ ] Add `manage_products` to the initial permissions insert
-- [ ] Add it to the admin role's permissions (so existing admins automatically have it)
+- [x] Add `manage_products` to the initial permissions insert
+- [x] Add it to the admin role's permissions (so existing admins automatically have it)
 
 **No frontend changes** — the permission is just a database row.
 
 ### 1.2 Create `admin_table_permissions` Table
 
 **Backend**:
-- [ ] Add `admin_table_permissions` to `db_schema/` (new file: `admin_table_permissions_schema.h`)
-- [ ] Add table helper in `sql_util/table_helpers/` (new file: `admin_table_permissions.h/.cpp`)
-- [ ] Create the table in `create_database.cpp`
-- [ ] Populate initial mappings — all product/event/subscription-related tables map to `manage_products`:
+- [x] Add `admin_table_permissions` to `db_schema/` (new file: `admin_table_permissions.h/.cpp`)
+- [x] Add table helper in `sql_util/table_helpers/` (new file: `admin_table_permissions.h/.cpp`)
+- [x] Create the table in `create_database.cpp`
+- [x] Populate initial mappings — all product/event/subscription-related tables map to `manage_products`:
   ```
   products → manage_products
   product_prices → manage_products
@@ -323,26 +323,26 @@ This is more useful than a raw `entitlements` table view because entitlements ar
 ### 1.3 Update Access Control Logic
 
 **Backend** (`endpoint_auth_helper.cpp`):
-- [ ] Modify `GetAllowedTables()`:
+- [x] Modify `GetAllowedTables()`:
   1. Start with public tables (unchanged)
   2. If admin: add all admin tables (unchanged)
   3. **New**: If not admin but has permissions, query `admin_table_permissions` and add tables where the user has the required permission
 - This means a user with `manage_products` permission (but not admin) can access product-related tables through the existing metadata CRUD system
 
 **Backend** (`session.h/cpp`):
-- [ ] Add `GetActiveUserPermissions(transaction)` → returns set of permission names for the logged-in user (if not already available)
+- [x] Add `GetActiveUserPermissions(transaction)` → returns set of permission names for the logged-in user (if not already available)
 
 **Tests**: Endpoint tests verifying that:
-- [ ] Admin user can access all tables (unchanged behavior)
-- [ ] User with `manage_products` can access product tables but not people/roles/secrets
-- [ ] User with no permissions sees only public tables
+- [x] Admin user can access all tables (unchanged behavior)
+- [x] User with `manage_products` can access product tables but not people/roles/secrets
+- [x] User with no permissions sees only public tables
 
 ### 1.4 Frontend Permission Check
 
 **Frontend**:
-- [ ] Add `manage_products` to the permission checking in auth/user service
-- [ ] Custom admin pages check for `manage_products` OR admin permission before rendering
-- [ ] Admin nav shows "Manage Products" link when user has the permission
+- [x] Add `manage_products` to the permission checking in auth/user service
+- [x] Custom admin pages check for `manage_products` OR admin permission before rendering
+- [x] Admin nav shows "Manage Products" link when user has the permission
 - **Important**: Users with only `manage_products` (not admin) do NOT see the "Manage Data" dropdown. That is reserved for full admins. `manage_products` users only see the custom product/event/subscription admin pages built in Phases 3-7. The existing metadata CRUD system (`/admin/tables/...`) remains admin-only.
 
 ---
