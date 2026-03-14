@@ -354,60 +354,60 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 ### 2.1 Add `product_entitlement_rules` to Admin
 
 **Backend** (`create_database.cpp`):
-- [ ] `admin_nested_tables`: Add as nested under `products`
-- [ ] `admin_column_data_info` entries:
+- [x] `admin_nested_tables`: Add as nested under `products`
+- [x] `admin_column_data_info` entries:
   - `product_id`: FK picker → products (readonly on edit — rule is 1:1 with product)
   - `grants_permission_id`: FK picker → permissions (nullable — some products don't grant permissions)
   - `seats_default`: number input, default 1
   - `validity_kind`: enum (instant, days_from_activation, calendar_month)
   - `validity_days`: number input (nullable — only relevant for days_from_activation)
-- [ ] `admin_column_friendly_names`: Product, Granted Permission, Default Seats, Validity Type, Validity Days
-- [ ] `admin_table_display_templates`: `Product: {product_id}, Permission: {grants_permission_id}`
+- [x] `admin_column_friendly_names`: Product, Granted Permission, Default Seats, Validity Type, Validity Days
+- [x] `admin_table_display_templates`: `Product: {product_id}, Permission: {grants_permission_id}`
 
 ### 2.2 Add `role_permissions` to Admin
 
 **Backend** (`create_database.cpp`):
-- [ ] `admin_nested_tables`: Add as nested under `roles`
-- [ ] `admin_column_data_info`: role_id (FK→roles, readonly on edit), permission_id (FK→permissions)
-- [ ] `admin_column_friendly_names`: Role, Permission
+- [x] `admin_nested_tables`: Add as nested under `roles`
+- [x] `admin_column_data_info`: role_id (FK→roles, readonly on edit), permission_id (FK→permissions)
+- [x] `admin_column_friendly_names`: Role, Permission
 - This allows admins to see and edit which permissions belong to which roles
 
 ### 2.3 Add `entitlements` to Admin
 
 **Backend** (`create_database.cpp`):
-- [ ] `admin_top_level_tables`: Add `entitlements`
-- [ ] `admin_column_data_info`:
+- [x] `admin_top_level_tables`: Add `entitlements`
+- [x] `admin_column_data_info`:
   - purchase_id (FK→purchases, readonly), purchase_item_id (readonly)
   - product_id (FK→products, readonly)
   - valid_from_us (date, readonly), valid_to_us (date, readonly)
   - seats_total (number), status (enum: active/expired/revoked)
   - revoked_us (date, readonly/hidden), revoked_reason (text, readonly/hidden)
-- [ ] `admin_nested_tables`: `entitlement_assignments` nested under `entitlements`
-- [ ] `admin_column_friendly_names` for both tables
+- [x] `admin_nested_tables`: `entitlement_assignments` nested under `entitlements`
+- [x] `admin_column_friendly_names` for both tables
 
 ### 2.4 Add `subscriptions` to Admin
 
 **Backend** (`create_database.cpp`):
-- [ ] `admin_top_level_tables`: Add `subscriptions`
-- [ ] `admin_column_data_info`:
+- [x] `admin_top_level_tables`: Add `subscriptions`
+- [x] `admin_column_data_info`:
   - person_id (FK→people), product_id (FK→products), saved_card_id (FK→saved_cards, nullable)
   - status (enum), billing_anchor_day (number)
   - current_period_start_us (date, readonly), current_period_end_us (date, readonly)
   - next_billing_us (date, readonly), grace_period_ends_us (date, readonly)
   - cancelled_us (date, readonly), cancel_reason (text, readonly)
-- [ ] `admin_nested_tables`: `subscription_charges` nested under `subscriptions`
-- [ ] `admin_table_display_templates`: `{person_id} - {product_id} ({status})`
+- [x] `admin_nested_tables`: `subscription_charges` nested under `subscriptions`
+- [x] `admin_table_display_templates`: `{person_id} - {product_id} ({status})`
 
 ### 2.5 Add `gift_permissions` to Admin
 
 **Backend** (`create_database.cpp`):
-- [ ] `admin_top_level_tables`: Add `gift_permissions`
-- [ ] `admin_column_data_info`: grantor/grantee person IDs (FK→people), status (enum)
+- [x] `admin_top_level_tables`: Add `gift_permissions`
+- [x] `admin_column_data_info`: grantor/grantee person IDs (FK→people), status (enum)
 
 ### 2.6 Tests for Phase 2
 
-- [ ] `get_table_rows_test.cpp`: Verify each newly configured table appears in admin schema and is queryable
-- [ ] Verify nested table relationships work (product → entitlement_rules, role → role_permissions, etc.)
+- [x] `get_table_rows_test.cpp`: Verify each newly configured table appears in admin schema and is queryable
+- [x] Verify nested table relationships work (product → entitlement_rules, role → role_permissions, etc.)
 
 ---
 
