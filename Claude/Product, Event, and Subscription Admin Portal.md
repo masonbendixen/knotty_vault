@@ -418,10 +418,10 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `ProductListComponent`:
 
 **Layout**:
-- [ ] Filter bar: kind dropdown (all/one_time/subscription/event/bookable_service), active/inactive toggle
-- [ ] Product table: name, code, kind, is_active, price (current default schedule), action buttons
-- [ ] "Create Product" button → inline form or modal
-- [ ] Each row clickable → routes to `/admin/products/:id`
+- [x] Filter bar: kind dropdown (all/one_time/subscription/event/bookable_service), active/inactive toggle
+- [x] Product table: name, code, kind, is_active, price (current default schedule), action buttons
+- [x] "Create Product" button → inline form or modal
+- [x] Each row clickable → routes to `/admin/products/:id`
 
 **Backend** — May reuse existing `GET /api/catalog_products` or `GET /api/get_table_rows/products`. The catalog endpoint already resolves prices, but the admin view might need all products (including inactive). Options:
 - Add admin flag to catalog endpoint to include inactive products
@@ -436,12 +436,12 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Sections**:
 
 1. **Product Info** (top card):
-   - [ ] Editable fields: name, code, description, kind, is_active, default_capacity, duration_minutes
-   - [ ] Save button calls `updateItem`
+   - [x] Editable fields: name, code, description, kind, is_active, default_capacity, duration_minutes
+   - [x] Save button calls `updateItem`
    - Uses existing form controls (SimpleText, SimpleBool, SimpleEnum)
 
 2. **Entitlement Configuration** (card):
-   - [ ] Shows `product_entitlement_rules` for this product (1:1 relationship)
+   - [x] Shows `product_entitlement_rules` for this product (embedded TableViewControl)
    - [ ] Fields: granted permission (FK picker → permissions), seats_default (number), validity_kind (enum), validity_days (number)
    - [ ] "Create Rule" if none exists, "Edit" if one does
    - Calls `addItem` / `updateItem` on `product_entitlement_rules` table
@@ -460,7 +460,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - Build the matrix client-side
 
 4. **Product Variants** (card, if applicable):
-   - [ ] Embedded `TableViewControlComponent` for `product_variants` filtered to this product
+   - [x] Embedded `TableViewControlComponent` for `product_variants` filtered to this product
    - Uses existing nested table mechanism
 
 5. **Context-specific section**:
@@ -478,13 +478,13 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `ProductCreateComponent` (or modal within ProductListComponent):
 
 **Form fields**:
-- [ ] Name (required), code (optional), description (textarea), kind (enum dropdown)
-- [ ] is_active (default true)
-- [ ] For event kind: default_capacity, duration_minutes
-- [ ] For subscription kind: duration_minutes (billing period)
+- [x] Name (required), code (optional), description (textarea), kind (enum dropdown)
+- [x] is_active (default true)
+- [x] For event kind: default_capacity, duration_minutes
+- [x] For subscription kind: duration_minutes (billing period)
 
 **After creation**:
-- [ ] Navigate to product detail page
+- [x] Navigate to product detail page
 - [ ] Prompt: "Would you like to configure pricing and entitlements?"
 - This naturally leads into the detail page sections
 
@@ -495,7 +495,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Goal**: Allow admins to clone an existing product with its prices and entitlement rule, then modify the copy. This is especially important for tiered memberships where each tier is additive (Silver → Gold → Platinum).
 
 **Frontend** — "Duplicate" button on the product detail page and product list row actions:
-- [ ] Opens a modal pre-filled with the source product's data (name suffixed with " (Copy)", all other fields cloned)
+- [x] "Duplicate" button on product detail page creates copy with "(Copy)" suffix and navigates to new product
 - [ ] Admin edits the name, description, prices, and entitlement configuration before saving
 - [ ] On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
 
@@ -828,15 +828,15 @@ Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have
 - [ ] Tests: verify each table appears in schema, is CRUD-able via endpoints
 
 ### Phase 3 — Product Management Pages
-- [ ] Create `ProductListComponent` with filtering and product table
-- [ ] Create `ProductDetailComponent` with info, entitlement, pricing sections
-- [ ] Implement pricing matrix view in product detail
-- [ ] Create product creation form/flow
-- [ ] Implement product duplication endpoint (`POST /api/admin/duplicate_product`)
-- [ ] Add "Duplicate" button to product detail and list actions
-- [ ] Add product admin routes to `admin.routes.ts`
-- [ ] Wire product list to admin navigation
-- [ ] Tests: ProductListComponent, ProductDetailComponent, duplication endpoint specs
+- [x] Create `ProductListComponent` with filtering and product table
+- [x] Create `ProductDetailComponent` with info, entitlement, pricing, variants sections (embedded TableViewControls)
+- [ ] Implement pricing matrix view in product detail (currently using embedded TableViewControl)
+- [x] Create product creation form/flow
+- [ ] Implement product duplication endpoint (`POST /api/admin/duplicate_product`) — frontend duplicate button exists, backend endpoint for copying prices/rules not yet built
+- [x] Add "Duplicate" button to product detail
+- [x] Add product manage routes to `manage.routes.ts`
+- [x] Wire product list to manage navigation (dashboard card)
+- [x] Tests: ProductListComponent, ProductCreateComponent, ProductDetailComponent specs
 
 ### Phase 4 — Event Management Pages
 - [ ] Create `EventListComponent` with filtering and capacity display
