@@ -288,18 +288,18 @@ This is more useful than a raw `entitlements` table view because entitlements ar
 ### 1.1 Create `manage_products` Permission
 
 **Backend** (`create_database.cpp`):
-- Add `manage_products` to the initial permissions insert
-- Add it to the admin role's permissions (so existing admins automatically have it)
+- [ ] Add `manage_products` to the initial permissions insert
+- [ ] Add it to the admin role's permissions (so existing admins automatically have it)
 
 **No frontend changes** — the permission is just a database row.
 
 ### 1.2 Create `admin_table_permissions` Table
 
 **Backend**:
-- Add `admin_table_permissions` to `db_schema/` (new file: `admin_table_permissions_schema.h`)
-- Add table helper in `sql_util/table_helpers/` (new file: `admin_table_permissions.h/.cpp`)
-- Create the table in `create_database.cpp`
-- Populate initial mappings — all product/event/subscription-related tables map to `manage_products`:
+- [ ] Add `admin_table_permissions` to `db_schema/` (new file: `admin_table_permissions_schema.h`)
+- [ ] Add table helper in `sql_util/table_helpers/` (new file: `admin_table_permissions.h/.cpp`)
+- [ ] Create the table in `create_database.cpp`
+- [ ] Populate initial mappings — all product/event/subscription-related tables map to `manage_products`:
   ```
   products → manage_products
   product_prices → manage_products
@@ -323,26 +323,26 @@ This is more useful than a raw `entitlements` table view because entitlements ar
 ### 1.3 Update Access Control Logic
 
 **Backend** (`endpoint_auth_helper.cpp`):
-- Modify `GetAllowedTables()`:
+- [ ] Modify `GetAllowedTables()`:
   1. Start with public tables (unchanged)
   2. If admin: add all admin tables (unchanged)
   3. **New**: If not admin but has permissions, query `admin_table_permissions` and add tables where the user has the required permission
 - This means a user with `manage_products` permission (but not admin) can access product-related tables through the existing metadata CRUD system
 
 **Backend** (`session.h/cpp`):
-- Add `GetActiveUserPermissions(transaction)` → returns set of permission names for the logged-in user (if not already available)
+- [ ] Add `GetActiveUserPermissions(transaction)` → returns set of permission names for the logged-in user (if not already available)
 
 **Tests**: Endpoint tests verifying that:
-- Admin user can access all tables (unchanged behavior)
-- User with `manage_products` can access product tables but not people/roles/secrets
-- User with no permissions sees only public tables
+- [ ] Admin user can access all tables (unchanged behavior)
+- [ ] User with `manage_products` can access product tables but not people/roles/secrets
+- [ ] User with no permissions sees only public tables
 
 ### 1.4 Frontend Permission Check
 
 **Frontend**:
-- Add `manage_products` to the permission checking in auth/user service
-- Custom admin pages check for `manage_products` OR admin permission before rendering
-- Admin nav shows "Manage Products" link when user has the permission
+- [ ] Add `manage_products` to the permission checking in auth/user service
+- [ ] Custom admin pages check for `manage_products` OR admin permission before rendering
+- [ ] Admin nav shows "Manage Products" link when user has the permission
 - **Important**: Users with only `manage_products` (not admin) do NOT see the "Manage Data" dropdown. That is reserved for full admins. `manage_products` users only see the custom product/event/subscription admin pages built in Phases 3-7. The existing metadata CRUD system (`/admin/tables/...`) remains admin-only.
 
 ---
@@ -354,60 +354,60 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 ### 2.1 Add `product_entitlement_rules` to Admin
 
 **Backend** (`create_database.cpp`):
-- `admin_nested_tables`: Add as nested under `products`
-- `admin_column_data_info` entries:
+- [ ] `admin_nested_tables`: Add as nested under `products`
+- [ ] `admin_column_data_info` entries:
   - `product_id`: FK picker → products (readonly on edit — rule is 1:1 with product)
   - `grants_permission_id`: FK picker → permissions (nullable — some products don't grant permissions)
   - `seats_default`: number input, default 1
   - `validity_kind`: enum (instant, days_from_activation, calendar_month)
   - `validity_days`: number input (nullable — only relevant for days_from_activation)
-- `admin_column_friendly_names`: Product, Granted Permission, Default Seats, Validity Type, Validity Days
-- `admin_table_display_templates`: `Product: {product_id}, Permission: {grants_permission_id}`
+- [ ] `admin_column_friendly_names`: Product, Granted Permission, Default Seats, Validity Type, Validity Days
+- [ ] `admin_table_display_templates`: `Product: {product_id}, Permission: {grants_permission_id}`
 
 ### 2.2 Add `role_permissions` to Admin
 
 **Backend** (`create_database.cpp`):
-- `admin_nested_tables`: Add as nested under `roles`
-- `admin_column_data_info`: role_id (FK→roles, readonly on edit), permission_id (FK→permissions)
-- `admin_column_friendly_names`: Role, Permission
+- [ ] `admin_nested_tables`: Add as nested under `roles`
+- [ ] `admin_column_data_info`: role_id (FK→roles, readonly on edit), permission_id (FK→permissions)
+- [ ] `admin_column_friendly_names`: Role, Permission
 - This allows admins to see and edit which permissions belong to which roles
 
 ### 2.3 Add `entitlements` to Admin
 
 **Backend** (`create_database.cpp`):
-- `admin_top_level_tables`: Add `entitlements`
-- `admin_column_data_info`:
+- [ ] `admin_top_level_tables`: Add `entitlements`
+- [ ] `admin_column_data_info`:
   - purchase_id (FK→purchases, readonly), purchase_item_id (readonly)
   - product_id (FK→products, readonly)
   - valid_from_us (date, readonly), valid_to_us (date, readonly)
   - seats_total (number), status (enum: active/expired/revoked)
   - revoked_us (date, readonly/hidden), revoked_reason (text, readonly/hidden)
-- `admin_nested_tables`: `entitlement_assignments` nested under `entitlements`
-- `admin_column_friendly_names` for both tables
+- [ ] `admin_nested_tables`: `entitlement_assignments` nested under `entitlements`
+- [ ] `admin_column_friendly_names` for both tables
 
 ### 2.4 Add `subscriptions` to Admin
 
 **Backend** (`create_database.cpp`):
-- `admin_top_level_tables`: Add `subscriptions`
-- `admin_column_data_info`:
+- [ ] `admin_top_level_tables`: Add `subscriptions`
+- [ ] `admin_column_data_info`:
   - person_id (FK→people), product_id (FK→products), saved_card_id (FK→saved_cards, nullable)
   - status (enum), billing_anchor_day (number)
   - current_period_start_us (date, readonly), current_period_end_us (date, readonly)
   - next_billing_us (date, readonly), grace_period_ends_us (date, readonly)
   - cancelled_us (date, readonly), cancel_reason (text, readonly)
-- `admin_nested_tables`: `subscription_charges` nested under `subscriptions`
-- `admin_table_display_templates`: `{person_id} - {product_id} ({status})`
+- [ ] `admin_nested_tables`: `subscription_charges` nested under `subscriptions`
+- [ ] `admin_table_display_templates`: `{person_id} - {product_id} ({status})`
 
 ### 2.5 Add `gift_permissions` to Admin
 
 **Backend** (`create_database.cpp`):
-- `admin_top_level_tables`: Add `gift_permissions`
-- `admin_column_data_info`: grantor/grantee person IDs (FK→people), status (enum)
+- [ ] `admin_top_level_tables`: Add `gift_permissions`
+- [ ] `admin_column_data_info`: grantor/grantee person IDs (FK→people), status (enum)
 
 ### 2.6 Tests for Phase 2
 
-- `get_table_rows_test.cpp`: Verify each newly configured table appears in admin schema and is queryable
-- Verify nested table relationships work (product → entitlement_rules, role → role_permissions, etc.)
+- [ ] `get_table_rows_test.cpp`: Verify each newly configured table appears in admin schema and is queryable
+- [ ] Verify nested table relationships work (product → entitlement_rules, role → role_permissions, etc.)
 
 ---
 
@@ -418,10 +418,10 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `ProductListComponent`:
 
 **Layout**:
-- Filter bar: kind dropdown (all/one_time/subscription/event/bookable_service), active/inactive toggle
-- Product table: name, code, kind, is_active, price (current default schedule), action buttons
-- "Create Product" button → inline form or modal
-- Each row clickable → routes to `/admin/products/:id`
+- [ ] Filter bar: kind dropdown (all/one_time/subscription/event/bookable_service), active/inactive toggle
+- [ ] Product table: name, code, kind, is_active, price (current default schedule), action buttons
+- [ ] "Create Product" button → inline form or modal
+- [ ] Each row clickable → routes to `/admin/products/:id`
 
 **Backend** — May reuse existing `GET /api/catalog_products` or `GET /api/get_table_rows/products`. The catalog endpoint already resolves prices, but the admin view might need all products (including inactive). Options:
 - Add admin flag to catalog endpoint to include inactive products
@@ -436,21 +436,21 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Sections**:
 
 1. **Product Info** (top card):
-   - Editable fields: name, code, description, kind, is_active, default_capacity, duration_minutes
-   - Save button calls `updateItem`
+   - [ ] Editable fields: name, code, description, kind, is_active, default_capacity, duration_minutes
+   - [ ] Save button calls `updateItem`
    - Uses existing form controls (SimpleText, SimpleBool, SimpleEnum)
 
 2. **Entitlement Configuration** (card):
-   - Shows `product_entitlement_rules` for this product (1:1 relationship)
-   - Fields: granted permission (FK picker → permissions), seats_default (number), validity_kind (enum), validity_days (number)
-   - "Create Rule" if none exists, "Edit" if one does
+   - [ ] Shows `product_entitlement_rules` for this product (1:1 relationship)
+   - [ ] Fields: granted permission (FK picker → permissions), seats_default (number), validity_kind (enum), validity_days (number)
+   - [ ] "Create Rule" if none exists, "Edit" if one does
    - Calls `addItem` / `updateItem` on `product_entitlement_rules` table
 
 3. **Pricing Matrix** (card):
-   - Table: rows = price schedules, columns = permissions (+ "no permission" column)
-   - Each cell shows the price in cents, editable inline
-   - Empty cells mean "not available for this permission/schedule combo"
-   - "Add Price" button for adding new cells
+   - [ ] Table: rows = price schedules, columns = permissions (+ "no permission" column)
+   - [ ] Each cell shows the price in cents, editable inline
+   - [ ] Empty cells mean "not available for this permission/schedule combo"
+   - [ ] "Add Price" button for adding new cells
    - This is the key view that makes pricing intuitive — currently spread across raw `product_prices` rows
 
    **Data loading**:
@@ -460,32 +460,32 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - Build the matrix client-side
 
 4. **Product Variants** (card, if applicable):
-   - Embedded `TableViewControlComponent` for `product_variants` filtered to this product
+   - [ ] Embedded `TableViewControlComponent` for `product_variants` filtered to this product
    - Uses existing nested table mechanism
 
 5. **Context-specific section**:
-   - If kind=event: "Event Sessions" card showing upcoming sessions, link to create new session
-   - If kind=subscription: "Active Subscriptions" card showing count and list
-   - If kind=one_time: "Recent Purchases" card showing recent purchase_items for this product
+   - [ ] If kind=event: "Event Sessions" card showing upcoming sessions, link to create new session
+   - [ ] If kind=subscription: "Active Subscriptions" card showing count and list
+   - [ ] If kind=one_time: "Recent Purchases" card showing recent purchase_items for this product
 
 6. **Entitlement Summary** (card):
-   - Count of active entitlements for this product
-   - List of people who have active entitlements (from entitlement_assignments joined through entitlements)
-   - Links to entitlement search filtered by this product
+   - [ ] Count of active entitlements for this product
+   - [ ] List of people who have active entitlements (from entitlement_assignments joined through entitlements)
+   - [ ] Links to entitlement search filtered by this product
 
 ### 3.3 Product Creation Flow
 
 **Frontend** — New `ProductCreateComponent` (or modal within ProductListComponent):
 
 **Form fields**:
-- Name (required), code (optional), description (textarea), kind (enum dropdown)
-- is_active (default true)
-- For event kind: default_capacity, duration_minutes
-- For subscription kind: duration_minutes (billing period)
+- [ ] Name (required), code (optional), description (textarea), kind (enum dropdown)
+- [ ] is_active (default true)
+- [ ] For event kind: default_capacity, duration_minutes
+- [ ] For subscription kind: duration_minutes (billing period)
 
 **After creation**:
-- Navigate to product detail page
-- Prompt: "Would you like to configure pricing and entitlements?"
+- [ ] Navigate to product detail page
+- [ ] Prompt: "Would you like to configure pricing and entitlements?"
 - This naturally leads into the detail page sections
 
 **Backend**: Uses existing `addItemFetchPrimaryKey` on the `products` table.
@@ -495,17 +495,17 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Goal**: Allow admins to clone an existing product with its prices and entitlement rule, then modify the copy. This is especially important for tiered memberships where each tier is additive (Silver → Gold → Platinum).
 
 **Frontend** — "Duplicate" button on the product detail page and product list row actions:
-- Opens a modal pre-filled with the source product's data (name suffixed with " (Copy)", all other fields cloned)
-- Admin edits the name, description, prices, and entitlement configuration before saving
-- On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
+- [ ] Opens a modal pre-filled with the source product's data (name suffixed with " (Copy)", all other fields cloned)
+- [ ] Admin edits the name, description, prices, and entitlement configuration before saving
+- [ ] On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
 
 **Backend** — New endpoint `POST /api/admin/duplicate_product`:
-- Input: source product_id
-- Creates a new product row (clone of source with name suffixed " (Copy)")
-- Copies all `product_prices` rows for the source to the new product
-- Copies `product_entitlement_rules` row for the source to the new product
-- Returns the new product ID
-- All in a single transaction
+- [ ] Input: source product_id
+- [ ] Creates a new product row (clone of source with name suffixed " (Copy)")
+- [ ] Copies all `product_prices` rows for the source to the new product
+- [ ] Copies `product_entitlement_rules` row for the source to the new product
+- [ ] Returns the new product ID
+- [ ] All in a single transaction
 
 **Tiered membership workflow**:
 1. Create Silver membership with base price, permission, and entitlement rule
@@ -522,12 +522,12 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `EventListComponent`:
 
 **Layout**:
-- Filter bar: date range picker, status dropdown (all/scheduled/cancelled/completed), product filter
-- Default view: upcoming scheduled events sorted by start_time
-- Table columns: product name, date/time, facility/room, capacity (booked/total), status, actions
-- Color-coded capacity: green (<50%), yellow (50-90%), red (>90%), full
-- "Create Event Session" button → routes to `/admin/events/new`
-- Each row clickable → routes to `/admin/events/:sessionId`
+- [ ] Filter bar: date range picker, status dropdown (all/scheduled/cancelled/completed), product filter
+- [ ] Default view: upcoming scheduled events sorted by start_time
+- [ ] Table columns: product name, date/time, facility/room, capacity (booked/total), status, actions
+- [ ] Color-coded capacity: green (<50%), yellow (50-90%), red (>90%), full
+- [ ] "Create Event Session" button → routes to `/admin/events/new`
+- [ ] Each row clickable → routes to `/admin/events/:sessionId`
 
 **Backend**: Uses `get_filtered_table_rows/event_sessions` with FK display resolution for product_id and facility_id. The existing metadata system handles pagination and sorting.
 
@@ -536,23 +536,23 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `EventCreateComponent`:
 
 **Form** (purpose-built, not raw table CRUD):
-1. **Product** (required): FK picker filtered to products where kind='event'. Shows product name and description.
-2. **Date & Time**: Date picker + time pickers for start and end. Pre-calculates duration from product's `duration_minutes` if set. End time auto-fills when start is selected.
-3. **Facility & Room**: Two cascading dropdowns — select facility first, then room filters to rooms in that facility. Shows room type for reference.
-4. **Capacity**: Number input. Pre-filled from product's `default_capacity` if set.
-5. **Visibility**: Checkboxes for `show_on_home_page` and `show_on_upcoming`, with numeric fields for `upcoming_visible_days_before` and `home_page_visible_days_before`.
-6. **Notes**: Textarea for internal notes.
+1. - [ ] **Product** (required): FK picker filtered to products where kind='event'. Shows product name and description.
+2. - [ ] **Date & Time**: Date picker + time pickers for start and end. Pre-calculates duration from product's `duration_minutes` if set. End time auto-fills when start is selected.
+3. - [ ] **Facility & Room**: Two cascading dropdowns — select facility first, then room filters to rooms in that facility. Shows room type for reference.
+4. - [ ] **Capacity**: Number input. Pre-filled from product's `default_capacity` if set.
+5. - [ ] **Visibility**: Checkboxes for `show_on_home_page` and `show_on_upcoming`, with numeric fields for `upcoming_visible_days_before` and `home_page_visible_days_before`.
+6. - [ ] **Notes**: Textarea for internal notes.
 
-**Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
+- [ ] **Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
 
 **Recurring mode** (R2.5 — in scope):
-- Toggle "Recurring" reveals additional fields:
+- [ ] Toggle "Recurring" reveals additional fields:
   - Recurrence pattern: weekly, biweekly, or custom interval (every N days)
   - Day(s) of week: multi-select (e.g., Monday + Wednesday + Friday)
   - End condition: "Until date" (date picker) or "Number of occurrences" (count)
-- Preview: shows a list of all sessions that will be created with dates/times, allowing the admin to review before confirming
-- On confirm: creates all event_sessions in a single transaction
-- Backend: new endpoint `POST /api/admin/create_recurring_sessions`
+- [ ] Preview: shows a list of all sessions that will be created with dates/times, allowing the admin to review before confirming
+- [ ] On confirm: creates all event_sessions in a single transaction
+- [ ] Backend: new endpoint `POST /api/admin/create_recurring_sessions`
   - Input: base session template (product_id, facility_id, room_id, capacity, start_time, end_time, visibility settings) + recurrence config (pattern, days_of_week, end_date_or_count)
   - Generates all session dates from recurrence config
   - Creates multiple `event_sessions` rows in a transaction
@@ -566,28 +566,27 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Sections**:
 
 1. **Session Info** (top card):
-   - Product name (linked to product detail), date/time, facility/room, capacity, status
-   - Edit button for editable fields (capacity, times, visibility, notes)
-   - Status actions: Cancel (with reason), Mark Complete
+   - [ ] Product name (linked to product detail), date/time, facility/room, capacity, status
+   - [ ] Edit button for editable fields (capacity, times, visibility, notes)
+   - [ ] Status actions: Cancel (with reason), Mark Complete
    - Cancellation triggers notification to booked attendees (deferred — R2.6)
 
 2. **Attendees / Bookings** (main card):
-   - Table: person name, email, booking status, payment status, entitlement status
-   - For each booking: link to the purchase, link to the person
-   - Status actions per attendee: mark attended, mark no-show, cancel booking
-   - Capacity bar: visual progress bar (booked / capacity)
+   - [ ] Table: person name, email, booking status, payment status, entitlement status
+   - [ ] For each booking: link to the purchase, link to the person
+   - [ ] Status actions per attendee: mark attended, mark no-show, cancel booking
+   - [ ] Capacity bar: visual progress bar (booked / capacity)
 
 3. **Waitlist** (card, if any waitlisted bookings):
-   - Sorted by booking creation time (first come first serve)
-   - "Promote to confirmed" action when seats available
+   - [ ] Sorted by booking creation time (first come first serve)
+   - [ ] "Promote to confirmed" action when seats available
 
 4. **Revenue Summary** (card):
-   - Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
-   - Payment status breakdown (completed/pending/failed)
+   - [ ] Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
+   - [ ] Payment status breakdown (completed/pending/failed)
 
 **Backend**:
-- The existing `EventAttendeesComponent` already has a route and basic attendee display
-- Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
+- [ ] Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
 - Or use existing `get_filtered_table_rows/bookings` filtered by event_session_id with FK resolution
 
 ### 4.4 Room Type Requirements for Events
@@ -595,9 +594,9 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Current state**: `event_sessions` already has `facility_id` and `location_room_id` FK columns. Products have no direct room type requirement.
 
 **Design for R1.8** ("define that events need a given room type"):
-- Add optional `required_room_type_id` FK column to `products` table (for event-type products)
-- When creating an event session, the room picker filters to rooms matching the required type
-- Admin metadata entry for the new column with FK picker → location_room_types
+- [ ] Add optional `required_room_type_id` FK column to `products` table (for event-type products)
+- [ ] When creating an event session, the room picker filters to rooms matching the required type
+- [ ] Admin metadata entry for the new column with FK picker → location_room_types
 
 **Alternative (simpler)**: Don't add a column. Instead, use convention — the admin picks an appropriate room when creating the session. The system shows room type in the picker to guide selection. Defer the enforcement to a later phase.
 
@@ -608,24 +607,24 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Goal**: Prevent double-booking rooms when creating event sessions. When an admin selects a room and time slot, the system checks for conflicts with existing sessions.
 
 **Backend** — New endpoint or business logic method:
-- `GET /api/admin/room_availability?facility_id=X&room_id=Y&start_us=T1&end_us=T2`
+- [ ] `GET /api/admin/room_availability?facility_id=X&room_id=Y&start_us=T1&end_us=T2`
   - Queries `event_sessions` for any non-cancelled sessions that overlap the requested time range in the same room
   - Returns: `{ available: bool, conflicts: EventSession[] }`
   - Overlap check: `existing.start_time_us < requested.end_time_us AND existing.end_time_us > requested.start_time_us`
 
 **Backend validation** — Add conflict check to event session creation:
-- In the `addItem` flow (or in a new business logic helper), validate no room conflict before inserting
-- Return a clear error if a conflict exists: "Room X is already booked for [Event Name] from [time] to [time]"
-- Also enforce this in the recurring session creation endpoint — if any date/time has a conflict, report which ones and don't create any (atomic)
+- [ ] In the `addItem` flow (or in a new business logic helper), validate no room conflict before inserting
+- [ ] Return a clear error if a conflict exists: "Room X is already booked for [Event Name] from [time] to [time]"
+- [ ] Also enforce this in the recurring session creation endpoint — if any date/time has a conflict, report which ones and don't create any (atomic)
 
 **Frontend integration**:
-- When admin selects a room and sets start/end time, call the availability check endpoint
-- If conflict: show a warning with the conflicting session name and time, disable the submit button
-- In recurring mode: after generating the preview list, check availability for all dates and mark conflicting ones in red
-- Admin can remove conflicting dates from the recurring batch before creating
+- [ ] When admin selects a room and sets start/end time, call the availability check endpoint
+- [ ] If conflict: show a warning with the conflicting session name and time, disable the submit button
+- [ ] In recurring mode: after generating the preview list, check availability for all dates and mark conflicting ones in red
+- [ ] Admin can remove conflicting dates from the recurring batch before creating
 
 **Database enforcement** (optional additional safety):
-- Consider a stored procedure or trigger that prevents inserting overlapping sessions in the same room
+- [ ] Consider a stored procedure or trigger that prevents inserting overlapping sessions in the same room
 - This provides a safety net even if the UI check is bypassed
 - Could be deferred if the API-level validation is sufficient
 
@@ -638,15 +637,15 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `SubscriptionListComponent`:
 
 **Layout**:
-- Status summary cards at top: Active (count), Past Due (count), Cancelled (count), Expired (count)
-- Filter bar: status dropdown, person search, product filter
-- Table: person name, product name, status, current period, next billing date, saved card last4
-- Status indicators: green=active, yellow=past_due, red=expired, grey=cancelled
-- Each row clickable → `/admin/subscriptions/:id`
+- [ ] Status summary cards at top: Active (count), Past Due (count), Cancelled (count), Expired (count)
+- [ ] Filter bar: status dropdown, person search, product filter
+- [ ] Table: person name, product name, status, current period, next billing date, saved card last4
+- [ ] Status indicators: green=active, yellow=past_due, red=expired, grey=cancelled
+- [ ] Each row clickable → `/admin/subscriptions/:id`
 
 **Backend**:
-- Existing `GET /api/admin/subscriptions` returns all subscriptions — reuse this
-- May need to enhance response to include person name and product name (currently may only have IDs)
+- [ ] Existing `GET /api/admin/subscriptions` returns all subscriptions — reuse or enhance
+- [ ] Ensure response includes person name and product name (not just IDs)
 - Or use `get_filtered_table_rows/subscriptions` with FK resolution
 
 ### 5.2 Subscription Detail Page (`/admin/subscriptions/:id`)
@@ -656,30 +655,30 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Sections**:
 
 1. **Subscription Info** (top card):
-   - Person (linked), product (linked to product detail), status, billing anchor day
-   - Current period: start → end dates
-   - Next billing date, grace period end (if past_due)
-   - Saved card: brand, last4, expiration
-   - Cancel reason (if cancelled)
+   - [ ] Person (linked), product (linked to product detail), status, billing anchor day
+   - [ ] Current period: start → end dates
+   - [ ] Next billing date, grace period end (if past_due)
+   - [ ] Saved card: brand, last4, expiration
+   - [ ] Cancel reason (if cancelled)
 
 2. **Actions** (card):
-   - Change product (upgrade/downgrade) — calls existing `POST /api/subscriptions/:id/change_product`
-   - Cancel subscription — calls existing `POST /api/subscriptions/:id/cancel`
-   - Retry billing (if past_due) — calls existing `POST /api/subscriptions/:id/retry_billing`
-   - Expire grace period (admin override)
+   - [ ] Change product (upgrade/downgrade) — calls existing `POST /api/subscriptions/:id/change_product`
+   - [ ] Cancel subscription — calls existing `POST /api/subscriptions/:id/cancel`
+   - [ ] Retry billing (if past_due) — calls existing `POST /api/subscriptions/:id/retry_billing`
+   - [ ] Expire grace period (admin override)
 
 3. **Current Entitlement** (card):
-   - Shows the entitlement for the current billing period
-   - Seat assignments with `SeatAssignmentComponent` (reuse from customer portal)
-   - Granted permission name
+   - [ ] Shows the entitlement for the current billing period
+   - [ ] Seat assignments with `SeatAssignmentComponent` (reuse from customer portal)
+   - [ ] Granted permission name
 
 4. **Billing History** (card):
-   - Embedded `TableViewControlComponent` for `subscription_charges` filtered by subscription_id
-   - Shows each billing cycle: period dates, status (completed/failed), charge amount, payment link
+   - [ ] Embedded `TableViewControlComponent` for `subscription_charges` filtered by subscription_id
+   - [ ] Shows each billing cycle: period dates, status (completed/failed), charge amount, payment link
 
 5. **Entitlement History** (card):
-   - All entitlements created for this subscription across billing cycles
-   - Status, validity period, seats used/total
+   - [ ] All entitlements created for this subscription across billing cycles
+   - [ ] Status, validity period, seats used/total
 
 ### 5.3 Admin Subscription Creation
 
@@ -689,30 +688,28 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Frontend** — "Create Subscription" button on subscription list page, opens a creation form:
 
-1. **Person selector**: FK picker to select the customer (search by name/email)
-2. **Product selector**: FK picker filtered to subscription-type products
-3. **Saved card**:
+1. - [ ] **Person selector**: FK picker to select the customer (search by name/email)
+2. - [ ] **Product selector**: FK picker filtered to subscription-type products
+3. - [ ] **Saved card**:
    - If the person already has saved cards: dropdown to select one
    - If no saved cards: option to add a card using the Square Web Payments SDK card form (same as the customer-facing card setup)
    - This sets the `saved_card_id` on the subscription for automatic billing
-4. **Start date**: Date picker. Two options:
+4. - [ ] **Start date**: Date picker. Two options:
    - "Start billing next month" — subscription starts on the 1st of next month, but entitlement starts immediately (rest of current month is free)
    - "Start billing now" — charges immediately for the current period
-5. **Charge now toggle**: Whether to charge the first billing cycle immediately
+5. - [ ] **Charge now toggle**: Whether to charge the first billing cycle immediately
 
 **Backend**:
-- Reuse existing `POST /api/subscriptions` endpoint but with admin authorization
-- Or create `POST /api/admin/subscriptions` that:
+- [ ] Reuse existing `POST /api/subscriptions` endpoint with admin authorization or create `POST /api/admin/subscriptions`
   - Takes person_id, product_id, saved_card_id, start_date, charge_now
   - Validates admin or manage_products permission
   - Calls `SubscriptionHelper::CreateSubscription()` with `created_by_person_id` set to the admin
   - If "rest of month free": creates an entitlement valid from now to end of month with no charge, sets `next_billing_us` to the 1st of next month
 
 **Card setup for new customers**:
-- The admin page needs to be able to save a card for a customer
-- New endpoint or enhance existing: `POST /api/admin/save_card` that takes person_id and card nonce
-- Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
-- Reuses existing card-saving business logic from the customer portal
+- [ ] New endpoint or enhance existing: `POST /api/admin/save_card` that takes person_id and card nonce
+- [ ] Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
+- [ ] Reuses existing card-saving business logic from the customer portal
 
 ### 5.4 Subscription Permission Configuration
 
@@ -731,15 +728,15 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `PricingOverviewComponent`:
 
 **Layout**:
-- Tabs or toggle: by Product | by Price Schedule
-- **By Product**: Select a product → shows pricing matrix (schedules × permissions) — same as product detail pricing section but standalone
-- **By Price Schedule**: Select a schedule → shows all products priced in that schedule with their prices per permission
+- [ ] Tabs or toggle: by Product | by Price Schedule
+- [ ] **By Product**: Select a product → shows pricing matrix (schedules × permissions) — same as product detail pricing section but standalone
+- [ ] **By Price Schedule**: Select a schedule → shows all products priced in that schedule with their prices per permission
 
 **Price Schedule Management** (sub-section):
-- List of all price schedules with active/inactive status, date range
-- Create new schedule with name, valid_from, valid_to, is_active
-- Edit existing schedule
-- When creating a new schedule: option to "Copy prices from schedule X" (R2.15)
+- [ ] List of all price schedules with active/inactive status, date range
+- [ ] Create new schedule with name, valid_from, valid_to, is_active
+- [ ] Edit existing schedule
+- [ ] When creating a new schedule: option to "Copy prices from schedule X" (R2.15)
 
 This page is primarily a navigation aid — it helps admins see the big picture of pricing across the system. The actual price editing happens through the product detail page's pricing matrix.
 
@@ -752,20 +749,20 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 **Frontend** — New `EntitlementSearchComponent`:
 
 **Layout**:
-- Search bar: search by person name or email
-- Filter: by status (active/expired/revoked), by product, by date range
-- Results table: person name, product name, status, valid from/to, seats (used/total), source (purchase link)
-- Each row expandable: shows seat assignments inline
+- [ ] Search bar: search by person name or email
+- [ ] Filter: by status (active/expired/revoked), by product, by date range
+- [ ] Results table: person name, product name, status, valid from/to, seats (used/total), source (purchase link)
+- [ ] Each row expandable: shows seat assignments inline
 
 **Backend**:
-- New endpoint: `GET /api/admin/entitlements?person_id=X&product_id=Y&status=Z`
+- [ ] New endpoint: `GET /api/admin/entitlements?person_id=X&product_id=Y&status=Z`
   - Returns entitlements with joined person info (via entitlement_assignments), product info, and assignment details
   - Paginated
 - Or leverage existing `get_filtered_table_rows/entitlements` with FK resolution for a simpler initial implementation
 
 **Manual entitlement creation** (R2.18 — deferred):
-- "Create Entitlement" button → form with product picker, person picker, validity dates, seats
-- Calls a new admin endpoint that creates an entitlement without a purchase
+- [ ] "Create Entitlement" button → form with product picker, person picker, validity dates, seats
+- [ ] Calls a new admin endpoint that creates an entitlement without a purchase
 - This is a comp/courtesy mechanism — track separately from purchases
 
 ---
