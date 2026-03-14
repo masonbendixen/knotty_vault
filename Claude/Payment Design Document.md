@@ -716,6 +716,7 @@ This section documents the user scenarios the payment system must support, valid
 
 ### Should Have (Phases 2-3: Multi-Seat & Permission Pricing)
 *Multi-person purchases and member pricing*
+[[Payment Should Have- Multi Seat and Bundled Pricing]]
 
 - [x] 5. User purchases a one time item for someone else like a massage or intro workshop
 - [ ] 6. User purchases a one time item for themself and one or more other people like a couple's massage

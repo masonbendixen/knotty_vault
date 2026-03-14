@@ -81,6 +81,30 @@
             }
           },
           {
+            "id": "2b00541812803313",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "Payment Should Have- Multi Seat and Bundled Pricing"
+            }
+          },
+          {
             "id": "0ba508ddd4f9b43f",
             "type": "leaf",
             "state": {
@@ -105,7 +129,7 @@
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 3
       },
       {
         "id": "b93333724901e982",
@@ -408,10 +432,12 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "116e1292b5ad2e52",
+  "active": "2b00541812803313",
   "lastOpenFiles": [
-    "Claude/Support for scheduled purchases.md",
+    "Claude/Scheduled Jobs.md",
+    "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
     "Claude/Payment Design Document.md",
+    "Claude/Support for scheduled purchases.md",
     "Claude/Purchase creation with server-side pricing.md",
     "Claude/Product browsing and quoting endpoints.md",
     "Claude/Square credentials and Sandbox setup.md",
@@ -419,7 +445,6 @@
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
     "Claude/Manual Testing Helper Executable.md",
-    "Claude/Scheduled Jobs.md",
     "Dashboard.md",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
