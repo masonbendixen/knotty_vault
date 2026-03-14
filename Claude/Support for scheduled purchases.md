@@ -452,99 +452,100 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 
 ## MUST HAVE - Thin Slice: Bookable Intro Workshop
 *End-to-end flow: create event, schedule it, show it publicly, let users book and pay, view attendees*
+[[Scheduling thin slice]]
 
-| # | Scenario | Rationale |
-|---|---|---|
-| 1 | Admin creates an event product type | Need product to exist |
-| 2 | Admin configures event product duration | Events need a duration |
-| 3 | Admin configures event product capacity | Need to limit attendees |
-| 4 | Admin configures permission-based pricing for event product | Already supported by payment system |
-| 7 | Admin creates a session instance of an event product | Need a specific date/time |
-| 9 | Admin configures session upcoming events visibility window | Show on upcoming events page |
-| 10 | User books a one-time event session | Core booking flow |
-| 11 | User receives booking confirmation email | User needs confirmation |
-| 14 | User views upcoming booked events in user portal | User needs to see their bookings |
-| 40 | User views past booked events and services | User needs purchase history |
-| 57 | Admin views all attendees for a specific event session | Admin needs to see who's coming |
-| 58 | Session auto-closes when capacity is reached | Prevent overbooking |
-| 65 | Timezone handling | Dates must display correctly |
+| | # | Scenario | Rationale |
+|---|---|---|---|
+| [x] | 1 | Admin creates an event product type | Need product to exist |
+| [x] | 2 | Admin configures event product duration | Events need a duration |
+| [x] | 3 | Admin configures event product capacity | Need to limit attendees |
+| [x] | 4 | Admin configures permission-based pricing for event product | Already supported by payment system |
+| [x] | 7 | Admin creates a session instance of an event product | Need a specific date/time |
+| [x] | 9 | Admin configures session upcoming events visibility window | Show on upcoming events page |
+| [x] | 10 | User books a one-time event session | Core booking flow |
+| [x] | 11 | User receives booking confirmation email | User needs confirmation |
+| [x] | 14 | User views upcoming booked events in user portal | User needs to see their bookings |
+| [x] | 40 | User views past booked events and services | User needs purchase history |
+| [x] | 57 | Admin views all attendees for a specific event session | Admin needs to see who's coming |
+| [x] | 58 | Session auto-closes when capacity is reached | Prevent overbooking |
+| [x] | 65 | Timezone handling | Dates must display correctly |
 
 ## SHOULD HAVE - Event Polish
 *Refunds, home page integration, reminders, public visibility*
 
-| # | Scenario | Rationale |
-|---|---|---|
-| 5 | Admin configures event product visibility | Public vs member-only events |
-| 6 | Admin configures event product as member-only booking | Restrict who can book |
-| 8 | Admin configures session home page visibility window | Marketing on home page |
-| 12 | Non-logged-in user prompted to register to book | Conversion funnel |
-| 13 | User receives reminder email before event | Reduce no-shows |
-| 15 | Admin configures refund policy for event product | Need cancellation rules |
-| 16 | User requests refund for booked event | Users need to cancel |
-| 42 | User views booking details with cancellation options | Cancel flow UX |
-| 59 | Admin manually overrides session capacity | Flexibility |
-| 60 | Admin cancels entire session (with reason) | Handle cancellations |
-| 64 | Booking conflicts prevented | Data integrity |
+| | # | Scenario | Rationale |
+|---|---|---|---|
+| [ ] | 5 | Admin configures event product visibility | Public vs member-only events |
+| [ ] | 6 | Admin configures event product as member-only booking | Restrict who can book |
+| [x] | 8 | Admin configures session home page visibility window | Marketing on home page |
+| [x] | 12 | Non-logged-in user prompted to register to book | Conversion funnel |
+| [ ] | 13 | User receives reminder email before event | Reduce no-shows |
+| [ ] | 15 | Admin configures refund policy for event product | Need cancellation rules |
+| [ ] | 16 | User requests refund for booked event | Users need to cancel |
+| [ ] | 42 | User views booking details with cancellation options | Cancel flow UX |
+| [ ] | 59 | Admin manually overrides session capacity | Flexibility |
+| [ ] | 60 | Admin cancels entire session (with reason) | Handle cancellations |
+| [ ] | 64 | Booking conflicts prevented | Data integrity |
 
 ## NICE TO HAVE - Bookable Services Foundation
 *Provider availability and service booking (massage, training, etc.)*
 
-| # | Scenario | Rationale |
-|---|---|---|
-| 19 | Admin creates a bookable service type | New product kind |
-| 20 | Admin configures duration variants | Multiple durations per service |
-| 21 | Admin configures buffer time | Prevent back-to-back |
-| 24 | Admin manages location resources | Room/space management |
-| 25 | Admin enters availability blocks for provider | Provider scheduling |
-| 29 | Provider enters unavailable blocks | Lunch breaks, etc. |
-| 30 | User browses available service time slots | Core service booking UX |
-| 32 | User books a service appointment | Core service booking flow |
-| 33 | User receives confirmation email for service | Confirmation |
-| 34 | User cancels service within full-refund window | Basic cancellation |
-| 66 | Sequential slot computation prevents schedule holes | Core availability algorithm |
+| | # | Scenario | Rationale |
+|---|---|---|---|
+| [ ] | 19 | Admin creates a bookable service type | New product kind |
+| [ ] | 20 | Admin configures duration variants | Multiple durations per service |
+| [ ] | 21 | Admin configures buffer time | Prevent back-to-back |
+| [x] | 24 | Admin manages location resources | Room/space management |
+| [ ] | 25 | Admin enters availability blocks for provider | Provider scheduling |
+| [ ] | 29 | Provider enters unavailable blocks | Lunch breaks, etc. |
+| [ ] | 30 | User browses available service time slots | Core service booking UX |
+| [ ] | 32 | User books a service appointment | Core service booking flow |
+| [ ] | 33 | User receives confirmation email for service | Confirmation |
+| [ ] | 34 | User cancels service within full-refund window | Basic cancellation |
+| [ ] | 66 | Sequential slot computation prevents schedule holes | Core availability algorithm |
 
 ## COULD HAVE - Advanced Scheduling
 *Time holes, booking windows, provider overrides, waitlist*
 
-| # | Scenario | Rationale |
-|---|---|---|
-| 17 | User reschedules to different session | Better UX than cancel+rebook |
-| 18 | User joins waitlist for full event | Capture demand |
-| 22 | Admin configures booking windows per permission | Member advantages |
-| 23 | Admin configures reminder window for services | Reduce no-shows |
-| ~~26~~ | ~~Admin configures provider rate overrides~~ | *REMOVED — see Alternatives Considered* |
-| 27 | Provider-specific buffer overrides | Provider preferences |
-| 28 | Maximum time-hole tolerance | Efficient scheduling |
-| 31 | User filters available slots by preferences | Better search UX |
-| 35 | User cancels service within partial-refund window | Tiered cancellation |
-| 36 | User cancels service within no-refund window | Full cancellation policy |
-| 37 | Staff checks in attendee | Attendance tracking |
-| 38 | Staff verifies identity for discounted bookings | Prevent abuse |
-| 39 | Member books for non-member at non-member price | Gifting flow |
-| 41 | User views bookings on calendar | Calendar integration |
+| | # | Scenario | Rationale |
+|---|---|---|---|
+| [ ] | 17 | User reschedules to different session | Better UX than cancel+rebook |
+| [ ] | 18 | User joins waitlist for full event | Capture demand |
+| [ ] | 22 | Admin configures booking windows per permission | Member advantages |
+| [ ] | 23 | Admin configures reminder window for services | Reduce no-shows |
+| ~~[ ]~~ | ~~26~~ | ~~Admin configures provider rate overrides~~ | *REMOVED — see Alternatives Considered* |
+| [ ] | 27 | Provider-specific buffer overrides | Provider preferences |
+| [ ] | 28 | Maximum time-hole tolerance | Efficient scheduling |
+| [ ] | 31 | User filters available slots by preferences | Better search UX |
+| [ ] | 35 | User cancels service within partial-refund window | Tiered cancellation |
+| [ ] | 36 | User cancels service within no-refund window | Full cancellation policy |
+| [ ] | 37 | Staff checks in attendee | Attendance tracking |
+| [ ] | 38 | Staff verifies identity for discounted bookings | Prevent abuse |
+| [ ] | 39 | Member books for non-member at non-member price | Gifting flow |
+| [ ] | 41 | User views bookings on calendar | Calendar integration |
 
 ## STRETCH - Admin Tools, Provider Portal, and Schedule Management
 *Provider self-service, admin reassignment, schedule templates, shift management, analytics*
 
-| # | Scenario | Rationale |
-|---|---|---|
-| 43 | Admin cancels user booking with full refund | Admin power |
-| 44 | Admin reassigns booking to different provider | Handle provider changes |
-| 45 | Provider views upcoming and past bookings | Provider awareness |
-| 46 | Provider receives email on new booking | Provider notification |
-| 47 | Provider portal home page | Self-service |
-| 48 | Provider manages service capabilities | Toggle availability |
-| 49 | Scheduler creates schedule templates for providers | Recurring weekly availability |
-| 50 | Scheduler overrides provider schedule for a specific day | Day-level schedule changes |
-| 51 | Provider requests a day off | Self-service time-off |
-| 52 | Provider requests a shift transfer | Give shift to another provider |
-| 53 | Provider requests a shift trade | Swap shifts between providers |
-| 54 | Provider views their published schedule | Schedule transparency |
-| 55 | Provider views booking details | Working view |
-| 56 | Provider cancels a session | Provider flexibility |
-| 61 | No-show tracking | Data quality |
-| 62 | Admin comps a re-slot into another session | Handle customer issues |
-| 63 | Admin views analytics/reports | Business intelligence |
+| | # | Scenario | Rationale |
+|---|---|---|---|
+| [ ] | 43 | Admin cancels user booking with full refund | Admin power |
+| [ ] | 44 | Admin reassigns booking to different provider | Handle provider changes |
+| [ ] | 45 | Provider views upcoming and past bookings | Provider awareness |
+| [ ] | 46 | Provider receives email on new booking | Provider notification |
+| [ ] | 47 | Provider portal home page | Self-service |
+| [ ] | 48 | Provider manages service capabilities | Toggle availability |
+| [ ] | 49 | Scheduler creates schedule templates for providers | Recurring weekly availability |
+| [ ] | 50 | Scheduler overrides provider schedule for a specific day | Day-level schedule changes |
+| [ ] | 51 | Provider requests a day off | Self-service time-off |
+| [ ] | 52 | Provider requests a shift transfer | Give shift to another provider |
+| [ ] | 53 | Provider requests a shift trade | Swap shifts between providers |
+| [ ] | 54 | Provider views their published schedule | Schedule transparency |
+| [ ] | 55 | Provider views booking details | Working view |
+| [ ] | 56 | Provider cancels a session | Provider flexibility |
+| [ ] | 61 | No-show tracking | Data quality |
+| [ ] | 62 | Admin comps a re-slot into another session | Handle customer issues |
+| [ ] | 63 | Admin views analytics/reports | Business intelligence |
 
 ---
 
