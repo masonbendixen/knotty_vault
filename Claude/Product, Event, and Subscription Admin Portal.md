@@ -343,6 +343,7 @@ This is more useful than a raw `entitlements` table view because entitlements ar
 - Add `manage_products` to the permission checking in auth/user service
 - Custom admin pages check for `manage_products` OR admin permission before rendering
 - Admin nav shows "Manage Products" link when user has the permission
+- **Important**: Users with only `manage_products` (not admin) do NOT see the "Manage Data" dropdown. That is reserved for full admins. `manage_products` users only see the custom product/event/subscription admin pages built in Phases 3-7. The existing metadata CRUD system (`/admin/tables/...`) remains admin-only.
 
 ---
 
@@ -489,6 +490,29 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Backend**: Uses existing `addItemFetchPrimaryKey` on the `products` table.
 
+### 3.4 Product Duplication
+
+**Goal**: Allow admins to clone an existing product with its prices and entitlement rule, then modify the copy. This is especially important for tiered memberships where each tier is additive (Silver → Gold → Platinum).
+
+**Frontend** — "Duplicate" button on the product detail page and product list row actions:
+- Opens a modal pre-filled with the source product's data (name suffixed with " (Copy)", all other fields cloned)
+- Admin edits the name, description, prices, and entitlement configuration before saving
+- On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
+
+**Backend** — New endpoint `POST /api/admin/duplicate_product`:
+- Input: source product_id
+- Creates a new product row (clone of source with name suffixed " (Copy)")
+- Copies all `product_prices` rows for the source to the new product
+- Copies `product_entitlement_rules` row for the source to the new product
+- Returns the new product ID
+- All in a single transaction
+
+**Tiered membership workflow**:
+1. Create Silver membership with base price, permission, and entitlement rule
+2. Duplicate Silver → rename to Gold, adjust price upward, potentially add/modify entitlement permissions
+3. Duplicate Gold → rename to Platinum, adjust further
+4. Each tier's entitlement rule can grant a different permission (silver_member, gold_member, platinum_member)
+
 ---
 
 ## Phase 4: Event Management Pages
@@ -521,10 +545,19 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
 
-**Recurring mode** (R2.5 — could be deferred):
-- Toggle "Recurring" reveals: recurrence pattern (weekly/biweekly), day of week, end date or count
-- Creates multiple event_sessions in a single operation
-- Backend: new endpoint `POST /api/admin/create_recurring_sessions` that creates multiple rows in a transaction
+**Recurring mode** (R2.5 — in scope):
+- Toggle "Recurring" reveals additional fields:
+  - Recurrence pattern: weekly, biweekly, or custom interval (every N days)
+  - Day(s) of week: multi-select (e.g., Monday + Wednesday + Friday)
+  - End condition: "Until date" (date picker) or "Number of occurrences" (count)
+- Preview: shows a list of all sessions that will be created with dates/times, allowing the admin to review before confirming
+- On confirm: creates all event_sessions in a single transaction
+- Backend: new endpoint `POST /api/admin/create_recurring_sessions`
+  - Input: base session template (product_id, facility_id, room_id, capacity, start_time, end_time, visibility settings) + recurrence config (pattern, days_of_week, end_date_or_count)
+  - Generates all session dates from recurrence config
+  - Creates multiple `event_sessions` rows in a transaction
+  - Returns array of created session IDs
+  - Validates room availability for each generated date/time slot before creating (see 4.5)
 
 ### 4.3 Event Session Detail Page (`/admin/events/:sessionId`)
 
@@ -569,6 +602,32 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Alternative (simpler)**: Don't add a column. Instead, use convention — the admin picks an appropriate room when creating the session. The system shows room type in the picker to guide selection. Defer the enforcement to a later phase.
 
 **Recommendation**: Start with the simpler alternative. Add `required_room_type_id` only if admins find they're frequently assigning wrong room types.
+
+### 4.5 Room Availability Checking (Double-Booking Prevention)
+
+**Goal**: Prevent double-booking rooms when creating event sessions. When an admin selects a room and time slot, the system checks for conflicts with existing sessions.
+
+**Backend** — New endpoint or business logic method:
+- `GET /api/admin/room_availability?facility_id=X&room_id=Y&start_us=T1&end_us=T2`
+  - Queries `event_sessions` for any non-cancelled sessions that overlap the requested time range in the same room
+  - Returns: `{ available: bool, conflicts: EventSession[] }`
+  - Overlap check: `existing.start_time_us < requested.end_time_us AND existing.end_time_us > requested.start_time_us`
+
+**Backend validation** — Add conflict check to event session creation:
+- In the `addItem` flow (or in a new business logic helper), validate no room conflict before inserting
+- Return a clear error if a conflict exists: "Room X is already booked for [Event Name] from [time] to [time]"
+- Also enforce this in the recurring session creation endpoint — if any date/time has a conflict, report which ones and don't create any (atomic)
+
+**Frontend integration**:
+- When admin selects a room and sets start/end time, call the availability check endpoint
+- If conflict: show a warning with the conflicting session name and time, disable the submit button
+- In recurring mode: after generating the preview list, check availability for all dates and mark conflicting ones in red
+- Admin can remove conflicting dates from the recurring batch before creating
+
+**Database enforcement** (optional additional safety):
+- Consider a stored procedure or trigger that prevents inserting overlapping sessions in the same room
+- This provides a safety net even if the UI check is bypassed
+- Could be deferred if the API-level validation is sufficient
 
 ---
 
@@ -622,7 +681,40 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - All entitlements created for this subscription across billing cycles
    - Status, validity period, seats used/total
 
-### 5.3 Subscription Permission Configuration
+### 5.3 Admin Subscription Creation
+
+**Goal**: Admins can create subscriptions on behalf of customers — a common use case during new member intro workshops.
+
+**Use case**: Admin signs up a new member, sets up their subscription to start billing next month, and gives them the rest of the current month free.
+
+**Frontend** — "Create Subscription" button on subscription list page, opens a creation form:
+
+1. **Person selector**: FK picker to select the customer (search by name/email)
+2. **Product selector**: FK picker filtered to subscription-type products
+3. **Saved card**:
+   - If the person already has saved cards: dropdown to select one
+   - If no saved cards: option to add a card using the Square Web Payments SDK card form (same as the customer-facing card setup)
+   - This sets the `saved_card_id` on the subscription for automatic billing
+4. **Start date**: Date picker. Two options:
+   - "Start billing next month" — subscription starts on the 1st of next month, but entitlement starts immediately (rest of current month is free)
+   - "Start billing now" — charges immediately for the current period
+5. **Charge now toggle**: Whether to charge the first billing cycle immediately
+
+**Backend**:
+- Reuse existing `POST /api/subscriptions` endpoint but with admin authorization
+- Or create `POST /api/admin/subscriptions` that:
+  - Takes person_id, product_id, saved_card_id, start_date, charge_now
+  - Validates admin or manage_products permission
+  - Calls `SubscriptionHelper::CreateSubscription()` with `created_by_person_id` set to the admin
+  - If "rest of month free": creates an entitlement valid from now to end of month with no charge, sets `next_billing_us` to the 1st of next month
+
+**Card setup for new customers**:
+- The admin page needs to be able to save a card for a customer
+- New endpoint or enhance existing: `POST /api/admin/save_card` that takes person_id and card nonce
+- Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
+- Reuses existing card-saving business logic from the customer portal
+
+### 5.4 Subscription Permission Configuration
 
 **For R1.11** ("specify which permission a subscription grants"):
 - This is configured through `product_entitlement_rules.grants_permission_id` on the subscription's product
@@ -701,16 +793,16 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 |-------|-------------|--------------|--------|----------|
 | 1 | Permission & access control | None | Medium | **Must Have** |
 | 2 | Metadata enhancements | Phase 1 (for permission gating) | Small | **Must Have** |
-| 3 | Product management pages | Phase 2 (for entitlement rules metadata) | Large | **Must Have** |
-| 4 | Event management pages | Phase 3 (product detail links) | Large | **Must Have** |
-| 5 | Subscription management pages | Phase 2 (metadata for subscriptions) | Medium | **Should Have** |
+| 3 | Product management pages + duplication | Phase 2 (for entitlement rules metadata) | Large | **Must Have** |
+| 4 | Event management pages + recurring + room availability | Phase 3 (product detail links) | Large | **Must Have** |
+| 5 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
 | 6 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
 | 7 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
 | 8 | Facilities enhancements | Phase 2 | Small | **Deferred** |
 
 **Critical path**: Phase 1 → Phase 2 → Phase 3 → Phase 4
 
-Phases 5, 6, 7 can be done in parallel after Phase 2.
+Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have** due to admin subscription creation being a key workflow for new member onboarding.
 
 ---
 
@@ -743,24 +835,35 @@ Phases 5, 6, 7 can be done in parallel after Phase 2.
 - [ ] Create `ProductDetailComponent` with info, entitlement, pricing sections
 - [ ] Implement pricing matrix view in product detail
 - [ ] Create product creation form/flow
+- [ ] Implement product duplication endpoint (`POST /api/admin/duplicate_product`)
+- [ ] Add "Duplicate" button to product detail and list actions
 - [ ] Add product admin routes to `admin.routes.ts`
 - [ ] Wire product list to admin navigation
-- [ ] Tests: ProductListComponent, ProductDetailComponent specs
+- [ ] Tests: ProductListComponent, ProductDetailComponent, duplication endpoint specs
 
 ### Phase 4 — Event Management Pages
 - [ ] Create `EventListComponent` with filtering and capacity display
-- [ ] Create `EventCreateComponent` with user-friendly form
+- [ ] Create `EventCreateComponent` with user-friendly form (single session)
+- [ ] Implement recurring event creation UI (recurrence pattern, preview, batch create)
+- [ ] Create `POST /api/admin/create_recurring_sessions` backend endpoint
+- [ ] Implement room availability checking endpoint (`GET /api/admin/room_availability`)
+- [ ] Add room conflict validation to event session creation (single and recurring)
+- [ ] Integrate availability check into event creation form (real-time conflict warnings)
 - [ ] Enhance event session detail page with attendees, status management, revenue
 - [ ] Add booking status management (attended/no-show)
 - [ ] Add event admin routes
-- [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent specs
+- [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
 
 ### Phase 5 — Subscription Management Pages
 - [ ] Create `SubscriptionListComponent` with status dashboard
 - [ ] Create `SubscriptionDetailComponent` with billing history and entitlement
 - [ ] Integrate admin subscription actions (cancel, retry, change product)
+- [ ] Create admin subscription creation form with person/product/card selectors
+- [ ] Implement admin card setup flow (save card for customer via Square Web Payments SDK)
+- [ ] Create `POST /api/admin/save_card` endpoint (or enhance existing)
+- [ ] Implement "rest of month free" flow (entitlement now, billing starts next month)
 - [ ] Add subscription admin routes
-- [ ] Tests: SubscriptionListComponent, SubscriptionDetailComponent specs
+- [ ] Tests: SubscriptionListComponent, SubscriptionDetailComponent, admin creation, card setup specs
 
 ### Phase 6 — Pricing Overview Page
 - [ ] Create `PricingOverviewComponent` with schedule and product views
@@ -776,21 +879,16 @@ Phases 5, 6, 7 can be done in parallel after Phase 2.
 
 ---
 
-## Open Questions
+## Resolved Decisions (from Open Questions)
 
-1. **Recurring event creation (R2.5)**: Should this be in the first release or deferred? Creating 8+ sessions one by one is tedious, but the recurring creation UI adds complexity.
-	-  Mason- I'd really like to handle recurring event creation. I think that this will be a pretty important use case.
+1. **Recurring event creation (R2.5)**: **In scope for Phase 4.** Important use case — creating sessions one by one is too tedious. Added recurring creation UI with pattern selection, preview, and batch creation to Phase 4.2.
 
-2. **Room availability checking (R2.20)**: How important is preventing double-booking of rooms? The metadata system doesn't enforce this. We could add a backend validation or just show a warning.
-	- Mason- I think that this will be very important to be honest.
+2. **Room availability checking (R2.20)**: **In scope for Phase 4.** Very important — double-booking prevention is critical. Added room availability endpoint and conflict validation to Phase 4.5, integrated into both single and recurring session creation.
 
-3. **Event calendar view (R2.10)**: Is a calendar visualization needed in v1, or is a sorted list sufficient? Calendar components (e.g., FullCalendar) add significant frontend dependency.
-	- We will need a calendar view eventually but that will be for the user and we can do that as a separate document.
+3. **Event calendar view (R2.10)**: **Deferred to separate document.** Will be needed eventually as a user-facing feature, not part of this admin portal work. Admin event list (sorted/filtered) is sufficient for admin workflow.
 
-4. **Admin subscription creation (R2.11)**: Should admins be able to create subscriptions on behalf of customers through this portal? This requires handling payment differently (comp, cash, or charging a customer's saved card).
-	- Yes, I think admin's should be able to create subscriptions. I feel like a pretty common use case will be setting this up with them during a new member intro workshop and purchasing for the next month but getting the rest of this month free. This will involve being able to setup a default card for them.
+4. **Admin subscription creation (R2.11)**: **In scope for Phase 5.** Key workflow: admin sets up subscription during new member intro workshop, charges for next month but gives rest of current month free. Includes saving a card for the customer. Added as Phase 5.3.
 
-5. **Product duplication (R2.2)**: Is this high priority? It could be a simple backend endpoint that copies a product row plus its prices and entitlement rule, but the UI needs to let admins modify the copy before saving.
-	- Many of the memberships will be additive so creating silver
+5. **Product duplication (R2.2)**: **In scope for Phase 3.** Important for tiered memberships — Silver → Gold → Platinum are additive, so duplicating and modifying is the natural workflow. Added as Phase 3.4 with backend duplication endpoint.
 
-6. **Scope of Phase 1**: Should `manage_products` users also see the existing "Manage Data" dropdown, or only the custom admin pages? If both, the dropdown should filter to only their permitted tables.
+6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-7). Updated in Phase 1.4.
