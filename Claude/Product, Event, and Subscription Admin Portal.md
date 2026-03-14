@@ -24,7 +24,7 @@ Please use the code base and these documents for context:
 
 We currently have an admin portal that exposes select tables to the user via Manage Data. See [[Nested item support]] for more information. Although one can kind of navigate products, events, and subscriptions through the raw database tables, it is hardly intuitive.
 
-I'd like a separate page or set of pages to be able to do things like create an event, product, or subscription. You should be able to perform operations like:
+I'd like a separate page or set of pages to be able to do things based on a new permission, manage_products, that admins have but can be granted to employees other than full admins to do things like create an event, product, or subscription. You should be able to perform operations like:
 
 - Create / edit a price schedule
 - Create / edit an event
@@ -36,7 +36,11 @@ I'd like a separate page or set of pages to be able to do things like create an 
 - The admin UI should be able to do CRUD operations for the various locations / facilities / rooms
 - The admin UI should be able to define that various events or services need a given room type
 - The admin UI should be able to create instantiations of events with a given start / end time, number of seats, facilities, and the other properties of and event through a user friendly UI.
-- The UI should be able to enumerate various event instances to see who is signed up, 
+- The UI should be able to enumerate various event instances to see who is signed up, payments for the event, and how much space is in the event. 
+- The UI should be entitlement aware and be able to navigate doing CRUD style operations on the entitlements associated for product creation
+- The UI should be able to enumerate the various events, products, and subscriptions and see for each instance which entitlements are granted and to whom.
+
+Please start by listing these requirements and help me brainstorm possible other ones and then we can work on design and implementation plan.
 
 # Steps
 - List of steps to accomplish this task.
