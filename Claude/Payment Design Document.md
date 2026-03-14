@@ -272,11 +272,11 @@ All errors return structured JSON following [RFC 7807 (Problem Details for HTTP 
 
 ### Entitlements
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/entitlements` | Active entitlements for current user |
-| POST | `/api/entitlement_assign/{entitlement_id}` | Assign seat to person |
-| POST | `/api/entitlement_unassign/{assignment_id}` | Remove seat assignment |
+| Method | Endpoint                                    | Description                          |
+| ------ | ------------------------------------------- | ------------------------------------ |
+| GET    | `/api/entitlements`                         | Active entitlements for current user |
+| POST   | `/api/entitlement_assign/{entitlement_id}`  | Assign seat to person                |
+| POST   | `/api/entitlement_unassign/{assignment_id}` | Remove seat assignment               |
 
 ### Scheduling & Bookings
 

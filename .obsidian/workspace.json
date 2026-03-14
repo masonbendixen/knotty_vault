@@ -62,7 +62,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Support for scheduled purchases.md",
+                "file": "Claude/Payment Design Document.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -77,7 +77,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Support for scheduled purchases"
+              "title": "Payment Design Document"
             }
           },
           {
@@ -410,25 +410,25 @@
   },
   "active": "116e1292b5ad2e52",
   "lastOpenFiles": [
-    "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
+    "Claude/Purchase creation with server-side pricing.md",
+    "Claude/Product browsing and quoting endpoints.md",
+    "Claude/Payment Design Document.md",
+    "Claude/Square credentials and Sandbox setup.md",
+    "Claude/Scheduling thin slice.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Support for scheduled purchases.md",
-    "Claude/Payment Design Document.md",
+    "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
     "Claude/Manual Testing Helper Executable.md",
     "Claude/Scheduled Jobs.md",
-    "Claude/Purchase creation with server-side pricing.md",
     "Dashboard.md",
-    "Claude/Product browsing and quoting endpoints.md",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
     "Claude/Tyler Work Item - Adding Classes page.md",
-    "Claude/Square credentials and Sandbox setup.md",
     "Claude/Prework for adding classes.md",
     "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
     "Claude/Payment base table helpers.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
-    "Claude/Scheduling thin slice.md",
     "Claude/Improving test execution speed.md",
     "Projects/Work for Tyler.md",
     "Claude/Adding an instructor page with photos.md",
@@ -444,7 +444,6 @@
     "Claude/md_to_docx.py",
     "Claude",
     "Claude/Scheduling thin slice.md.tmp.45848.1772486171105",
-    "Projects/Untitled 3.base",
-    "Projects/Untitled 2.base"
+    "Projects/Untitled 3.base"
   ]
 }
