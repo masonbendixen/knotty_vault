@@ -30,8 +30,13 @@ I'd like a separate page or set of pages to be able to do things like create an 
 - Create / edit an event
 - Create / edit a product
 - Create / edit a subscription
-- Bind events, products, and subscriptions to different price schedules and create prices per price schedule and permission. Ad
-- For subscriptions
+- Bind events, products, and subscriptions to different price schedules and create prices per price schedule and permission. Ad admin should be able to configure if the price for various permissions including whether or not it is available to user's with no permission.
+- The admin should be able to perform CRUD operations on permissions
+- For subscriptions, the admin should be able to specify various permission that a given subscription grants.
+- The admin UI should be able to do CRUD operations for the various locations / facilities / rooms
+- The admin UI should be able to define that various events or services need a given room type
+- The admin UI should be able to create instantiations of events with a given start / end time, number of seats, facilities, and the other properties of and event through a user friendly UI.
+- The UI should be able to enumerate various event instances to see who is signed up, 
 
 # Steps
 - List of steps to accomplish this task.
