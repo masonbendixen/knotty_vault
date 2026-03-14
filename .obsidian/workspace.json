@@ -62,7 +62,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Manual Testing Helper Executable.md",
+                "file": "Claude/Subscriptions- Recurring billing and card management.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -77,7 +77,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Manual Testing Helper Executable"
+              "title": "Subscriptions- Recurring billing and card management"
             }
           },
           {
@@ -410,14 +410,14 @@
   },
   "active": "116e1292b5ad2e52",
   "lastOpenFiles": [
-    "Claude/Scheduled Jobs.md",
-    "Claude/Manual Testing Helper Executable.md",
+    "Claude/Support for scheduled purchases.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
-    "Claude/Purchase creation with server-side pricing.md",
     "Claude/Payment Design Document.md",
+    "Claude/Manual Testing Helper Executable.md",
+    "Claude/Scheduled Jobs.md",
+    "Claude/Purchase creation with server-side pricing.md",
     "Dashboard.md",
     "Claude/Product browsing and quoting endpoints.md",
-    "Claude/Support for scheduled purchases.md",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
     "Claude/Tyler Work Item - Adding Classes page.md",
