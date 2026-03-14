@@ -707,6 +707,7 @@ This section documents the user scenarios the payment system must support, valid
 
 ### Must Have (Phase 1: Thin Slice)
 *Core payment flow - minimum viable product*
+[[Purchase creation with server-side pricing]]
 
 - [x] 1. User purchases a one time item for themself like an intro workshop or massage
 - [x] 2. User tries to pay for a service and their card is declined and they need to retry with a different card
@@ -720,23 +721,24 @@ This section documents the user scenarios the payment system must support, valid
 - [ ] 6. User purchases a one time item for themself and one or more other people like a couple's massage
 - [ ] 7. User purchases a bundled product (e.g., massage + spa entry as a single product)
 - [x] 8. User who has purchased a monthly membership receives a discount for other services (permission-based pricing)
-- [ ] 9. User reassigns seat to a different person (e.g., user buys party package and different guests show up)
+- [x] 9. User reassigns seat to a different person (e.g., user buys party package and different guests show up)
 
 ### Nice to Have (Phase 4: Subscriptions)
 *Recurring billing and card management*
+[[Subscriptions- Recurring billing and card management]]
 
-- [ ] 10. User subscribes for a monthly service like Knotty Yoga Platinum
-- [ ] 11. User pays for a monthly subscription service for another user to receive
-- [ ] 12. User subscribes for a multi-seat monthly service (e.g., Couples Membership)
-- [ ] 13. User elects to cancel their subscription at the end of the month
-- [ ] 14. User has not paid for renewal - grace period before losing benefits
-- [ ] 15. User on subscription with card declined - grace period, notified to update payment
-- [ ] 16. New user buys membership for next month and gets remainder of current month free
-- [ ] 17. User saves a card on file for future payment
-- [ ] 18. User updates/removes a card on file
-- [ ] 19. User changes default payment method
-- [ ] 20. User receives expiring entitlement reminder
-- [ ] 21. User receives expiring card notification
+- [x] 10. User subscribes for a monthly service like Knotty Yoga Platinum
+- [x] 11. User pays for a monthly subscription service for another user to receive
+- [x] 12. User subscribes for a multi-seat monthly service (e.g., Couples Membership)
+- [x] 13. User elects to cancel their subscription at the end of the month
+- [x] 14. User has not paid for renewal - grace period before losing benefits
+- [x] 15. User on subscription with card declined - grace period, notified to update payment
+- [x] 16. New user buys membership for next month and gets remainder of current month free
+- [x] 17. User saves a card on file for future payment
+- [x] 18. User updates/removes a card on file
+- [x] 19. User changes default payment method
+- [x] 20. User receives expiring entitlement reminder
+- [x] 21. User receives expiring card notification
 
 ### Handle in Future (Phases 5-6: Vouchers & Refunds)
 *Gift cards, coupons, and refunds*
@@ -754,9 +756,9 @@ This section documents the user scenarios the payment system must support, valid
 ### Low Priority (Post-MVP)
 *Complex edge cases and admin features*
 
-- [ ] 31. User upgrades to a higher tier membership (prorated)
-- [ ] 32. User downgrades to a lower tier membership (effective next cycle)
-- [ ] 33. User reactivates after cancelling membership (history preserved)
+- [x] 31. User upgrades to a higher tier membership (prorated)
+- [x] 32. User downgrades to a lower tier membership (effective next cycle)
+- [x] 33. User reactivates after cancelling membership (history preserved)
 - [ ] 34. User is gifted something but passes it on to someone else
 - [ ] 35. Admin grants extension of a membership as reward
 - [ ] 36. Credit card chargeback - invalidate payment, outstanding balance
