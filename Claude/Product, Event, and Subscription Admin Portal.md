@@ -779,13 +779,18 @@ Phases 5, 6, 7 can be done in parallel after Phase 2.
 ## Open Questions
 
 1. **Recurring event creation (R2.5)**: Should this be in the first release or deferred? Creating 8+ sessions one by one is tedious, but the recurring creation UI adds complexity.
+	-  Mason- I'd really like to handle recurring event creation. I think that this will be a pretty important use case.
 
 2. **Room availability checking (R2.20)**: How important is preventing double-booking of rooms? The metadata system doesn't enforce this. We could add a backend validation or just show a warning.
+	- Mason- I think that this will be very important to be honest.
 
 3. **Event calendar view (R2.10)**: Is a calendar visualization needed in v1, or is a sorted list sufficient? Calendar components (e.g., FullCalendar) add significant frontend dependency.
+	- We will need a calendar view eventually but that will be for the user and we can do that as a separate document.
 
 4. **Admin subscription creation (R2.11)**: Should admins be able to create subscriptions on behalf of customers through this portal? This requires handling payment differently (comp, cash, or charging a customer's saved card).
+	- Yes, I think admin's should be able to create subscriptions. I feel like a pretty common use case will be setting this up with them during a new member intro workshop and purchasing for the next month but getting the rest of this month free. This will involve being able to setup a default card for them.
 
 5. **Product duplication (R2.2)**: Is this high priority? It could be a simple backend endpoint that copies a product row plus its prices and entitlement rule, but the UI needs to let admins modify the copy before saving.
+	- Many of the memberships will be additive so creating silver
 
 6. **Scope of Phase 1**: Should `manage_products` users also see the existing "Manage Data" dropdown, or only the custom admin pages? If both, the dropdown should filter to only their permitted tables.
