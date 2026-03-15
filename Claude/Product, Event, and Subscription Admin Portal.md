@@ -442,15 +442,15 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 2. **Entitlement Configuration** (card):
    - [x] Shows `product_entitlement_rules` for this product (embedded TableViewControl)
-   - [ ] Fields: granted permission (FK picker → permissions), seats_default (number), validity_kind (enum), validity_days (number)
-   - [ ] "Create Rule" if none exists, "Edit" if one does
+   - [x] Fields: granted permission (FK picker → permissions), seats_default (number), validity_kind (enum), validity_days (number)
+   - [x] "Create Rule" if none exists, "Edit" if one does
    - Calls `addItem` / `updateItem` on `product_entitlement_rules` table
 
 3. **Pricing Matrix** (card):
-   - [ ] Table: rows = price schedules, columns = permissions (+ "no permission" column)
-   - [ ] Each cell shows the price in cents, editable inline
-   - [ ] Empty cells mean "not available for this permission/schedule combo"
-   - [ ] "Add Price" button for adding new cells
+   - [x] Table: rows = price schedules, columns = permissions (+ "no permission" column)
+   - [x] Each cell shows the price in cents, editable inline
+   - [x] Empty cells mean "not available for this permission/schedule combo"
+   - [x] "Add Price" button for adding new cells (click empty cell to add)
    - This is the key view that makes pricing intuitive — currently spread across raw `product_prices` rows
 
    **Data loading**:
@@ -464,13 +464,13 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - Uses existing nested table mechanism
 
 5. **Context-specific section**:
-   - [ ] If kind=event: "Event Sessions" card showing upcoming sessions, link to create new session
-   - [ ] If kind=subscription: "Active Subscriptions" card showing count and list
-   - [ ] If kind=one_time: "Recent Purchases" card showing recent purchase_items for this product
+   - [x] If kind=event: "Event Sessions" card showing upcoming sessions, link to create new session
+   - [x] If kind=subscription: "Active Subscriptions" card showing count and list
+   - [x] If kind=one_time: "Recent Purchases" card showing recent purchase_items for this product
 
 6. **Entitlement Summary** (card):
-   - [ ] Count of active entitlements for this product
-   - [ ] List of people who have active entitlements (from entitlement_assignments joined through entitlements)
+   - [x] Count of active entitlements for this product
+   - [x] List of people who have active entitlements (from entitlement_assignments joined through entitlements)
    - [ ] Links to entitlement search filtered by this product
 
 ### 3.3 Product Creation Flow
