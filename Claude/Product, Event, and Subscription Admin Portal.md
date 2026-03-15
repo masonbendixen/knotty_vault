@@ -522,12 +522,12 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `EventListComponent`:
 
 **Layout**:
-- [ ] Filter bar: date range picker, status dropdown (all/scheduled/cancelled/completed), product filter
-- [ ] Default view: upcoming scheduled events sorted by start_time
-- [ ] Table columns: product name, date/time, facility/room, capacity (booked/total), status, actions
-- [ ] Color-coded capacity: green (<50%), yellow (50-90%), red (>90%), full
-- [ ] "Create Event Session" button → routes to `/admin/events/new`
-- [ ] Each row clickable → routes to `/admin/events/:sessionId`
+- [x] Filter bar: date range picker, status dropdown (all/scheduled/cancelled/completed), product filter
+- [x] Default view: upcoming scheduled events sorted by start_time
+- [x] Table columns: product name, date/time, facility/room, capacity (booked/total), status, actions
+- [x] Color-coded capacity: green (<50%), yellow (50-90%), red (>90%), full
+- [x] "Create Event Session" button → routes to `/admin/events/new`
+- [x] Each row clickable → routes to `/admin/events/:sessionId`
 
 **Backend**: Uses `get_filtered_table_rows/event_sessions` with FK display resolution for product_id and facility_id. The existing metadata system handles pagination and sorting.
 
@@ -536,14 +536,14 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Frontend** — New `EventCreateComponent`:
 
 **Form** (purpose-built, not raw table CRUD):
-1. - [ ] **Product** (required): FK picker filtered to products where kind='event'. Shows product name and description.
-2. - [ ] **Date & Time**: Date picker + time pickers for start and end. Pre-calculates duration from product's `duration_minutes` if set. End time auto-fills when start is selected.
-3. - [ ] **Facility & Room**: Two cascading dropdowns — select facility first, then room filters to rooms in that facility. Shows room type for reference.
-4. - [ ] **Capacity**: Number input. Pre-filled from product's `default_capacity` if set.
-5. - [ ] **Visibility**: Checkboxes for `show_on_home_page` and `show_on_upcoming`, with numeric fields for `upcoming_visible_days_before` and `home_page_visible_days_before`.
-6. - [ ] **Notes**: Textarea for internal notes.
+1. - [x] **Product** (required): FK picker filtered to products where kind='event'. Shows product name and description.
+2. - [x] **Date & Time**: Date picker + time pickers for start and end. Pre-calculates duration from product's `duration_minutes` if set. End time auto-fills when start is selected.
+3. - [x] **Facility & Room**: Two cascading dropdowns — select facility first, then room filters to rooms in that facility. Shows room type for reference.
+4. - [x] **Capacity**: Number input. Pre-filled from product's `default_capacity` if set.
+5. - [x] **Visibility**: Checkboxes for `show_on_home_page` and `show_on_upcoming`, with numeric fields for `upcoming_visible_days_before` and `home_page_visible_days_before`.
+6. - [x] **Notes**: Textarea for internal notes.
 
-- [ ] **Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
+- [x] **Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
 
 **Recurring mode** (R2.5 — in scope):
 - [ ] Toggle "Recurring" reveals additional fields:
@@ -566,16 +566,16 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Sections**:
 
 1. **Session Info** (top card):
-   - [ ] Product name (linked to product detail), date/time, facility/room, capacity, status
-   - [ ] Edit button for editable fields (capacity, times, visibility, notes)
-   - [ ] Status actions: Cancel (with reason), Mark Complete
+   - [x] Product name (linked to product detail), date/time, facility/room, capacity, status
+   - [x] Edit button for editable fields (capacity, times, visibility, notes)
+   - [x] Status actions: Cancel (with reason), Mark Complete
    - Cancellation triggers notification to booked attendees (deferred — R2.6)
 
 2. **Attendees / Bookings** (main card):
-   - [ ] Table: person name, email, booking status, payment status, entitlement status
+   - [x] Table: person name, email, booking status, payment status, entitlement status
    - [ ] For each booking: link to the purchase, link to the person
    - [ ] Status actions per attendee: mark attended, mark no-show, cancel booking
-   - [ ] Capacity bar: visual progress bar (booked / capacity)
+   - [x] Capacity bar: visual progress bar (booked / capacity)
 
 3. **Waitlist** (card, if any waitlisted bookings):
    - [ ] Sorted by booking creation time (first come first serve)
