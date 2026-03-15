@@ -832,11 +832,21 @@ Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have
 - [x] Create `ProductDetailComponent` with info, entitlement, pricing, variants sections (embedded TableViewControls)
 - [ ] Implement pricing matrix view in product detail (currently using embedded TableViewControl)
 - [x] Create product creation form/flow
-- [ ] Implement product duplication endpoint (`POST /api/admin/duplicate_product`) — frontend duplicate button exists, backend endpoint for copying prices/rules not yet built
+- [x] Implement product duplication endpoint (`POST /api/admin/duplicate_product`) with `ProductHelper` business logic layer — copies product, prices, and entitlement rules
+- [x] Wire `duplicateProduct` across all ServerAccess layers (interface, network, mock, proxy) and update `ProductDetailComponent` to use backend endpoint
 - [x] Add "Duplicate" button to product detail
 - [x] Add product manage routes to `manage.routes.ts`
 - [x] Wire product list to manage navigation (dashboard card)
 - [x] Tests: ProductListComponent, ProductCreateComponent, ProductDetailComponent specs
+- [x] Tests: ProductHelper (5 tests), AdminDuplicateProduct endpoint (3 tests), duplicateProduct mock spec (3 tests)
+
+#### Price Schedule Management (first-class entity)
+- [x] Create `ScheduleListComponent` with active/inactive toggle filter
+- [x] Create `ScheduleCreateComponent` with name, validFrom, validTo, isActive form
+- [x] Create `ScheduleDetailComponent` with edit form, duplicate button, embedded product_prices TableViewControl
+- [x] Add schedule routes to `manage.routes.ts` (`/manage/schedules`, `/manage/schedules/new`, `/manage/schedules/:id`)
+- [x] Add "Price Schedules" card to manage dashboard
+- [x] Tests: ScheduleListComponent (12 tests), ScheduleCreateComponent (11 tests), ScheduleDetailComponent (16 tests)
 
 ### Phase 4 — Event Management Pages
 - [ ] Create `EventListComponent` with filtering and capacity display
