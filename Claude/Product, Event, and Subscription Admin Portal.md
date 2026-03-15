@@ -496,16 +496,16 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Frontend** — "Duplicate" button on the product detail page and product list row actions:
 - [x] "Duplicate" button on product detail page creates copy with "(Copy)" suffix and navigates to new product
-- [ ] Admin edits the name, description, prices, and entitlement configuration before saving
-- [ ] On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
+- [x] Admin edits the name, description, prices, and entitlement configuration before saving
+- [x] On save: creates the new product, copies `product_prices` entries (with new product_id), copies `product_entitlement_rules` entry
 
 **Backend** — New endpoint `POST /api/admin/duplicate_product`:
-- [ ] Input: source product_id
-- [ ] Creates a new product row (clone of source with name suffixed " (Copy)")
-- [ ] Copies all `product_prices` rows for the source to the new product
-- [ ] Copies `product_entitlement_rules` row for the source to the new product
-- [ ] Returns the new product ID
-- [ ] All in a single transaction
+- [x] Input: source product_id
+- [x] Creates a new product row (clone of source with name suffixed " (Copy)")
+- [x] Copies all `product_prices` rows for the source to the new product
+- [x] Copies `product_entitlement_rules` row for the source to the new product
+- [x] Returns the new product ID
+- [x] All in a single transaction
 
 **Tiered membership workflow**:
 1. Create Silver membership with base price, permission, and entitlement rule
