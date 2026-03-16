@@ -630,9 +630,135 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 ---
 
-## Phase 5: Subscription Management Pages
+## Phase 5: Smart Event Session Creation — Defaults, Derived Fields, and CRUD Extensibility
 
-### 5.1 Subscription List Page (`/admin/subscriptions`)
+### Problem Statement
+
+When creating an event session from a product page, the admin must manually enter values that the system already knows:
+- **Capacity** must be typed in, even though the product defines `default_capacity`
+- **End time** must be entered manually, even though the product defines `duration_minutes` and the end time can be computed from `start_time + duration`
+
+This is tedious, error-prone, and becomes especially painful with recurring event creation (Phase 4.2). The question is: where should this intelligence live, and how general should the solution be?
+
+### Option A: Bespoke Event Session Creation Page
+
+Build a purpose-built Angular form specifically for creating event sessions, replacing the generic admin table CRUD for this use case.
+
+**How it works**:
+- New `EventSessionCreateComponent` at `/manage/events/new` (or launched from the product detail page)
+- The form knows the parent product and reads its `default_capacity` and `duration_minutes`
+- Capacity field pre-populates from the product's default
+- End time is auto-computed from start time + duration, shown read-only by default
+- "Custom end time" toggle allows override
+- Submits via `addItemFetchPrimaryKey` on `event_sessions`
+
+**Benefits**:
+- Full control over UX — can tailor the form exactly to the event session workflow
+- Easy to add event-specific features later (recurring mode, room availability checks, visibility toggles)
+- No risk of breaking the generic CRUD system
+- Simpler to implement — no metadata/framework changes needed
+
+**Drawbacks**:
+- Only benefits event sessions — every other table that could use smart defaults gets nothing
+- Duplicates form rendering logic that the generic CRUD already handles (FK pickers, date inputs, validation)
+- Another component to maintain alongside the generic CRUD
+- If we later want the same capability for other tables (e.g., pre-populating subscription fields from a product), we build another bespoke page
+
+### Option B: Extend Generic CRUD with Server-Side Metadata for Defaults and Derived Fields
+
+Teach the admin table CRUD system to understand field defaults and computed fields through metadata, so any table can benefit.
+
+**How it works — Server side**:
+- New metadata concept: **field defaults** — when creating a row in a child table, certain fields can inherit values from the parent row
+  - Example metadata: `event_sessions.capacity` defaults from `products.default_capacity` (when the parent context is `products`)
+  - Stored as a new metadata table (e.g., `admin_field_defaults`) or as additional columns on `admin_column_display_info`
+- New metadata concept: **derived fields** — a field's value can be computed from other fields in the same row
+  - Example: `event_sessions.end_time_us = start_time_us + (parent.duration_minutes * 60 * 1000000)`
+  - This is more complex — requires expressing formulas in metadata
+
+**How it works — Client side**:
+- When the CRUD form loads in "new" mode with a parent context, it fetches the parent row and applies default mappings
+- For derived fields: when `start_time_us` changes, the form auto-computes `end_time_us` if it hasn't been manually set
+- A "lock" icon or toggle on derived fields indicates auto-compute mode vs manual override
+
+**Benefits**:
+- Every table benefits — any future parent→child default or computed field works automatically
+- No bespoke pages needed — the generic CRUD becomes smart enough
+- Single system to maintain
+- Metadata-driven, so admins or developers can configure new defaults without code changes
+
+**Drawbacks**:
+- Significantly more complex to implement — metadata schema, server-side default resolution, client-side form logic
+- Derived field computation (especially time arithmetic with microseconds) is hard to express generically in metadata
+- Risk of over-engineering — how many other tables actually need this?
+- Harder to test and debug than a straightforward bespoke form
+- The generic CRUD form would need to handle "auto-compute" state per field, which adds UI complexity
+
+### Option C: Hybrid — Lightweight CRUD Extensions + Bespoke Where Needed
+
+Extend the generic CRUD with simple default value passing (the easy part), but keep complex derived-field logic in bespoke pages.
+
+**How it works**:
+- **Simple defaults via query params**: When navigating to the CRUD form, pass `defaults=capacity:20,status:scheduled` in the query string. The generic form pre-fills these fields. No server metadata changes needed.
+- **Parent-aware defaults via server**: Add an optional endpoint or metadata that maps `parent_table.column → child_table.column` for default values. When the CRUD form loads with a `ctx` binding, it fetches the parent row and maps specified fields. This is a one-time metadata addition, not a full computation engine.
+- **Bespoke page for complex logic**: The duration→end_time computation, the "auto-compute with override" toggle, recurring mode, and room availability checks all live in a purpose-built event session form. These are inherently event-specific workflows that don't generalize well.
+
+**Benefits**:
+- Simple defaults (capacity, status) work across all tables via a lightweight mechanism
+- Complex event-specific logic gets proper UX treatment without contorting the generic system
+- Lower risk — small, testable changes to CRUD, full control in the bespoke form
+- Recurring event creation (Phase 4.2) naturally lives in the bespoke form too
+
+**Drawbacks**:
+- Still need a bespoke page for event sessions (though a simpler one since basic defaults are handled)
+- Two systems working together — must be clear about when to use CRUD vs bespoke
+
+### Recommendation
+
+**Option C (Hybrid)** appears to be the best balance. The reasoning:
+
+1. **Default value passing is genuinely reusable** — passing `defaults` via query params is trivial to implement and immediately useful across many tables. Any parent→child navigation in the admin portal benefits.
+
+2. **Duration→end time computation is genuinely event-specific** — expressing time arithmetic in generic metadata is over-engineering. No other table in the system has a similar derived-field relationship. A bespoke form handles this cleanly.
+
+3. **Recurring creation (Phase 4.2) requires a bespoke form anyway** — the preview-and-batch-create workflow can't live in the generic CRUD. Since we're already building a bespoke event session form for recurring mode, adding duration computation and default capacity there is minimal additional work.
+
+4. **The bespoke form can reuse CRUD building blocks** — FK pickers, date inputs, and validation logic from the generic CRUD can be extracted into shared form controls, so the bespoke page isn't starting from scratch.
+
+### Implementation Plan (if Option C is chosen)
+
+**5.1 CRUD Default Value Passing**:
+- [ ] Accept `defaults` query param in the admin table CRUD form (e.g., `defaults=capacity:20,status:scheduled`)
+- [ ] Pre-fill form fields from defaults when in "new" mode
+- [ ] Pass defaults from product detail page when navigating to "New Event Session"
+- [ ] Tests: verify default values are applied, verify they can be overridden by the user
+
+**5.2 Parent-Aware Default Resolution** (optional enhancement):
+- [ ] Add `admin_field_default_mappings` metadata table: `child_table`, `child_column`, `parent_table`, `parent_column`
+- [ ] When CRUD form loads in "new" mode with a `ctx` binding, fetch parent row and apply mapped defaults
+- [ ] This replaces hardcoded `defaults` query params with a data-driven approach
+- [ ] Tests: verify parent defaults are resolved and applied
+
+**5.3 Bespoke Event Session Creation Form**:
+- [ ] New `EventSessionCreateComponent` with product context
+- [ ] Auto-populate capacity from product's `default_capacity`
+- [ ] Auto-compute end time from start time + product's `duration_minutes`
+- [ ] "Custom end time" toggle to override the computed value
+- [ ] Reuse existing FK pickers and date input controls where possible
+- [ ] Serves as the foundation for recurring creation (Phase 4.2)
+- [ ] Tests: EventSessionCreateComponent spec
+
+### Open Questions
+
+1. Should the `defaults` query param approach (5.1) be implemented first as a quick win, or should we go straight to the bespoke form (5.3)?
+2. Is parent-aware default resolution (5.2) worth the metadata investment, or is the query param approach sufficient for foreseeable needs?
+3. Should the bespoke event session form replace the generic CRUD entirely for event sessions, or should both remain accessible (bespoke for creation, CRUD for editing)?
+
+---
+
+## Phase 6: Subscription Management Pages
+
+### 6.1 Subscription List Page (`/admin/subscriptions`)
 
 **Frontend** — New `SubscriptionListComponent`:
 
@@ -648,7 +774,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [ ] Ensure response includes person name and product name (not just IDs)
 - Or use `get_filtered_table_rows/subscriptions` with FK resolution
 
-### 5.2 Subscription Detail Page (`/admin/subscriptions/:id`)
+### 6.2 Subscription Detail Page (`/admin/subscriptions/:id`)
 
 **Frontend** — New `SubscriptionDetailComponent`:
 
@@ -680,7 +806,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - [ ] All entitlements created for this subscription across billing cycles
    - [ ] Status, validity period, seats used/total
 
-### 5.3 Admin Subscription Creation
+### 6.3 Admin Subscription Creation
 
 **Goal**: Admins can create subscriptions on behalf of customers — a common use case during new member intro workshops.
 
@@ -711,7 +837,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [ ] Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
 - [ ] Reuses existing card-saving business logic from the customer portal
 
-### 5.4 Subscription Permission Configuration
+### 6.4 Subscription Permission Configuration
 
 **For R1.11** ("specify which permission a subscription grants"):
 - This is configured through `product_entitlement_rules.grants_permission_id` on the subscription's product
@@ -721,9 +847,9 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 ---
 
-## Phase 6: Pricing Management Page
+## Phase 7: Pricing Management Page
 
-### 6.1 Pricing Overview Page (`/admin/pricing`)
+### 7.1 Pricing Overview Page (`/admin/pricing`)
 
 **Frontend** — New `PricingOverviewComponent`:
 
@@ -742,9 +868,9 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ---
 
-## Phase 7: Entitlement Management Page
+## Phase 8: Entitlement Management Page
 
-### 7.1 Entitlement Search Page (`/admin/entitlements`)
+### 8.1 Entitlement Search Page (`/admin/entitlements`)
 
 **Frontend** — New `EntitlementSearchComponent`:
 
@@ -767,9 +893,9 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ---
 
-## Phase 8: Facilities & Infrastructure Pages
+## Phase 9: Facilities & Infrastructure Pages
 
-### 8.1 Facilities Already Configured
+### 9.1 Facilities Already Configured
 
 The existing metadata system already has:
 - `facilities` as a top-level admin table
@@ -778,7 +904,7 @@ The existing metadata system already has:
 
 These are already CRUD-able through the existing admin portal. No additional work needed unless we want enhanced UIs.
 
-### 8.2 Facility Schedule View (R2.21 — deferred)
+### 9.2 Facility Schedule View (R2.21 — deferred)
 
 A calendar view showing all event sessions at a facility. Deferred until there's demand — admins can filter the event list by facility for now.
 
@@ -792,14 +918,15 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 | 2 | Metadata enhancements | Phase 1 (for permission gating) | Small | **Must Have** |
 | 3 | Product management pages + duplication | Phase 2 (for entitlement rules metadata) | Large | **Must Have** |
 | 4 | Event management pages + recurring + room availability | Phase 3 (product detail links) | Large | **Must Have** |
-| 5 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
-| 6 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
-| 7 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
-| 8 | Facilities enhancements | Phase 2 | Small | **Deferred** |
+| 5 | Smart event session creation — defaults, derived fields, CRUD extensibility | Phase 4 (event session workflow) | Medium | **Should Have** |
+| 6 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
+| 7 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
+| 8 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
+| 9 | Facilities enhancements | Phase 2 | Small | **Deferred** |
 
-**Critical path**: Phase 1 → Phase 2 → Phase 3 → Phase 4
+**Critical path**: Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 
-Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have** due to admin subscription creation being a key workflow for new member onboarding.
+Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have** due to admin subscription creation being a key workflow for new member onboarding.
 
 ---
 
@@ -861,7 +988,15 @@ Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have
 - [ ] Add event admin routes
 - [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
 
-### Phase 5 — Subscription Management Pages
+### Phase 5 — Smart Event Session Creation
+- [ ] Accept `defaults` query param in admin table CRUD form for pre-filling fields
+- [ ] Pass defaults from product detail page when navigating to "New Event Session"
+- [ ] Evaluate need for parent-aware default resolution via metadata
+- [ ] Build bespoke `EventSessionCreateComponent` with auto-computed end time and capacity defaults
+- [ ] Add "Custom end time" toggle for duration override
+- [ ] Tests: CRUD default passing, EventSessionCreateComponent spec
+
+### Phase 6 — Subscription Management Pages
 - [ ] Create `SubscriptionListComponent` with status dashboard
 - [ ] Create `SubscriptionDetailComponent` with billing history and entitlement
 - [ ] Integrate admin subscription actions (cancel, retry, change product)
@@ -872,13 +1007,13 @@ Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have
 - [ ] Add subscription admin routes
 - [ ] Tests: SubscriptionListComponent, SubscriptionDetailComponent, admin creation, card setup specs
 
-### Phase 6 — Pricing Overview Page
+### Phase 7 — Pricing Overview Page
 - [ ] Create `PricingOverviewComponent` with schedule and product views
 - [ ] Implement price schedule CRUD within the page
 - [ ] Implement "copy prices from schedule" feature
 - [ ] Tests: PricingOverviewComponent spec
 
-### Phase 7 — Entitlement Management Page
+### Phase 8 — Entitlement Management Page
 - [ ] Create `EntitlementSearchComponent` with person/product search
 - [ ] Create or reuse admin entitlement endpoint with filtering
 - [ ] Display seat assignments inline
@@ -894,8 +1029,8 @@ Phases 5, 6, 7 can be done in parallel after Phase 2. Phase 5 is now **Must Have
 
 3. **Event calendar view (R2.10)**: **Deferred to separate document.** Will be needed eventually as a user-facing feature, not part of this admin portal work. Admin event list (sorted/filtered) is sufficient for admin workflow.
 
-4. **Admin subscription creation (R2.11)**: **In scope for Phase 5.** Key workflow: admin sets up subscription during new member intro workshop, charges for next month but gives rest of current month free. Includes saving a card for the customer. Added as Phase 5.3.
+4. **Admin subscription creation (R2.11)**: **In scope for Phase 6.** Key workflow: admin sets up subscription during new member intro workshop, charges for next month but gives rest of current month free. Includes saving a card for the customer. Added as Phase 6.3.
 
 5. **Product duplication (R2.2)**: **In scope for Phase 3.** Important for tiered memberships — Silver → Gold → Platinum are additive, so duplicating and modifying is the natural workflow. Added as Phase 3.4 with backend duplication endpoint.
 
-6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-7). Updated in Phase 1.4.
+6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-8). Updated in Phase 1.4.
