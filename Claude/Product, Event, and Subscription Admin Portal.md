@@ -630,7 +630,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 ---
 
-## Phase 5: Smart Event Session Creation — Defaults, Derived Fields, and CRUD Extensibility
+## Phase 5: Client-Side CRUD Extensions — Defaults and Computed Fields
 
 ### Problem Statement
 
@@ -638,121 +638,136 @@ When creating an event session from a product page, the admin must manually ente
 - **Capacity** must be typed in, even though the product defines `default_capacity`
 - **End time** must be entered manually, even though the product defines `duration_minutes` and the end time can be computed from `start_time + duration`
 
-This is tedious, error-prone, and becomes especially painful with recurring event creation (Phase 4.2). The question is: where should this intelligence live, and how general should the solution be?
+This is tedious and error-prone. Rather than complicating the server with formulas in database metadata, we solve this entirely on the client by extending the generic CRUD table pages to accept **default values** and **computed field rules** via query parameters. The server stays clean — this is purely a client UI friendliness concern.
 
-### Option A: Bespoke Event Session Creation Page
+### Design: Client-Side CRUD Extensions via Query Parameters
 
-Build a purpose-built Angular form specifically for creating event sessions, replacing the generic admin table CRUD for this use case.
+The caller (e.g., the product detail page) knows the parent context and can pass everything the CRUD form needs through query params. No server changes required.
 
-**How it works**:
-- New `EventSessionCreateComponent` at `/manage/events/new` (or launched from the product detail page)
-- The form knows the parent product and reads its `default_capacity` and `duration_minutes`
-- Capacity field pre-populates from the product's default
-- End time is auto-computed from start time + duration, shown read-only by default
-- "Custom end time" toggle allows override
-- Submits via `addItemFetchPrimaryKey` on `event_sessions`
+#### 5.1 Default Values
 
-**Benefits**:
-- Full control over UX — can tailor the form exactly to the event session workflow
-- Easy to add event-specific features later (recurring mode, room availability checks, visibility toggles)
-- No risk of breaking the generic CRUD system
-- Simpler to implement — no metadata/framework changes needed
+A JSON blob passed as a `defaults` query param. When the CRUD form is in "new" mode, it pre-fills fields from this blob.
 
-**Drawbacks**:
-- Only benefits event sessions — every other table that could use smart defaults gets nothing
-- Duplicates form rendering logic that the generic CRUD already handles (FK pickers, date inputs, validation)
-- Another component to maintain alongside the generic CRUD
-- If we later want the same capability for other tables (e.g., pre-populating subscription fields from a product), we build another bespoke page
+**Query param format**:
+```
+defaults={"capacity":"20","status":"scheduled"}
+```
 
-### Option B: Extend Generic CRUD with Server-Side Metadata for Defaults and Derived Fields
+**Behavior**:
+- On form load in create mode, each key in `defaults` is matched to a form field by column name
+- The field is pre-filled with the provided value
+- The user can freely change the value — defaults are suggestions, not constraints
+- In edit mode, `defaults` is ignored (existing row values take precedence)
+- Fields not present in `defaults` behave exactly as they do today
 
-Teach the admin table CRUD system to understand field defaults and computed fields through metadata, so any table can benefit.
+**Example — Product detail navigates to new event session**:
+```typescript
+// Product detail knows: default_capacity = 20
+this.router.navigate(
+  ['/admin/tables', 'event_sessions', 'new'],
+  { queryParams: {
+    returnUrl: this.router.url,
+    ctx: serializeBindingStack(this.productBindingStack),
+    defaults: JSON.stringify({ capacity: this.product.default_capacity })
+  }}
+);
+```
 
-**How it works — Server side**:
-- New metadata concept: **field defaults** — when creating a row in a child table, certain fields can inherit values from the parent row
-  - Example metadata: `event_sessions.capacity` defaults from `products.default_capacity` (when the parent context is `products`)
-  - Stored as a new metadata table (e.g., `admin_field_defaults`) or as additional columns on `admin_column_display_info`
-- New metadata concept: **derived fields** — a field's value can be computed from other fields in the same row
-  - Example: `event_sessions.end_time_us = start_time_us + (parent.duration_minutes * 60 * 1000000)`
-  - This is more complex — requires expressing formulas in metadata
+#### 5.2 Computed Date Fields
 
-**How it works — Client side**:
-- When the CRUD form loads in "new" mode with a parent context, it fetches the parent row and applies default mappings
-- For derived fields: when `start_time_us` changes, the form auto-computes `end_time_us` if it hasn't been manually set
-- A "lock" icon or toggle on derived fields indicates auto-compute mode vs manual override
+A JSON blob passed as a `computed` query param describing date fields that should be auto-calculated from other fields.
 
-**Benefits**:
-- Every table benefits — any future parent→child default or computed field works automatically
-- No bespoke pages needed — the generic CRUD becomes smart enough
-- Single system to maintain
-- Metadata-driven, so admins or developers can configure new defaults without code changes
+**Query param format**:
+```
+computed={"dates":[{"source":"start_time_us","dest":"end_time_us","offsetMinutes":60,"autoByDefault":true}]}
+```
 
-**Drawbacks**:
-- Significantly more complex to implement — metadata schema, server-side default resolution, client-side form logic
-- Derived field computation (especially time arithmetic with microseconds) is hard to express generically in metadata
-- Risk of over-engineering — how many other tables actually need this?
-- Harder to test and debug than a straightforward bespoke form
-- The generic CRUD form would need to handle "auto-compute" state per field, which adds UI complexity
+**Structure**:
+```typescript
+interface ComputedFields {
+  dates: ComputedDateRule[];
+}
 
-### Option C: Hybrid — Lightweight CRUD Extensions + Bespoke Where Needed
+interface ComputedDateRule {
+  source: string;        // Column name of the source date field
+  dest: string;          // Column name of the destination date field
+  offsetMinutes: number; // Minutes to add to source to compute dest
+  autoByDefault: boolean; // Whether auto-compute is on initially
+}
+```
 
-Extend the generic CRUD with simple default value passing (the easy part), but keep complex derived-field logic in bespoke pages.
+**Behavior**:
+- When the form loads, each computed date rule is registered
+- If `autoByDefault` is true, the destination field shows a toggle/checkbox indicating it is auto-computed (e.g., "Auto from start time + 60 min")
+- While auto-compute is on:
+  - The destination field is read-only and displays the computed value
+  - When the source field changes, the destination updates automatically
+  - The toggle/checkbox lets the user switch to manual mode
+- When auto-compute is off:
+  - The destination field becomes a normal editable date/time input
+  - The user can enter any value
+  - A toggle lets them switch back to auto-compute mode
+- In edit mode, `computed` rules still apply but `autoByDefault` is ignored — if the existing dest value matches `source + offset`, auto-compute is on; otherwise it's off (preserving whatever the user previously set)
 
-**How it works**:
-- **Simple defaults via query params**: When navigating to the CRUD form, pass `defaults=capacity:20,status:scheduled` in the query string. The generic form pre-fills these fields. No server metadata changes needed.
-- **Parent-aware defaults via server**: Add an optional endpoint or metadata that maps `parent_table.column → child_table.column` for default values. When the CRUD form loads with a `ctx` binding, it fetches the parent row and maps specified fields. This is a one-time metadata addition, not a full computation engine.
-- **Bespoke page for complex logic**: The duration→end_time computation, the "auto-compute with override" toggle, recurring mode, and room availability checks all live in a purpose-built event session form. These are inherently event-specific workflows that don't generalize well.
+**Example — Product detail passes duration**:
+```typescript
+// Product detail knows: duration_minutes = 60
+const computed = {
+  dates: [{
+    source: 'start_time_us',
+    dest: 'end_time_us',
+    offsetMinutes: parseInt(this.product.duration_minutes, 10),
+    autoByDefault: true
+  }]
+};
+this.router.navigate(
+  ['/admin/tables', 'event_sessions', 'new'],
+  { queryParams: {
+    returnUrl: this.router.url,
+    ctx: serializeBindingStack(this.productBindingStack),
+    defaults: JSON.stringify({ capacity: this.product.default_capacity }),
+    computed: JSON.stringify(computed)
+  }}
+);
+```
 
-**Benefits**:
-- Simple defaults (capacity, status) work across all tables via a lightweight mechanism
-- Complex event-specific logic gets proper UX treatment without contorting the generic system
-- Lower risk — small, testable changes to CRUD, full control in the bespoke form
-- Recurring event creation (Phase 4.2) naturally lives in the bespoke form too
+### Why Client-Side Only
 
-**Drawbacks**:
-- Still need a bespoke page for event sessions (though a simpler one since basic defaults are handled)
-- Two systems working together — must be clear about when to use CRUD vs bespoke
+- **The server doesn't need to know about UI convenience features.** Default capacity and duration-based end times are presentation concerns — the server just stores whatever values the client sends.
+- **No formulas in database metadata.** Expressing `end_time = start_time + duration * 60 * 1000000` in a metadata table is fragile, hard to debug, and only the client needs it.
+- **The caller has the context.** The product detail page already has the product row with `default_capacity` and `duration_minutes`. Passing these as query params is trivial — no need for the CRUD form to fetch parent data or understand parent-child field mappings.
+- **Generalizable without over-engineering.** Any page that navigates to CRUD "new" mode can pass `defaults` and `computed` params. If subscriptions or other tables need similar behavior later, they just pass the appropriate JSON — no new metadata tables, no server endpoints.
 
-### Recommendation
+### Where This Lives in the Codebase
 
-**Option C (Hybrid)** appears to be the best balance. The reasoning:
+The CRUD form logic is in the admin table entry form components. Changes are isolated to:
+- **Query param parsing**: Read `defaults` and `computed` from route query params on form init
+- **Default application**: Apply defaults to form controls before the user interacts
+- **Computed field wiring**: Subscribe to source field value changes, compute dest values, manage auto/manual toggle state
+- **UI for computed fields**: Toggle or checkbox per computed field to switch between auto and manual mode
 
-1. **Default value passing is genuinely reusable** — passing `defaults` via query params is trivial to implement and immediately useful across many tables. Any parent→child navigation in the admin portal benefits.
+### Implementation Plan
 
-2. **Duration→end time computation is genuinely event-specific** — expressing time arithmetic in generic metadata is over-engineering. No other table in the system has a similar derived-field relationship. A bespoke form handles this cleanly.
+**5.1 Default Values**:
+- [ ] Parse `defaults` query param (JSON) in the CRUD form component on init
+- [ ] In create mode, apply each default to the matching form control
+- [ ] Update product detail's `onCreateEventSession()` to pass `defaults` with `capacity` from product
+- [ ] Tests: defaults applied in create mode, ignored in edit mode, user can override
 
-3. **Recurring creation (Phase 4.2) requires a bespoke form anyway** — the preview-and-batch-create workflow can't live in the generic CRUD. Since we're already building a bespoke event session form for recurring mode, adding duration computation and default capacity there is minimal additional work.
+**5.2 Computed Date Fields**:
+- [ ] Parse `computed` query param (JSON) in the CRUD form component on init
+- [ ] Define `ComputedDateRule` interface
+- [ ] For each date rule: subscribe to source field changes, auto-compute dest value when auto mode is on
+- [ ] Add toggle UI per computed field (auto-compute on/off)
+- [ ] Handle microsecond timestamp arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
+- [ ] In edit mode: infer auto/manual state from whether existing dest matches computed value
+- [ ] Update product detail's `onCreateEventSession()` to pass `computed` with duration rule
+- [ ] Tests: auto-compute on source change, toggle to manual, toggle back to auto, edit mode inference
 
-4. **The bespoke form can reuse CRUD building blocks** — FK pickers, date inputs, and validation logic from the generic CRUD can be extracted into shared form controls, so the bespoke page isn't starting from scratch.
-
-### Implementation Plan (if Option C is chosen)
-
-**5.1 CRUD Default Value Passing**:
-- [ ] Accept `defaults` query param in the admin table CRUD form (e.g., `defaults=capacity:20,status:scheduled`)
-- [ ] Pre-fill form fields from defaults when in "new" mode
-- [ ] Pass defaults from product detail page when navigating to "New Event Session"
-- [ ] Tests: verify default values are applied, verify they can be overridden by the user
-
-**5.2 Parent-Aware Default Resolution** (optional enhancement):
-- [ ] Add `admin_field_default_mappings` metadata table: `child_table`, `child_column`, `parent_table`, `parent_column`
-- [ ] When CRUD form loads in "new" mode with a `ctx` binding, fetch parent row and apply mapped defaults
-- [ ] This replaces hardcoded `defaults` query params with a data-driven approach
-- [ ] Tests: verify parent defaults are resolved and applied
-
-**5.3 Bespoke Event Session Creation Form**:
-- [ ] New `EventSessionCreateComponent` with product context
-- [ ] Auto-populate capacity from product's `default_capacity`
-- [ ] Auto-compute end time from start time + product's `duration_minutes`
-- [ ] "Custom end time" toggle to override the computed value
-- [ ] Reuse existing FK pickers and date input controls where possible
-- [ ] Serves as the foundation for recurring creation (Phase 4.2)
-- [ ] Tests: EventSessionCreateComponent spec
-
-### Open Questions
-
-1. Should the `defaults` query param approach (5.1) be implemented first as a quick win, or should we go straight to the bespoke form (5.3)?
-2. Is parent-aware default resolution (5.2) worth the metadata investment, or is the query param approach sufficient for foreseeable needs?
-3. Should the bespoke event session form replace the generic CRUD entirely for event sessions, or should both remain accessible (bespoke for creation, CRUD for editing)?
+**5.3 Wire Up Event Session Creation**:
+- [ ] Product detail page passes both `defaults` and `computed` when navigating to new event session
+- [ ] Event list page's "Create Event Session" button — consider whether it should also pass defaults (it doesn't have a product context, so probably not)
+- [ ] Verify the full flow: product page → CRUD new → capacity pre-filled, end time auto-computed → save → return to product page
 
 ---
 
@@ -988,13 +1003,12 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Add event admin routes
 - [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
 
-### Phase 5 — Smart Event Session Creation
-- [ ] Accept `defaults` query param in admin table CRUD form for pre-filling fields
-- [ ] Pass defaults from product detail page when navigating to "New Event Session"
-- [ ] Evaluate need for parent-aware default resolution via metadata
-- [ ] Build bespoke `EventSessionCreateComponent` with auto-computed end time and capacity defaults
-- [ ] Add "Custom end time" toggle for duration override
-- [ ] Tests: CRUD default passing, EventSessionCreateComponent spec
+### Phase 5 — Client-Side CRUD Extensions
+- [ ] Parse `defaults` JSON query param in CRUD form, apply to form controls in create mode
+- [ ] Parse `computed` JSON query param, wire up auto-computed date fields with toggle UI
+- [ ] Handle microsecond timestamp arithmetic for computed dates
+- [ ] Update product detail's `onCreateEventSession()` to pass `defaults` (capacity) and `computed` (duration→end time)
+- [ ] Tests: default application, computed field auto-update, manual override toggle, edit mode behavior
 
 ### Phase 6 — Subscription Management Pages
 - [ ] Create `SubscriptionListComponent` with status dashboard
