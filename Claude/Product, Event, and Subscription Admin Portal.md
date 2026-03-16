@@ -638,54 +638,18 @@ When creating an event session from a product page, the admin must manually ente
 - **Capacity** must be typed in, even though the product defines `default_capacity`
 - **End time** must be entered manually, even though the product defines `duration_minutes` and the end time can be computed from `start_time + duration`
 
-This is tedious and error-prone. Rather than complicating the server with formulas in database metadata, we solve this entirely on the client by extending the generic CRUD table pages to accept **default values** and **computed field rules** via query parameters. The server stays clean — this is purely a client UI friendliness concern.
+This is tedious and error-prone. Rather than complicating the server with formulas in database metadata, we solve this entirely on the client by extending the generic CRUD table pages. The server stays clean — this is purely a client UI friendliness concern. The caller (e.g., the product detail page) already has all the context it needs and passes it to the CRUD form via Angular route state.
 
-### Design: Client-Side CRUD Extensions via Query Parameters
+### Design: `CrudFormAssist` via Angular Route State
 
-The caller (e.g., the product detail page) knows the parent context and can pass everything the CRUD form needs through query params. No server changes required.
+A single unified object, `CrudFormAssist`, carries both default values and computed field rules. It is passed via Angular's `router.navigate` `state` option, which uses the Navigation API to transfer data without putting it in the URL.
 
-#### 5.1 Default Values
+#### Interface
 
-A JSON blob passed as a `defaults` query param. When the CRUD form is in "new" mode, it pre-fills fields from this blob.
-
-**Query param format**:
-```
-defaults={"capacity":"20","status":"scheduled"}
-```
-
-**Behavior**:
-- On form load in create mode, each key in `defaults` is matched to a form field by column name
-- The field is pre-filled with the provided value
-- The user can freely change the value — defaults are suggestions, not constraints
-- In edit mode, `defaults` is ignored (existing row values take precedence)
-- Fields not present in `defaults` behave exactly as they do today
-
-**Example — Product detail navigates to new event session**:
 ```typescript
-// Product detail knows: default_capacity = 20
-this.router.navigate(
-  ['/admin/tables', 'event_sessions', 'new'],
-  { queryParams: {
-    returnUrl: this.router.url,
-    ctx: serializeBindingStack(this.productBindingStack),
-    defaults: JSON.stringify({ capacity: this.product.default_capacity })
-  }}
-);
-```
-
-#### 5.2 Computed Date Fields
-
-A JSON blob passed as a `computed` query param describing date fields that should be auto-calculated from other fields.
-
-**Query param format**:
-```
-computed={"dates":[{"source":"start_time_us","dest":"end_time_us","offsetMinutes":60,"autoByDefault":true}]}
-```
-
-**Structure**:
-```typescript
-interface ComputedFields {
-  dates: ComputedDateRule[];
+interface CrudFormAssist {
+  defaults?: Record<string, string>;
+  computedDates?: ComputedDateRule[];
 }
 
 interface ComputedDateRule {
@@ -696,8 +660,46 @@ interface ComputedDateRule {
 }
 ```
 
-**Behavior**:
-- When the form loads, each computed date rule is registered
+#### Example — Product detail navigates to new event session
+
+```typescript
+const formAssist: CrudFormAssist = {
+  defaults: {
+    capacity: this.product.default_capacity,  // e.g., '20'
+  },
+  computedDates: [{
+    source: 'start_time_us',
+    dest: 'end_time_us',
+    offsetMinutes: parseInt(this.product.duration_minutes, 10),  // e.g., 60
+    autoByDefault: true,
+  }],
+};
+
+this.router.navigate(
+  ['/admin/tables', 'event_sessions', 'new'],
+  {
+    queryParams: {
+      returnUrl: this.router.url,
+      ctx: serializeBindingStack(this.productBindingStack),
+    },
+    state: { formAssist },
+  }
+);
+```
+
+The CRUD form reads `history.state?.formAssist` on init.
+
+#### 5.1 Default Values Behavior
+
+- On form load in create mode, each key in `defaults` is matched to a form field by column name
+- The field is pre-filled with the provided value
+- The user can freely change the value — defaults are suggestions, not constraints
+- In edit mode, `defaults` is ignored (existing row values take precedence)
+- Fields not present in `defaults` behave exactly as they do today
+
+#### 5.2 Computed Date Fields Behavior
+
+- When the form loads, each `ComputedDateRule` is registered
 - If `autoByDefault` is true, the destination field shows a toggle/checkbox indicating it is auto-computed (e.g., "Auto from start time + 60 min")
 - While auto-compute is on:
   - The destination field is read-only and displays the computed value
@@ -707,66 +709,56 @@ interface ComputedDateRule {
   - The destination field becomes a normal editable date/time input
   - The user can enter any value
   - A toggle lets them switch back to auto-compute mode
-- In edit mode, `computed` rules still apply but `autoByDefault` is ignored — if the existing dest value matches `source + offset`, auto-compute is on; otherwise it's off (preserving whatever the user previously set)
+- In edit mode, `autoByDefault` is ignored — if the existing dest value matches `source + offset`, auto-compute is on; otherwise it's off (preserving whatever the user previously set)
+- Microsecond arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
 
-**Example — Product detail passes duration**:
-```typescript
-// Product detail knows: duration_minutes = 60
-const computed = {
-  dates: [{
-    source: 'start_time_us',
-    dest: 'end_time_us',
-    offsetMinutes: parseInt(this.product.duration_minutes, 10),
-    autoByDefault: true
-  }]
-};
-this.router.navigate(
-  ['/admin/tables', 'event_sessions', 'new'],
-  { queryParams: {
-    returnUrl: this.router.url,
-    ctx: serializeBindingStack(this.productBindingStack),
-    defaults: JSON.stringify({ capacity: this.product.default_capacity }),
-    computed: JSON.stringify(computed)
-  }}
-);
-```
+#### Extensibility
+
+The `CrudFormAssist` interface is designed to grow. If we later need other types of computed fields (e.g., numeric calculations, string concatenation), we add sibling arrays like `computedNumbers` rather than building a generic formula engine. Each computed type has its own clear, typed structure.
 
 ### Why Client-Side Only
 
 - **The server doesn't need to know about UI convenience features.** Default capacity and duration-based end times are presentation concerns — the server just stores whatever values the client sends.
 - **No formulas in database metadata.** Expressing `end_time = start_time + duration * 60 * 1000000` in a metadata table is fragile, hard to debug, and only the client needs it.
-- **The caller has the context.** The product detail page already has the product row with `default_capacity` and `duration_minutes`. Passing these as query params is trivial — no need for the CRUD form to fetch parent data or understand parent-child field mappings.
-- **Generalizable without over-engineering.** Any page that navigates to CRUD "new" mode can pass `defaults` and `computed` params. If subscriptions or other tables need similar behavior later, they just pass the appropriate JSON — no new metadata tables, no server endpoints.
+- **The caller has the context.** The product detail page already has the product row with `default_capacity` and `duration_minutes`. Passing these via route state is trivial — no need for the CRUD form to fetch parent data or understand parent-child field mappings.
+- **Generalizable without over-engineering.** Any page that navigates to CRUD "new" mode can pass a `CrudFormAssist`. If subscriptions or other tables need similar behavior later, they just populate the same interface — no new metadata tables, no server endpoints.
+
+### Why Route State Instead of Query Params
+
+- **Clean URLs.** JSON in query params produces ugly, percent-encoded URLs. Route state keeps the URL clean.
+- **No encoding concerns.** Route state is passed as a typed JavaScript object — no JSON serialization/parsing, no URL-safety issues.
+- **Unified object.** A single `formAssist` state property carries both defaults and computed rules, rather than splitting across multiple query params.
+- **Acceptable trade-off.** Route state is lost on page refresh, but this is fine — nobody bookmarks or shares a link to a CRUD create form. The user always navigates there from a parent page.
 
 ### Where This Lives in the Codebase
 
 The CRUD form logic is in the admin table entry form components. Changes are isolated to:
-- **Query param parsing**: Read `defaults` and `computed` from route query params on form init
-- **Default application**: Apply defaults to form controls before the user interacts
+- **Route state reading**: Read `history.state?.formAssist` on form init
+- **Default application**: Apply `defaults` to form controls before the user interacts
 - **Computed field wiring**: Subscribe to source field value changes, compute dest values, manage auto/manual toggle state
 - **UI for computed fields**: Toggle or checkbox per computed field to switch between auto and manual mode
+- **Type definition**: `CrudFormAssist` and `ComputedDateRule` interfaces in a shared types file
 
 ### Implementation Plan
 
 **5.1 Default Values**:
-- [ ] Parse `defaults` query param (JSON) in the CRUD form component on init
-- [ ] In create mode, apply each default to the matching form control
-- [ ] Update product detail's `onCreateEventSession()` to pass `defaults` with `capacity` from product
+- [ ] Define `CrudFormAssist` and `ComputedDateRule` interfaces in shared types
+- [ ] Read `formAssist` from route state in the CRUD form component on init
+- [ ] In create mode, apply each `defaults` entry to the matching form control
+- [ ] Update product detail's `onCreateEventSession()` to pass `formAssist` with `defaults.capacity`
 - [ ] Tests: defaults applied in create mode, ignored in edit mode, user can override
 
 **5.2 Computed Date Fields**:
-- [ ] Parse `computed` query param (JSON) in the CRUD form component on init
-- [ ] Define `ComputedDateRule` interface
-- [ ] For each date rule: subscribe to source field changes, auto-compute dest value when auto mode is on
+- [ ] For each `computedDates` rule: subscribe to source field changes, auto-compute dest value when auto mode is on
 - [ ] Add toggle UI per computed field (auto-compute on/off)
 - [ ] Handle microsecond timestamp arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
 - [ ] In edit mode: infer auto/manual state from whether existing dest matches computed value
-- [ ] Update product detail's `onCreateEventSession()` to pass `computed` with duration rule
+- [ ] Update product detail's `onCreateEventSession()` to include `computedDates` with duration rule
 - [ ] Tests: auto-compute on source change, toggle to manual, toggle back to auto, edit mode inference
 
 **5.3 Wire Up Event Session Creation**:
-- [ ] Product detail page passes both `defaults` and `computed` when navigating to new event session
-- [ ] Event list page's "Create Event Session" button — consider whether it should also pass defaults (it doesn't have a product context, so probably not)
+- [ ] Product detail page passes `formAssist` with both `defaults` and `computedDates` via route state
+- [ ] Event list page's "Create Event Session" button — no `formAssist` needed (no product context)
 - [ ] Verify the full flow: product page → CRUD new → capacity pre-filled, end time auto-computed → save → return to product page
 
 ---
@@ -933,7 +925,7 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 | 2 | Metadata enhancements | Phase 1 (for permission gating) | Small | **Must Have** |
 | 3 | Product management pages + duplication | Phase 2 (for entitlement rules metadata) | Large | **Must Have** |
 | 4 | Event management pages + recurring + room availability | Phase 3 (product detail links) | Large | **Must Have** |
-| 5 | Smart event session creation — defaults, derived fields, CRUD extensibility | Phase 4 (event session workflow) | Medium | **Should Have** |
+| 5 | Client-side CRUD extensions — defaults and computed fields via route state | Phase 4 (event session workflow) | Medium | **Should Have** |
 | 6 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
 | 7 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
 | 8 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
@@ -1004,10 +996,11 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
 
 ### Phase 5 — Client-Side CRUD Extensions
-- [ ] Parse `defaults` JSON query param in CRUD form, apply to form controls in create mode
-- [ ] Parse `computed` JSON query param, wire up auto-computed date fields with toggle UI
+- [ ] Define `CrudFormAssist` and `ComputedDateRule` interfaces in shared types
+- [ ] Read `formAssist` from route state in CRUD form component, apply `defaults` in create mode
+- [ ] Wire up `computedDates` rules with auto-compute logic and toggle UI
 - [ ] Handle microsecond timestamp arithmetic for computed dates
-- [ ] Update product detail's `onCreateEventSession()` to pass `defaults` (capacity) and `computed` (duration→end time)
+- [ ] Update product detail's `onCreateEventSession()` to pass `formAssist` via route state
 - [ ] Tests: default application, computed field auto-update, manual override toggle, edit mode behavior
 
 ### Phase 6 — Subscription Management Pages
@@ -1048,3 +1041,89 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 5. **Product duplication (R2.2)**: **In scope for Phase 3.** Important for tiered memberships — Silver → Gold → Platinum are additive, so duplicating and modifying is the natural workflow. Added as Phase 3.4 with backend duplication endpoint.
 
 6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-8). Updated in Phase 1.4.
+
+7. **Smart defaults and computed fields for CRUD forms (Phase 5)**: **Resolved — client-side only, via route state.** See Alternatives Considered below for the full decision process.
+
+---
+
+## Alternatives Considered
+
+### Phase 5: How to handle smart defaults and computed fields in CRUD forms
+
+**Context**: When creating an event session from a product page, the product already knows the default capacity and duration. The admin shouldn't have to re-enter these. The question was: where should this intelligence live, and how general should the solution be?
+
+#### Approach 1: Bespoke Event Session Creation Page
+
+Build a purpose-built Angular form specifically for creating event sessions, replacing the generic admin table CRUD for this use case.
+
+- New `EventSessionCreateComponent` with full control over the form
+- Knows the parent product, reads `default_capacity` and `duration_minutes`
+- Auto-computes end time, pre-fills capacity, has "custom end time" toggle
+
+**Pros**: Full UX control, no risk of breaking generic CRUD, simple to implement.
+**Cons**: Only benefits event sessions. Duplicates form rendering logic (FK pickers, date inputs, validation) that generic CRUD already handles. Another component to maintain. Every future table needing similar behavior requires another bespoke page.
+
+**Verdict**: Rejected. Too narrow — the underlying need (defaults and computed fields) is general enough to warrant a reusable solution.
+
+#### Approach 2: Server-Side Metadata for Defaults and Derived Fields
+
+Teach the admin table CRUD system to understand field defaults and computed fields through server-side metadata tables.
+
+- New metadata table `admin_field_default_mappings`: maps `parent_table.column → child_table.column` for default values
+- Derived fields expressed as metadata formulas (e.g., `end_time_us = start_time_us + duration_minutes * 60 * 1000000`)
+- CRUD form fetches parent row on load, applies mapped defaults, registers derived field computations
+
+**Pros**: Every table benefits automatically. Metadata-driven — configurable without code changes. Single system to maintain.
+**Cons**: Significantly more complex. Expressing time arithmetic in database metadata is fragile and hard to debug. The CRUD form needs "auto-compute" state per field. Over-engineering — how many tables actually need this? The server gains complexity for what is purely a client UI concern.
+
+**Verdict**: Rejected. We don't want to express formulas in database metadata. This is a client UI friendliness concern that shouldn't complicate the server.
+
+#### Approach 3: Hybrid — Lightweight CRUD Extensions + Bespoke Where Needed
+
+Extend the generic CRUD with simple default value passing via query params, but keep complex derived-field logic (duration→end time, recurring creation) in a bespoke event session form.
+
+- Simple defaults via query param: `defaults=capacity:20,status:scheduled`
+- Bespoke `EventSessionCreateComponent` for duration computation and recurring mode
+
+**Pros**: Simple defaults work across all tables. Complex event logic gets proper UX. Lower risk.
+**Cons**: Still requires a bespoke page. Two systems working together. The query param approach was the initial direction before the delivery mechanism was refined.
+
+**Verdict**: Partially accepted — the idea of extending the generic CRUD was right, but splitting between CRUD defaults and a bespoke form was unnecessary. The computed date logic is general enough to live in the CRUD form itself.
+
+#### Approach 4: JSON Query Parameters for Both Defaults and Computed Fields
+
+Pass both `defaults` and `computed` as separate JSON query params to the CRUD form. No server changes, no bespoke pages — the generic CRUD handles everything.
+
+- `defaults={"capacity":"20","status":"scheduled"}`
+- `computed={"dates":[{"source":"start_time_us","dest":"end_time_us","offsetMinutes":60,"autoByDefault":true}]}`
+
+**Pros**: Fully general, no server changes, no bespoke pages. Any caller can pass both types of assistance to any CRUD form.
+**Cons**: Raw JSON in URLs is not URL-safe — braces, quotes, and colons must be percent-encoded, producing ugly URLs like `%7B%22capacity%22%3A%2220%22%7D`. Two separate query params rather than a unified object. Angular handles the encoding automatically, but the URLs are unreadable and can get long with complex computed rules.
+
+**Verdict**: Close, but the delivery mechanism was wrong. The JSON-in-URL approach works but is inelegant.
+
+#### Approach 5 (Chosen): Unified `CrudFormAssist` Object via Angular Route State
+
+Combine defaults and computed field rules into a single `CrudFormAssist` interface, passed via Angular's route state rather than query params.
+
+```typescript
+interface CrudFormAssist {
+  defaults?: Record<string, string>;
+  computedDates?: ComputedDateRule[];
+}
+```
+
+Passed via `router.navigate(..., { state: { formAssist } })`. The CRUD form reads `history.state?.formAssist` on init.
+
+**Pros**:
+- Clean URLs — no JSON encoding in the address bar
+- No encoding/parsing concerns — typed JavaScript object, not serialized strings
+- Single unified object for all form assistance — no splitting across multiple params
+- Fully general — any page navigating to any CRUD form can pass assistance
+- No server changes — purely client-side
+- Extensible — add `computedNumbers`, `computedStrings`, etc. as needed without restructuring
+
+**Cons**:
+- Route state is lost on page refresh — but this is acceptable since nobody bookmarks or shares CRUD create form URLs. The user always navigates there from a parent page.
+
+**Verdict**: Accepted. This is the chosen approach for Phase 5.
