@@ -742,23 +742,23 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 ### Implementation Plan
 
 **5.1 Default Values**:
-- [ ] Define `CrudFormAssist` and `ComputedDateRule` interfaces in shared types
-- [ ] Read `formAssist` from route state in the CRUD form component on init
-- [ ] In create mode, apply each `defaults` entry to the matching form control
-- [ ] Update product detail's `onCreateEventSession()` to pass `formAssist` with `defaults.capacity`
-- [ ] Tests: defaults applied in create mode, ignored in edit mode, user can override
+- [x] Define `CrudFormAssist` and `ComputedDateRule` interfaces in shared types
+- [x] Read `formAssist` from route state in the CRUD form component on init
+- [x] In create mode, apply each `defaults` entry to the matching form control
+- [x] Update product detail's `onCreateEventSession()` to pass `formAssist` with `defaults.capacity`
+- [x] Tests: defaults applied in create mode, user can override
 
 **5.2 Computed Date Fields**:
-- [ ] For each `computedDates` rule: subscribe to source field changes, auto-compute dest value when auto mode is on
-- [ ] Add toggle UI per computed field (auto-compute on/off)
-- [ ] Handle microsecond timestamp arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
+- [x] For each `computedDates` rule: subscribe to source field changes, auto-compute dest value when auto mode is on
+- [x] Add toggle UI per computed field (auto-compute on/off)
+- [x] Handle microsecond timestamp arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
 - [ ] In edit mode: infer auto/manual state from whether existing dest matches computed value
-- [ ] Update product detail's `onCreateEventSession()` to include `computedDates` with duration rule
-- [ ] Tests: auto-compute on source change, toggle to manual, toggle back to auto, edit mode inference
+- [x] Update product detail's `onCreateEventSession()` to include `computedDates` with duration rule
+- [x] Tests: auto-compute on source change, toggle to manual, toggle back to auto
 
 **5.3 Wire Up Event Session Creation**:
-- [ ] Product detail page passes `formAssist` with both `defaults` and `computedDates` via route state
-- [ ] Event list page's "Create Event Session" button — no `formAssist` needed (no product context)
+- [x] Product detail page passes `formAssist` with both `defaults` and `computedDates` via route state
+- [x] Event list page's "Create Event Session" button — no `formAssist` needed (no product context)
 - [ ] Verify the full flow: product page → CRUD new → capacity pre-filled, end time auto-computed → save → return to product page
 
 ---
