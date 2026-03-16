@@ -15,7 +15,9 @@ I'd like to add a blog to the website. I'd like to add an author_blog permission
 
 On the client side, under the admin tab, their should be a new menu item called Blog Posts that is guarded by the author_blog permission. Going to this page should have a row of blog posts with pagination sorted by created_at_us. The user should be able to choose a year and month and have an option for All Years and All Months (choosing All Years automatically selects All Months) that let you filter posts. There should be edit and delete icons for each post.
 
-There should be a New Post button that brings up a blog authoring screen. There should be fields for Name, Author, a bool checkbox for Draft, and a date / time picker to choose when to post and then a button for Post Now that sets the post to post immediately at the current time. Below these
+There should be a New Post button that brings up a blog authoring screen. There should be fields for Name, Author, a bool checkbox for Draft, and a date / time picker to choose when to post and then a button for Post Now that sets the post to post immediately at the current time. Then there should be a Save Post and Cancel buttons. Below these, there should be a left and right pane for authoring. To the left we should host ngx-markdown with syntax highlighting for authoring markdown and then on the right, we should show the fully rendered markdown. Clicking Save Post should save this entry to the database. The Edit button in the grid control should bring up the same page but with the existing data from the existing post populating the controls.
+
+There should be a new top level menu entry that required no permissions called Blog. Clicking this should bring the latest Blog posts up that shows the five most recent blog posts with next and previous posts buttons at the bottom. At the top of the page, there should be buttons for navigating year / month / day with 
 
 # Steps
 - List of steps to accomplish this task.
