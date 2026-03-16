@@ -177,7 +177,7 @@
             }
           }
         ],
-        "currentTab": 5
+        "currentTab": 4
       },
       {
         "id": "b93333724901e982",
@@ -480,10 +480,10 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "36797f836f2c9375",
+  "active": "21e6fdf5f63a3767",
   "lastOpenFiles": [
-    "Claude/Scheduled Jobs.md",
     "Claude/Blog support with markdown.md",
+    "Claude/Scheduled Jobs.md",
     "Claude/Product, Event, and Subscription Admin Portal.md",
     "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
     "Claude/Payment Design Document.md",
