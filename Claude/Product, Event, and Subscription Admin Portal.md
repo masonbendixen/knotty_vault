@@ -553,12 +553,12 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 **Staff eligibility**: Only people with the `instructor` permission are eligible for staff assignments. Add a new `instructor` permission and bind it to the existing `kRoleNameInstructor` role. The `facility_staff` table and staff picker filter to people who have this permission.
 
 **Backend**:
-- [ ] Add `instructor` permission to initial data in `create_database.cpp` and bind to the instructor role
-- [ ] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
-- [ ] Table helpers for both new tables
-- [ ] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
-- [ ] Endpoint or FK picker support: `GET /api/admin/facility_staff?facility_id=X` to get staff for a facility (filtered to people with `instructor` permission)
-- [ ] Include staff info in event session detail response (join or nested query)
+- [x] Add `instructor` permission to initial data in `create_database.cpp` and bind to the instructor role
+- [x] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
+- [x] Table helpers for both new tables
+- [x] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
+- [x] Endpoint or FK picker support: `GET /api/admin/facility/<id>/staff` and `GET /api/admin/event_session/<id>/staff` with JOIN queries
+- [x] Include staff info in event session detail response (join or nested query)
 - [ ] When creating recurring event sessions (4.3), copy staff assignments from the template session to all generated sessions
 
 **Frontend — Staff section in event session creation/detail**:
