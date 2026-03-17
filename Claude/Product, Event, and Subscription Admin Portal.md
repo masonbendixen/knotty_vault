@@ -619,6 +619,66 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
   - Returns array of created session IDs
   - Validates room availability for each generated date/time slot before creating (see 4.6)
 
+#### Implementation Plan — Recurring Event Sessions
+
+**Approach**: Build a bespoke `/manage/events/create` page that reuses existing form controls for the session template, adds recurring-specific UI, and calls a new backend endpoint for batch creation. The "Create Event Session" button in event-list will navigate here instead of the generic CRUD page.
+
+**What we reuse**:
+- `fk-picker` — product selection (filtered to kind='event'), facility, room
+- `simple-date` — date/time pickers for start, end, and "until date"
+- `simple-bool` — visibility checkboxes (show_on_home_page, show_on_upcoming)
+- `simple-text` — capacity, days-before fields, occurrence count
+- `long-text` — notes textarea
+- `EventSessionCardComponent` — in the preview list to show what sessions will be created
+- `microsToDate` / `dateToMicros` — timestamp conversion utilities
+
+**What's new**:
+- `EventCreateComponent` at `/manage/events/create` — bespoke form page
+- Recurring toggle with recurrence pattern controls (Angular Material chips/checkboxes for day-of-week, radio for pattern, etc.)
+- Preview panel showing generated session dates before confirming
+- Backend `POST /api/admin/create_recurring_sessions` endpoint
+- Backend `RecurringSessionHelper` in `business_logic/scheduling/` for date generation + batch creation
+- `createRecurringSessions()` on `ServerAccess` interface
+
+**Step-by-step**:
+
+1. **Backend — `RecurringSessionHelper`** (`business_logic/scheduling/recurring_session_helper.h/cpp`):
+   - Struct `RecurringSessionRequest`: base session fields + recurrence config (pattern, days_of_week, end_date_us or occurrence_count)
+   - `GenerateSessionDates(request)` — pure logic, returns `vector<pair<int64_t, int64_t>>` (start/end timestamps) for all occurrences
+   - `CreateRecurringSessions(transaction, request)` — calls GenerateSessionDates, creates all rows via `EventSessions` table helper, returns created IDs
+   - Unit tests for date generation (weekly, biweekly, custom interval, multi-day, until-date, count-based)
+
+2. **Backend — Endpoint** (`endpoints/admin_create_recurring_sessions.h/cpp`):
+   - `POST /api/admin/create_recurring_sessions` — admin-only
+   - Parses JSON body into `RecurringSessionRequest`
+   - Calls `RecurringSessionHelper::CreateRecurringSessions`
+   - Returns `{ session_ids: [...] }`
+   - Endpoint test
+
+3. **Frontend — Types & Network**:
+   - `CreateRecurringSessionsRequest` and `CreateRecurringSessionsResponse` types in `scheduling.types.ts`
+   - `createRecurringSessions()` method on `ServerAccess` interface, proxy, network, and mock
+   - Mock spec tests
+
+4. **Frontend — `EventCreateComponent`** (`pages/manage/events/event-create/`):
+   - **Session template section**: Product FK picker, date/time pickers, facility/room cascading FK pickers, capacity, visibility checkboxes, notes — all using existing controls
+   - **Recurring toggle**: `mat-slide-toggle` "Recurring"
+   - **Recurrence config section** (shown when recurring):
+     - Pattern: `mat-radio-group` — Weekly / Biweekly / Custom interval
+     - Custom interval: number input for "every N days" (shown when Custom selected)
+     - Days of week: `mat-chip-listbox` multi-select for Mon–Sun
+     - End condition: `mat-radio-group` — "Until date" (date picker) or "After N occurrences" (number input)
+   - **Preview button**: generates dates client-side using same algorithm as backend, shows list of date/time pairs
+   - **Preview section**: list of generated sessions with dates, or use a simple table/list (not full EventSessionCard since they don't exist yet)
+   - **Create button**: submits to `createRecurringSessions()` for recurring, or `addItemFetchPrimaryKey()` for single session
+   - On success: navigates back to `/manage/events`
+   - Component spec tests
+
+5. **Frontend — Routing & Navigation**:
+   - Add `/manage/events/create` route in `manage.routes.ts`
+   - Update `event-list.component.ts` `onCreateSession()` to navigate to `/manage/events/create` instead of generic CRUD
+   - Update event-list test for new navigation target
+
 ### 4.4 Event Session Detail Page (`/admin/events/:sessionId`)
 
 **Frontend** — Enhance existing `EventAttendeesComponent` (route: `/admin/event-session/:sessionId/attendees`) or create new `EventDetailComponent`:
