@@ -580,7 +580,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Staff-centric views**:
 - [x] Admin view: "show all sessions for instructor X" — instructor autocomplete filter on Event Sessions page with dynamic year/month options derived from actual session data. Backend: `GET /api/admin/event_session_staff_assignments` endpoint + `StaffingHelper::GetAllEventSessionStaffAssignments`. Frontend: autocomplete filters sessions, year/month dropdowns only show options with data (further scoped by selected instructor). 12 new event-list tests, 3 mock spec tests, 2 backend tests.
-- [ ] Staff portal: staff member can see their own upcoming sessions they are assigned to (accessible to people with `instructor` permission)
+- [x] Staff portal: staff member can see their own upcoming sessions they are assigned to (accessible to people with `instructor` permission). Backend: `GET /api/my_staff_session_ids` endpoint + `StaffingHelper::GetEventSessionIdsForPerson`. Frontend: "Staff" top-level menu (visible to instructor/admin_portal permissions or admin role), `StaffGuard`, `MySessionsComponent` at `/staff` showing user's assigned scheduled sessions with dynamic year/month filtering. 14 component spec tests, 2 mock spec tests, 2 backend tests.
 
 **Deferred**: Staff schedule / availability windows — will be a later phase. For now, staff are assigned to sessions manually without availability conflict checking.
 
