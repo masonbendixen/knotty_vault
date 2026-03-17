@@ -563,15 +563,19 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [ ] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
 - [ ] Endpoint or FK picker support: `GET /api/admin/facility_staff?facility_id=X` to get staff for a facility
 - [ ] Include staff info in event session detail response (join or nested query)
+Mason- Please always list the backend work before the front end work.
 
 **Open questions**:
 - Should `facility_staff` require a permission (e.g., `is_instructor`) on the person, or is being in the table sufficient to indicate they're staff at that facility?
 	- Mason- There is a kRoleNameInstructor role already. I think we should should add a permission also named "instructor" that we bind to this role and check for this permission.
 - Do we need a "staff schedule" concept (availability windows per person per day), or is it sufficient to just assign staff to sessions and handle conflicts manually?
-	- We will probably need a staff schedule eventually but we will leave that for a later exercise.
+	- Mason- We will probably need a staff schedule eventually but we will leave that for a later exercise.
 - Should the event session creation form require at least one staff member, or allow creating sessions without staff and assigning later?
+	- Mason- No, we don't need staff for events. Some things like open gym could just have who ever is on staff manning the space supervise but we don't need to advertise who that will be.
 - When duplicating/recurring event sessions, should staff assignments carry over from the template session?
+	- Mason- Yes
 - Do we want a staff-centric view ("show me all sessions for instructor X this month") in addition to the session-centric view?
+	- Mason- Yes, and it would be nice to have a portal for the given staff member to see their sessions that they are booked for.
 
 ### 4.3 Event Session Creation Page (`/admin/events/new`)
 
