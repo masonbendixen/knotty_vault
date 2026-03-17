@@ -569,8 +569,10 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Frontend — Staff section in event session detail**:
 - [x] `EventSessionStaffComponent` at `/admin/event-session/:sessionId/staff` showing staff with role chips, notes, and session header (10 component spec tests)
-- [x] Staff toggle in `EventSessionCardComponent`: expandable staff section showing names, roles, notes — integrated into event list workflow (7 new card tests)
-- [x] "Manage Staff" button in card navigates to full staff management page
+- [x] Staff toggle in `EventSessionCardComponent`: expandable staff section showing names, roles, notes — integrated into event list workflow (13 card tests)
+- [x] "Assign Staff" button in card navigates to `/admin/tables/event_session_staffing/new` with session context pre-filled
+- [x] Edit/delete buttons per staff row: edit navigates to generic CRUD, delete removes via `deleteItem` API
+- [x] Staff member names are hyperlinked to their person entry (`/admin/tables/people/edit/:personId`)
 - [x] Support adding multiple staff to a session (instructor + assistant) — via nested table CRUD on `event_session_staffing`
 - [x] Role selector per staff member (instructor / assistant / substitute) — via admin enum on `event_session_staffing.role`
 - [x] When facility changes in event creation form, re-filter the staff auto-complete suggestions — facility staff endpoint available via `getAdminFacilityStaff`
