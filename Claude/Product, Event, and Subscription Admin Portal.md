@@ -531,7 +531,47 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Backend**: Uses `get_filtered_table_rows/event_sessions` with FK display resolution for product_id and facility_id. The existing metadata system handles pagination and sorting.
 
-### 4.2 Event Session Creation Page (`/admin/events/new`)
+### 4.2 Staff Binding to Event Sessions
+
+**Goal**: Associate staff members (instructors, assistants) with event sessions so that scheduling and public-facing information reflect who is running each class.
+
+**New tables**:
+
+1. **`event_session_staffing`** — Links staff to event sessions (many-to-many):
+   - `id` (SERIAL, PK)
+   - `event_session_id` (FK → `event_sessions`)
+   - `person_id` (FK → `people`)
+   - `role` (VARCHAR) — e.g., "instructor", "assistant", "substitute" (optional, defaults to "instructor")
+   - `notes` (TEXT, nullable) — optional notes for this assignment
+
+2. **`facility_staff`** — Which staff work at which facilities (many-to-many):
+   - `id` (SERIAL, PK)
+   - `facility_id` (FK → `facilities`)
+   - `person_id` (FK → `people`)
+   - `is_primary` (BOOL) — whether this is the person's primary facility (for default suggestions)
+
+**Frontend — Staff section in event session creation/detail**:
+- [ ] Staff picker in event creation form: auto-complete dropdown filtered to staff at the selected facility (via `facility_staff` lookup)
+- [ ] Support adding multiple staff to a session (instructor + assistant)
+- [ ] Role selector per staff member (instructor / assistant / substitute)
+- [ ] In event session detail page: staff card showing assigned staff with role, ability to add/remove/change
+- [ ] When facility changes in event creation form, re-filter the staff auto-complete suggestions
+
+**Backend**:
+- [ ] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
+- [ ] Table helpers for both new tables
+- [ ] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
+- [ ] Endpoint or FK picker support: `GET /api/admin/facility_staff?facility_id=X` to get staff for a facility
+- [ ] Include staff info in event session detail response (join or nested query)
+
+**Open questions**:
+- Should `facility_staff` require a permission (e.g., `is_instructor`) on the person, or is being in the table sufficient to indicate they're staff at that facility?
+- Do we need a "staff schedule" concept (availability windows per person per day), or is it sufficient to just assign staff to sessions and handle conflicts manually?
+- Should the event session creation form require at least one staff member, or allow creating sessions without staff and assigning later?
+- When duplicating/recurring event sessions, should staff assignments carry over from the template session?
+- Do we want a staff-centric view ("show me all sessions for instructor X this month") in addition to the session-centric view?
+
+### 4.3 Event Session Creation Page (`/admin/events/new`)
 
 **Frontend** — New `EventCreateComponent`:
 
@@ -557,9 +597,9 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
   - Generates all session dates from recurrence config
   - Creates multiple `event_sessions` rows in a transaction
   - Returns array of created session IDs
-  - Validates room availability for each generated date/time slot before creating (see 4.5)
+  - Validates room availability for each generated date/time slot before creating (see 4.6)
 
-### 4.3 Event Session Detail Page (`/admin/events/:sessionId`)
+### 4.4 Event Session Detail Page (`/admin/events/:sessionId`)
 
 **Frontend** — Enhance existing `EventAttendeesComponent` (route: `/admin/event-session/:sessionId/attendees`) or create new `EventDetailComponent`:
 
@@ -587,7 +627,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [ ] Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
 - Or use existing `get_filtered_table_rows/bookings` filtered by event_session_id with FK resolution
 
-### 4.4 Room Type Requirements for Events
+### 4.5 Room Type Requirements for Events
 
 **Current state**: `event_sessions` already has `facility_id` and `location_room_id` FK columns. Products have no direct room type requirement.
 
@@ -600,7 +640,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 **Recommendation**: Start with the simpler alternative. Add `required_room_type_id` only if admins find they're frequently assigning wrong room types.
 
-### 4.5 Room Availability Checking (Double-Booking Prevention)
+### 4.6 Room Availability Checking (Double-Booking Prevention)
 
 **Goal**: Prevent double-booking rooms when creating event sessions. When an admin selects a room and time slot, the system checks for conflicts with existing sessions.
 
@@ -900,7 +940,7 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ## Phase 9: Waitlist Management
 
-Extracted from Phase 4.3 — waitlist functionality is a distinct feature with its own UI, backend, and notification concerns.
+Extracted from Phase 4.4 — waitlist functionality is a distinct feature with its own UI, backend, and notification concerns.
 
 ### 9.1 Waitlist Display
 
@@ -948,7 +988,7 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 | 1 | Permission & access control | None | Medium | **Must Have** |
 | 2 | Metadata enhancements | Phase 1 (for permission gating) | Small | **Must Have** |
 | 3 | Product management pages + duplication | Phase 2 (for entitlement rules metadata) | Large | **Must Have** |
-| 4 | Event management pages + recurring + room availability | Phase 3 (product detail links) | Large | **Must Have** |
+| 4 | Event management pages + staff binding + recurring + room availability | Phase 3 (product detail links) | Large | **Must Have** |
 | 5 | Client-side CRUD extensions — defaults and computed fields via route state | Phase 4 (event session workflow) | Medium | **Should Have** |
 | 6 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
 | 7 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
@@ -1009,6 +1049,11 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 
 ### Phase 4 — Event Management Pages
 - [ ] Create `EventListComponent` with filtering and capacity display
+- [ ] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
+- [ ] Create table helpers for `event_session_staffing` and `facility_staff`
+- [ ] Add admin metadata for both staffing tables (nested under event sessions / facilities)
+- [ ] Implement staff auto-complete picker filtered by facility
+- [ ] Add staff section to event session creation and detail pages
 - [ ] Create `EventCreateComponent` with user-friendly form (single session)
 - [ ] Implement recurring event creation UI (recurrence pattern, preview, batch create)
 - [ ] Create `POST /api/admin/create_recurring_sessions` backend endpoint
@@ -1018,7 +1063,7 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Enhance event session detail page with attendees, status management, revenue
 - [ ] Add booking status management (attended/no-show)
 - [ ] Add event admin routes
-- [ ] Tests: EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
+- [ ] Tests: staffing table helpers, facility staff lookup, EventListComponent, EventCreateComponent, EventDetailComponent, recurring creation, room availability specs
 
 ### Phase 5 — Client-Side CRUD Extensions
 - [ ] Define `CrudFormAssist` and `ComputedDateRule` interfaces in shared types
@@ -1067,9 +1112,9 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 
 ## Resolved Decisions (from Open Questions)
 
-1. **Recurring event creation (R2.5)**: **In scope for Phase 4.** Important use case — creating sessions one by one is too tedious. Added recurring creation UI with pattern selection, preview, and batch creation to Phase 4.2.
+1. **Recurring event creation (R2.5)**: **In scope for Phase 4.** Important use case — creating sessions one by one is too tedious. Added recurring creation UI with pattern selection, preview, and batch creation to Phase 4.3.
 
-2. **Room availability checking (R2.20)**: **In scope for Phase 4.** Very important — double-booking prevention is critical. Added room availability endpoint and conflict validation to Phase 4.5, integrated into both single and recurring session creation.
+2. **Room availability checking (R2.20)**: **In scope for Phase 4.** Very important — double-booking prevention is critical. Added room availability endpoint and conflict validation to Phase 4.6, integrated into both single and recurring session creation.
 
 3. **Event calendar view (R2.10)**: **Deferred to separate document.** Will be needed eventually as a user-facing feature, not part of this admin portal work. Admin event list (sorted/filtered) is sufficient for admin workflow.
 
