@@ -550,32 +550,37 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - `person_id` (FK → `people`)
    - `is_primary` (BOOL) — whether this is the person's primary facility (for default suggestions)
 
+**Staff eligibility**: Only people with the `instructor` permission are eligible for staff assignments. Add a new `instructor` permission and bind it to the existing `kRoleNameInstructor` role. The `facility_staff` table and staff picker filter to people who have this permission.
+
+**Backend**:
+- [ ] Add `instructor` permission to initial data in `create_database.cpp` and bind to the instructor role
+- [ ] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
+- [ ] Table helpers for both new tables
+- [ ] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
+- [ ] Endpoint or FK picker support: `GET /api/admin/facility_staff?facility_id=X` to get staff for a facility (filtered to people with `instructor` permission)
+- [ ] Include staff info in event session detail response (join or nested query)
+- [ ] When creating recurring event sessions (4.3), copy staff assignments from the template session to all generated sessions
+
 **Frontend — Staff section in event session creation/detail**:
 - [ ] Staff picker in event creation form: auto-complete dropdown filtered to staff at the selected facility (via `facility_staff` lookup)
 - [ ] Support adding multiple staff to a session (instructor + assistant)
 - [ ] Role selector per staff member (instructor / assistant / substitute)
 - [ ] In event session detail page: staff card showing assigned staff with role, ability to add/remove/change
 - [ ] When facility changes in event creation form, re-filter the staff auto-complete suggestions
+- [ ] Staff assignment is optional — sessions can be created without staff (e.g., open gym)
 
-**Backend**:
-- [ ] Add `event_session_staffing` and `facility_staff` tables to `db_schema/` and `create_database.cpp`
-- [ ] Table helpers for both new tables
-- [ ] Admin metadata entries so both tables are CRUD-able and appear as nested items under event sessions / facilities
-- [ ] Endpoint or FK picker support: `GET /api/admin/facility_staff?facility_id=X` to get staff for a facility
-- [ ] Include staff info in event session detail response (join or nested query)
-Mason- Please always list the backend work before the front end work.
+**Staff-centric views**:
+- [ ] Admin view: "show all sessions for instructor X" — filtered event list by staff member, useful for scheduling oversight
+- [ ] Staff portal: staff member can see their own upcoming sessions they are assigned to (accessible to people with `instructor` permission)
 
-**Open questions**:
-- Should `facility_staff` require a permission (e.g., `is_instructor`) on the person, or is being in the table sufficient to indicate they're staff at that facility?
-	- Mason- There is a kRoleNameInstructor role already. I think we should should add a permission also named "instructor" that we bind to this role and check for this permission.
-- Do we need a "staff schedule" concept (availability windows per person per day), or is it sufficient to just assign staff to sessions and handle conflicts manually?
-	- Mason- We will probably need a staff schedule eventually but we will leave that for a later exercise.
-- Should the event session creation form require at least one staff member, or allow creating sessions without staff and assigning later?
-	- Mason- No, we don't need staff for events. Some things like open gym could just have who ever is on staff manning the space supervise but we don't need to advertise who that will be.
-- When duplicating/recurring event sessions, should staff assignments carry over from the template session?
-	- Mason- Yes
-- Do we want a staff-centric view ("show me all sessions for instructor X this month") in addition to the session-centric view?
-	- Mason- Yes, and it would be nice to have a portal for the given staff member to see their sessions that they are booked for.
+**Deferred**: Staff schedule / availability windows — will be a later phase. For now, staff are assigned to sessions manually without availability conflict checking.
+
+**Resolved decisions**:
+- Staff eligibility is gated by the `instructor` permission (bound to the existing instructor role)
+- Staff assignment is optional on event sessions
+- Recurring session creation copies staff assignments from the template
+- Staff schedule / availability is deferred to a future phase
+- A staff-centric view (admin + staff portal) is in scope
 
 ### 4.3 Event Session Creation Page (`/admin/events/new`)
 
