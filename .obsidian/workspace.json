@@ -158,7 +158,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Manual Testing Helper Executable.md",
+                "file": "Claude/Product, Event, and Subscription Admin Portal.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,7 +173,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Manual Testing Helper Executable"
+              "title": "Product, Event, and Subscription Admin Portal"
             }
           }
         ],
@@ -483,6 +483,7 @@
   "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
     "Dashboard.md",
+    "Claude/Manual Testing Helper Executable.md",
     "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
     "Claude/Product, Event, and Subscription Admin Portal.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
@@ -495,7 +496,6 @@
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Scheduling thin slice.md",
     "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
-    "Claude/Manual Testing Helper Executable.md",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
     "Claude/Tyler Work Item - Adding Classes page.md",
