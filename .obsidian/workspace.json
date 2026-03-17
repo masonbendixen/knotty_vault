@@ -158,7 +158,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Product browsing and quoting endpoints.md",
+                "file": "Claude/Product, Event, and Subscription Admin Portal.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,11 +173,11 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Product browsing and quoting endpoints"
+              "title": "Product, Event, and Subscription Admin Portal"
             }
           }
         ],
-        "currentTab": 4
+        "currentTab": 6
       },
       {
         "id": "b93333724901e982",
@@ -480,22 +480,22 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "90e27d4ef876844d",
+  "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
+    "Dashboard.md",
+    "Claude/Subscriptions- Recurring billing and card management.md",
+    "Claude/Product browsing and quoting endpoints.md",
+    "Claude/Scheduled Jobs.md",
     "Claude/Product, Event, and Subscription Admin Portal.md",
     "Claude/Blog support with markdown.md",
-    "Claude/Scheduled Jobs.md",
     "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
     "Claude/Payment Design Document.md",
     "Claude/Support for scheduled purchases.md",
     "Claude/Purchase creation with server-side pricing.md",
-    "Claude/Product browsing and quoting endpoints.md",
     "Claude/Square credentials and Sandbox setup.md",
     "Claude/Scheduling thin slice.md",
-    "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
     "Claude/Manual Testing Helper Executable.md",
-    "Dashboard.md",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
     "Claude/Tyler Work Item - Adding Classes page.md",
