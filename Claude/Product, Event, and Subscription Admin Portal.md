@@ -577,9 +577,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - [ ] Status actions per attendee: mark attended, mark no-show, cancel booking
    - [x] Capacity bar: visual progress bar (booked / capacity)
 
-3. **Waitlist** (card, if any waitlisted bookings):
-   - [ ] Sorted by booking creation time (first come first serve)
-   - [ ] "Promote to confirmed" action when seats available
+3. **Waitlist**: See Phase 9
 
 4. **Revenue Summary** (card):
    - [ ] Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
@@ -900,9 +898,35 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ---
 
-## Phase 9: Facilities & Infrastructure Pages
+## Phase 9: Waitlist Management
 
-### 9.1 Facilities Already Configured
+Extracted from Phase 4.3 — waitlist functionality is a distinct feature with its own UI, backend, and notification concerns.
+
+### 9.1 Waitlist Display
+
+**Frontend** — Add a waitlist card to the Event Session Detail Page:
+- [ ] Show waitlisted bookings sorted by creation time (first come, first serve)
+- [ ] Display: person name, email, booking time, position in queue
+- [ ] Only visible when there are waitlisted bookings for the session
+
+### 9.2 Waitlist Promotion
+
+- [ ] "Promote to confirmed" action per waitlisted booking when seats are available
+- [ ] Auto-suggest promotion when a confirmed booking is cancelled and waitlisted bookings exist
+- [ ] Notification to the promoted person (email) — ties into R2.6 notification system
+
+### 9.3 Waitlist Backend
+
+- [ ] Endpoint or business logic to promote a waitlisted booking to confirmed status
+- [ ] Validation: only promote if capacity allows
+- [ ] Update booking status, create/update entitlement if needed
+- [ ] Tests: waitlist promotion, capacity validation, ordering
+
+---
+
+## Phase 10: Facilities & Infrastructure Pages
+
+### 10.1 Facilities Already Configured
 
 The existing metadata system already has:
 - `facilities` as a top-level admin table
@@ -911,7 +935,7 @@ The existing metadata system already has:
 
 These are already CRUD-able through the existing admin portal. No additional work needed unless we want enhanced UIs.
 
-### 9.2 Facility Schedule View (R2.21 — deferred)
+### 10.2 Facility Schedule View (R2.21 — deferred)
 
 A calendar view showing all event sessions at a facility. Deferred until there's demand — admins can filter the event list by facility for now.
 
@@ -929,7 +953,8 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 | 6 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
 | 7 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
 | 8 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
-| 9 | Facilities enhancements | Phase 2 | Small | **Deferred** |
+| 9 | Waitlist management — display, promotion, notifications | Phase 4 (event detail page) | Medium | **Should Have** |
+| 10 | Facilities enhancements | Phase 2 | Small | **Deferred** |
 
 **Critical path**: Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 
@@ -1025,6 +1050,18 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Create or reuse admin entitlement endpoint with filtering
 - [ ] Display seat assignments inline
 - [ ] Tests: EntitlementSearchComponent spec
+
+### Phase 9 — Waitlist Management
+- [ ] Add waitlist card to event session detail page (sorted by booking creation time)
+- [ ] Implement "promote to confirmed" action per waitlisted booking
+- [ ] Backend logic for waitlist promotion with capacity validation
+- [ ] Auto-suggest promotion on confirmed booking cancellation
+- [ ] Notification to promoted person (email)
+- [ ] Tests: waitlist display, promotion, capacity validation, ordering
+
+### Phase 10 — Facilities & Infrastructure
+- (No work needed — facilities are already CRUD-able through existing admin portal)
+- [ ] Facility schedule view (deferred until demand)
 
 ---
 
