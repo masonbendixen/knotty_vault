@@ -158,7 +158,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Product, Event, and Subscription Admin Portal.md",
+                "file": "Dashboard.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,7 +173,7 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Product, Event, and Subscription Admin Portal"
+              "title": "Dashboard"
             }
           }
         ],
@@ -482,11 +482,11 @@
   },
   "active": "0ba508ddd4f9b43f",
   "lastOpenFiles": [
+    "Claude/Product, Event, and Subscription Admin Portal.md",
     "Dashboard.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Product browsing and quoting endpoints.md",
     "Claude/Scheduled Jobs.md",
-    "Claude/Product, Event, and Subscription Admin Portal.md",
     "Claude/Blog support with markdown.md",
     "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
     "Claude/Payment Design Document.md",
