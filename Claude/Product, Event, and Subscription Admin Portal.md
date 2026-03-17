@@ -579,7 +579,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [x] Staff assignment is optional — sessions can be created without staff (e.g., open gym)
 
 **Staff-centric views**:
-- [ ] Admin view: "show all sessions for instructor X" — filtered event list by staff member, useful for scheduling oversight
+- [x] Admin view: "show all sessions for instructor X" — instructor autocomplete filter on Event Sessions page with dynamic year/month options derived from actual session data. Backend: `GET /api/admin/event_session_staff_assignments` endpoint + `StaffingHelper::GetAllEventSessionStaffAssignments`. Frontend: autocomplete filters sessions, year/month dropdowns only show options with data (further scoped by selected instructor). 12 new event-list tests, 3 mock spec tests, 2 backend tests.
 - [ ] Staff portal: staff member can see their own upcoming sessions they are assigned to (accessible to people with `instructor` permission)
 
 **Deferred**: Staff schedule / availability windows — will be a later phase. For now, staff are assigned to sessions manually without availability conflict checking.
