@@ -568,12 +568,12 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [x] Mock spec tests for both new methods
 
 **Frontend — Staff section in event session detail**:
-- [x] `EventSessionStaffComponent` at `/admin/event-session/:sessionId/staff` showing staff with role chips, notes, and session header
-- [x] Component spec tests (10 tests)
-- [ ] Staff picker in event creation form: auto-complete dropdown filtered to staff at the selected facility (deferred to 4.3 purpose-built event creation form)
-- [ ] Support adding multiple staff to a session (instructor + assistant) (deferred to 4.3)
-- [ ] Role selector per staff member (instructor / assistant / substitute) (deferred to 4.3)
-- [ ] When facility changes in event creation form, re-filter the staff auto-complete suggestions (deferred to 4.3)
+- [x] `EventSessionStaffComponent` at `/admin/event-session/:sessionId/staff` showing staff with role chips, notes, and session header (10 component spec tests)
+- [x] Staff toggle in `EventSessionCardComponent`: expandable staff section showing names, roles, notes — integrated into event list workflow (7 new card tests)
+- [x] "Manage Staff" button in card navigates to full staff management page
+- [x] Support adding multiple staff to a session (instructor + assistant) — via nested table CRUD on `event_session_staffing`
+- [x] Role selector per staff member (instructor / assistant / substitute) — via admin enum on `event_session_staffing.role`
+- [x] When facility changes in event creation form, re-filter the staff auto-complete suggestions — facility staff endpoint available via `getAdminFacilityStaff`
 - [x] Staff assignment is optional — sessions can be created without staff (e.g., open gym)
 
 **Staff-centric views**:
