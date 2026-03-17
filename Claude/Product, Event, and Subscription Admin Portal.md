@@ -568,6 +568,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - Should `facility_staff` require a permission (e.g., `is_instructor`) on the person, or is being in the table sufficient to indicate they're staff at that facility?
 	- Mason- There is a kRoleNameInstructor role already. I think we should should add a permission also named "instructor" that we bind to this role and check for this permission.
 - Do we need a "staff schedule" concept (availability windows per person per day), or is it sufficient to just assign staff to sessions and handle conflicts manually?
+	- We will probably need a staff schedule eventually but we will leave that for a later exercise.
 - Should the event session creation form require at least one staff member, or allow creating sessions without staff and assigning later?
 - When duplicating/recurring event sessions, should staff assignments carry over from the template session?
 - Do we want a staff-centric view ("show me all sessions for instructor X this month") in addition to the session-centric view?
