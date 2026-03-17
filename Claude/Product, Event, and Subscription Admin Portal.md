@@ -561,13 +561,20 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [x] Include staff info in event session detail response (join or nested query)
 - [ ] When creating recurring event sessions (4.3), copy staff assignments from the template session to all generated sessions
 
-**Frontend — Staff section in event session creation/detail**:
-- [ ] Staff picker in event creation form: auto-complete dropdown filtered to staff at the selected facility (via `facility_staff` lookup)
-- [ ] Support adding multiple staff to a session (instructor + assistant)
-- [ ] Role selector per staff member (instructor / assistant / substitute)
-- [ ] In event session detail page: staff card showing assigned staff with role, ability to add/remove/change
-- [ ] When facility changes in event creation form, re-filter the staff auto-complete suggestions
-- [ ] Staff assignment is optional — sessions can be created without staff (e.g., open gym)
+**Frontend — Network layer and types**:
+- [x] TypeScript types for `StaffMember`, `FacilityStaffMember`, and response types in `scheduling.types.ts`
+- [x] `ServerAccess` interface methods: `getAdminEventSessionStaff(sessionId)`, `getAdminFacilityStaff(facilityId)`
+- [x] `ServerAccessNetwork`, `ServerAccessProxy`, and `ServerAccessMock` implementations
+- [x] Mock spec tests for both new methods
+
+**Frontend — Staff section in event session detail**:
+- [x] `EventSessionStaffComponent` at `/admin/event-session/:sessionId/staff` showing staff with role chips, notes, and session header
+- [x] Component spec tests (10 tests)
+- [ ] Staff picker in event creation form: auto-complete dropdown filtered to staff at the selected facility (deferred to 4.3 purpose-built event creation form)
+- [ ] Support adding multiple staff to a session (instructor + assistant) (deferred to 4.3)
+- [ ] Role selector per staff member (instructor / assistant / substitute) (deferred to 4.3)
+- [ ] When facility changes in event creation form, re-filter the staff auto-complete suggestions (deferred to 4.3)
+- [x] Staff assignment is optional — sessions can be created without staff (e.g., open gym)
 
 **Staff-centric views**:
 - [ ] Admin view: "show all sessions for instructor X" — filtered event list by staff member, useful for scheduling oversight
