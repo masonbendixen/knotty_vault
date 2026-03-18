@@ -2218,6 +2218,20 @@ Response (200):
 - [x] Frontend: `SubscriptionDetailComponent` — upgrade UI, grace period extension, entitlement history
 - [x] Frontend: `subscription-detail.component.spec.ts` — 12 tests for new functionality
 
+### Admin Subscription Creation (6.3)
+
+- [x] Backend: `GET /api/admin/person/<id>/cards` — list saved cards for a person (`admin_card_actions.h/cpp`)
+- [x] Backend: `POST /api/admin/person/<id>/cards` — save a new card for a person via `CardHelper::CreateCard`
+- [x] Backend tests: 7 tests in `admin_card_actions_test.cpp`
+- [x] Backend: Reuses existing `POST /api/admin/subscriptions` endpoint
+- [x] Frontend: `ServerAccess` wiring for `adminCreateSubscription`, `adminGetPersonCards`, `adminSavePersonCard`
+- [x] Frontend: `CreateSubscriptionComponent` — person autocomplete, product selector, card selector with Square SDK new card form, start month picker, charge now toggle
+- [x] Frontend: Route `subscriptions/new` in `manage.routes.ts`
+- [x] Frontend: "Create Subscription" button on subscription list page
+- [x] Frontend tests: `create-subscription.component.spec.ts` — 20 component tests
+- [x] Frontend tests: `ServerAccess.mock.spec.ts` — 10 tests for new admin methods
+- [x] CMakeLists.txt and `web_app.cpp` registrations for new endpoint files
+
 ### Date Display Fix — UTC Calendar Dates
 
 Period dates (period_start_us, period_end_us, valid_from_us, valid_to_us) are stored as UTC midnight timestamps. The frontend was formatting them in local time, causing US-timezone users to see dates shifted by one day (e.g., "Feb 28 – Mar 31" instead of "Mar 1 – Mar 31" for a March subscription). Additionally, period end dates use an exclusive-end convention (first microsecond of next month), so they need to subtract 1 day for display.

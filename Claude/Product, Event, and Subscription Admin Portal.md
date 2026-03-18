@@ -943,28 +943,25 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 
 **Frontend** — "Create Subscription" button on subscription list page, opens a creation form:
 
-1. - [ ] **Person selector**: FK picker to select the customer (search by name/email)
-2. - [ ] **Product selector**: FK picker filtered to subscription-type products
-3. - [ ] **Saved card**:
-   - If the person already has saved cards: dropdown to select one
-   - If no saved cards: option to add a card using the Square Web Payments SDK card form (same as the customer-facing card setup)
+1. - [x] **Person selector**: Autocomplete search using `getFkOptions('people')` — `create-subscription.component.ts`
+2. - [x] **Product selector**: Dropdown filtered to subscription-type products via `getCatalogProducts()`
+3. - [x] **Saved card**:
+   - If the person already has saved cards: dropdown to select one (via `adminGetPersonCards`)
+   - If no saved cards: option to add a card using the Square Web Payments SDK card form (via `SquarePaymentService` + `adminSavePersonCard`)
    - This sets the `saved_card_id` on the subscription for automatic billing
-4. - [ ] **Start date**: Date picker. Two options:
-   - "Start billing next month" — subscription starts on the 1st of next month, but entitlement starts immediately (rest of current month is free)
-   - "Start billing now" — charges immediately for the current period
-5. - [ ] **Charge now toggle**: Whether to charge the first billing cycle immediately
+4. - [x] **Start date**: Month selector offering current month + 5 future months
+5. - [x] **Charge now toggle**: Checkbox when start month is current month
 
 **Backend**:
-- [ ] Reuse existing `POST /api/subscriptions` endpoint with admin authorization or create `POST /api/admin/subscriptions`
-  - Takes person_id, product_id, saved_card_id, start_date, charge_now
-  - Validates admin or manage_products permission
+- [x] Reuses existing `POST /api/admin/subscriptions` endpoint — takes person_id, product_id, saved_card_id, period_start_us, period_end_us, charge_now, idempotency_key
+  - Validates `manage_subscriptions` permission
   - Calls `SubscriptionHelper::CreateSubscription()` with `created_by_person_id` set to the admin
-  - If "rest of month free": creates an entitlement valid from now to end of month with no charge, sets `next_billing_us` to the 1st of next month
 
 **Card setup for new customers**:
-- [ ] New endpoint or enhance existing: `POST /api/admin/save_card` that takes person_id and card nonce
-- [ ] Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
-- [ ] Reuses existing card-saving business logic from the customer portal
+- [x] `GET /api/admin/person/:id/cards` — lists saved cards for a person (`admin_card_actions.cpp`)
+- [x] `POST /api/admin/person/:id/cards` — saves a new card for a person via `CardHelper::CreateCard`
+- [x] Creates a Square customer for the person (if not exists), attaches the card, saves to `saved_cards`
+- [x] Reuses existing card-saving business logic from `CardHelper`
 
 ### 6.4 Subscription Permission Configuration
 
