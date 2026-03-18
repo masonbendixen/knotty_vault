@@ -886,21 +886,21 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 
 ## Phase 6: Subscription Management Pages
 
-### 6.1 Subscription List Page (`/admin/subscriptions`)
+### 6.1 Subscription List Page (`/manage/subscriptions`)
 
 **Frontend** — New `SubscriptionListComponent`:
 
 **Layout**:
-- [ ] Status summary cards at top: Active (count), Past Due (count), Cancelled (count), Expired (count)
-- [ ] Filter bar: status dropdown, person search, product filter
-- [ ] Table: person name, product name, status, current period, next billing date, saved card last4
-- [ ] Status indicators: green=active, yellow=past_due, red=expired, grey=cancelled
-- [ ] Each row clickable → `/admin/subscriptions/:id`
+- [x] Status summary cards at top: Active (count), Past Due (count), Cancelled (count), Expired (count)
+- [x] Filter bar: status dropdown, product filter, year/month filters (only populated values, default current month)
+- [x] Table: person name, product name, status, current period, next billing date, saved card display
+- [x] Status indicators: green=active, yellow=past_due, red=expired, grey=cancelled
+- [x] Each row clickable → `/admin/tables/subscriptions/edit/:id`
+- [x] Revenue Summary button → `/manage/subscriptions/revenue` page showing total revenue, past due count, cancelled count
+- [x] Dashboard card added to manage dashboard
 
 **Backend**:
-- [ ] Existing `GET /api/admin/subscriptions` returns all subscriptions — reuse or enhance
-- [ ] Ensure response includes person name and product name (not just IDs)
-- Or use `get_filtered_table_rows/subscriptions` with FK resolution
+- [x] Uses `get_filtered_table_rows/subscriptions` with FK resolution for person names, product names, and card display
 
 ### 6.2 Subscription Detail Page (`/admin/subscriptions/:id`)
 
