@@ -606,18 +606,18 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [x] **Conversion**: The form converts human-readable date/time to microsecond timestamps before submitting via `addItemFetchPrimaryKey` on `event_sessions`.
 
 **Recurring mode** (R2.5 — in scope):
-- [ ] Toggle "Recurring" reveals additional fields:
+- [x] Toggle "Recurring" reveals additional fields:
   - Recurrence pattern: weekly, biweekly, or custom interval (every N days)
   - Day(s) of week: multi-select (e.g., Monday + Wednesday + Friday)
   - End condition: "Until date" (date picker) or "Number of occurrences" (count)
-- [ ] Preview: shows a list of all sessions that will be created with dates/times, allowing the admin to review before confirming
-- [ ] On confirm: creates all event_sessions in a single transaction
-- [ ] Backend: new endpoint `POST /api/admin/create_recurring_sessions`
+- [x] Preview: shows a list of all sessions that will be created with dates/times, allowing the admin to review before confirming
+- [x] On confirm: creates all event_sessions in a single transaction
+- [x] Backend: new endpoint `POST /api/admin/create_recurring_sessions`
   - Input: base session template (product_id, facility_id, room_id, capacity, start_time, end_time, visibility settings) + recurrence config (pattern, days_of_week, end_date_or_count)
   - Generates all session dates from recurrence config
   - Creates multiple `event_sessions` rows in a transaction
   - Returns array of created session IDs
-  - Validates room availability for each generated date/time slot before creating (see 4.6)
+  - Room availability validation deferred to 4.6
 
 #### Implementation Plan — Recurring Event Sessions
 
