@@ -1,0 +1,4 @@
+# Obsidian local state (causes conflicts)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
