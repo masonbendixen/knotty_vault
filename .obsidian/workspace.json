@@ -4,132 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "bf3535de9dd94aba",
+        "id": "b93333724901e982",
         "type": "tabs",
-        "dimension": 50.27075812274368,
         "children": [
           {
-            "id": "074ce5ec0cbf99e8",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Support for scheduled purchases.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Support for scheduled purchases"
-            }
-          },
-          {
-            "id": "2550e3882c3c9a72",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Scheduled Jobs.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Scheduled Jobs"
-            }
-          },
-          {
-            "id": "116e1292b5ad2e52",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Payment Design Document.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Design Document"
-            }
-          },
-          {
-            "id": "2b00541812803313",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Should Have- Multi Seat and Bundled Pricing"
-            }
-          },
-          {
-            "id": "21e6fdf5f63a3767",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Claude/Scheduled Jobs.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Scheduled Jobs"
-            }
-          },
-          {
-            "id": "36797f836f2c9375",
+            "id": "4087922054d12d43",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -153,12 +32,12 @@
             }
           },
           {
-            "id": "0ba508ddd4f9b43f",
+            "id": "837db4b29bf57069",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Claude/Product, Event, and Subscription Admin Portal.md",
+                "file": "Claude/Tyler Work Item - Adding Classes page.md",
                 "mode": "source",
                 "source": false,
                 "backlinks": true,
@@ -173,151 +52,10 @@
                 }
               },
               "icon": "lucide-file",
-              "title": "Product, Event, and Subscription Admin Portal"
+              "title": "Tyler Work Item - Adding Classes page"
             }
           }
-        ],
-        "currentTab": 6
-      },
-      {
-        "id": "b93333724901e982",
-        "type": "tabs",
-        "dimension": 49.72924187725632,
-        "children": [
-          {
-            "id": "339f41db73b280f2",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Payment Support.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Support"
-            }
-          },
-          {
-            "id": "4a17c008a0296d55",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Payment Support.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Payment Support"
-            }
-          },
-          {
-            "id": "039b98639b8dadcd",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Class/Project.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Project"
-            }
-          },
-          {
-            "id": "4087922054d12d43",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Projects/Authentication, security.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "Authentication, security"
-            }
-          },
-          {
-            "id": "6e60df995e31980a",
-            "type": "leaf",
-            "state": {
-              "type": "release-notes",
-              "state": {
-                "currentVersion": "1.9.14"
-              },
-              "icon": "lucide-book-up",
-              "title": "Release Notes 1.9.14"
-            }
-          },
-          {
-            "id": "15404aeb66fd9a33",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Sources/mailio.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "mailio"
-            }
-          }
-        ],
-        "currentTab": 2
+        ]
       }
     ],
     "direction": "vertical"
@@ -476,20 +214,26 @@
       "canvas:Create new canvas": false,
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
-      "command-palette:Open command palette": false
+      "command-palette:Open command palette": false,
+      "obsidian-git:Open Git source control": false
     }
   },
-  "active": "0ba508ddd4f9b43f",
+  "active": "90e27d4ef876844d",
   "lastOpenFiles": [
-    "Claude/Product, Event, and Subscription Admin Portal.md.tmp.1356.1773775646406",
+    "Projects/Untitled.base",
+    "Claude/Blog support with markdown.md",
+    "Projects/Work for Tyler.md",
+    "Claude/Tyler Work Item - Adding Classes page.md",
     "Dashboard.md",
+    "Projects/Authentication, security.md",
+    "Sources/mailio.md",
+    "Claude/Product, Event, and Subscription Admin Portal.md",
+    "Claude/Product, Event, and Subscription Admin Portal.md.tmp.1356.1773775646406",
     "Claude/Manual Testing Helper Executable.md",
     "Claude/Payment Should Have- Multi Seat and Bundled Pricing.md",
-    "Claude/Product, Event, and Subscription Admin Portal.md",
     "Claude/Subscriptions- Recurring billing and card management.md",
     "Claude/Product browsing and quoting endpoints.md",
     "Claude/Scheduled Jobs.md",
-    "Claude/Blog support with markdown.md",
     "Claude/Payment Design Document.md",
     "Claude/Support for scheduled purchases.md",
     "Claude/Purchase creation with server-side pricing.md",
@@ -498,24 +242,18 @@
     "Claude/Support for scheduled purchases.md.tmp.1356.1773450607848",
     "Claude/6.4 Subscription Upgrades/Downgrades (Scenarios 31, 32, 33).md",
     "Claude/6.4 Subscription Upgrades",
-    "Claude/Tyler Work Item - Adding Classes page.md",
     "Claude/Prework for adding classes.md",
     "Claude/Phase C.5 - Wire Admin Menu to Table CRUD.md",
     "Claude/Payment base table helpers.md",
     "Claude/Add unique constraint for multiple columns on table.md",
     "Projects/Wiring up client and server.md",
     "Claude/Improving test execution speed.md",
-    "Projects/Work for Tyler.md",
     "Claude/Adding an instructor page with photos.md",
-    "Class/Project.md",
-    "Templates/Claude.md",
     "Sources/Images/register.component.html",
     "Sources/Images",
     "Claude/Purchase creation with server-side pricing.docx",
     "Claude/Payment Design Document.docx",
     "Claude/md_to_docx.py",
-    "Claude",
-    "Claude/Scheduling thin slice.md.tmp.45848.1772486171105",
-    "Projects/Untitled 3.base"
+    "Claude"
   ]
 }
