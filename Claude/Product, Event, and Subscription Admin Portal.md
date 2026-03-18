@@ -902,36 +902,37 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 **Backend**:
 - [x] Uses `get_filtered_table_rows/subscriptions` with FK resolution for person names, product names, and card display
 
-### 6.2 Subscription Detail Page (`/admin/subscriptions/:id`)
+### 6.2 Subscription Detail Page (`/manage/subscriptions/:id`)
 
-**Frontend** — New `SubscriptionDetailComponent`:
+**Frontend** — New `AdminSubscriptionDetailComponent`:
 
 **Sections**:
 
 1. **Subscription Info** (top card):
-   - [ ] Person (linked), product (linked to product detail), status, billing anchor day
-   - [ ] Current period: start → end dates
-   - [ ] Next billing date, grace period end (if past_due)
-   - [ ] Saved card: brand, last4, expiration
-   - [ ] Cancel reason (if cancelled)
+   - [x] Person (linked to admin people edit), product (linked to product detail), status, billing anchor day
+   - [x] Current period: start → end dates
+   - [x] Next billing date, grace period end (if past_due)
+   - [x] Card on file: Yes/No indicator (card details not exposed to admin for security)
+   - [x] Cancel reason (if cancelled), cancelled date, effective until date
 
-2. **Actions** (card):
-   - [ ] Change product (upgrade/downgrade) — calls existing `POST /api/subscriptions/:id/change_product`
-   - [ ] Cancel subscription — calls existing `POST /api/subscriptions/:id/cancel`
-   - [ ] Retry billing (if past_due) — calls existing `POST /api/subscriptions/:id/retry_billing`
-   - [ ] Expire grace period (admin override)
+2. **Actions**:
+   - [ ] Change product (upgrade/downgrade) — deferred, no endpoint yet
+   - [x] Cancel subscription — calls existing `POST /api/subscriptions/:id/cancel` with optional reason
+   - [x] Retry billing (if past_due) — calls existing `POST /api/subscriptions/:id/retry_billing`
+   - [ ] Expire grace period (admin override) — deferred, no endpoint yet
 
 3. **Current Entitlement** (card):
-   - [ ] Shows the entitlement for the current billing period
-   - [ ] Seat assignments with `SeatAssignmentComponent` (reuse from customer portal)
-   - [ ] Granted permission name
+   - [x] Shows the entitlement for the current billing period
+   - [x] Seat assignments with `SeatAssignmentComponent` (reuse from customer portal)
+   - [x] Granted permission name shown as badge
 
 4. **Billing History** (card):
-   - [ ] Embedded `TableViewControlComponent` for `subscription_charges` filtered by subscription_id
-   - [ ] Shows each billing cycle: period dates, status (completed/failed), charge amount, payment link
+   - [x] Charges table filtered by subscription_id from `subscription_charges` table
+   - [x] Shows each billing cycle: period dates, status (completed/failed/pending), charge amount, charged date
+   - [x] Total charged amount from completed charges
 
 5. **Entitlement History** (card):
-   - [ ] All entitlements created for this subscription across billing cycles
+   - [ ] All entitlements created for this subscription across billing cycles — deferred until entitlement query by subscription is available
    - [ ] Status, validity period, seats used/total
 
 ### 6.3 Admin Subscription Creation
