@@ -697,7 +697,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
    - [x] Status actions per attendee: mark attended, mark no-show (cancel booking deferred — requires refund/credit policy decisions)
    - [x] Capacity bar: visual progress bar (booked / capacity)
 
-3. **Waitlist**: See Phase 9
+3. **Waitlist**: See Phase 10
 
 4. **Revenue Summary** (card):
    - [x] Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
@@ -994,9 +994,142 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ---
 
-## Phase 8: Entitlement Management Page
+## Phase 8: Product Variants
 
-### 8.1 Entitlement Search Page (`/admin/entitlements`)
+Make product variants a first-class citizen across the system. The database schema (`product_variants` table, `product_variant_id` FK columns on `product_prices`, `purchase_items`, and `bookable_service_sessions`) already exists but is not wired into the catalog, pricing resolution, purchase, or entitlement flows.
+
+**Use case**: Replace the standalone "60-Minute Massage" product with a "Massage" product that has 60-minute ($160), 90-minute ($220), and 120-minute ($300) variants. Customers select a variant when purchasing; pricing resolves per variant.
+
+### 8.1 Seed Data Changes
+
+**Backend** (`create_database.cpp`):
+- [ ] Rename product "massage-60" to "Massage" (code: "massage", kind: "one_time")
+- [ ] Remove `duration_minutes` from the product level (duration now lives on variants)
+- [ ] Create product variants:
+  - code "massage-60", name "60-Minute Massage", duration_minutes=60, sort_order=1
+  - code "massage-90", name "90-Minute Massage", duration_minutes=90, sort_order=2
+  - code "massage-120", name "120-Minute Massage", duration_minutes=120, sort_order=3
+- [ ] Update existing `product_prices` for massage to reference the 60-minute variant (backward-compatible migration of existing price)
+- [ ] Add new `product_prices` rows for 90-minute ($220) and 120-minute ($300) variants per active price schedule
+
+### 8.2 Pricing Resolution
+
+The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently resolves prices by `product_id + schedule_id + permission_ids`, ignoring `variant_id`. This must become variant-aware.
+
+**Backend** — Stored procedure changes (`sql_util/stored_procedures/`):
+- [ ] Update `GetBestProductPriceByProductSchedulePermissions` to accept an optional `variant_id` parameter
+- [ ] When variant_id is provided: filter `product_prices` to rows matching that variant_id
+- [ ] When variant_id is NULL: filter to rows where `product_variant_id IS NULL` (backward compatible for products without variants)
+- [ ] Update `stored_procedures.h/cpp` with new SQL
+- [ ] Tests: stored procedure returns correct price for specific variant, returns NULL-variant price for non-variant products
+
+**Backend** — `CatalogHelper` changes (`business_logic/payment/catalog_helper.h/cpp`):
+- [ ] Add `ProductVariantInfo` struct: id, product_id, code, name, duration_minutes, buffer_minutes, sort_order, is_active
+- [ ] Extend `ProductInfo` to include `std::vector<ProductVariantInfo> variants`
+- [ ] Update `GetProducts()` / product loading to also fetch variants for each product
+- [ ] Update `ResolvePriceForProduct` to accept optional variant_id
+- [ ] Update `ResolvedPrice` or pricing context to carry variant_id
+- [ ] Tests: catalog returns products with variants populated, pricing resolves variant-specific prices
+
+### 8.3 Purchase Flow — Variant-Aware
+
+**Backend** — `QuoteLineItem` and purchase creation:
+- [ ] Add optional `variant_id` field to `QuoteLineItem` struct
+- [ ] Update `CatalogHelper::BuildQuote` to use variant_id when resolving prices
+- [ ] Update `PurchaseHelper::CreatePurchase` to write `product_variant_id` to `purchase_items`
+- [ ] Validate: if a product has active variants, a variant_id is required in the purchase request
+- [ ] Validate: the variant_id must belong to the specified product_id and be active
+- [ ] Tests: purchase creation with variant records correct variant_id on purchase_items, quote resolves variant-specific price
+
+**Backend** — `EntitlementHelper` considerations:
+- [ ] Entitlement rules remain at the product level (`product_entitlement_rules` has no variant_id) — a purchase of any variant of a product triggers the same entitlement rule
+- [ ] No schema changes needed: the product defines "what access you get", the variant defines "which specific service configuration"
+- [ ] Verify existing entitlement creation still works when purchase_items have variant_id set
+
+### 8.4 KeyValueTable Conversions
+
+**Backend** (`business_logic/payment/payment_key_value_table.h/cpp`):
+- [ ] Add `ProductVariantInfoToKeyValueTable` function
+- [ ] Add `ProductVariantsToKeyValueTableArray` function
+- [ ] Update `ProductInfoToKeyValueTable` to include variant count or nested variant data
+- [ ] Tests: round-trip conversion for variant info
+
+### 8.5 Endpoint Changes
+
+**Backend** (`endpoints/`):
+- [ ] `GET /api/catalog_products`: Include `variants` array in each product's JSON response (each variant: id, code, name, duration_minutes, buffer_minutes, sort_order, is_active)
+- [ ] `POST /api/purchase_create`: Accept optional `variant_id` per line item in the request body
+- [ ] Add validation: if product has active variants, variant_id is required; variant must belong to product and be active
+- [ ] Tests: catalog endpoint returns variants, purchase endpoint accepts and validates variant_id
+
+### 8.6 Angular Types
+
+**Frontend** (`shared/types/payment.types.ts`):
+- [ ] Add `ProductVariant` interface: `id`, `product_id`, `code`, `name`, `duration_minutes`, `buffer_minutes`, `sort_order`, `is_active`
+- [ ] Extend `CatalogProduct` to include `variants: ProductVariant[]`
+- [ ] Extend `CreatePurchaseRequest` line items to include optional `variant_id`
+- [ ] Extend `PurchaseItem` to include optional `variant_id` and `variant_name` for display in purchase history
+
+### 8.7 Angular Network Layer
+
+**Frontend** (`shared/services/network/`):
+- [ ] Update `ServerAccessMock` catalog response to include variants in mock product data (Massage product with 3 variants)
+- [ ] Update mock purchase creation to validate and store variant_id
+- [ ] Update mock spec tests for variant-aware catalog and purchase flows
+
+### 8.8 Admin UI — Product Detail Page
+
+**Frontend** (`pages/manage/products/product-detail/`):
+- [ ] The variants section already exists as an embedded `TableViewControl` for `product_variants` — no change needed for basic CRUD
+- [ ] Enhance pricing matrix: when a product has variants, the matrix rows become variants (variant × schedule × permission), allowing per-variant price editing
+- [ ] If no variants exist for a product, the pricing matrix works as today (product-level pricing)
+- [ ] Show variant name and duration in the pricing matrix row headers
+- [ ] Tests: product detail with variants shows variant pricing matrix, without variants shows product-level matrix
+
+### 8.9 Admin UI — Pricing Overview Page
+
+**Frontend** (`pages/manage/pricing/pricing-overview/`):
+- [ ] In the "By Product" matrix view: for products with variants, show variant rows indented under the product row
+- [ ] Each variant gets its own row of price cells (schedule × permission)
+- [ ] Products without variants continue to show a single row as today
+- [ ] In the "By Schedule" card view: show variant names alongside product names for products with variants
+- [ ] Tests: pricing overview renders variant rows, handles mixed variant/non-variant products
+
+### 8.10 Customer-Facing UI — Catalog & Checkout
+
+**Frontend** (`pages/shop/`):
+- [ ] Catalog product cards for products with variants: show a variant selector (dropdown or radio buttons)
+- [ ] Selected variant determines the displayed price
+- [ ] "Add to Cart" captures the selected variant_id
+- [ ] Checkout summary shows variant name (e.g., "Massage — 90-Minute Massage")
+- [ ] If a product has variants and none is selected, the "Add to Cart" button is disabled
+- [ ] Products without variants work exactly as today (no selector shown)
+- [ ] Tests: variant selector renders, price updates on selection, cart captures variant_id
+
+### 8.11 Bookable Service Sessions (Future Consideration)
+
+The `bookable_service_sessions` table already has a required `product_variant_id` FK column, designed for service booking where the variant determines the time slot duration and buffer. Full integration with the booking/scheduling system is deferred to the scheduling thin slice work, but the variant infrastructure built in this phase will support it.
+
+- [ ] Verify that `bookable_service_sessions` variant FK works correctly with the new seed data
+- [ ] No new scheduling logic in this phase — just ensure compatibility
+
+### Open Questions
+
+1. **Variant-level entitlement rules**: Should entitlement rules ever differ by variant? Currently `product_entitlement_rules` is per-product with no variant_id column. If a 120-minute massage should grant a different entitlement than a 60-minute one (unlikely for massage, but possible for other product types), we would need a `product_variant_id` FK on `product_entitlement_rules`. **Recommendation**: Defer. Keep entitlements at the product level. Adding the FK column later is straightforward.
+
+2. **Variant deactivation behavior**: If a variant is deactivated (`is_active = false`), should it still appear in purchase history? What about in-progress purchases with that variant? **Recommendation**: Inactive variants are hidden from the catalog but remain on existing purchase records. Attempting to create a new purchase with an inactive variant returns a validation error.
+
+3. **Default variant selection**: For products with variants, should there be a "default" variant pre-selected in the UI? The schema has `sort_order` which determines display order. **Recommendation**: The first active variant (lowest sort_order) is pre-selected in the catalog. No explicit "default" column needed.
+
+4. **Variant-less products**: Many products (events, subscriptions, simple one-time purchases) won't have variants. The system must continue to work cleanly for these — no variant selection UI, no variant_id in purchase requests, pricing resolves at the product level. **Recommendation**: Handled by the NULL variant_id path in pricing resolution and "if product has variants" conditionals in the UI.
+
+5. **Bulk variant creation**: Should the admin UI support creating multiple variants at once (e.g., "generate 30/60/90/120 minute variants")? **Recommendation**: Defer. The existing `TableViewControl` for variants supports adding them one at a time, which is sufficient for the initial use case.
+
+---
+
+## Phase 9: Entitlement Management Page
+
+### 9.1 Entitlement Search Page (`/admin/entitlements`)
 
 **Frontend** — New `EntitlementSearchComponent`:
 
@@ -1019,24 +1152,24 @@ This page is primarily a navigation aid — it helps admins see the big picture 
 
 ---
 
-## Phase 9: Waitlist Management
+## Phase 10: Waitlist Management
 
 Extracted from Phase 4.4 — waitlist functionality is a distinct feature with its own UI, backend, and notification concerns.
 
-### 9.1 Waitlist Display
+### 10.1 Waitlist Display
 
 **Frontend** — Add a waitlist card to the Event Session Detail Page:
 - [ ] Show waitlisted bookings sorted by creation time (first come, first serve)
 - [ ] Display: person name, email, booking time, position in queue
 - [ ] Only visible when there are waitlisted bookings for the session
 
-### 9.2 Waitlist Promotion
+### 10.2 Waitlist Promotion
 
 - [ ] "Promote to confirmed" action per waitlisted booking when seats are available
 - [ ] Auto-suggest promotion when a confirmed booking is cancelled and waitlisted bookings exist
 - [ ] Notification to the promoted person (email) — ties into R2.6 notification system
 
-### 9.3 Waitlist Backend
+### 10.3 Waitlist Backend
 
 - [ ] Endpoint or business logic to promote a waitlisted booking to confirmed status
 - [ ] Validation: only promote if capacity allows
@@ -1045,9 +1178,9 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 
 ---
 
-## Phase 10: Facilities & Infrastructure Pages
+## Phase 11: Facilities & Infrastructure Pages
 
-### 10.1 Facilities Already Configured
+### 11.1 Facilities Already Configured
 
 The existing metadata system already has:
 - `facilities` as a top-level admin table
@@ -1056,7 +1189,7 @@ The existing metadata system already has:
 
 These are already CRUD-able through the existing admin portal. No additional work needed unless we want enhanced UIs.
 
-### 10.2 Facility Schedule View (R2.21 — deferred)
+### 11.2 Facility Schedule View (R2.21 — deferred)
 
 A calendar view showing all event sessions at a facility. Deferred until there's demand — admins can filter the event list by facility for now.
 
@@ -1073,13 +1206,14 @@ A calendar view showing all event sessions at a facility. Deferred until there's
 | 5 | Client-side CRUD extensions — defaults and computed fields via route state | Phase 4 (event session workflow) | Medium | **Should Have** |
 | 6 | Subscription management pages + admin creation | Phase 2 (metadata for subscriptions) | Large | **Must Have** |
 | 7 | Pricing overview page | Phase 3 (product detail pricing) | Small | **Nice to Have** |
-| 8 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
-| 9 | Waitlist management — display, promotion, notifications | Phase 4 (event detail page) | Medium | **Should Have** |
-| 10 | Facilities enhancements | Phase 2 | Small | **Deferred** |
+| 8 | Product variants — first-class variant support | Phase 3 (product detail, catalog, pricing) | Large | **Must Have** |
+| 9 | Entitlement management page | Phase 2 (metadata for entitlements) | Medium | **Should Have** |
+| 10 | Waitlist management — display, promotion, notifications | Phase 4 (event detail page) | Medium | **Should Have** |
+| 11 | Facilities enhancements | Phase 2 | Small | **Deferred** |
 
 **Critical path**: Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 
-Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have** due to admin subscription creation being a key workflow for new member onboarding.
+Phases 6, 7, 8, 9 can be done in parallel after their respective dependencies. Phase 6 is now **Must Have** due to admin subscription creation being a key workflow for new member onboarding.
 
 ---
 
@@ -1171,13 +1305,32 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Implement "copy prices from schedule" feature
 - [x] Tests: PricingOverviewComponent spec
 
-### Phase 8 — Entitlement Management Page
+### Phase 8 — Product Variants
+- [ ] Rename massage-60 product to "Massage" and create 60/90/120-minute variants in seed data
+- [ ] Add variant-specific prices ($160/$220/$300) to seed data
+- [ ] Update `GetBestProductPriceByProductSchedulePermissions` stored procedure to accept optional variant_id
+- [ ] Add `ProductVariantInfo` struct and extend `ProductInfo` with variants in `CatalogHelper`
+- [ ] Update `ResolvePriceForProduct` to accept optional variant_id
+- [ ] Add `variant_id` to `QuoteLineItem`, update `BuildQuote` and `CreatePurchase` for variant-aware flow
+- [ ] Add `ProductVariantInfoToKeyValueTable` conversion function
+- [ ] Update `GET /api/catalog_products` endpoint to include variants in response
+- [ ] Update `POST /api/purchase_create` to accept and validate optional variant_id per line item
+- [ ] Add `ProductVariant` TypeScript interface, extend `CatalogProduct` and `CreatePurchaseRequest` types
+- [ ] Update `ServerAccessMock` and mock spec tests for variant-aware catalog and purchases
+- [ ] Enhance product detail pricing matrix: variant rows when product has variants
+- [ ] Enhance pricing overview: variant rows in matrix view, variant names in schedule view
+- [ ] Catalog page: variant selector for products with variants, price updates on selection
+- [ ] Checkout: capture variant_id, display variant name in summary
+- [ ] Verify `bookable_service_sessions` variant FK compatibility with new seed data
+- [ ] Tests: stored procedure, catalog helper, purchase flow, endpoint, KeyValueTable conversion, component specs
+
+### Phase 9 — Entitlement Management Page
 - [ ] Create `EntitlementSearchComponent` with person/product search
 - [ ] Create or reuse admin entitlement endpoint with filtering
 - [ ] Display seat assignments inline
 - [ ] Tests: EntitlementSearchComponent spec
 
-### Phase 9 — Waitlist Management
+### Phase 10 — Waitlist Management
 - [ ] Add waitlist card to event session detail page (sorted by booking creation time)
 - [ ] Implement "promote to confirmed" action per waitlisted booking
 - [ ] Backend logic for waitlist promotion with capacity validation
@@ -1185,7 +1338,7 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Notification to promoted person (email)
 - [ ] Tests: waitlist display, promotion, capacity validation, ordering
 
-### Phase 10 — Facilities & Infrastructure
+### Phase 11 — Facilities & Infrastructure
 - (No work needed — facilities are already CRUD-able through existing admin portal)
 - [ ] Facility schedule view (deferred until demand)
 
@@ -1203,7 +1356,7 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 
 5. **Product duplication (R2.2)**: **In scope for Phase 3.** Important for tiered memberships — Silver → Gold → Platinum are additive, so duplicating and modifying is the natural workflow. Added as Phase 3.4 with backend duplication endpoint.
 
-6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-8). Updated in Phase 1.4.
+6. **Manage Data visibility**: **Resolved — manage_products users do NOT see Manage Data.** That is for actual admins only. `manage_products` users only see the custom admin pages (Phases 3-9). Updated in Phase 1.4.
 
 7. **Smart defaults and computed fields for CRUD forms (Phase 5)**: **Resolved — client-side only, via route state.** See Alternatives Considered below for the full decision process.
 
