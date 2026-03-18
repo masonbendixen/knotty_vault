@@ -916,10 +916,10 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
    - [x] Cancel reason (if cancelled), cancelled date, effective until date
 
 2. **Actions**:
-   - [ ] Change product (upgrade/downgrade) — deferred, no endpoint yet
+   - [x] Change product (upgrade/downgrade) — `POST /api/admin/subscriptions/:id/change_product`
    - [x] Cancel subscription — calls existing `POST /api/subscriptions/:id/cancel` with optional reason
    - [x] Retry billing (if past_due) — calls existing `POST /api/subscriptions/:id/retry_billing`
-   - [ ] Expire grace period (admin override) — deferred, no endpoint yet
+   - [x] Extend grace period (admin override) — `POST /api/admin/subscriptions/:id/extend_grace_period`
 
 3. **Current Entitlement** (card):
    - [x] Shows the entitlement for the current billing period
@@ -932,8 +932,8 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
    - [x] Total charged amount from completed charges
 
 5. **Entitlement History** (card):
-   - [ ] All entitlements created for this subscription across billing cycles — deferred until entitlement query by subscription is available
-   - [ ] Status, validity period, seats used/total
+   - [x] All entitlements created for this subscription across billing cycles — `GET /api/admin/subscriptions/:id/entitlements`
+   - [x] Status, validity period, seats used/total, assignments
 
 ### 6.3 Admin Subscription Creation
 
