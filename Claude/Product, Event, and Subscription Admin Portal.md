@@ -694,7 +694,7 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 2. **Attendees / Bookings** (main card):
    - [x] Table: person name, email, booking status, payment status, entitlement status
    - [x] For each booking: link to the purchase, link to the person
-   - [ ] Status actions per attendee: mark attended, mark no-show, cancel booking
+   - [x] Status actions per attendee: mark attended, mark no-show (cancel booking deferred — requires refund/credit policy decisions)
    - [x] Capacity bar: visual progress bar (booked / capacity)
 
 3. **Waitlist**: See Phase 9
