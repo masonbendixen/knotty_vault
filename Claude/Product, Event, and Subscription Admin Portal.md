@@ -980,12 +980,12 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 **Frontend** — New `PricingOverviewComponent`:
 
 **Layout**:
-- [ ] Tabs or toggle: by Product | by Price Schedule
-- [ ] **By Product**: Select a product → shows pricing matrix (schedules × permissions) — same as product detail pricing section but standalone
-- [ ] **By Price Schedule**: Select a schedule → shows all products priced in that schedule with their prices per permission
+- [x] Tabs or toggle: by Product | by Price Schedule
+- [x] **By Product**: Select a product → shows pricing matrix (schedules × permissions) — same as product detail pricing section but standalone
+- [x] **By Price Schedule**: Select a schedule → shows all products priced in that schedule with their prices per permission
 
 **Price Schedule Management** (sub-section):
-- [ ] List of all price schedules with active/inactive status, date range
+- [x] List of all price schedules with active/inactive status, date range
 - [ ] Create new schedule with name, valid_from, valid_to, is_active
 - [ ] Edit existing schedule
 - [ ] When creating a new schedule: option to "Copy prices from schedule X" (R2.15)
@@ -1166,10 +1166,10 @@ Phases 6, 7, 8 can be done in parallel after Phase 2. Phase 6 is now **Must Have
 - [ ] Tests: SubscriptionListComponent, SubscriptionDetailComponent, admin creation, card setup specs
 
 ### Phase 7 — Pricing Overview Page
-- [ ] Create `PricingOverviewComponent` with schedule and product views
+- [x] Create `PricingOverviewComponent` with schedule and product views
 - [ ] Implement price schedule CRUD within the page
 - [ ] Implement "copy prices from schedule" feature
-- [ ] Tests: PricingOverviewComponent spec
+- [x] Tests: PricingOverviewComponent spec
 
 ### Phase 8 — Entitlement Management Page
 - [ ] Create `EntitlementSearchComponent` with person/product search
