@@ -1113,17 +1113,17 @@ The `bookable_service_sessions` table already has a required `product_variant_id
 - [ ] Verify that `bookable_service_sessions` variant FK works correctly with the new seed data
 - [ ] No new scheduling logic in this phase — just ensure compatibility
 
-### Open Questions
+### Resolved Decisions
 
-1. **Variant-level entitlement rules**: Should entitlement rules ever differ by variant? Currently `product_entitlement_rules` is per-product with no variant_id column. If a 120-minute massage should grant a different entitlement than a 60-minute one (unlikely for massage, but possible for other product types), we would need a `product_variant_id` FK on `product_entitlement_rules`. **Recommendation**: Defer. Keep entitlements at the product level. Adding the FK column later is straightforward.
+1. **Variant-level entitlement rules**: Deferred. Entitlement rules stay at the product level — no `product_variant_id` FK on `product_entitlement_rules`. Can be added later if needed.
 
-2. **Variant deactivation behavior**: If a variant is deactivated (`is_active = false`), should it still appear in purchase history? What about in-progress purchases with that variant? **Recommendation**: Inactive variants are hidden from the catalog but remain on existing purchase records. Attempting to create a new purchase with an inactive variant returns a validation error.
+2. **Variant deactivation behavior**: Inactive variants are hidden from the catalog but remain on existing purchase records. Creating a new purchase with an inactive variant returns a validation error.
 
-3. **Default variant selection**: For products with variants, should there be a "default" variant pre-selected in the UI? The schema has `sort_order` which determines display order. **Recommendation**: The first active variant (lowest sort_order) is pre-selected in the catalog. No explicit "default" column needed.
+3. **Default variant selection**: First active variant (lowest `sort_order`) is pre-selected in the catalog UI. No explicit "default" column needed.
 
-4. **Variant-less products**: Many products (events, subscriptions, simple one-time purchases) won't have variants. The system must continue to work cleanly for these — no variant selection UI, no variant_id in purchase requests, pricing resolves at the product level. **Recommendation**: Handled by the NULL variant_id path in pricing resolution and "if product has variants" conditionals in the UI.
+4. **Variant-less products**: Handled by the NULL variant_id path in pricing resolution and "if product has variants" conditionals in the UI. No variant selection shown, no variant_id in purchase requests.
 
-5. **Bulk variant creation**: Should the admin UI support creating multiple variants at once (e.g., "generate 30/60/90/120 minute variants")? **Recommendation**: Defer. The existing `TableViewControl` for variants supports adding them one at a time, which is sufficient for the initial use case.
+5. **Bulk variant creation**: Deferred. The existing `TableViewControl` for one-at-a-time variant creation is sufficient for the initial use case.
 
 ---
 
