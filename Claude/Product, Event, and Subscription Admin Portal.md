@@ -693,18 +693,18 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 
 2. **Attendees / Bookings** (main card):
    - [x] Table: person name, email, booking status, payment status, entitlement status
-   - [ ] For each booking: link to the purchase, link to the person
+   - [x] For each booking: link to the purchase, link to the person
    - [ ] Status actions per attendee: mark attended, mark no-show, cancel booking
    - [x] Capacity bar: visual progress bar (booked / capacity)
 
 3. **Waitlist**: See Phase 9
 
 4. **Revenue Summary** (card):
-   - [ ] Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
-   - [ ] Payment status breakdown (completed/pending/failed)
+   - [x] Total revenue from this session's bookings (sum of purchase_items.line_total_cents for this session's bookings)
+   - [x] Payment status breakdown (completed/pending/failed)
 
 **Backend**:
-- [ ] Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
+- [x] Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
 - Or use existing `get_filtered_table_rows/bookings` filtered by event_session_id with FK resolution
 
 ### 4.5 Room Type Requirements for Events
