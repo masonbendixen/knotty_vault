@@ -707,42 +707,46 @@ Add missing tables to the existing metadata-driven admin system. This gives imme
 - [x] Enhance `GET /api/event_sessions/:id/attendees` (if exists) or create it to return bookings with person info and payment info
 - Or use existing `get_filtered_table_rows/bookings` filtered by event_session_id with FK resolution
 
-### 4.5 Room Type Requirements for Events
+### 4.5 Room Type Requirements for Events — DEFERRED
+
+Deferred until massage scheduling work. Room type enforcement is more relevant for service-based scheduling (massage rooms) than group events.
 
 **Current state**: `event_sessions` already has `facility_id` and `location_room_id` FK columns. Products have no direct room type requirement.
 
 **Design for R1.8** ("define that events need a given room type"):
-- [ ] Add optional `required_room_type_id` FK column to `products` table (for event-type products)
-- [ ] When creating an event session, the room picker filters to rooms matching the required type
-- [ ] Admin metadata entry for the new column with FK picker → location_room_types
+- Add optional `required_room_type_id` FK column to `products` table (for event-type products)
+- When creating an event session, the room picker filters to rooms matching the required type
+- Admin metadata entry for the new column with FK picker → location_room_types
 
 **Alternative (simpler)**: Don't add a column. Instead, use convention — the admin picks an appropriate room when creating the session. The system shows room type in the picker to guide selection. Defer the enforcement to a later phase.
 
 **Recommendation**: Start with the simpler alternative. Add `required_room_type_id` only if admins find they're frequently assigning wrong room types.
 
-### 4.6 Room Availability Checking (Double-Booking Prevention)
+### 4.6 Room Availability Checking (Double-Booking Prevention) — DEFERRED
+
+Deferred until massage booking work. Double-booking prevention is more critical for 1:1 service rooms than shared group event spaces.
 
 **Goal**: Prevent double-booking rooms when creating event sessions. When an admin selects a room and time slot, the system checks for conflicts with existing sessions.
 
 **Backend** — New endpoint or business logic method:
-- [ ] `GET /api/admin/room_availability?facility_id=X&room_id=Y&start_us=T1&end_us=T2`
+- `GET /api/admin/room_availability?facility_id=X&room_id=Y&start_us=T1&end_us=T2`
   - Queries `event_sessions` for any non-cancelled sessions that overlap the requested time range in the same room
   - Returns: `{ available: bool, conflicts: EventSession[] }`
   - Overlap check: `existing.start_time_us < requested.end_time_us AND existing.end_time_us > requested.start_time_us`
 
 **Backend validation** — Add conflict check to event session creation:
-- [ ] In the `addItem` flow (or in a new business logic helper), validate no room conflict before inserting
-- [ ] Return a clear error if a conflict exists: "Room X is already booked for [Event Name] from [time] to [time]"
-- [ ] Also enforce this in the recurring session creation endpoint — if any date/time has a conflict, report which ones and don't create any (atomic)
+- In the `addItem` flow (or in a new business logic helper), validate no room conflict before inserting
+- Return a clear error if a conflict exists: "Room X is already booked for [Event Name] from [time] to [time]"
+- Also enforce this in the recurring session creation endpoint — if any date/time has a conflict, report which ones and don't create any (atomic)
 
 **Frontend integration**:
-- [ ] When admin selects a room and sets start/end time, call the availability check endpoint
-- [ ] If conflict: show a warning with the conflicting session name and time, disable the submit button
-- [ ] In recurring mode: after generating the preview list, check availability for all dates and mark conflicting ones in red
-- [ ] Admin can remove conflicting dates from the recurring batch before creating
+- When admin selects a room and sets start/end time, call the availability check endpoint
+- If conflict: show a warning with the conflicting session name and time, disable the submit button
+- In recurring mode: after generating the preview list, check availability for all dates and mark conflicting ones in red
+- Admin can remove conflicting dates from the recurring batch before creating
 
 **Database enforcement** (optional additional safety):
-- [ ] Consider a stored procedure or trigger that prevents inserting overlapping sessions in the same room
+- Consider a stored procedure or trigger that prevents inserting overlapping sessions in the same room
 - This provides a safety net even if the UI check is bypassed
 - Could be deferred if the API-level validation is sufficient
 
@@ -870,14 +874,13 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 - [x] For each `computedDates` rule: subscribe to source field changes, auto-compute dest value when auto mode is on
 - [x] Add toggle UI per computed field (auto-compute on/off)
 - [x] Handle microsecond timestamp arithmetic: `dest_us = source_us + (offsetMinutes * 60 * 1_000_000)`
-- [ ] In edit mode: infer auto/manual state from whether existing dest matches computed value
 - [x] Update product detail's `onCreateEventSession()` to include `computedDates` with duration rule
 - [x] Tests: auto-compute on source change, toggle to manual, toggle back to auto
 
 **5.3 Wire Up Event Session Creation**:
 - [x] Product detail page passes `formAssist` with both `defaults` and `computedDates` via route state
 - [x] Event list page's "Create Event Session" button — no `formAssist` needed (no product context)
-- [ ] Verify the full flow: product page → CRUD new → capacity pre-filled, end time auto-computed → save → return to product page
+- [x] Verify the full flow: product page → CRUD new → capacity pre-filled, end time auto-computed → save → return to product page ✅ 2026-03-17
 
 ---
 
