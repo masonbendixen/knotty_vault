@@ -986,9 +986,9 @@ The CRUD form logic is in the admin table entry form components. Changes are iso
 
 **Price Schedule Management** (sub-section):
 - [x] List of all price schedules with active/inactive status, date range
-- [ ] Create new schedule with name, valid_from, valid_to, is_active
-- [ ] Edit existing schedule
-- [ ] When creating a new schedule: option to "Copy prices from schedule X" (R2.15)
+- [x] Create new schedule with name, valid_from, valid_to, is_active
+- [x] Edit existing schedule
+- [x] When creating a new schedule: option to "Copy prices from schedule X" (R2.15)
 
 This page is primarily a navigation aid — it helps admins see the big picture of pricing across the system. The actual price editing happens through the product detail page's pricing matrix.
 
