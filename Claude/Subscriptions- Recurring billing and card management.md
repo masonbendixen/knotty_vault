@@ -2218,6 +2218,16 @@ Response (200):
 - [x] Frontend: `SubscriptionDetailComponent` — upgrade UI, grace period extension, entitlement history
 - [x] Frontend: `subscription-detail.component.spec.ts` — 12 tests for new functionality
 
+### Date Display Fix — UTC Calendar Dates
+
+Period dates (period_start_us, period_end_us, valid_from_us, valid_to_us) are stored as UTC midnight timestamps. The frontend was formatting them in local time, causing US-timezone users to see dates shifted by one day (e.g., "Feb 28 – Mar 31" instead of "Mar 1 – Mar 31" for a March subscription). Additionally, period end dates use an exclusive-end convention (first microsecond of next month), so they need to subtract 1 day for display.
+
+- [x] Added UTC formatting utilities to `DateFormatting.ts` (`formatCalendarDate`, `formatPeriodEndDate`, `getUtcYear`, `getUtcMonth`)
+- [x] Updated 6 components to use UTC date formatting (my-subscriptions, subscription-detail user/admin, subscription-list, product-detail)
+- [x] Updated templates to use `formatEndDate` for period end and entitlement end dates
+- [x] Fixed admin subscription list year/month filtering to use UTC
+- [x] 15 new tests in `DateFormatting.spec.ts`
+
 ### Manual Testing — Subscription Product Change
 
 **Upgrade (immediate)**:
