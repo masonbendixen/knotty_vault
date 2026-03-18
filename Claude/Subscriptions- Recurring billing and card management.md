@@ -2205,6 +2205,19 @@ Response (200):
 - [x] Update `CMakeLists.txt` for new mail files
 - [x] Update planning document with manual testing instructions
 
+### Admin Endpoints & Frontend Wiring
+
+- [x] Admin endpoint: `POST /api/admin/subscriptions/<id>/extend_grace_period` (`admin_subscription_actions.h/cpp`)
+- [x] Admin endpoint: `GET /api/admin/subscriptions/<id>/entitlements` (entitlement history with assignments)
+- [x] Admin endpoint: `POST /api/admin/subscriptions/<id>/change_product` (admin-initiated upgrade)
+- [x] Admin endpoint tests (`admin_subscription_actions_test.cpp`)
+- [x] Enhanced `ChangeSubscriptionProduct` to charge upgrade price difference via `PayWithCard`
+- [x] Added `manage_subscriptions` permission to database seed (`create_database.cpp`)
+- [x] Frontend: `ServerAccess` interface + proxy + network + mock for 3 admin endpoints
+- [x] Frontend: `ServerAccess.mock.spec.ts` — 12 tests for admin methods
+- [x] Frontend: `SubscriptionDetailComponent` — upgrade UI, grace period extension, entitlement history
+- [x] Frontend: `subscription-detail.component.spec.ts` — 12 tests for new functionality
+
 ### Manual Testing — Subscription Product Change
 
 **Upgrade (immediate)**:
