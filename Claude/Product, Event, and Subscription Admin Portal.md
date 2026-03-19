@@ -1016,20 +1016,21 @@ Make product variants a first-class citizen across the system. The database sche
 
 The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently resolves prices by `product_id + schedule_id + permission_ids`, ignoring `variant_id`. This must become variant-aware.
 
-**Backend** — Stored procedure changes (`sql_util/stored_procedures/`):
-- [ ] Update `GetBestProductPriceByProductSchedulePermissions` to accept an optional `variant_id` parameter
-- [ ] When variant_id is provided: filter `product_prices` to rows matching that variant_id
-- [ ] When variant_id is NULL: filter to rows where `product_variant_id IS NULL` (backward compatible for products without variants)
-- [ ] Update `stored_procedures.h/cpp` with new SQL
-- [ ] Tests: stored procedure returns correct price for specific variant, returns NULL-variant price for non-variant products
+**Backend** — SQL query changes (`sql_util/table_helpers/product_prices.cpp`):
+- [x] Update `GetBestProductPriceByProductSchedulePermissions` to accept an optional `variant_id` parameter
+- [x] When variant_id is provided: filter `product_prices` to rows matching that variant_id
+- [x] When variant_id is NULL: filter to rows where `product_variant_id IS NULL` (backward compatible for products without variants)
+- [x] Add variant-aware SQL queries for all pricing resolution paths
+- [x] Tests: 3 new tests — variant price resolution, variant+permission pricing, non-variant ignores variant prices
 
 **Backend** — `CatalogHelper` changes (`business_logic/payment/catalog_helper.h/cpp`):
-- [ ] Add `ProductVariantInfo` struct: id, product_id, code, name, duration_minutes, buffer_minutes, sort_order, is_active
-- [ ] Extend `ProductInfo` to include `std::vector<ProductVariantInfo> variants`
-- [ ] Update `GetProducts()` / product loading to also fetch variants for each product
-- [ ] Update `ResolvePriceForProduct` to accept optional variant_id
-- [ ] Update `ResolvedPrice` or pricing context to carry variant_id
-- [ ] Tests: catalog returns products with variants populated, pricing resolves variant-specific prices
+- [x] Add `ProductVariantInfo` struct: id, product_id, code, name, duration_minutes, buffer_minutes, sort_order, is_active
+- [x] Extend `ProductInfo` to include `std::vector<ProductVariantInfo> variants`
+- [x] Add `GetVariantsForProduct()` to load active variants sorted by sort_order
+- [x] Update `GetCatalog()` and `GetProduct()` to populate variants and resolve first-variant price
+- [x] Update `ResolvePriceForProduct` to accept optional variant_id
+- [x] Update `ResolvedPrice` to carry variant_id; update `QuoteLineItem` with optional variant_id
+- [x] Tests: 3 new tests — catalog with variants, quote with variant pricing, product without variants backward compat
 
 ### 8.3 Purchase Flow — Variant-Aware
 
@@ -1308,9 +1309,9 @@ Phases 6, 7, 8, 9 can be done in parallel after their respective dependencies. P
 ### Phase 8 — Product Variants
 - [x] Rename massage-60 product to "Massage" and create 60/90/120-minute variants in seed data
 - [x] Add variant-specific prices ($160/$220/$300) to seed data
-- [ ] Update `GetBestProductPriceByProductSchedulePermissions` stored procedure to accept optional variant_id
-- [ ] Add `ProductVariantInfo` struct and extend `ProductInfo` with variants in `CatalogHelper`
-- [ ] Update `ResolvePriceForProduct` to accept optional variant_id
+- [x] Update `GetBestProductPriceByProductSchedulePermissions` SQL queries to accept optional variant_id
+- [x] Add `ProductVariantInfo` struct and extend `ProductInfo` with variants in `CatalogHelper`
+- [x] Update `ResolvePriceForProduct` to accept optional variant_id
 - [ ] Add `variant_id` to `QuoteLineItem`, update `BuildQuote` and `CreatePurchase` for variant-aware flow
 - [ ] Add `ProductVariantInfoToKeyValueTable` conversion function
 - [ ] Update `GET /api/catalog_products` endpoint to include variants in response
