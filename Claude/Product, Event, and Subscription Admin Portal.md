@@ -1063,7 +1063,7 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 - [x] `POST /api/catalog_quote`: Accept optional `variant_id` per line item in the request body
 - [x] `POST /api/purchase_create`: Accept optional `variant_id` per line item in the request body
 - [x] Validation delegated to `PurchaseHelper::CreatePurchase` (implemented in 8.3): if product has active variants, variant_id is required; variant must belong to product and be active
-- [x] Tests: catalog endpoint returns variants (2 tests), purchase endpoint accepts and validates variant_id (2 tests)
+- [x] Tests: catalog endpoint returns variants (2 tests), purchase endpoint accepts and validates variant_id (2 tests), quote endpoint resolves variant pricing (2 tests)
 
 ### 8.6 Angular Types
 
