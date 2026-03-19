@@ -1050,10 +1050,11 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.4 KeyValueTable Conversions
 
 **Backend** (`business_logic/payment/payment_key_value_table.h/cpp`):
-- [ ] Add `ProductVariantInfoToKeyValueTable` function
-- [ ] Add `ProductVariantsToKeyValueTableArray` function
-- [ ] Update `ProductInfoToKeyValueTable` to include variant count or nested variant data
-- [ ] Tests: round-trip conversion for variant info
+- [x] Add `ProductVariantInfoToKeyValueTable` function
+- [x] Add `ProductVariantsToKeyValueTableArray` function
+- [x] Update `ProductInfoToKeyValueTable` to include `variant_count`
+- [x] Update `PurchaseItemInfoToKeyValueTable` to include `product_variant_id`, `variant_name`, `variant_code`
+- [x] Tests: round-trip conversion for variant info (8 new tests)
 
 ### 8.5 Endpoint Changes
 
