@@ -1111,13 +1111,14 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.10 Customer-Facing UI — Catalog & Checkout
 
 **Frontend** (`pages/shop/`):
-- [ ] Catalog product cards for products with variants: show a variant selector (dropdown or radio buttons)
-- [ ] Selected variant determines the displayed price
-- [ ] "Add to Cart" captures the selected variant_id
-- [ ] Checkout summary shows variant name (e.g., "Massage — 90-Minute Massage")
-- [ ] If a product has variants and none is selected, the "Add to Cart" button is disabled
-- [ ] Products without variants work exactly as today (no selector shown)
-- [ ] Tests: variant selector renders, price updates on selection, cart captures variant_id
+- [x] Catalog product cards: variant products show "from $X" prefix and "N options available" badge
+- [x] Product detail: variant selector (styled button group) with auto-selection of first variant; "Purchase" button disabled if no variant selected
+- [x] Product detail navigates to checkout with `variantId` query parameter
+- [x] Checkout reads `variantId` from query params, resolves variant from product data
+- [x] Checkout order summary shows "Product — Variant Name" (e.g., "Massage — 90-Minute Massage")
+- [x] Checkout includes `variant_id` in `createPurchase` request
+- [x] Products without variants work exactly as today (no selector, no query param)
+- [x] Tests: catalog "from" prefix (2 tests), product detail variant selector + auto-select + navigate with variantId + no selector for non-variant (4 tests), checkout variant display name + variant_id in purchase call (3 tests)
 
 ### 8.11 Bookable Service Sessions (Future Consideration)
 
