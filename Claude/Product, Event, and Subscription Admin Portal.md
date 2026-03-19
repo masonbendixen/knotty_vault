@@ -1124,8 +1124,10 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 
 The `bookable_service_sessions` table already has a required `product_variant_id` FK column, designed for service booking where the variant determines the time slot duration and buffer. Full integration with the booking/scheduling system is deferred to the scheduling thin slice work, but the variant infrastructure built in this phase will support it.
 
-- [ ] Verify that `bookable_service_sessions` variant FK works correctly with the new seed data
-- [ ] No new scheduling logic in this phase — just ensure compatibility
+- [x] Verified `bookable_service_sessions.product_variant_id` FK is required (non-nullable) and references `product_variants.id`
+- [x] Seed data creates 3 massage variants (ids auto-assigned) that future bookable service sessions can reference
+- [x] Tests: 2 new schema-level tests — valid variant FK insert succeeds, invalid variant FK insert throws FK constraint violation
+- [x] No new scheduling logic in this phase — just compatibility verified
 
 ### Resolved Decisions
 
