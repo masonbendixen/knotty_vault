@@ -1035,17 +1035,17 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.3 Purchase Flow — Variant-Aware
 
 **Backend** — `QuoteLineItem` and purchase creation:
-- [ ] Add optional `variant_id` field to `QuoteLineItem` struct
-- [ ] Update `CatalogHelper::BuildQuote` to use variant_id when resolving prices
-- [ ] Update `PurchaseHelper::CreatePurchase` to write `product_variant_id` to `purchase_items`
-- [ ] Validate: if a product has active variants, a variant_id is required in the purchase request
-- [ ] Validate: the variant_id must belong to the specified product_id and be active
-- [ ] Tests: purchase creation with variant records correct variant_id on purchase_items, quote resolves variant-specific price
+- [x] Add optional `variant_id` field to `QuoteLineItem` struct (already existed from 8.2)
+- [x] Update `CatalogHelper::BuildQuote` to use variant_id when resolving prices (already worked from 8.2)
+- [x] Update `PurchaseHelper::CreatePurchase` to write `product_variant_id` to `purchase_items`
+- [x] Validate: if a product has active variants, a variant_id is required in the purchase request
+- [x] Validate: the variant_id must belong to the specified product_id and be active
+- [x] Tests: purchase creation with variant records correct variant_id on purchase_items, quote resolves variant-specific price
 
 **Backend** — `EntitlementHelper` considerations:
-- [ ] Entitlement rules remain at the product level (`product_entitlement_rules` has no variant_id) — a purchase of any variant of a product triggers the same entitlement rule
-- [ ] No schema changes needed: the product defines "what access you get", the variant defines "which specific service configuration"
-- [ ] Verify existing entitlement creation still works when purchase_items have variant_id set
+- [x] Entitlement rules remain at the product level (`product_entitlement_rules` has no variant_id) — a purchase of any variant of a product triggers the same entitlement rule
+- [x] No schema changes needed: the product defines "what access you get", the variant defines "which specific service configuration"
+- [x] Verify existing entitlement creation still works when purchase_items have variant_id set
 
 ### 8.4 KeyValueTable Conversions
 
