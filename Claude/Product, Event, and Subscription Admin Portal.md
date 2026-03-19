@@ -1087,11 +1087,14 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.8 Admin UI — Product Detail Page
 
 **Frontend** (`pages/manage/products/product-detail/`):
-- [ ] The variants section already exists as an embedded `TableViewControl` for `product_variants` — no change needed for basic CRUD
-- [ ] Enhance pricing matrix: when a product has variants, the matrix rows become variants (variant × schedule × permission), allowing per-variant price editing
-- [ ] If no variants exist for a product, the pricing matrix works as today (product-level pricing)
-- [ ] Show variant name and duration in the pricing matrix row headers
-- [ ] Tests: product detail with variants shows variant pricing matrix, without variants shows product-level matrix
+- [x] The variants section already exists as an embedded `TableViewControl` for `product_variants` — no change needed for basic CRUD
+- [x] Enhance pricing matrix: when a product has variants, the matrix rows become variants grouped under schedule headers (variant × schedule × permission), allowing per-variant price editing
+- [x] If no variants exist for a product, the pricing matrix works as today (product-level pricing)
+- [x] Show variant name and duration in the pricing matrix row headers
+- [x] Load product variants in `loadPricingData` alongside prices, schedules, and permissions
+- [x] Updated `getPrice`, `isEditing`, `onCellClick`, `onCellSave` to accept `variantId` parameter
+- [x] New price records include `product_variant_id` when created for a variant cell
+- [x] Tests: 6 new tests — variant rows render, non-variant mode unchanged, variant-specific price lookup, create variant price includes variant_id, non-variant price omits variant_id, variant cell click enters edit mode
 
 ### 8.9 Admin UI — Pricing Overview Page
 
