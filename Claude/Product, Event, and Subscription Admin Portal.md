@@ -1099,11 +1099,14 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.9 Admin UI — Pricing Overview Page
 
 **Frontend** (`pages/manage/pricing/pricing-overview/`):
-- [ ] In the "By Product" matrix view: for products with variants, show variant rows indented under the product row
-- [ ] Each variant gets its own row of price cells (schedule × permission)
-- [ ] Products without variants continue to show a single row as today
-- [ ] In the "By Schedule" card view: show variant names alongside product names for products with variants
-- [ ] Tests: pricing overview renders variant rows, handles mixed variant/non-variant products
+- [x] Load `product_variants` in `loadData` alongside products, schedules, prices, and permissions
+- [x] Added `VariantRow` interface, `variants` array, `getVariantsForProduct()`, `productHasVariants()` helpers
+- [x] Updated `PriceRow` to include `product_variant_id`; updated `getPrice`, `getStandardPrice`, `isEditing`, `onCellClick`, `onCellSave` with `variantId` parameter
+- [x] Updated `copyPricesFromSchedule` to preserve `product_variant_id` when copying
+- [x] In "By Product" view: products with variants show a header row ("N variants") followed by indented variant sub-rows with price cells per schedule × permission
+- [x] Products without variants continue to show a single row as before
+- [x] In "By Schedule" card view: variant products show one row per variant with "Product — Variant Name" format
+- [x] Tests: 4 new tests — variant sub-rows in by_product view, variant rows in by_schedule view, variant-specific price lookup, mixed variant/non-variant products
 
 ### 8.10 Customer-Facing UI — Catalog & Checkout
 
