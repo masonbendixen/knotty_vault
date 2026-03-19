@@ -1003,14 +1003,14 @@ Make product variants a first-class citizen across the system. The database sche
 ### 8.1 Seed Data Changes
 
 **Backend** (`create_database.cpp`):
-- [ ] Rename product "massage-60" to "Massage" (code: "massage", kind: "one_time")
-- [ ] Remove `duration_minutes` from the product level (duration now lives on variants)
-- [ ] Create product variants:
+- [x] Rename product "massage-60" to "Massage" (code: "massage", kind: "one_time")
+- [x] Remove `duration_minutes` from the product level (duration now lives on variants)
+- [x] Create product variants:
   - code "massage-60", name "60-Minute Massage", duration_minutes=60, sort_order=1
   - code "massage-90", name "90-Minute Massage", duration_minutes=90, sort_order=2
   - code "massage-120", name "120-Minute Massage", duration_minutes=120, sort_order=3
-- [ ] Update existing `product_prices` for massage to reference the 60-minute variant (backward-compatible migration of existing price)
-- [ ] Add new `product_prices` rows for 90-minute ($220) and 120-minute ($300) variants per active price schedule
+- [x] Update existing `product_prices` for massage to reference the 60-minute variant (backward-compatible migration of existing price)
+- [x] Add new `product_prices` rows for 90-minute ($220) and 120-minute ($300) variants per active price schedule
 
 ### 8.2 Pricing Resolution
 
@@ -1306,8 +1306,8 @@ Phases 6, 7, 8, 9 can be done in parallel after their respective dependencies. P
 - [x] Tests: PricingOverviewComponent spec
 
 ### Phase 8 — Product Variants
-- [ ] Rename massage-60 product to "Massage" and create 60/90/120-minute variants in seed data
-- [ ] Add variant-specific prices ($160/$220/$300) to seed data
+- [x] Rename massage-60 product to "Massage" and create 60/90/120-minute variants in seed data
+- [x] Add variant-specific prices ($160/$220/$300) to seed data
 - [ ] Update `GetBestProductPriceByProductSchedulePermissions` stored procedure to accept optional variant_id
 - [ ] Add `ProductVariantInfo` struct and extend `ProductInfo` with variants in `CatalogHelper`
 - [ ] Update `ResolvePriceForProduct` to accept optional variant_id
