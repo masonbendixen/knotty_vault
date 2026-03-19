@@ -1059,10 +1059,11 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.5 Endpoint Changes
 
 **Backend** (`endpoints/`):
-- [ ] `GET /api/catalog_products`: Include `variants` array in each product's JSON response (each variant: id, code, name, duration_minutes, buffer_minutes, sort_order, is_active)
-- [ ] `POST /api/purchase_create`: Accept optional `variant_id` per line item in the request body
-- [ ] Add validation: if product has active variants, variant_id is required; variant must belong to product and be active
-- [ ] Tests: catalog endpoint returns variants, purchase endpoint accepts and validates variant_id
+- [x] `GET /api/catalog_products`: Include `variants` array in each product's JSON response (each variant: id, code, name, duration_minutes, buffer_minutes, sort_order, is_active)
+- [x] `POST /api/catalog_quote`: Accept optional `variant_id` per line item in the request body
+- [x] `POST /api/purchase_create`: Accept optional `variant_id` per line item in the request body
+- [x] Validation delegated to `PurchaseHelper::CreatePurchase` (implemented in 8.3): if product has active variants, variant_id is required; variant must belong to product and be active
+- [x] Tests: catalog endpoint returns variants (2 tests), purchase endpoint accepts and validates variant_id (2 tests)
 
 ### 8.6 Angular Types
 
