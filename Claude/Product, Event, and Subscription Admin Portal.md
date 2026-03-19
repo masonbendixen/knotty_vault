@@ -1150,21 +1150,32 @@ The `bookable_service_sessions` table already has a required `product_variant_id
 **Frontend** — New `EntitlementSearchComponent`:
 
 **Layout**:
-- [ ] Search bar: search by person name or email
-- [ ] Filter: by status (active/expired/revoked), by product, by date range
-- [ ] Results table: person name, product name, status, valid from/to, seats (used/total), source (purchase link)
-- [ ] Each row expandable: shows seat assignments inline
+- [x] Search bar: search by product name, entitlement ID, or person name/email (client-side filter)
+- [x] Filter: by status (active/expired/revoked) and by product (dropdown populated from products table)
+- [x] Summary cards: count of active, expired, and revoked entitlements
+- [x] Results as expandable accordion panels: product name, status badge, seats (used/total), validity dates
+- [x] Each row expandable: loads seat assignments on demand via `getFilteredTableRows('entitlement_assignments')`
+- [x] Assignment table shows person name (resolved via FK display) and active/removed status
+- [x] Purchase link navigates to purchase edit form
 
 **Backend**:
-- [ ] New endpoint: `GET /api/admin/entitlements?person_id=X&product_id=Y&status=Z`
-  - Returns entitlements with joined person info (via entitlement_assignments), product info, and assignment details
-  - Paginated
-- Or leverage existing `get_filtered_table_rows/entitlements` with FK resolution for a simpler initial implementation
+- [x] Leverages existing `getFilteredTableRows('entitlements')` with status/product_id filters — no new endpoint needed
+- [x] Product names resolved via `resolveFkDisplay('products')`, person names via `resolveFkDisplay('people')`
+
+**Routing & Navigation**:
+- [x] Route: `/manage/entitlements` → `EntitlementListComponent`
+- [x] Dashboard card added with `verified_user` icon
 
 **Manual entitlement creation** (R2.18 — deferred):
 - [ ] "Create Entitlement" button → form with product picker, person picker, validity dates, seats
 - [ ] Calls a new admin endpoint that creates an entitlement without a purchase
 - This is a comp/courtesy mechanism — track separately from purchases
+
+**Tests** (12 tests):
+- [x] Component creates, loads and displays entitlements, shows summary counts
+- [x] Resolves product names, filters by status, filters by product
+- [x] Displays status badges, loads assignments on panel open
+- [x] Error state, empty state, search filtering, navigation
 
 ---
 
