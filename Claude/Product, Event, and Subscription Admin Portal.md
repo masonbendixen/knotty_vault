@@ -1068,17 +1068,21 @@ The stored procedure `GetBestProductPriceByProductSchedulePermissions` currently
 ### 8.6 Angular Types
 
 **Frontend** (`shared/types/payment.types.ts`):
-- [ ] Add `ProductVariant` interface: `id`, `product_id`, `code`, `name`, `duration_minutes`, `buffer_minutes`, `sort_order`, `is_active`
-- [ ] Extend `CatalogProduct` to include `variants: ProductVariant[]`
-- [ ] Extend `CreatePurchaseRequest` line items to include optional `variant_id`
-- [ ] Extend `PurchaseItem` to include optional `variant_id` and `variant_name` for display in purchase history
+- [x] Add `ProductVariant` interface: `id`, `product_id`, `code`, `name`, `duration_minutes`, `buffer_minutes`, `sort_order`, `is_active`
+- [x] Extend `CatalogProduct` to include `variant_count: number` and `variants: ProductVariant[]`
+- [x] Extend `CreatePurchaseItem` to include optional `variant_id`
+- [x] Extend `PurchaseItem` to include optional `product_variant_id`, `variant_name`, `variant_code`
+- [x] Re-export `ProductVariant` from `ServerAccess.ts`
 
 ### 8.7 Angular Network Layer
 
 **Frontend** (`shared/services/network/`):
-- [ ] Update `ServerAccessMock` catalog response to include variants in mock product data (Massage product with 3 variants)
-- [ ] Update mock purchase creation to validate and store variant_id
-- [ ] Update mock spec tests for variant-aware catalog and purchase flows
+- [x] Update `ServerAccessNetwork.getCatalogProducts` to map `variants` array and `variant_count` from API response
+- [x] Update `ServerAccessMock` catalog data: Massage product now has 3 variants (60/90/120 min) with variant-specific prices
+- [x] Update mock `createPurchase` to validate variant_id (required for variant products, rejected for non-variant products) and resolve variant-specific prices
+- [x] Add `PurchaseItem` import to mock for typed purchase item construction
+- [x] Fix existing test: `createPurchase` test used product_id:2 (now variant product) — switched to product_id:3 (Private Training Session)
+- [x] Tests: 4 new mock spec tests — variant catalog data, variant purchase with price resolution, missing variant_id fails, variant_id on non-variant product fails
 
 ### 8.8 Admin UI — Product Detail Page
 
