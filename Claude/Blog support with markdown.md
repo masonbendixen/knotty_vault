@@ -37,7 +37,7 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 3. **Author field type?** — **Free-text string.** The spec defines `author` as a string. Authors may want pen names. Default to logged-in user's name in the editor.
 
-4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right.** No heavyweight CodeMirror/Monaco. PrismJS (bundled with ngx-markdown) provides syntax highlighting in the rendered preview's code blocks.
+4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. PrismJS (optional dependency of ngx-markdown, installed separately) provides syntax highlighting in the rendered preview's code blocks.
 
 5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in admin list.
 
@@ -49,7 +49,7 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 8. **Day-level filtering on public blog:** — **Client-side computation.** Derive available days from the posts loaded for the selected year/month. The `GetAvailableDates` endpoint returns year/month pairs only. Day options are extracted from `post_at_us` of currently loaded posts.
 
-9. **ngx-markdown Angular 19 compatibility:** If `ngx-markdown` doesn't support Angular 19, fallback is using `marked` directly with Angular's `DomSanitizer` and `[innerHTML]`. Will verify at install time.
+9. **ngx-markdown Angular 19 compatibility:** — **Confirmed compatible.** Use `ngx-markdown@^19.0.0` (latest v19.1.1) with `marked@^15.0.0`. The library's major version aligns with Angular's major version. Uses `provideMarkdown()` for standalone app setup. No fallback needed.
 
 ---
 
@@ -240,14 +240,26 @@ namespace Blog {
 
 ### Phase 5.1: Install ngx-markdown + Blog Types
 
-**Run:** `cd ui && npm install ngx-markdown marked prismjs`
-- If Angular 19 incompatibility, fall back to `marked` + `DomSanitizer` + `[innerHTML]`
+**Run:** `cd ui && npm install ngx-markdown@^19.0.0 marked@^15.0.0 prismjs@^1.30.0 --save`
+- ngx-markdown v19.x is confirmed compatible with Angular 19 (major versions align)
+- `marked@^15.0.0` is the required peer dependency for ngx-markdown v19
+- `prismjs` is optional but needed for syntax highlighting in code blocks
 
 **Modify:** `ui/angular.json`
 - Add to `styles` array: `"node_modules/prismjs/themes/prism-okaidia.css"`
+- Add to `scripts` array:
+  ```json
+  "node_modules/prismjs/prism.js",
+  "node_modules/prismjs/components/prism-typescript.min.js",
+  "node_modules/prismjs/components/prism-javascript.min.js",
+  "node_modules/prismjs/components/prism-css.min.js"
+  ```
+  (Add additional `prism-*.min.js` entries for other languages as needed)
 
 **Modify:** `ui/src/app/app.config.ts`
-- Add `provideMarkdown()` to providers (or `MarkdownModule.forRoot()` depending on ngx-markdown version)
+- Import: `import { provideMarkdown } from 'ngx-markdown';`
+- Add `provideMarkdown()` to `providers` array
+  - Note: If remote `.md` file loading via `[src]` is needed later, pass `{ loader: HttpClient }` and ensure `provideHttpClient()` is also present
 
 **Create:** `ui/src/app/shared/types/blog.types.ts`
 ```typescript
@@ -337,7 +349,7 @@ export interface UpdateBlogPostRequest {
 - `ui/src/app/pages/public/blog/blog-list/blog-list.component.scss`
 
 **Features:**
-- Standalone component importing `SharedModule`, `MarkdownComponent`
+- Standalone component importing `SharedModule`, `MarkdownModule` (from `ngx-markdown`)
 - Injects `SERVER_ACCESS_TOKEN` for API calls, `AuthService` for permission checks
 - On init: calls `getBlogDates()` and `getBlogPosts(0, 5)`
 - **Date navigation** at top:
@@ -400,7 +412,7 @@ export interface UpdateBlogPostRequest {
 - `ui/src/app/pages/blog-admin/blog-editor/blog-editor.component.scss`
 
 **Features:**
-- Standalone component with `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`
+- Standalone component with `SharedModule`, `MarkdownModule` (from `ngx-markdown`), `ReactiveFormsModule`
 - **Reactive form fields:**
   - `name` (mat-form-field, text input, required)
   - `author` (mat-form-field, text input, required, defaults to user's `firstName + " " + lastName`)
