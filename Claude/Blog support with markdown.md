@@ -37,7 +37,7 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 3. **Author field type?** — **Free-text string.** The spec defines `author` as a string. Authors may want pen names. Default to logged-in user's name in the editor.
 
-4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. PrismJS (optional dependency of ngx-markdown, installed separately) provides syntax highlighting in the rendered preview's code blocks.
+4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. No PrismJS — blog posts don't need code block syntax highlighting.
 
 5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in admin list.
 
@@ -240,21 +240,10 @@ namespace Blog {
 
 ### Phase 5.1: Install ngx-markdown + Blog Types
 
-**Run:** `cd ui && npm install ngx-markdown@^19.0.0 marked@^15.0.0 prismjs@^1.30.0 --save`
+**Run:** `cd ui && npm install ngx-markdown@^19.0.0 marked@^15.0.0 --save`
 - ngx-markdown v19.x is confirmed compatible with Angular 19 (major versions align)
 - `marked@^15.0.0` is the required peer dependency for ngx-markdown v19
-- `prismjs` is optional but needed for syntax highlighting in code blocks
-
-**Modify:** `ui/angular.json`
-- Add to `styles` array: `"node_modules/prismjs/themes/prism-okaidia.css"`
-- Add to `scripts` array:
-  ```json
-  "node_modules/prismjs/prism.js",
-  "node_modules/prismjs/components/prism-typescript.min.js",
-  "node_modules/prismjs/components/prism-javascript.min.js",
-  "node_modules/prismjs/components/prism-css.min.js"
-  ```
-  (Add additional `prism-*.min.js` entries for other languages as needed)
+- No PrismJS — blog posts don't require code block syntax highlighting
 
 **Modify:** `ui/src/app/app.config.ts`
 - Import: `import { provideMarkdown } from 'ngx-markdown';`
@@ -532,7 +521,7 @@ Backend (steps 1-5) can be completed fully before frontend. Frontend steps 6-8 c
 - `ui/src/app/shared/services/header/mockHeaderResponse.ts` — add Blog menu + Blog Posts admin
 - `ui/src/app/app.routes.ts` — add blog-admin route
 - `ui/src/app/pages/public/public.routes.ts` — add /blog route
-- `ui/angular.json` — add PrismJS styles
+- `ui/angular.json` — no changes needed (PrismJS removed)
 - `ui/src/app/app.config.ts` — add markdown provider
 
 ### Key Existing Functions to Reuse
