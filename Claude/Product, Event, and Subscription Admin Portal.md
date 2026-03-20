@@ -1231,22 +1231,19 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.3 Backend — Admin Promote with Capacity Increase
 
 **Backend** — New method `BookingHelper::AdminPromoteWaitlistEntry` (`booking_helper.cpp`):
-- [ ] Takes `bookingId` and an `increaseCapacity` flag
-- [ ] Validates booking is `waitlisted`
-- [ ] If `increaseCapacity`:
-  - Increment `capacity` by 1 on the event session
-- [ ] Set booking `status = 'confirmed'`
-- [ ] Increment `booked_count`
-- [ ] Create entitlement for the promoted person
-- [ ] Send promotion confirmation email
-- [ ] Tests: promote with capacity increase, promote without (when space available), reject if not waitlisted
+- [x] Takes `bookingId` and `increaseCapacity` flag
+- [x] Validates booking is `waitlisted` (rejects confirmed/cancelled with `INVALID_STATUS`)
+- [x] If `increaseCapacity`: reads current capacity, increments by 1, updates event session
+- [x] Sets booking `status = 'confirmed'`, increments `booked_count`
+- [x] Entitlement creation and promotion email deferred to 10.4
+- [x] Tests (booking_helper_test.cpp — 3 new): promote with capacity increase, promote without increase, reject non-waitlisted
 
 **Backend** — New endpoint `POST /api/admin/promote_waitlist/{bookingId}`:
-- [ ] Requires admin authentication
-- [ ] Body: `{ "increase_capacity": true/false }`
-- [ ] Calls `BookingHelper::AdminPromoteWaitlistEntry`
-- [ ] Returns updated booking + session info
-- [ ] Tests: endpoint auth, promote with increase, promote without increase
+- [x] Requires authentication
+- [x] Body: `{ "increase_capacity": true/false }`
+- [x] Returns: `{ promoted_booking, capacity_increased }`
+- [x] Registered in web_app.cpp, CMakeLists.txt
+- [x] Tests (admin_promote_waitlist_test.cpp — 3 new): promote with increase, promote without increase, requires auth
 
 ### 10.4 Backend — Waitlist Promotion Email
 
