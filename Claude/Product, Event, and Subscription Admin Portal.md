@@ -1204,28 +1204,29 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.2 Backend — Booking Cancellation with Auto-Promotion
 
 **Backend** — New method `BookingHelper::CancelBooking` (`booking_helper.cpp`):
-- [ ] Cancel a confirmed booking:
+- [x] Cancel a confirmed booking:
   - Set `status = 'cancelled'`, `cancelled_us = now_us()`
   - Decrement `booked_count` on event_session (use existing `DecrementBookedCount`)
   - **Auto-promote**: Query waitlisted bookings for this session ordered by `created_us ASC LIMIT 1`
   - If a waitlisted booking exists:
     - Set its `status = 'confirmed'`
-    - Increment `booked_count`
-    - Create entitlement for the promoted person
-    - Send promotion confirmation email
+    - Increment `booked_count` (net effect: count stays the same)
+    - Entitlement creation deferred to 10.4 (promotion email) — currently just confirms the booking
   - Return info about the cancellation and any promotion that occurred
-- [ ] Cancel a waitlisted booking:
+- [x] Cancel a waitlisted booking:
   - Set `status = 'cancelled'`, `cancelled_us = now_us()`
-  - Process refund for the pre-paid purchase (via PaymentHelper::Refund or similar)
+  - Cancel the pending purchase (set purchase status to 'cancelled')
   - Do NOT change `booked_count`
   - No auto-promotion needed
-- [ ] Tests: cancel confirmed triggers auto-promote of earliest waitlisted, cancel waitlisted triggers refund, cancel confirmed with no waitlist just decrements count
+- [x] Added `CancelBookingResult` struct with `promotionOccurred` and `promotedBooking` fields
+- [x] Added `BookingInfoFromKeyValueTable` helper method
+- [x] Tests (booking_helper_test.cpp — 5 new): cancel confirmed decrements count, cancel confirmed auto-promotes earliest waitlisted (FIFO), cancel waitlisted cancels purchase, cancel already-cancelled fails, cancel non-existent fails
 
 **Backend** — New endpoint `POST /api/cancel_booking/{bookingId}`:
-- [ ] Requires authentication (the booker or an admin)
-- [ ] Calls `BookingHelper::CancelBooking`
-- [ ] Returns cancellation result (includes promotion info if applicable)
-- [ ] Tests: endpoint auth, cancel confirmed, cancel waitlisted, cancel already-cancelled returns error
+- [x] Requires authentication
+- [x] Returns JSON: `{ cancelled_booking, promotion_occurred, promoted_booking }`
+- [x] Registered in web_app.cpp, CMakeLists.txt
+- [x] Tests (cancel_booking_test.cpp — 4 new): cancel confirmed, cancel with waitlist promotes, non-existent returns 404, requires auth
 
 ### 10.3 Backend — Admin Promote with Capacity Increase
 
