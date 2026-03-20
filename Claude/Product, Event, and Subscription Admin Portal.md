@@ -1256,16 +1256,15 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.5 Scheduled Job — Post-Event Waitlist Refunds
 
 **Backend** — New endpoint `POST /api/admin/process_waitlist_refunds`:
-- [ ] Finds all events where `end_time_us < now_us()` and have waitlisted bookings
-- [ ] For each remaining waitlisted booking on a past event:
-  - Process full refund for the pre-paid purchase
-  - Set booking `status = 'cancelled'` with reason "Event passed — waitlist refund"
-- [ ] Returns count of refunds processed
-- [ ] Idempotent — safe to run multiple times
-- [ ] Tests: refunds waitlisted bookings for past events, ignores confirmed bookings, ignores future events
+- [x] SQL joins `bookings` + `event_sessions` to find waitlisted bookings where `end_time_us < now_us()`
+- [x] For each: sets booking `status = 'cancelled'`, `cancelled_us = now`, `notes = "Event passed — waitlist refund"`, cancels the pending purchase
+- [x] Returns `{ total_processed: N }`
+- [x] Idempotent — cancelled bookings won't re-match `status = 'waitlisted'` on subsequent runs
+- [x] Registered in web_app.cpp, CMakeLists.txt
+- [x] Tests (4): refunds waitlisted for past events, ignores future events, idempotent (second run processes 0), requires auth
 
-**Scheduled Jobs document** — Add to Section 1.2 (New Endpoints Needed) in `Scheduled Jobs.md`:
-- [ ] Add entry #12: `POST /api/admin/process_waitlist_refunds`, Hourly frequency, purpose: auto-refund waitlisted bookings for events that have passed
+**Scheduled Jobs document** — Already updated in planning phase:
+- [x] Entry #12 in Section 1.2, item #10 updated in Section 1.3
 
 ### 10.6 Frontend — Waitlist Display on Admin Event Attendees
 
