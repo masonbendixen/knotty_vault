@@ -1190,14 +1190,16 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.1 Backend — Waitlist Booking on Sold-Out Events
 
 **Backend** — Modify `BookingHelper::BookEvent` (`booking_helper.cpp`):
-- [ ] When `booked_count >= capacity`, instead of returning `ERROR_SESSION_SOLDOUT`, create a waitlisted booking:
-  - Create purchase and payment (pre-charge) as normal
+- [x] When `booked_count >= capacity`, instead of returning `ERROR_SESSION_SOLDOUT`, create a waitlisted booking:
+  - Create purchase (pre-charge) as normal
   - Create booking with `status = 'waitlisted'`
   - Do NOT increment `booked_count` (only confirmed bookings count)
   - Do NOT create entitlement (entitlement created on promotion)
   - Return result indicating `waitlisted = true` to the caller
-- [ ] Add `waitlisted` field to `BookEventResult`
-- [ ] Tests: book when full creates waitlisted booking, purchase is still funded, booked_count unchanged
+- [x] Added `waitlisted` field to `BookEventResult`
+- [x] Endpoint returns `"waitlisted": true/false` in JSON response
+- [x] Tests (booking_helper_test.cpp — 5 new tests): sold-out creates waitlisted booking, waitlisted does not increment booked_count, waitlisted still creates purchase, confirmed has waitlisted=false, multiple waitlisted maintain FIFO via created_us
+- [x] Tests (book_event_test.cpp — 1 new + 1 updated): endpoint returns waitlisted booking when full, updated sold-out test from expecting 400 to expecting 200 with waitlisted status
 
 ### 10.2 Backend — Booking Cancellation with Auto-Promotion
 
