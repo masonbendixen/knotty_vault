@@ -1183,25 +1183,127 @@ The `bookable_service_sessions` table already has a required `product_variant_id
 
 Extracted from Phase 4.4 — waitlist functionality is a distinct feature with its own UI, backend, and notification concerns.
 
-### 10.1 Waitlist Display
+**Core design**: Users who try to book a sold-out event are pre-charged and placed on a waitlist. When a spot opens (cancellation or admin capacity increase), the earliest waitlisted person is automatically promoted to confirmed. After the event passes, remaining waitlisted bookings get automatic refunds via a scheduled job.
 
-**Frontend** — Add a waitlist card to the Event Session Detail Page:
-- [ ] Show waitlisted bookings sorted by creation time (first come, first serve)
-- [ ] Display: person name, email, booking time, position in queue
-- [ ] Only visible when there are waitlisted bookings for the session
+**FIFO ordering**: Waitlist promotion uses `bookings.created_us ASC` — first person to join the waitlist gets promoted first. The `waitlist_position` column is NOT used for ordering; `created_us` is the source of truth.
 
-### 10.2 Waitlist Promotion
+### 10.1 Backend — Waitlist Booking on Sold-Out Events
 
-- [ ] "Promote to confirmed" action per waitlisted booking when seats are available
-- [ ] Auto-suggest promotion when a confirmed booking is cancelled and waitlisted bookings exist
-- [ ] Notification to the promoted person (email) — ties into R2.6 notification system
+**Backend** — Modify `BookingHelper::BookEvent` (`booking_helper.cpp`):
+- [ ] When `booked_count >= capacity`, instead of returning `ERROR_SESSION_SOLDOUT`, create a waitlisted booking:
+  - Create purchase and payment (pre-charge) as normal
+  - Create booking with `status = 'waitlisted'`
+  - Do NOT increment `booked_count` (only confirmed bookings count)
+  - Do NOT create entitlement (entitlement created on promotion)
+  - Return result indicating `waitlisted = true` to the caller
+- [ ] Add `waitlisted` field to `BookEventResult`
+- [ ] Tests: book when full creates waitlisted booking, purchase is still funded, booked_count unchanged
 
-### 10.3 Waitlist Backend
+### 10.2 Backend — Booking Cancellation with Auto-Promotion
 
-- [ ] Endpoint or business logic to promote a waitlisted booking to confirmed status
-- [ ] Validation: only promote if capacity allows
-- [ ] Update booking status, create/update entitlement if needed
-- [ ] Tests: waitlist promotion, capacity validation, ordering
+**Backend** — New method `BookingHelper::CancelBooking` (`booking_helper.cpp`):
+- [ ] Cancel a confirmed booking:
+  - Set `status = 'cancelled'`, `cancelled_us = now_us()`
+  - Decrement `booked_count` on event_session (use existing `DecrementBookedCount`)
+  - **Auto-promote**: Query waitlisted bookings for this session ordered by `created_us ASC LIMIT 1`
+  - If a waitlisted booking exists:
+    - Set its `status = 'confirmed'`
+    - Increment `booked_count`
+    - Create entitlement for the promoted person
+    - Send promotion confirmation email
+  - Return info about the cancellation and any promotion that occurred
+- [ ] Cancel a waitlisted booking:
+  - Set `status = 'cancelled'`, `cancelled_us = now_us()`
+  - Process refund for the pre-paid purchase (via PaymentHelper::Refund or similar)
+  - Do NOT change `booked_count`
+  - No auto-promotion needed
+- [ ] Tests: cancel confirmed triggers auto-promote of earliest waitlisted, cancel waitlisted triggers refund, cancel confirmed with no waitlist just decrements count
+
+**Backend** — New endpoint `POST /api/cancel_booking/{bookingId}`:
+- [ ] Requires authentication (the booker or an admin)
+- [ ] Calls `BookingHelper::CancelBooking`
+- [ ] Returns cancellation result (includes promotion info if applicable)
+- [ ] Tests: endpoint auth, cancel confirmed, cancel waitlisted, cancel already-cancelled returns error
+
+### 10.3 Backend — Admin Promote with Capacity Increase
+
+**Backend** — New method `BookingHelper::AdminPromoteWaitlistEntry` (`booking_helper.cpp`):
+- [ ] Takes `bookingId` and an `increaseCapacity` flag
+- [ ] Validates booking is `waitlisted`
+- [ ] If `increaseCapacity`:
+  - Increment `capacity` by 1 on the event session
+- [ ] Set booking `status = 'confirmed'`
+- [ ] Increment `booked_count`
+- [ ] Create entitlement for the promoted person
+- [ ] Send promotion confirmation email
+- [ ] Tests: promote with capacity increase, promote without (when space available), reject if not waitlisted
+
+**Backend** — New endpoint `POST /api/admin/promote_waitlist/{bookingId}`:
+- [ ] Requires admin authentication
+- [ ] Body: `{ "increase_capacity": true/false }`
+- [ ] Calls `BookingHelper::AdminPromoteWaitlistEntry`
+- [ ] Returns updated booking + session info
+- [ ] Tests: endpoint auth, promote with increase, promote without increase
+
+### 10.4 Backend — Waitlist Promotion Email
+
+**Backend** — New email template `waitlist_promotion_mail.h/cpp` (`business_logic/scheduling/`):
+- [ ] Email sent when a waitlisted person is promoted to confirmed
+- [ ] Includes: event name, date/time, location, "You're in!" messaging
+- [ ] Uses `FormatString` with `NormalizeCrLf` per email conventions
+- [ ] Tests: email content generation
+
+### 10.5 Scheduled Job — Post-Event Waitlist Refunds
+
+**Backend** — New endpoint `POST /api/admin/process_waitlist_refunds`:
+- [ ] Finds all events where `end_time_us < now_us()` and have waitlisted bookings
+- [ ] For each remaining waitlisted booking on a past event:
+  - Process full refund for the pre-paid purchase
+  - Set booking `status = 'cancelled'` with reason "Event passed — waitlist refund"
+- [ ] Returns count of refunds processed
+- [ ] Idempotent — safe to run multiple times
+- [ ] Tests: refunds waitlisted bookings for past events, ignores confirmed bookings, ignores future events
+
+**Scheduled Jobs document** — Add to Section 1.2 (New Endpoints Needed) in `Scheduled Jobs.md`:
+- [ ] Add entry #12: `POST /api/admin/process_waitlist_refunds`, Hourly frequency, purpose: auto-refund waitlisted bookings for events that have passed
+
+### 10.6 Frontend — Waitlist Display on Admin Event Attendees
+
+**Frontend** — Modify `event-attendees.component` (`pages/admin/event-attendees/`):
+- [ ] Split attendee list into two sections: "Confirmed" and "Waitlisted"
+- [ ] Waitlisted section shows bookings sorted by `booked_at_us` (FIFO order) with position numbers
+- [ ] Each waitlisted row has a "Promote" button that calls the admin promote endpoint with `increase_capacity: true`
+- [ ] Show capacity info: "15/20 confirmed, 3 on waitlist"
+- [ ] After promotion, refresh the attendee list
+- [ ] Tests: waitlisted section renders, promote button calls endpoint, capacity display
+
+### 10.7 Frontend — User-Facing Waitlist Flow
+
+**Frontend** — Modify booking flow to handle waitlist:
+- [ ] When `/api/book_event` returns a waitlisted result, show "You're on the waitlist!" message instead of "Booking confirmed"
+- [ ] In user's "My Events" section, show waitlisted bookings with a "Waitlisted" badge and position
+- [ ] Add "Cancel Waitlist" button that calls the cancel endpoint (triggers refund)
+- [ ] Tests: waitlist confirmation UI, cancel waitlist button
+
+### 10.8 Frontend — Cancel Booking Button
+
+**Frontend** — Add cancellation to user booking views:
+- [ ] "Cancel Booking" button on confirmed bookings (calls `POST /api/cancel_booking/{id}`)
+- [ ] Confirmation dialog before cancelling
+- [ ] After cancel, refresh booking list
+- [ ] Tests: cancel button renders, confirmation dialog, cancellation triggers refresh
+
+### Implementation Order
+
+Backend-first, layered approach:
+1. **10.1** — Waitlist booking on sold-out (modify BookEvent)
+2. **10.2** — Cancel booking with auto-promotion (new CancelBooking + endpoint)
+3. **10.4** — Promotion email template
+4. **10.3** — Admin promote with capacity increase (new AdminPromote + endpoint)
+5. **10.5** — Scheduled job for post-event refunds
+6. **10.6** — Admin UI (attendees split, promote button)
+7. **10.7** — User-facing waitlist flow
+8. **10.8** — User cancel booking button
 
 ---
 

@@ -62,6 +62,7 @@ These scheduled tasks don't have admin endpoints yet. Each needs a new endpoint 
 | 6 | `/api/admin/cleanup_expired_tokens` | POST | Daily | Delete expired device tokens (older than `kAuthDeviceTokenMaxDurationInMicros`) and expired email verifications (older than `kEmailVerificationExpirationWindowInMicros`). Currently these are only checked at use time, not cleaned up. | `device_tokens` table has `created_us`/`last_seen_us`; `email_verifications` has expiration. Neither has cleanup. |
 | 7 | `/api/admin/cleanup_idempotency_keys` | POST | Daily | Delete expired idempotency keys (where `expires_us` is past). Prevents unbounded table growth. | `idempotency_keys` table has `expires_us` column. `IdempotencyHelper` checks expiry but doesn't reap old records. |
 | 8 | `/api/admin/cleanup_scaled_photos` | POST | Daily | Delete scaled photo cache entries older than `kScaledPhotoMaxAgeUs`. Secret keys for interval (`kScaledPhotoReaperIntervalUs`, default 24h) and max age (`kScaledPhotoMaxAgeUs`) already exist. | `secret_keys.h` defines both configuration keys. No reaper implementation exists yet. |
+| 12 | `/api/admin/process_waitlist_refunds` | POST | Hourly | Find all events where `end_time_us < now_us()` that have waitlisted bookings. For each remaining waitlisted booking, process a full refund and set status to cancelled with reason "Event passed — waitlist refund". Idempotent. | Phase 10 Waitlist Management in Product, Event, and Subscription Admin Portal.md. |
 
 ## 1.3 Future Scheduled Jobs (Not Yet Implementable)
 
@@ -70,7 +71,7 @@ These will become relevant as more features are built. Listed here for completen
 | # | Job | Frequency | Depends On | Purpose |
 |---|-----|-----------|------------|---------|
 | 9 | Generate provider availability from schedule templates | Weekly or on-demand | Schedule templates feature (STRETCH tier scenarios 49-54) | Batch-generate concrete `provider_availability` entries from `schedule_templates` for a configurable scheduling window (e.g., 12 weeks out). |
-| 10 | Waitlist expiration processing | Hourly | Waitlist feature (COULD HAVE scenario 18) | For events that have passed, auto-refund any remaining waitlisted bookings that weren't promoted. |
+| 10 | **Waitlist refund processing** | **Hourly** | **Waitlist feature (Phase 10)** | **For events that have passed, auto-refund any remaining waitlisted bookings that weren't promoted. Endpoint: `POST /api/admin/process_waitlist_refunds`. Finds events where `end_time_us < now_us()` with waitlisted bookings, processes full refund for each, sets booking status to cancelled with reason "Event passed — waitlist refund". Idempotent.** |
 | 11 | No-show marking | Daily (morning after) | Check-in feature (STRETCH scenario 61) | Mark bookings where the event/service has passed and the attendee was never checked in as "no_show". |
 
 ---
