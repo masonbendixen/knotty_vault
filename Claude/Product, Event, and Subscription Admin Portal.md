@@ -1248,10 +1248,10 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.4 Backend — Waitlist Promotion Email
 
 **Backend** — New email template `waitlist_promotion_mail.h/cpp` (`business_logic/scheduling/`):
-- [ ] Email sent when a waitlisted person is promoted to confirmed
-- [ ] Includes: event name, date/time, location, "You're in!" messaging
-- [ ] Uses `FormatString` with `NormalizeCrLf` per email conventions
-- [ ] Tests: email content generation
+- [x] `WaitlistPromotionData` struct: firstName, email, eventName, eventDate, eventTime, facilityName, locationRoomName
+- [x] `GenerateWaitlistPromotionBody` generates HTML email with green "You're In!" header, event details, and "your payment has already been processed" messaging
+- [x] Uses `FormatString` with `NormalizeCrLf` per email conventions
+- [x] Tests (4): contains event details, contains promotion messaging ("You're In!", "moved off the waitlist", "now confirmed", "already been processed"), HTML well-formed, no room suffix when empty
 
 ### 10.5 Scheduled Job — Post-Event Waitlist Refunds
 
