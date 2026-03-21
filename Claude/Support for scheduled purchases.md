@@ -510,7 +510,7 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 | | # | Scenario | Rationale |
 |---|---|---|---|
 | [ ] | 17 | User reschedules to different session | Better UX than cancel+rebook |
-| [ ] | 18 | User joins waitlist for full event | Capture demand |
+| [x] | 18 | User joins waitlist for full event | Capture demand |
 | [ ] | 22 | Admin configures booking windows per permission | Member advantages |
 | [ ] | 23 | Admin configures reminder window for services | Reduce no-shows |
 | ~~[ ]~~ | ~~26~~ | ~~Admin configures provider rate overrides~~ | *REMOVED — see Alternatives Considered* |
