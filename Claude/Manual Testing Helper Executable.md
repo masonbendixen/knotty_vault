@@ -679,13 +679,16 @@ void RunDashboard(TestHelperContext& context) {
 ## Questions / Decisions Needed
 
 1. **Square client for `run_billing`**: The test Square client with queued success responses is safe but doesn't exercise real payment. A `--use_real_square` flag could be added later for sandbox testing.
-	- I very much want things like creating cards or doing transactions to use
+	- Mason- I very much want things like creating cards or doing transactions to use the Square sandbox.
 
 2. **Should this link against `knotty_yoga_tests` too?** The test mail helper, test secrets helper, and test square client all live in that library. Options: link against it, or create a separate `knotty_yoga_test_utils` library for shared test utilities.
+	- Mason- I'm okay linking against the test code but I'd rather use the real secrets and square since I largely want to use this as a helper for setting up real conditions that are hard to do in the UI.
 
 3. **FTXUI version**: 5.0.0 is the latest stable on Conan. Verify it builds with our MSVC 2022 toolchain and Boost 1.86.
+	- Mason- Can you check it via conan to see if it has a dependency on Boost?
 
 4. **replxx version**: 0.0.4 is latest on Conan. Small library, should be straightforward.
+	- Mason- What dependencies does it have? Any that conflict with what we already have in the project?
 
 ---
 
