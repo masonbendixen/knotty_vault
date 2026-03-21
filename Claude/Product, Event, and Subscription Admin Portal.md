@@ -1291,10 +1291,12 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.8 Frontend — Cancel Booking Button
 
 **Frontend** — Add cancellation to user booking views:
-- [ ] "Cancel Booking" button on confirmed bookings (calls `POST /api/cancel_booking/{id}`)
-- [ ] Confirmation dialog before cancelling
-- [ ] After cancel, refresh booking list
-- [ ] Tests: cancel button renders, confirmation dialog, cancellation triggers refresh
+- [x] Added `cancelBooking(bookingId)` to ServerAccess interface, proxy, network (`POST /api/cancel_booking/{id}`), and mock
+- [x] "Cancel Booking" button on confirmed bookings, "Leave Waitlist" button on waitlisted bookings
+- [x] Inline confirmation: click shows "Are you sure?" with "Yes, Cancel" and "No, Keep It" buttons
+- [x] After cancel, reloads both upcoming and past booking lists
+- [x] No cancel button for already-cancelled or past bookings
+- [x] Tests (6 new): cancel button for confirmed, "Leave Waitlist" for waitlisted, confirmation dialog, dismiss dialog, calls cancelBooking on confirm, no button for cancelled
 
 ### Implementation Order
 
