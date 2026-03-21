@@ -731,19 +731,54 @@ This means the tool can:
 - Read/write the same secrets the server uses
 - Send real emails when explicitly requested
 
-## New Questions (Round 2)
+## Resolved Questions (Round 2)
 
-1. **FTXUI version**: The latest on Conan is actually **6.1.9** (released May 2025), not 5.0.0. Should we use the latest, or pin to a specific version? The API changed between 4.x and 5.x but has been stable since. Recommendation: use 6.1.9.
-	- Mason- I'll go with your recommendation.
+1. **FTXUI version**: Use **6.1.9** (latest stable).
 
-2. **Card creation in the tool**: Since we're using real Square sandbox, should the "create test user" flow also include a step to create a sandbox card for that user? This would let you go from zero to a fully set up test user (with account, role, permissions, and payment method) in one command. The card creation would go through the real Square sandbox API to tokenize a test card number and save it.
-	- Mason- The sandbox has a built in card that is starts with a 4 and then all 1's after that that takes any CVC code, expiration date in the future, and any zip code. That is pro
+2. **Card creation**: Use the Square sandbox test card `4111 1111 1111 1111` (any CVC, any future expiration, any zip). The `create_test_user` command should offer an option to save this card for the user via the real Square sandbox API + `CardHelper::CreateCard`. This gives the user a saved card on file for subscription and payment testing without needing the web UI.
 
-3. **Dashboard refresh**: When you perform an action in the dashboard (e.g., promote a waitlisted booking), should the current screen auto-refresh to show updated data, or should you manually press `R` to refresh? Auto-refresh is more responsive but means an extra DB query after every action.
+3. **Dashboard refresh**: **Auto-refresh** after every action. The dashboard re-queries the DB and updates the visible table/screen immediately after a command completes. No manual refresh needed.
 
-4. **Persistent session**: The tool keeps a DB connection alive for the session. Should it also maintain an authenticated "session" (like a logged-in user) for testing endpoints that require specific user context? This would let commands like `list_subscriptions` default to "for the current user" without needing `--person_id` every time. You'd switch users with `set_user --person_id=3` or `set_user --email=mason@example.com`.
+4. **Persistent session / current user**: The tool maintains a "logged-in user" context. On startup, it auto-logs in as `masonbendixen@gmail.com` (looked up by email in the people table). The status bar shows the current user. Commands like `list_subscriptions` default to the current user's person_id. Switch users with `login --email=jane@example.com` or `login --person_id=3`. The `create_test_user` command offers to switch to the newly created user.
 
-5. **Command aliases**: Should we support short aliases for common commands? For example, `ls` = `list_subscriptions`, `lb` = `list_bookings`, `pw` = `promote_waitlist_entry`. These would work in both REPL and dashboard command bar.
+5. **Command aliases**: Yes — short aliases for common commands. Aliases work in both REPL and dashboard command bar. Tab completion shows both the alias and the full name.
+
+| Alias | Command |
+|-------|---------|
+| `ls` | `list_subscriptions` |
+| `le` | `list_entitlements` |
+| `lb` | `list_bookings` |
+| `les` | `list_event_sessions` |
+| `lp` | `list_products` |
+| `lu` | `list_users` (new — shows people table) |
+| `sb` | `simulate_billing_failure` |
+| `rb` | `run_billing` |
+| `eg` | `expire_grace_periods` |
+| `pw` | `promote_waitlist_entry` |
+| `cb` | `cancel_booking` |
+| `cu` | `create_test_user` |
+| `ss` | `set_secret` |
+| `ab` | `advance_subscription_billing` |
+| `who` | `current_user` (show who's logged in) |
+
+## Default Login Behavior
+
+On startup, the tool:
+1. Connects to the database
+2. Looks up `masonbendixen@gmail.com` in the people table
+3. If found, sets that person as the "current user" and displays it in the status bar
+4. If not found (fresh database), prompts: "Default user not found. Use `login --email=X` or `cu` to create a test user."
+
+The current user is shown in:
+- The FTXUI status bar: `User: Mason Bendixen (masonbendixen@gmail.com) ID:1`
+- The REPL prompt: `knotty [Mason]> `
+- One-shot mode header: `Logged in as Mason Bendixen (ID 1)`
+
+Commands that accept `--person_id` use the current user's ID when the flag is omitted:
+- `list_subscriptions` → shows subscriptions for current user
+- `list_entitlements` → shows entitlements for current user
+- `list_bookings` → shows bookings for current user
+- `simulate_billing_failure --subscription_id=12` → validates the subscription belongs to current user (or allows `--any_user` flag to override)
 
 ---
 
