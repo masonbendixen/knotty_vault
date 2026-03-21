@@ -330,7 +330,247 @@ ID    Product              Status     Period Start          Period End          
 
 3. **Should this link against `knotty_yoga_tests` too?** The test mail helper, test secrets helper, and test square client all live in that library. Currently `knotty_yoga_tests` is only used by the test executable, but we'd need it here for the test service implementations. Alternatively, we could move the test util factories into `knotty_yoga_core` (less clean) or create a separate `knotty_yoga_test_utils` library.
 
-4. **Any additional scenarios** beyond what's in the subscription planning doc? For example:
-   - Create a test subscription from scratch (person + product + card + subscription)
-   - Advance time on a subscription (set next_billing_us to the past to make it billable)
-   - Reset a subscription back to active from expired/cancelled
+4. **Any additional scenarios** beyond what's in the subscription planning doc? See section below.
+
+---
+
+## Additional Test Scenarios (from Phases 8-10 and codebase analysis)
+
+### 12. `process_waitlist_refunds` — Post-Event Waitlist Cleanup
+
+**What it does**: Calls the waitlist refund business logic that would normally run as a scheduled job. Finds all waitlisted bookings for events that have already passed and cancels them with purchase cancellation.
+
+**Flags**:
+- `--send_real_email` (optional)
+
+**Operations**:
+1. Query bookings with `status = 'waitlisted'` joined to event_sessions where `end_time_us < now_us()`
+2. For each: cancel the booking, cancel the purchase
+3. Print count of refunds processed
+
+**Why manual testing needs this**: Events happen at specific times. You can't easily wait for an event to pass to verify the refund job works. This command lets you: (a) create an event session with a past time, (b) add a waitlisted booking to it, (c) run this command to verify the refund fires.
+
+### 13. `simulate_sold_out_event` — Set Up Waitlist Testing
+
+**What it does**: Creates an event session at full capacity with one confirmed booking, so the next booking attempt will be waitlisted. Optionally creates the waitlisted booking too.
+
+**Flags**:
+- `--session_id=<id>` (required — existing event session to fill)
+- `--create_waitlist_entry` (optional — also create a waitlisted booking for `--person_id`)
+- `--person_id=<id>` (required if `--create_waitlist_entry`)
+
+**Operations**:
+1. Set `booked_count = capacity` on the event session
+2. If `--create_waitlist_entry`: create a purchase + booking with `status = 'waitlisted'` for the person
+3. Print session state and any created booking
+
+**Why manual testing needs this**: To test the waitlist flow (joining, promotion, cancel), you need a sold-out event. Through the UI you'd need to create enough accounts to fill the event. This shortcut fills the capacity directly.
+
+### 14. `promote_waitlist_entry` — Promote a Waitlisted Booking
+
+**What it does**: Calls `BookingHelper::AdminPromoteWaitlistEntry()` directly for a specific booking. Promotes a waitlisted person to confirmed with optional capacity increase.
+
+**Flags**:
+- `--booking_id=<id>` (required)
+- `--increase_capacity` (optional — also increase session capacity by 1)
+- `--send_real_email` (optional — send promotion notification)
+
+**Operations**:
+1. Call `AdminPromoteWaitlistEntry(transaction, bookingId, increaseCapacity)`
+2. Print updated booking status and session capacity
+
+### 15. `cancel_booking` — Cancel a Booking
+
+**What it does**: Calls `BookingHelper::CancelBooking()` directly. For confirmed bookings, auto-promotes the earliest waitlisted person.
+
+**Flags**:
+- `--booking_id=<id>` (required)
+- `--send_real_email` (optional — send promotion email if auto-promotion occurs)
+
+**Operations**:
+1. Call `CancelBooking(transaction, bookingId)`
+2. Print: cancelled booking info, whether promotion occurred, promoted booking info
+3. Print updated session booked_count
+
+### 16. `set_event_session_time` — Move an Event to Past/Future
+
+**What it does**: Changes an event session's start_time_us and end_time_us. Useful for testing time-dependent scenarios like waitlist refunds (which only fire for past events) and booking validation (which prevents booking past events).
+
+**Flags**:
+- `--session_id=<id>` (required)
+- `--hours_offset=<n>` (required — positive = future, negative = past, relative to now)
+
+**Operations**:
+1. Calculate new start/end times: `now + hours_offset * 3600000000` (preserving the original duration)
+2. Update event_sessions `start_time_us` and `end_time_us`
+3. Print the updated session times
+
+**Why manual testing needs this**: You can't easily create a past event session through the UI (the create form validates future dates). This lets you move an event to the past to test waitlist refunds and other time-dependent flows.
+
+### 17. `list_bookings` — View Booking State
+
+**What it does**: Lists bookings, optionally filtered by event session or person.
+
+**Flags**:
+- `--session_id=<id>` (optional — filter by session)
+- `--person_id=<id>` (optional — filter by person)
+
+**Operations**:
+1. Query bookings table with optional filters
+2. Join with people for names, event_sessions + products for event names
+3. Print each booking: id, person name, event name, status, created_us, waitlist position
+
+### 18. `create_test_user` — Create a User for Testing
+
+**What it does**: Creates a fully validated user (bypassing email verification) with a specified email, name, and password.
+
+**Flags**:
+- `--email=<email>` (required)
+- `--first_name=<name>` (optional, default "Test")
+- `--last_name=<name>` (optional, default "User")
+- `--password=<password>` (optional, default "Password123!")
+
+**Operations**:
+1. Call `PersonHelper::CreateFullyValidatedUser()`
+2. Print the created person's ID and email
+
+**Why manual testing needs this**: Creating users through the registration flow requires email verification. For rapid testing of multi-user scenarios (like waitlist with multiple people), this shortcut is essential.
+
+### 19. `advance_subscription_billing` — Make a Subscription Billable
+
+**What it does**: Sets a subscription's `next_billing_us` to a time in the past so the next `run_billing` invocation will process it.
+
+**Flags**:
+- `--subscription_id=<id>` (required)
+
+**Operations**:
+1. Validate the subscription exists and is active with a `next_billing_us` set
+2. Set `next_billing_us = now - 1 hour` and advance `current_period_start_us`/`current_period_end_us` to the next month
+3. Print the updated subscription dates
+
+**Why manual testing needs this**: Subscription billing only processes subscriptions whose `next_billing_us` is in the past. You'd have to wait a full billing cycle to test it naturally.
+
+### 20. `reset_subscription` — Reset a Subscription to Active
+
+**What it does**: Resets a cancelled, expired, or past_due subscription back to active status. Useful for re-testing flows without recreating the subscription.
+
+**Flags**:
+- `--subscription_id=<id>` (required)
+
+**Operations**:
+1. Set `status = 'active'`, clear `cancelled_us`, `cancel_reason`, `grace_period_ends_us`
+2. Set `current_period_start_us = now`, `current_period_end_us = start of next month`
+3. Print the updated subscription
+
+### 21. `list_event_sessions` — View Event Session State
+
+**What it does**: Lists event sessions, showing capacity, booked count, status, and waitlist info.
+
+**Flags**:
+- `--product_id=<id>` (optional — filter by product)
+- `--include_past` (optional — also show past sessions, default only future)
+
+**Operations**:
+1. Query event_sessions joined with products
+2. For each session, count waitlisted bookings
+3. Print: id, product name, start time, capacity, booked/capacity, waitlisted count, status
+
+### 22. `create_variant_prices` — Bulk Set Variant Prices
+
+**What it does**: Sets prices for all active variants of a product in the current active price schedule.
+
+**Flags**:
+- `--product_id=<id>` (required)
+- `--prices=<amount1,amount2,...>` (required — one per variant in sort_order, in dollars e.g. "160.00,220.00,300.00")
+
+**Operations**:
+1. Look up the active price schedule
+2. Look up active variants for the product sorted by sort_order
+3. For each variant: create or update the product_price entry
+4. Print the variant names and their new prices
+
+**Why manual testing needs this**: Setting up variant pricing through the admin UI's pricing matrix is tedious for multiple variants across schedules. This bulk command speeds up test setup.
+
+### 23. `simulate_payment_failure` — Test Failed Payment Flows
+
+**What it does**: Creates a subscription charge record with `status = 'failed'` and sets the subscription to `past_due` with a grace period. This simulates what happens when the Square payment API returns a failure during automatic billing.
+
+**Flags**:
+- `--subscription_id=<id>` (required)
+- `--failure_reason=<text>` (optional, default "Card declined — test simulation")
+
+**Operations**:
+1. Create a subscription_charges record with `status = 'failed'`, `failure_reason`
+2. Set subscription `status = 'past_due'`, set `grace_period_ends_us`
+3. Print the subscription and charge details
+
+**Why manual testing needs this**: Without this, you'd need to actually set up a card that declines (difficult in sandbox) to test the past_due → retry → grace period → expire flow.
+
+### 24. `send_test_email` — Verify Email Configuration
+
+**What it does**: Sends a test email to verify the mail server configuration is working.
+
+**Flags**:
+- `--to=<email>` (required)
+- `--template=<name>` (optional — "payment_confirmation", "booking_confirmation", "waitlist_confirmation", "waitlist_promotion", "subscription_created". Default: simple test message)
+
+**Operations**:
+1. Create a mail helper using production settings
+2. Generate the email body (either a simple test message or the specified template with dummy data)
+3. Send the email
+4. Print success/failure
+
+## Updated Command List
+
+```
+knottyyoga_test_helper --command=<command_name> [options]
+
+Commands:
+  help                          List all commands and descriptions
+
+  --- Subscription Testing ---
+  list_subscriptions            Show all subscriptions (optionally for a person)
+  simulate_billing_failure      Set an active subscription to past_due with grace period
+  simulate_payment_failure      Create a failed charge record and set past_due
+  run_billing                   Process all due subscription billing cycles
+  expire_grace_periods          Expire past_due subscriptions whose grace period ended
+  advance_subscription_billing  Make a subscription billable by setting next_billing to past
+  reset_subscription            Reset a cancelled/expired subscription to active
+  change_subscription_product   Upgrade or downgrade a subscription's product
+
+  --- Card Testing ---
+  set_card_expiration           Change a saved card's expiration date
+  check_expiring_cards          Find and notify about cards expiring soon
+
+  --- Entitlement Testing ---
+  list_entitlements             Show all entitlements (optionally for a person)
+  check_expiring_entitlements   Find and notify about entitlements expiring soon
+
+  --- Event / Booking / Waitlist Testing ---
+  list_event_sessions           Show event sessions with capacity and waitlist info
+  list_bookings                 Show bookings filtered by session or person
+  simulate_sold_out_event       Fill an event to capacity for waitlist testing
+  cancel_booking                Cancel a booking (with auto-promotion if waitlisted)
+  promote_waitlist_entry        Promote a waitlisted booking to confirmed
+  process_waitlist_refunds      Refund remaining waitlisted bookings for past events
+  set_event_session_time        Move an event session to past or future
+
+  --- Product / Variant Testing ---
+  list_products                 Show all products (optionally filter by kind)
+  create_variant_prices         Bulk set variant prices for a product
+
+  --- Utility ---
+  create_test_user              Create a fully validated test user
+  set_secret                    Set a configuration secret value
+  send_test_email               Send a test email to verify mail configuration
+
+Common flags:
+  --command=<name>              Command to run (required)
+  --person_id=<id>              Person ID (for commands that need it)
+  --subscription_id=<id>        Subscription ID
+  --session_id=<id>             Event session ID
+  --booking_id=<id>             Booking ID
+  --product_id=<id>             Product ID
+  --send_real_email             Actually send emails (default: capture only)
+  --help / -?                   Show help
+```
