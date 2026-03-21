@@ -734,8 +734,10 @@ This means the tool can:
 ## New Questions (Round 2)
 
 1. **FTXUI version**: The latest on Conan is actually **6.1.9** (released May 2025), not 5.0.0. Should we use the latest, or pin to a specific version? The API changed between 4.x and 5.x but has been stable since. Recommendation: use 6.1.9.
+	- Mason- I'll go with your recommendation.
 
 2. **Card creation in the tool**: Since we're using real Square sandbox, should the "create test user" flow also include a step to create a sandbox card for that user? This would let you go from zero to a fully set up test user (with account, role, permissions, and payment method) in one command. The card creation would go through the real Square sandbox API to tokenize a test card number and save it.
+	- Mason- The sandbox has a built in card that is starts with a 4 and then all 1's after that that takes any CVC code, expiration date in the future, and any zip code. That is pro
 
 3. **Dashboard refresh**: When you perform an action in the dashboard (e.g., promote a waitlisted booking), should the current screen auto-refresh to show updated data, or should you manually press `R` to refresh? Auto-refresh is more responsive but means an extra DB query after every action.
 
