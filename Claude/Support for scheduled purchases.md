@@ -319,7 +319,7 @@ When computing available time slots for a provider, the system ensures consecuti
 
 # Implemented User Scenarios
 
-Status as of Scheduling Thin Slice completion (March 2026). Checked items are fully implemented end-to-end.
+Status updated March 2026. Checked items are fully implemented end-to-end.
 
 ## Event Product Setup (Admin)
 - [x] 1. Admin creates an event product type
@@ -343,16 +343,16 @@ Status as of Scheduling Thin Slice completion (March 2026). Checked items are fu
 
 ## Refunds and Cancellation (One-Time Events)
 - [ ] 15. Admin configures refund policy for an event product
-- [ ] 16. User requests a refund for a booked event
+- [x] 16. User requests a refund for a booked event (cancel booking with purchase cancellation — Phase 10.2/10.8)
 - [ ] 17. User reschedules a booked event to a different session
 
 ## Waitlist (One-Time Events)
-- [ ] 18. User joins a waitlist for a full event session
+- [x] 18. User joins a waitlist for a full event session (Phase 10.1 — pre-pay waitlist with auto-promotion)
 
 ## Bookable Service Products (Admin)
 - [ ] 19. Admin creates a bookable service type
-- [ ] 20. Admin configures duration variants for a bookable service
-- [ ] 21. Admin configures buffer time for a bookable service
+- [x] 20. Admin configures duration variants for a bookable service (Phase 8 — product variants with duration/buffer)
+- [x] 21. Admin configures buffer time for a bookable service (Phase 8 — buffer_minutes on product_variants)
 - [ ] 22. Admin configures booking windows for a bookable service
 - [ ] 23. Admin configures reminder window for a bookable service
 
@@ -386,7 +386,7 @@ Status as of Scheduling Thin Slice completion (March 2026). Checked items are fu
 ## User History and Calendar
 - [x] 40. User views past booked events and services
 - [ ] 41. User views upcoming bookings on calendar
-- [ ] 42. User views booking details with cancellation options
+- [x] 42. User views booking details with cancellation options (Phase 10.8 — cancel/leave waitlist buttons on My Events)
 
 ## Admin Management
 - [ ] 43. Admin cancels a user's booking with full refund
@@ -409,7 +409,7 @@ Status as of Scheduling Thin Slice completion (March 2026). Checked items are fu
 ## Additional Scenarios
 - [x] 57. Admin views all attendees for a specific event session
 - [x] 58. Session auto-closes when capacity is reached
-- [ ] 59. Admin can manually override capacity for a session
+- [x] 59. Admin can manually override capacity for a session (Phase 10.3 — promote waitlist entry with capacity increase)
 - [ ] 60. Event session cancellation by admin (entire session)
 - [ ] 61. No-show tracking
 - [ ] 62. Admin comps a re-slot into another session
@@ -481,9 +481,9 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 | [x] | 12 | Non-logged-in user prompted to register to book | Conversion funnel |
 | [ ] | 13 | User receives reminder email before event | Reduce no-shows |
 | [ ] | 15 | Admin configures refund policy for event product | Need cancellation rules |
-| [ ] | 16 | User requests refund for booked event | Users need to cancel |
-| [ ] | 42 | User views booking details with cancellation options | Cancel flow UX |
-| [ ] | 59 | Admin manually overrides session capacity | Flexibility |
+| [x] | 16 | User requests refund for booked event | Users need to cancel |
+| [x] | 42 | User views booking details with cancellation options | Cancel flow UX |
+| [x] | 59 | Admin manually overrides session capacity | Flexibility |
 | [ ] | 60 | Admin cancels entire session (with reason) | Handle cancellations |
 | [ ] | 64 | Booking conflicts prevented | Data integrity |
 
@@ -493,8 +493,8 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 | | # | Scenario | Rationale |
 |---|---|---|---|
 | [ ] | 19 | Admin creates a bookable service type | New product kind |
-| [ ] | 20 | Admin configures duration variants | Multiple durations per service |
-| [ ] | 21 | Admin configures buffer time | Prevent back-to-back |
+| [x] | 20 | Admin configures duration variants | Multiple durations per service |
+| [x] | 21 | Admin configures buffer time | Prevent back-to-back |
 | [x] | 24 | Admin manages location resources | Room/space management |
 | [ ] | 25 | Admin enters availability blocks for provider | Provider scheduling |
 | [ ] | 29 | Provider enters unavailable blocks | Lunch breaks, etc. |
