@@ -1279,10 +1279,14 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.7 Frontend — User-Facing Waitlist Flow
 
 **Frontend** — Modify booking flow to handle waitlist:
-- [ ] When `/api/book_event` returns a waitlisted result, show "You're on the waitlist!" message instead of "Booking confirmed"
-- [ ] In user's "My Events" section, show waitlisted bookings with a "Waitlisted" badge and position
-- [ ] Add "Cancel Waitlist" button that calls the cancel endpoint (triggers refund)
-- [ ] Tests: waitlist confirmation UI, cancel waitlist button
+- [x] Added `waitlisted: boolean` to `BookEventResponse` type
+- [x] Updated mock `bookEvent` to create waitlisted bookings when sold out (instead of throwing error)
+- [x] Removed `sold_out` state — sold-out events now show the booking form with "Join Waitlist and Pay" button and "Sold out — you can join the waitlist" messaging
+- [x] Two success screens: "Booking Confirmed!" (green checkmark) vs "You're on the Waitlist!" (orange hourglass with explanation about auto-confirmation and refund policy)
+- [x] Button label dynamically shows "Book and Pay $X" or "Join Waitlist and Pay $X" based on remaining spots
+- [x] My Events section already shows "Waitlisted" badge from existing status handling — no change needed
+- [x] Cancel waitlist button deferred to 10.8
+- [x] Tests (12 total — 9 updated + 3 new): waitlist messaging for sold-out, payment form still shown for sold-out, waitlisted success page, bookingWaitlisted flag, "Book and Pay" label for available events
 
 ### 10.8 Frontend — Cancel Booking Button
 
