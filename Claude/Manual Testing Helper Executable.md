@@ -224,30 +224,290 @@ Common flags:
 2. Join with product_prices for current pricing
 3. Print each product: id, code, name, price
 
+## Dependencies
+
+| Library | Conan Package | Purpose |
+|---------|--------------|---------|
+| **FTXUI** | `ftxui/5.0.0` | Terminal UI framework — dashboard menus, tables, forms, split views. Pure ANSI sequences, works over SSH. |
+| **replxx** | `replxx/0.0.4` | Interactive line editor — history, tab completion, syntax highlighting for the command-line mode. |
+| **Abseil** | `abseil/20220623.1` (already in conanfile) | Command-line flag parsing for the non-interactive `--command=X` mode. |
+
+Both FTXUI and replxx are available on Conan Center. They're lightweight, cross-platform (Windows + Linux), and header/static-link friendly.
+
+## Dual-Mode Architecture
+
+The tool operates in three modes:
+
+### Mode 1: One-Shot Command (`--command=X`)
+Run a single command and exit. No TUI, no REPL. Output goes to stdout. Used for scripting and CI.
+```bash
+knottyyoga_test_helper --command=list_subscriptions --person_id=3
+```
+
+### Mode 2: Dashboard (FTXUI) — Default Interactive Mode
+Launch with no `--command` flag. FTXUI takes over the terminal with a full TUI: menus, tables, forms, and a status bar. Navigate with arrow keys, Enter to select, Escape to go back.
+
+Press `:` to drop into Command Mode (replxx). Press `q` or `Ctrl+C` to quit.
+
+### Mode 3: Command Mode (replxx)
+Entered from the dashboard via `:`, or launched directly with `--repl`. Full line editing with history (saved to `~/.knottyyoga_test_history`), tab completion on command names and flags, and multi-line support.
+
+Type `dashboard` or `back` to return to FTXUI. Type `quit` or `exit` to exit. Press Enter on an empty prompt to return to the dashboard.
+
+### Terminal Ownership
+
+FTXUI and replxx cannot own the terminal simultaneously. The modal switch works:
+
+1. **FTXUI active**: FTXUI owns the alternate screen buffer and raw input mode.
+2. **User presses `:`**: FTXUI calls `screen.Exit()`, restoring the normal terminal.
+3. **replxx active**: replxx takes over stdin with line editing, history, completion.
+4. **User types `back`/empty Enter**: replxx returns, FTXUI re-enters its event loop.
+
+Both modes share:
+- The same `DatabaseHelper` and `TransactionProvider` (kept alive between commands)
+- The same command dispatch table (a `std::map<std::string, CommandFn>`)
+- The same service instances (secrets, mail, square)
+
+## FTXUI Dashboard Layout
+
+### Main Menu Screen
+```
+┌─────────────────────────────────────────────────────┐
+│  Knotty Yoga Test Helper                    [q]uit  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ▶ Subscriptions                                    │
+│    Events & Bookings                                │
+│    Users & Permissions                              │
+│    Products & Pricing                               │
+│    Entitlements                                     │
+│    Configuration                                    │
+│    Email Testing                                    │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│  DB: knottyyoga (connected)     [:] command mode    │
+└─────────────────────────────────────────────────────┘
+```
+
+### Subscriptions Screen (after selecting "Subscriptions")
+```
+┌─────────────────────────────────────────────────────┐
+│  Subscriptions                    [Esc] back [q]uit │
+├─────────────────────────────────────────────────────┤
+│ ID  Person           Product              Status    │
+│ ──  ──────           ───────              ──────    │
+│ 12  Mason Bendixen   Monthly Membership   active    │
+│ 13  Jane Doe         Gold Membership      past_due  │
+│ 14  Bob Smith        Monthly Membership   cancelled │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│ Actions:                                            │
+│ [S] Simulate billing failure  [B] Run billing       │
+│ [E] Expire grace periods      [A] Advance billing   │
+│ [R] Reset to active           [C] Change product    │
+├─────────────────────────────────────────────────────┤
+│  ↑↓ navigate  Enter: details  [:] command mode      │
+└─────────────────────────────────────────────────────┘
+```
+
+### Events & Bookings Screen
+```
+┌─────────────────────────────────────────────────────┐
+│  Events & Bookings                [Esc] back [q]uit │
+├─────────────────────────────────────────────────────┤
+│ Sessions:                                           │
+│ ID  Event              Date          Cap   Booked WL│
+│ ──  ─────              ────          ───   ────── ──│
+│  1  Intro Workshop     Mar 25 10AM   20    15     2 │
+│  2  Yoga Flow          Mar 26 6PM     1     1     3 │
+│  3  Partner Yoga       Mar 28 2PM    10     0     0 │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│ Actions:                                            │
+│ [F] Fill to capacity   [T] Change session time      │
+│ [W] Process waitlist refunds                        │
+│                                                     │
+│ Selected session actions (Enter on a row):          │
+│ [L] List bookings  [P] Promote waitlist entry       │
+│ [X] Cancel booking                                  │
+├─────────────────────────────────────────────────────┤
+│  ↑↓ navigate  Enter: bookings  [:] command mode     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Session Bookings Detail (after Enter on a session)
+```
+┌─────────────────────────────────────────────────────┐
+│  Intro Workshop — Mar 25 10:00 AM   [Esc] back      │
+│  Capacity: 20  Booked: 15  Waitlisted: 2            │
+├─────────────────────────────────────────────────────┤
+│ Confirmed:                                          │
+│ ID  Person           Booked At                      │
+│  5  Alice Smith      Mar 20, 2026                   │
+│  6  Bob Jones        Mar 21, 2026                   │
+│  ...                                                │
+│                                                     │
+│ Waitlisted (FIFO):                                  │
+│ #  ID  Person           Joined                      │
+│ 1  22  Carol White      Mar 22, 2026                │
+│ 2  23  Dave Brown       Mar 22, 2026                │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│ [P] Promote selected  [X] Cancel selected           │
+│ [:] command mode                                    │
+└─────────────────────────────────────────────────────┘
+```
+
+### Users & Permissions Screen
+```
+┌─────────────────────────────────────────────────────┐
+│  Users & Permissions              [Esc] back [q]uit │
+├─────────────────────────────────────────────────────┤
+│ ID  Name              Email                  Roles  │
+│ ──  ────              ─────                  ─────  │
+│  1  Mason Bendixen    mason@example.com      admin  │
+│  2  Jane Doe          jane@example.com       user   │
+│  3  Bob Smith         bob@example.com        user   │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│ Actions:                                            │
+│ [N] Create test user   [R] Assign role              │
+│ [P] Grant permission   [D] Save default card        │
+├─────────────────────────────────────────────────────┤
+│  ↑↓ navigate  Enter: details  [:] command mode      │
+└─────────────────────────────────────────────────────┘
+```
+
+### Form Example: Create Test User
+```
+┌─────────────────────────────────────────────────────┐
+│  Create Test User                                   │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Email:      [test@example.com                   ]  │
+│  First Name: [Test                               ]  │
+│  Last Name:  [User                               ]  │
+│  Password:   [Password123!                       ]  │
+│                                                     │
+│  ☐ Assign admin role                                │
+│  ☐ Grant manage_products permission                 │
+│                                                     │
+│         [Create]     [Cancel]                       │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│  Tab: next field  Enter: submit  Esc: cancel        │
+└─────────────────────────────────────────────────────┘
+```
+
+## replxx Tab Completion
+
+When in command mode, replxx provides intelligent completion:
+
+| Context | Completion |
+|---------|-----------|
+| Empty prompt | All command names |
+| `list_` | `list_subscriptions`, `list_entitlements`, `list_bookings`, `list_event_sessions`, `list_products` |
+| `cancel_booking --` | `--booking_id=`, `--send_real_email` |
+| `create_test_user --email=` | No completion (free text) |
+| `set_secret --key=` | Secret key names from `secret_keys.h` |
+
+### History
+
+replxx saves command history to `~/.knottyyoga_test_history`. History persists across sessions. Ctrl+R searches history. Up/down arrows navigate history.
+
+### Context-Aware Pre-Population
+
+When dropping from FTXUI into command mode via `:`, the prompt can be pre-populated based on the current dashboard context:
+
+| Dashboard Context | Pre-populated Command |
+|---|---|
+| Subscription row selected (ID 12) | `simulate_billing_failure --subscription_id=12` |
+| Session row selected (ID 1) | `list_bookings --session_id=1` |
+| Waitlisted booking selected (ID 22) | `promote_waitlist_entry --booking_id=22` |
+| No specific selection | Empty prompt |
+
 ## File Structure
 
 ```
 src/test_helper/
-    main.cpp                    Entry point, flag definitions, command dispatch
-    test_helper_commands.h      Command function declarations
-    test_helper_commands.cpp    Command implementations
-    CMakeLists.txt              Build config
+    main.cpp                    Entry point, mode selection, flag parsing
+    command_registry.h          Command dispatch table + metadata (name, description, flags)
+    command_registry.cpp
+    command_runner.h            Executes commands with shared DB/service context
+    command_runner.cpp
+    commands/
+        subscription_commands.h/cpp    Subscription-related commands
+        booking_commands.h/cpp         Event/booking/waitlist commands
+        user_commands.h/cpp            User creation, role/permission assignment
+        product_commands.h/cpp         Product and variant commands
+        utility_commands.h/cpp         Secrets, email, general utilities
+    dashboard/
+        dashboard.h/cpp                FTXUI main loop, screen management
+        main_menu.h/cpp                Top-level menu component
+        subscription_screen.h/cpp      Subscription list + actions
+        booking_screen.h/cpp           Events, sessions, bookings views
+        user_screen.h/cpp              User management screen
+        form_helpers.h/cpp             Reusable FTXUI form components (text input, checkbox, etc.)
+    repl/
+        repl.h/cpp                     replxx setup, history, completion, prompt loop
+        completer.h/cpp                Tab completion logic (commands, flags, DB values)
+    CMakeLists.txt
 ```
 
 ## CMake Changes
 
+### New Conan dependencies (`conanfile.py`)
+
+```python
+Library("ftxui", "5.0.0", CMakeInfo("ftxui", "ftxui::ftxui")),
+Library("replxx", "0.0.4", CMakeInfo("replxx", "replxx::replxx")),
+```
+
 ### `src/test_helper/CMakeLists.txt` (new)
 
 ```cmake
-target_sources(knotty_yoga_test_helper
-    PRIVATE
-    test_helper_commands.h
-    test_helper_commands.cpp
+target_sources(knotty_yoga_test_helper PRIVATE
+    command_registry.h
+    command_registry.cpp
+    command_runner.h
+    command_runner.cpp
+    commands/subscription_commands.h
+    commands/subscription_commands.cpp
+    commands/booking_commands.h
+    commands/booking_commands.cpp
+    commands/user_commands.h
+    commands/user_commands.cpp
+    commands/product_commands.h
+    commands/product_commands.cpp
+    commands/utility_commands.h
+    commands/utility_commands.cpp
+    dashboard/dashboard.h
+    dashboard/dashboard.cpp
+    dashboard/main_menu.h
+    dashboard/main_menu.cpp
+    dashboard/subscription_screen.h
+    dashboard/subscription_screen.cpp
+    dashboard/booking_screen.h
+    dashboard/booking_screen.cpp
+    dashboard/user_screen.h
+    dashboard/user_screen.cpp
+    dashboard/form_helpers.h
+    dashboard/form_helpers.cpp
+    repl/repl.h
+    repl/repl.cpp
+    repl/completer.h
+    repl/completer.cpp
 )
 
 add_executable(knottyyoga_test_helper "main.cpp")
-target_link_libraries(knotty_yoga_test_helper ${ABSL_LIB} ${PQXX_LIB} knotty_yoga_core)
-target_link_libraries(knottyyoga_test_helper ${ABSL_LIB} knotty_yoga_core knotty_yoga_test_helper)
+target_link_libraries(knottyyoga_test_helper
+    knotty_yoga_core
+    knotty_yoga_test_helper
+    ${ABSL_LIB}
+    ${PQXX_LIB}
+    ftxui::ftxui
+    replxx::replxx
+)
 ```
 
 ### Top-level `CMakeLists.txt` changes
@@ -261,76 +521,171 @@ Add `add_subdirectory(test_helper)` alongside existing subdirectories.
 
 ## Implementation Approach
 
-### `main.cpp` — Flag definitions and dispatch
+### `main.cpp` — Mode Selection
 
 ```cpp
-#include <iostream>
 #include <absl/flags/flag.h>
 #include <absl/flags/parse.h>
-#include "test_helper_commands.h"
+#include "command_registry.h"
+#include "command_runner.h"
+#include "dashboard/dashboard.h"
+#include "repl/repl.h"
 
-ABSL_FLAG(std::string, command, "", "Command to run (use 'help' to list)");
-ABSL_FLAG(int64_t, subscription_id, 0, "Subscription ID");
-ABSL_FLAG(int64_t, person_id, 0, "Person ID");
-ABSL_FLAG(int64_t, card_id, 0, "Card ID");
-ABSL_FLAG(int64_t, new_product_id, 0, "New product ID");
-ABSL_FLAG(int32_t, exp_month, 0, "Expiration month (1-12)");
-ABSL_FLAG(int32_t, exp_year, 0, "Expiration year");
-ABSL_FLAG(int32_t, grace_days, 0, "Grace period days override");
-ABSL_FLAG(bool, immediate, false, "Immediate change (upgrade)");
-ABSL_FLAG(bool, send_real_email, false, "Send real emails instead of capturing");
-ABSL_FLAG(std::string, key, "", "Secret key name");
-ABSL_FLAG(std::string, value, "", "Secret value");
+ABSL_FLAG(std::string, command, "", "Run a single command and exit");
+ABSL_FLAG(bool, repl, false, "Start in command-line mode (skip dashboard)");
+// ... other flags ...
 
 int main(int argc, char** argv) {
     absl::ParseCommandLine(argc, argv);
+
+    // Shared context: DB connection, services, command table
+    auto context = CreateSharedContext();
+
     std::string command = absl::GetFlag(FLAGS_command);
-    // dispatch to command functions...
+
+    if (!command.empty()) {
+        // Mode 1: One-shot command
+        return context.runner.Execute(command, /* args from flags */);
+    }
+
+    if (absl::GetFlag(FLAGS_repl)) {
+        // Mode 3: REPL only (no dashboard)
+        return RunRepl(context);
+    }
+
+    // Mode 2: Dashboard (default) with modal switch to REPL
+    return RunDashboard(context);
 }
 ```
 
-### `test_helper_commands.cpp` — Command implementations
+### Shared Context
 
-Each command is a standalone function that:
-1. Creates `DatabaseHelper` via `MakeProductionDatabaseHelper()`
-2. Creates `TransactionProvider` via `MakeProductionTransactionProvider()`
-3. Runs in a transaction
-4. Creates the necessary helpers with test or real service implementations
-5. Calls the business logic
-6. Prints results to stdout
+All three modes share a `TestHelperContext`:
 
-### Output format
-
-Plain text, human-readable. Each command prints a header and then key-value or tabular output. Example:
-
+```cpp
+struct TestHelperContext {
+    DatabaseHelper databaseHelper;
+    TransactionProviderPtr transactionProvider;
+    Secrets::SecretsHelperPtr secretsHelper;
+    Mail::MailHelperPtr mailHelper;           // test or real based on flag
+    Square::SquareClientPtr squareClient;     // test client
+    CommandRegistry registry;                 // command name → function map
+    CommandRunner runner;                     // executes commands in transactions
+};
 ```
-=== Subscriptions for Person 3 ===
-ID    Product              Status     Period Start          Period End            Next Billing
----   -------              ------     ------------          ----------            ------------
-12    Monthly Membership   active     2026-03-01            2026-04-01            2026-04-01
-13    Gold Membership      cancelled  2026-02-01            2026-03-01            --
+
+The context is created once at startup and kept alive for the lifetime of the tool. In interactive mode, this means the DB connection persists across commands — no reconnect overhead.
+
+### Command Registry
+
+```cpp
+struct CommandInfo {
+    std::string name;
+    std::string category;       // "Subscriptions", "Bookings", etc.
+    std::string description;
+    std::vector<FlagInfo> flags; // for tab completion and help
+    CommandFn execute;           // std::function<int(Transaction&, const Args&)>
+};
+
+class CommandRegistry {
+public:
+    void Register(CommandInfo info);
+    const CommandInfo* Find(const std::string& name) const;
+    std::vector<std::string> GetCommandNames() const;
+    std::vector<std::string> GetFlagNames(const std::string& command) const;
+    std::vector<CommandInfo> GetByCategory(const std::string& category) const;
+    void PrintHelp() const;
+    void PrintCommandHelp(const std::string& command) const;
+};
 ```
+
+### Modal Switch: Dashboard ↔ REPL
+
+```cpp
+// In dashboard.cpp
+void RunDashboard(TestHelperContext& context) {
+    while (true) {
+        auto action = ShowDashboard(context);  // FTXUI event loop
+
+        if (action == DashboardAction::Quit) break;
+
+        if (action == DashboardAction::CommandMode) {
+            // FTXUI has exited, terminal is normal
+            auto replAction = RunReplSession(context, action.prePopulated);
+            // replxx session done, loop back to FTXUI
+            if (replAction == ReplAction::Quit) break;
+            continue;  // re-enter FTXUI
+        }
+    }
+}
+```
+
+### Output Format
+
+**One-shot mode**: Plain text tables to stdout (pipeable, greppable).
+
+**REPL mode**: Same plain text but with ANSI colors for readability:
+- Green: success messages, active status
+- Red: errors, failed status, past_due
+- Yellow: warnings, waitlisted status
+- Cyan: headers, column names
+- Gray: cancelled, expired
+
+**Dashboard mode**: FTXUI renders everything — no direct stdout. Tables are FTXUI components with scrolling and selection.
 
 ## Implementation Checklist
 
-- [ ] Create `src/test_helper/` directory
-- [ ] `main.cpp` — flag definitions, command dispatch, help text
-- [ ] `test_helper_commands.h` — command function declarations
-- [ ] `test_helper_commands.cpp` — all command implementations
-- [ ] `CMakeLists.txt` — build configuration
-- [ ] Update top-level `CMakeLists.txt` — add library target and PDB property
-- [ ] Update `src/CMakeLists.txt` — add_subdirectory
-- [ ] Verify it builds on Windows
+### Phase 1: Foundation
+- [ ] Add FTXUI and replxx to `conanfile.py`
+- [ ] Create `src/test_helper/` directory structure
+- [ ] `main.cpp` — mode selection (one-shot, dashboard, repl)
+- [ ] `command_registry.h/cpp` — command dispatch table with metadata
+- [ ] `command_runner.h/cpp` — shared context, transaction management
+- [ ] `CMakeLists.txt` — build configuration with new dependencies
+- [ ] Update top-level `CMakeLists.txt` and `src/CMakeLists.txt`
+- [ ] Verify it builds on Windows and Linux
+
+### Phase 2: Commands
+- [ ] `commands/subscription_commands.cpp` — all subscription commands
+- [ ] `commands/booking_commands.cpp` — all event/booking/waitlist commands
+- [ ] `commands/user_commands.cpp` — user creation, roles, permissions
+- [ ] `commands/product_commands.cpp` — product/variant/pricing commands
+- [ ] `commands/utility_commands.cpp` — secrets, email, list commands
+- [ ] One-shot mode working (`--command=X`)
+
+### Phase 3: REPL
+- [ ] `repl/repl.cpp` — replxx setup, history file, prompt loop
+- [ ] `repl/completer.cpp` — tab completion for commands and flags
+- [ ] Parse command + flags from replxx input line
+- [ ] History persistence (`~/.knottyyoga_test_history`)
+- [ ] `--repl` mode working
+
+### Phase 4: Dashboard
+- [ ] `dashboard/dashboard.cpp` — FTXUI main loop, modal switch to REPL
+- [ ] `dashboard/main_menu.cpp` — top-level category menu
+- [ ] `dashboard/subscription_screen.cpp` — subscription list + action keys
+- [ ] `dashboard/booking_screen.cpp` — sessions list → bookings detail drill-down
+- [ ] `dashboard/user_screen.cpp` — user list + creation form
+- [ ] `dashboard/form_helpers.cpp` — reusable form components
+- [ ] Context-aware REPL pre-population (`:` on selected row)
+- [ ] Status bar with DB connection info
+
+### Phase 5: Polish
+- [ ] ANSI colors in REPL output
+- [ ] Error handling for all DB operations (print error, don't crash)
+- [ ] `--send_real_email` flag respected across all modes
+- [ ] Help system (`help`, `help <command>`, `?` in dashboard)
 
 ## Questions / Decisions Needed
 
-1. **Square client for `run_billing`**: The test Square client with queued success responses is safe but doesn't exercise real payment. Is there a scenario where you'd want `--use_real_square` to actually charge sandbox cards? (Can add later if needed.)
+1. **Square client for `run_billing`**: The test Square client with queued success responses is safe but doesn't exercise real payment. A `--use_real_square` flag could be added later for sandbox testing.
+	- I very much want things like creating cards or doing transactions to use
 
-2. **Output format**: Plain text tables as shown above, or would JSON output be useful for scripting? (Can start with plain text and add `--json` later.)
+2. **Should this link against `knotty_yoga_tests` too?** The test mail helper, test secrets helper, and test square client all live in that library. Options: link against it, or create a separate `knotty_yoga_test_utils` library for shared test utilities.
 
-3. **Should this link against `knotty_yoga_tests` too?** The test mail helper, test secrets helper, and test square client all live in that library. Currently `knotty_yoga_tests` is only used by the test executable, but we'd need it here for the test service implementations. Alternatively, we could move the test util factories into `knotty_yoga_core` (less clean) or create a separate `knotty_yoga_test_utils` library.
+3. **FTXUI version**: 5.0.0 is the latest stable on Conan. Verify it builds with our MSVC 2022 toolchain and Boost 1.86.
 
-4. **Any additional scenarios** beyond what's in the subscription planning doc? See section below.
+4. **replxx version**: 0.0.4 is latest on Conan. Small library, should be straightforward.
 
 ---
 
