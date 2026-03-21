@@ -1269,12 +1269,12 @@ Extracted from Phase 4.4 — waitlist functionality is a distinct feature with i
 ### 10.6 Frontend — Waitlist Display on Admin Event Attendees
 
 **Frontend** — Modify `event-attendees.component` (`pages/admin/event-attendees/`):
-- [ ] Split attendee list into two sections: "Confirmed" and "Waitlisted"
-- [ ] Waitlisted section shows bookings sorted by `booked_at_us` (FIFO order) with position numbers
-- [ ] Each waitlisted row has a "Promote" button that calls the admin promote endpoint with `increase_capacity: true`
-- [ ] Show capacity info: "15/20 confirmed, 3 on waitlist"
-- [ ] After promotion, refresh the attendee list
-- [ ] Tests: waitlisted section renders, promote button calls endpoint, capacity display
+- [x] Split attendees into three sections: "Confirmed" (confirmed + attended), "Waitlist" (sorted FIFO with position #), "Cancelled / No-Show"
+- [x] Waitlist table: position #, name, email, joined date, "Promote" button per row
+- [x] Promote calls `adminPromoteWaitlist(bookingId, true)`, refreshes data on success
+- [x] Capacity summary: "3/20 confirmed, 1 on waitlist"
+- [x] Added `adminPromoteWaitlist` to ServerAccess interface, proxy, network, and mock
+- [x] Tests (13): split sections, capacity summary with/without waitlist, promote button, FIFO order, empty state, status labels, error states
 
 ### 10.7 Frontend — User-Facing Waitlist Flow
 
