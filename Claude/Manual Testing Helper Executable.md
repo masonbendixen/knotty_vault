@@ -228,8 +228,8 @@ Common flags:
 
 | Library | Conan Package | Purpose |
 |---------|--------------|---------|
-| **FTXUI** | `ftxui/5.0.0` | Terminal UI framework — dashboard menus, tables, forms, split views. Pure ANSI sequences, works over SSH. |
-| **replxx** | `replxx/0.0.4` | Interactive line editor — history, tab completion, syntax highlighting for the command-line mode. |
+| **FTXUI** | `ftxui/6.1.9` | Terminal UI framework — dashboard menus, tables, forms, split views. Pure ANSI sequences, works over SSH. **Zero external dependencies.** |
+| **replxx** | `replxx/0.0.4` | Interactive line editor — history, tab completion, syntax highlighting for the command-line mode. **Zero external dependencies** (pthreads on Linux only). |
 | **Abseil** | `abseil/20220623.1` (already in conanfile) | Command-line flag parsing for the non-interactive `--command=X` mode. |
 
 Both FTXUI and replxx are available on Conan Center. They're lightweight, cross-platform (Windows + Linux), and header/static-link friendly.
@@ -459,7 +459,7 @@ src/test_helper/
 ### New Conan dependencies (`conanfile.py`)
 
 ```python
-Library("ftxui", "5.0.0", CMakeInfo("ftxui", "ftxui::ftxui")),
+Library("ftxui", "6.1.9", CMakeInfo("ftxui", "ftxui::ftxui")),
 Library("replxx", "0.0.4", CMakeInfo("replxx", "replxx::replxx")),
 ```
 
@@ -676,19 +676,72 @@ void RunDashboard(TestHelperContext& context) {
 - [ ] `--send_real_email` flag respected across all modes
 - [ ] Help system (`help`, `help <command>`, `?` in dashboard)
 
-## Questions / Decisions Needed
+## Resolved Questions
 
-1. **Square client for `run_billing`**: The test Square client with queued success responses is safe but doesn't exercise real payment. A `--use_real_square` flag could be added later for sandbox testing.
-	- Mason- I very much want things like creating cards or doing transactions to use the Square sandbox.
+1. **Square client**: Use the **real Square sandbox client** (not test mocks). The tool should create real sandbox cards, process real sandbox payments, etc. This means reading `square_access_token` and `square_environment` from the production secrets table and constructing a real `SquareClient` + `HttpClient`, same as `main.cpp` does for the web server.
 
-2. **Should this link against `knotty_yoga_tests` too?** The test mail helper, test secrets helper, and test square client all live in that library. Options: link against it, or create a separate `knotty_yoga_test_utils` library for shared test utilities.
-	- Mason- I'm okay linking against the test code but I'd rather use the real secrets and square since I largely want to use this as a helper for setting up real conditions that are hard to do in the UI.
+2. **Service implementations**: Use **real secrets** (from the database) and **real Square** (sandbox). Only mail gets the test helper by default (with `--send_real_email` to opt-in to real mail). This means the tool connects to the same database as the web server and reads the same configuration.
 
-3. **FTXUI version**: 5.0.0 is the latest stable on Conan. Verify it builds with our MSVC 2022 toolchain and Boost 1.86.
-	- Mason- Can you check it via conan to see if it has a dependency on Boost?
+3. **FTXUI dependencies**: **None.** FTXUI has zero external dependencies — no Boost, no ncurses, nothing. Pure C++ standard library. Latest version on Conan is 6.1.9 (not 5.0.0 as originally noted). No conflicts with our project.
 
-4. **replxx version**: 0.0.4 is latest on Conan. Small library, should be straightforward.
-	- Mason- What dependencies does it have? Any that conflict with what we already have in the project?
+4. **replxx dependencies**: **None** (just pthreads on Linux, which is a system library). No Boost, no readline, no ncurses. Zero-config, BSD-3-Clause licensed. No conflicts.
+
+## Updated Architecture Based on Resolved Questions
+
+### Service Initialization
+
+Since we're using real services (not test mocks), initialization mirrors `main.cpp`:
+
+```cpp
+// Real database connection
+DatabaseHelper databaseHelper = MakeProductionDatabaseHelper();
+auto transactionProvider = MakeProductionTransactionProvider(databaseHelper);
+
+// Real secrets from the database
+Secrets::SecretsHelperPtr secretsHelper;
+transactionProvider->RunInTransaction([&](Transaction& transaction) {
+    secretsHelper = Secrets::MakeSecretsHelper(databaseHelper);
+});
+
+// Real Square client (sandbox)
+Square::SquareClientPtr squareClient;
+transactionProvider->RunInTransaction([&](Transaction& transaction) {
+    std::string token = secretsHelper->LookupSecret(transaction, Secrets::kSquareAccessToken);
+    std::string env = secretsHelper->LookupSecret(transaction, Secrets::kSquareEnvironment);
+    if (!token.empty()) {
+        auto httpClient = Http::MakeHttpClient();
+        squareClient = Square::MakeSquareClient(httpClient, token, env == "sandbox");
+    }
+});
+
+// Test mail by default, real mail with --send_real_email
+Mail::MailHelperPtr mailHelper;
+if (sendRealEmail) {
+    transactionProvider->RunInTransaction([&](Transaction& transaction) {
+        mailHelper = Mail::MakeMailHelper(transaction, secretsHelper);
+    });
+} else {
+    mailHelper = Mail::Test::MakeTestMailHelper();
+}
+```
+
+This means the tool can:
+- Create real sandbox cards via Square API
+- Process real sandbox payments
+- Read/write the same secrets the server uses
+- Send real emails when explicitly requested
+
+## New Questions (Round 2)
+
+1. **FTXUI version**: The latest on Conan is actually **6.1.9** (released May 2025), not 5.0.0. Should we use the latest, or pin to a specific version? The API changed between 4.x and 5.x but has been stable since. Recommendation: use 6.1.9.
+
+2. **Card creation in the tool**: Since we're using real Square sandbox, should the "create test user" flow also include a step to create a sandbox card for that user? This would let you go from zero to a fully set up test user (with account, role, permissions, and payment method) in one command. The card creation would go through the real Square sandbox API to tokenize a test card number and save it.
+
+3. **Dashboard refresh**: When you perform an action in the dashboard (e.g., promote a waitlisted booking), should the current screen auto-refresh to show updated data, or should you manually press `R` to refresh? Auto-refresh is more responsive but means an extra DB query after every action.
+
+4. **Persistent session**: The tool keeps a DB connection alive for the session. Should it also maintain an authenticated "session" (like a logged-in user) for testing endpoints that require specific user context? This would let commands like `list_subscriptions` default to "for the current user" without needing `--person_id` every time. You'd switch users with `set_user --person_id=3` or `set_user --email=mason@example.com`.
+
+5. **Command aliases**: Should we support short aliases for common commands? For example, `ls` = `list_subscriptions`, `lb` = `list_bookings`, `pw` = `promote_waitlist_entry`. These would work in both REPL and dashboard command bar.
 
 ---
 
