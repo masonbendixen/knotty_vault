@@ -657,11 +657,13 @@ void RunDashboard(TestHelperContext& context) {
 - [ ] One-shot mode verified (`--command=X`)
 
 ### Phase 3: REPL
-- [ ] `repl/repl.cpp` — replxx setup, history file, prompt loop
-- [ ] `repl/completer.cpp` — tab completion for commands and flags
-- [ ] Parse command + flags from replxx input line
-- [ ] History persistence (`~/.knottyyoga_test_history`)
-- [ ] `--repl` mode working
+- [x] `repl/repl.cpp` — replxx setup, history file, prompt loop (implemented in Phase 1)
+- [x] Tab completion for commands, aliases, and `--flag=` names (inline in repl.cpp via CommandRegistry)
+- [x] `ParseCommandLine` in `command_registry.cpp` — splits input into command + args
+- [x] History persistence — `%USERPROFILE%\.knottyyoga_test_history` / `~/.knottyyoga_test_history`
+- [x] `--repl` mode wired in `main.cpp`
+- [x] Modal return: empty Enter / `back` → Dashboard, `quit` / Ctrl+D → Quit
+- [x] User-aware prompt: `knotty [Mason]> `
 
 ### Phase 4: Dashboard
 - [ ] `dashboard/dashboard.cpp` — FTXUI main loop, modal switch to REPL
