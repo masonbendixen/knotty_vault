@@ -673,10 +673,10 @@ void RunDashboard(TestHelperContext& context) {
 - [x] Status bar with DB connection info
 
 ### Phase 5: Polish
-- [ ] ANSI colors in REPL output
-- [ ] Error handling for all DB operations (print error, don't crash)
-- [ ] `--send_real_email` flag respected across all modes
-- [ ] Help system (`help`, `help <command>`, `?` in dashboard)
+- [x] ANSI colors in REPL output — `console_colors.h` with color constants, `ColorizeStatus()`, `PrintSuccess/Error/Warning/Header/Dim` helpers. Windows ANSI enabled via `EnableAnsiColors()`. All command output colorized: cyan headers, colored status values, green success, red errors, yellow warnings, gray dim text.
+- [x] Error handling for all DB operations — `SafeQueryTable` wraps dashboard queries in try/catch, `ExecuteCommand` catches exceptions, `CreateContext` wrapped in main, `QueryTable` returns error rows on failure
+- [x] `--send_real_email` flag respected across all modes (was already working — `send_test_email` warns in test mode)
+- [x] Help system — `help`/`?` alias registered as command, `?` key in dashboard prints help + drops to REPL, colored help output with category headers/bold names/cyan flags/yellow required markers
 
 ## Resolved Questions
 
