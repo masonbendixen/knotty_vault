@@ -426,31 +426,27 @@ When dropping from FTXUI into command mode via `:`, the prompt can be pre-popula
 | Waitlisted booking selected (ID 22) | `promote_waitlist_entry --booking_id=22` |
 | No specific selection | Empty prompt |
 
-## File Structure
+## File Structure (Actual Implementation)
 
 ```
 src/test_helper/
     main.cpp                    Entry point, mode selection, flag parsing
     command_registry.h          Command dispatch table + metadata (name, description, flags)
-    command_registry.cpp
-    command_runner.h            Executes commands with shared DB/service context
-    command_runner.cpp
+    command_registry.cpp        Includes ParseCommandLine parser
+    command_runner.h            Shared context struct, CreateContext, LoginAsUser, ExecuteCommand
+    command_runner.cpp          Real DB/secrets/Square services, test mail by default
     commands/
-        subscription_commands.h/cpp    Subscription-related commands
-        booking_commands.h/cpp         Event/booking/waitlist commands
-        user_commands.h/cpp            User creation, role/permission assignment
-        product_commands.h/cpp         Product and variant commands
-        utility_commands.h/cpp         Secrets, email, general utilities
+        subscription_commands.h/cpp    6 commands: ls, sb, rb, eg, ab, reset_subscription
+        booking_commands.h/cpp         7 commands: les, lb, simulate_sold_out_event, cb, pw, process_waitlist_refunds, set_event_session_time
+        user_commands.h/cpp            2 commands: cu (with --admin), lu
+        product_commands.h/cpp         2 commands: lp, le
+        utility_commands.h/cpp         5 commands: ss, set_card_expiration, check_expiring_cards, check_expiring_entitlements, send_test_email
     dashboard/
-        dashboard.h/cpp                FTXUI main loop, screen management
-        main_menu.h/cpp                Top-level menu component
-        subscription_screen.h/cpp      Subscription list + actions
-        booking_screen.h/cpp           Events, sessions, bookings views
-        user_screen.h/cpp              User management screen
-        form_helpers.h/cpp             Reusable FTXUI form components (text input, checkbox, etc.)
+        dashboard.h/cpp                All-in-one: FTXUI main loop, main menu, 6 category screens,
+                                       RenderTable/QueryTable/StatusBar helpers, modal switch to REPL
     repl/
-        repl.h/cpp                     replxx setup, history, completion, prompt loop
-        completer.h/cpp                Tab completion logic (commands, flags, DB values)
+        repl.h/cpp                     replxx setup, history, tab completion (inline via CommandRegistry),
+                                       user-aware prompt, modal return (Dashboard/Quit)
     CMakeLists.txt
 ```
 
@@ -666,14 +662,15 @@ void RunDashboard(TestHelperContext& context) {
 - [x] User-aware prompt: `knotty [Mason]> `
 
 ### Phase 4: Dashboard
-- [ ] `dashboard/dashboard.cpp` — FTXUI main loop, modal switch to REPL
-- [ ] `dashboard/main_menu.cpp` — top-level category menu
-- [ ] `dashboard/subscription_screen.cpp` — subscription list + action keys
-- [ ] `dashboard/booking_screen.cpp` — sessions list → bookings detail drill-down
-- [ ] `dashboard/user_screen.cpp` — user list + creation form
-- [ ] `dashboard/form_helpers.cpp` — reusable form components
-- [ ] Context-aware REPL pre-population (`:` on selected row)
-- [ ] Status bar with DB connection info
+- [x] `dashboard/dashboard.cpp` — FTXUI main loop, modal switch to REPL (consolidated all screens into single file)
+- [x] Main menu — top-level category menu (6 categories, inline in dashboard.cpp)
+- [x] Subscription screen — subscription list + action keys [s/b/e/a/r] (inline in dashboard.cpp)
+- [x] Events & Bookings screen — sessions list with [Enter] bookings detail, [f/t/w] actions (inline in dashboard.cpp)
+- [x] Users screen — user list + [n] create user, [l] login as selected (inline in dashboard.cpp)
+- [x] Products, Entitlements, Configuration screens (inline in dashboard.cpp)
+- [x] RenderTable, QueryTable, StatusBar helpers (inline in dashboard.cpp)
+- [x] Context-aware REPL pre-population (`:` on selected row)
+- [x] Status bar with DB connection info
 
 ### Phase 5: Polish
 - [ ] ANSI colors in REPL output
