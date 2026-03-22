@@ -636,14 +636,16 @@ void RunDashboard(TestHelperContext& context) {
 ## Implementation Checklist
 
 ### Phase 1: Foundation
-- [ ] Add FTXUI and replxx to `conanfile.py`
-- [ ] Create `src/test_helper/` directory structure
-- [ ] `main.cpp` — mode selection (one-shot, dashboard, repl)
-- [ ] `command_registry.h/cpp` — command dispatch table with metadata
-- [ ] `command_runner.h/cpp` — shared context, transaction management
-- [ ] `CMakeLists.txt` — build configuration with new dependencies
-- [ ] Update top-level `CMakeLists.txt` and `src/CMakeLists.txt`
-- [ ] Verify it builds on Windows and Linux
+- [x] Add FTXUI (6.1.9) and replxx (0.0.4) to `conanfile.py`
+- [x] Create `src/test_helper/` directory structure (commands/, dashboard/, repl/)
+- [x] `main.cpp` — three-mode selection (one-shot, dashboard, repl), absl flags, auto-login
+- [x] `command_registry.h/cpp` — command dispatch table with metadata, name/alias lookup, help, parsing
+- [x] `command_runner.h/cpp` — shared context with real DB/secrets/Square, test mail, login system
+- [x] `repl/repl.cpp` — replxx with history, tab completion, user-aware prompt, modal return
+- [x] `dashboard/dashboard.cpp` — FTXUI main menu with modal switch to REPL via `:`
+- [x] `CMakeLists.txt` — build configuration linking core, tests, ftxui, replxx
+- [x] Update top-level `CMakeLists.txt` (library target, PDB) and `src/CMakeLists.txt` (subdirectory)
+- [ ] Verify it builds on Windows (requires `conan install` to fetch new packages)
 
 ### Phase 2: Commands
 - [ ] `commands/subscription_commands.cpp` — all subscription commands
