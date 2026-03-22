@@ -648,12 +648,13 @@ void RunDashboard(TestHelperContext& context) {
 - [ ] Verify it builds on Windows (requires `conan install` to fetch new packages)
 
 ### Phase 2: Commands
-- [ ] `commands/subscription_commands.cpp` — all subscription commands
-- [ ] `commands/booking_commands.cpp` — all event/booking/waitlist commands
-- [ ] `commands/user_commands.cpp` — user creation, roles, permissions
-- [ ] `commands/product_commands.cpp` — product/variant/pricing commands
-- [ ] `commands/utility_commands.cpp` — secrets, email, list commands
-- [ ] One-shot mode working (`--command=X`)
+- [x] `commands/subscription_commands.cpp` — list_subscriptions (ls), simulate_billing_failure (sb), run_billing (rb), expire_grace_periods (eg), advance_subscription_billing (ab), reset_subscription
+- [x] `commands/booking_commands.cpp` — list_event_sessions (les), list_bookings (lb), simulate_sold_out_event, cancel_booking (cb), promote_waitlist_entry (pw), process_waitlist_refunds, set_event_session_time
+- [x] `commands/user_commands.cpp` — create_test_user (cu) with --admin flag, list_users (lu)
+- [x] `commands/product_commands.cpp` — list_products (lp), list_entitlements (le)
+- [x] `commands/utility_commands.cpp` — set_secret (ss), set_card_expiration, check_expiring_cards, check_expiring_entitlements, send_test_email
+- [x] All commands registered in command_runner.cpp via per-category Register functions
+- [ ] One-shot mode verified (`--command=X`)
 
 ### Phase 3: REPL
 - [ ] `repl/repl.cpp` — replxx setup, history file, prompt loop
