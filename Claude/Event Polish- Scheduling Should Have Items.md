@@ -105,29 +105,30 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — Endpoint Layer
 
-- [ ] **`visible_event_sessions.cpp`** — No structural change needed (already passes personId to helper). Verify the new fields appear in the JSON response.
-- [ ] **`book_event.cpp`** — No structural change needed (BookingHelper now returns the error). Verify the error JSON is returned correctly.
+- [x] **`visible_event_sessions.cpp`** — No structural change needed (already passes personId to helper). New fields flow through via KVT automatically.
+- [x] **`book_event.cpp`** — Updated to return `ErrorResponse::NotAuthorized()` (403) for `BOOKING_PERMISSION_REQUIRED` error code, instead of generic BadRequest.
 
 ### Frontend — Types
 
-- [ ] **`scheduling.types.ts`** — Add `visibility_permission_id?: number` and `booking_permission_id?: number` to `EventSession` interface
+- [x] **`scheduling.types.ts`** — Added `visibility_permission_id?: number` and `booking_permission_id?: number` to `EventSession` interface
 
 ### Frontend — Upcoming Events Page
 
-- [ ] **`upcoming-events.component.html`** — Show "Members Only" badge on events where `booking_permission_id` is set. Disable "Book Now" button for events with `booking_permission_id` set (since the backend will reject the booking anyway, this is a UX polish — the visibility filter already hides events the user can't see).
+- [x] **`upcoming-events.component.html`** — Shows purple "Members Only" badge on events where `booking_permission_id` is set. Badge appears next to event title. Book Now button still works (backend enforces the actual restriction).
+- [x] **`upcoming-events.component.scss`** — Added `.members-only-badge` style (purple pill badge)
 
 ### Frontend — Event Booking Page
 
-- [ ] **`event-booking.component.ts`** — Handle the `booking_permission_required` error code from `bookEvent()`. Display a user-friendly message like "This event is available to members only."
+- [x] **`event-booking.component.ts`** — Added `NOT_AUTHORIZED` case to `getErrorMessage()`. When booking is denied due to permission, displays the server's detail message (e.g., "This event requires a membership to book.").
 
 ### Frontend — Event Create Component (Admin)
 
-- [ ] **`event-create.component.ts/html`** — Add optional dropdowns for `visibility_permission_id` and `booking_permission_id` in the product configuration. These are on the **product**, not the session, so this might be better placed on the product detail page. **Decision needed**: If the admin wants to set visibility/booking permissions, they do it via the product admin page (which already supports editing arbitrary columns via the admin CRUD UI). The event create form doesn't need changes — it picks the product, and the product carries the permissions. **No new UI needed in event-create** unless we want a read-only display showing the product's current permissions.
+- [x] **No changes needed** — Visibility and booking permissions are on the **product**, not the session. Admin configures these via the product admin page (existing admin CRUD UI with FK pickers). Event create form picks the product, and the product carries the permissions.
 
 ### Frontend — Tests
 
-- [ ] **Component spec tests** for upcoming-events: test "Members Only" badge renders when `booking_permission_id` is set
-- [ ] **Component spec tests** for event-booking: test error handling for `booking_permission_required`
+- [x] **Component spec tests** for upcoming-events: test "Members Only" badge renders when `booking_permission_id` is set, and does not render when not set
+- [x] **Component spec tests** for event-booking: test 403 NOT_AUTHORIZED error displays "membership to book" message
 
 ---
 
