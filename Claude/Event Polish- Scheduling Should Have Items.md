@@ -82,26 +82,26 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — Business Logic Layer
 
-- [ ] **`EventSessionHelper::GetVisibleEventSessions()`** — Add permission filtering
+- [x] **`EventSessionHelper::GetVisibleEventSessions()`** — Add permission filtering
   - Load `products.visibility_permission_id` for each session's product
   - If `visibility_permission_id` is set (non-null, non-zero):
     - If `personId == 0` (not logged in): exclude the session
     - If logged in: check if user has the permission via `Session::ActiveUserHasPermission()` or a direct SQL query against `role_permissions` + `role_assignments`. Since EventSessionHelper doesn't have a Session object, pass the person's permission set or do a SQL-level filter.
     - **Approach**: Extend the SQL query in `GetVisibleEventSessions()` to LEFT JOIN through the permission chain: `LEFT JOIN role_assignments ra ON ra.person_id = {personId} LEFT JOIN role_permissions rp ON rp.role_id = ra.role_id AND rp.permission_id = p.visibility_permission_id`. Filter: `WHERE p.visibility_permission_id IS NULL OR rp.id IS NOT NULL`.
   - Include `visibility_permission_id` and `booking_permission_id` in the returned `ResolvedEventSession` so the frontend knows whether to show "Members Only" badge or disable booking
-- [ ] **Tests** in `event_session_helper_test.cpp` — Test visibility filtering: public event visible to all, member-only event hidden from non-members, member-only event visible to members
+- [x] **Tests** in `event_session_helper_test.cpp` — Test visibility filtering: public event visible to all, member-only event hidden from non-members, member-only event visible to members
 
-- [ ] **`BookingHelper::BookEvent()`** — Add booking permission check
+- [x] **`BookingHelper::BookEvent()`** — Add booking permission check
   - After loading the event session + product, check `products.booking_permission_id`
   - If set: verify the person (attendee, not payer) has the permission
   - Query: `SELECT 1 FROM role_assignments ra JOIN role_permissions rp ON rp.role_id = ra.role_id WHERE ra.person_id = {personId} AND rp.permission_id = {bookingPermissionId}`
   - If check fails: return error with code `"booking_permission_required"` and message "This event requires a membership to book."
-- [ ] **Tests** in `booking_helper_test.cpp` — Test booking permission: allowed when user has permission, denied when user lacks permission, allowed when `booking_permission_id` is null
+- [x] **Tests** in `booking_helper_test.cpp` — Test booking permission: allowed when user has permission, denied when user lacks permission, allowed when `booking_permission_id` is null
 
 ### Backend — Business Logic Layer (KVT)
 
-- [ ] **`SchedulingKeyValueTable`** — Add `visibility_permission_id` and `booking_permission_id` to `EventSessionInfoToKeyValueTable()` and the reverse conversion, so these values flow through the endpoint JSON
-- [ ] **Tests** in `scheduling_key_value_table_test.cpp` — Round-trip tests for new fields
+- [x] **`SchedulingKeyValueTable`** — Add `visibility_permission_id` and `booking_permission_id` to `EventSessionInfoToKeyValueTable()` and the reverse conversion, so these values flow through the endpoint JSON
+- [x] **Tests** in `scheduling_key_value_table_test.cpp` — Round-trip tests for new fields
 
 ### Backend — Endpoint Layer
 
