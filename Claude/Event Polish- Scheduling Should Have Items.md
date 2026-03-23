@@ -26,6 +26,6 @@ Let's implement the SHOULD HAVE - Event Polish section of Support for scheduled 
 
 Be aware that we have [[Manual Testing Helper Executable]] as a place to add tasks that need support to test a scenario and [[Scheduled Jobs]] for tasks that need to be performed periodically (like sending reminder emails and so forth).
 
-P
+Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Please always add tests for anything you chance for which testing is possible.
 
 # Place plan here
