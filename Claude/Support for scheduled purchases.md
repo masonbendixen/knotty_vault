@@ -472,6 +472,7 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 
 ## SHOULD HAVE - Event Polish
 *Refunds, home page integration, reminders, public visibility*
+[[Event Polish- Scheduling Should Have Items]]
 
 | | # | Scenario | Rationale |
 |---|---|---|---|
