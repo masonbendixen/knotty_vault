@@ -326,8 +326,8 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [x] 2. Admin configures event product duration
 - [x] 3. Admin configures event product capacity
 - [x] 4. Admin configures permission-based pricing for event product
-- [ ] 5. Admin configures event product visibility via permission
-- [ ] 6. Admin configures event product booking restriction via permission
+- [x] 5. Admin configures event product visibility via permission (visibility_permission_id on product, SQL filtering in GetVisibleEventSessions)
+- [x] 6. Admin configures event product booking restriction via permission (booking_permission_id on product, checked in BookEvent + can_book in session response)
 
 ## Session Instance Management (Admin)
 - [x] 7. Admin creates a session instance of an event product
@@ -338,11 +338,11 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [x] 10. User books a one-time event session
 - [x] 11. User receives booking confirmation email
 - [x] 12. Non-logged-in user sees event and is prompted to register/log in to book
-- [ ] 13. User receives reminder email before their booked event
+- [x] 13. User receives reminder email before their booked event (EventReminderHelper + admin endpoint + test helper command)
 - [x] 14. User views their upcoming booked events in the user portal
 
 ## Refunds and Cancellation (One-Time Events)
-- [ ] 15. Admin configures refund policy for an event product
+- [x] 15. Admin configures refund policy for an event product (cancellation_policy_id on product, RefundHelper with tiered windows, policy shown on booking page + cancel flow)
 - [x] 16. User requests a refund for a booked event (cancel booking with purchase cancellation — Phase 10.2/10.8)
 - [ ] 17. User reschedules a booked event to a different session
 
@@ -410,11 +410,11 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [x] 57. Admin views all attendees for a specific event session
 - [x] 58. Session auto-closes when capacity is reached
 - [x] 59. Admin can manually override capacity for a session (Phase 10.3 — promote waitlist entry with capacity increase)
-- [ ] 60. Event session cancellation by admin (entire session)
+- [x] 60. Event session cancellation by admin (entire session) (SessionCancellationHelper, admin endpoint, Cancel Session button on event card, refunds + emails)
 - [ ] 61. No-show tracking
 - [ ] 62. Admin comps a re-slot into another session
 - [ ] 63. Admin views analytics/reports for sessions
-- [ ] 64. Booking conflicts are prevented
+- [x] 64. Booking conflicts are prevented (overlap check in BookEvent for confirmed + waitlisted bookings)
 - [x] 65. Timezone handling
 - [ ] 66. Sequential slot computation prevents schedule holes
 
@@ -476,17 +476,17 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 
 | | # | Scenario | Rationale |
 |---|---|---|---|
-| [ ] | 5 | Admin configures event product visibility | Public vs member-only events |
-| [ ] | 6 | Admin configures event product as member-only booking | Restrict who can book |
+| [x] | 5 | Admin configures event product visibility | Public vs member-only events |
+| [x] | 6 | Admin configures event product as member-only booking | Restrict who can book |
 | [x] | 8 | Admin configures session home page visibility window | Marketing on home page |
 | [x] | 12 | Non-logged-in user prompted to register to book | Conversion funnel |
-| [ ] | 13 | User receives reminder email before event | Reduce no-shows |
-| [ ] | 15 | Admin configures refund policy for event product | Need cancellation rules |
+| [x] | 13 | User receives reminder email before event | Reduce no-shows |
+| [x] | 15 | Admin configures refund policy for event product | Need cancellation rules |
 | [x] | 16 | User requests refund for booked event | Users need to cancel |
 | [x] | 42 | User views booking details with cancellation options | Cancel flow UX |
 | [x] | 59 | Admin manually overrides session capacity | Flexibility |
-| [ ] | 60 | Admin cancels entire session (with reason) | Handle cancellations |
-| [ ] | 64 | Booking conflicts prevented | Data integrity |
+| [x] | 60 | Admin cancels entire session (with reason) | Handle cancellations |
+| [x] | 64 | Booking conflicts prevented | Data integrity |
 
 ## NICE TO HAVE - Bookable Services Foundation
 *Provider availability and service booking (massage, training, etc.)*

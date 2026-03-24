@@ -748,7 +748,7 @@ This section documents the user scenarios the payment system must support, valid
 - [ ] 23. User redeems a voucher/gift card and has remaining balance
 - [ ] 24. User uses a percentage-based discount coupon
 - [ ] 25. User pays with multiple payment sources (card + voucher, two cards)
-- [ ] 26. Studio refunds a one time purchase item
+- [x] 26. Studio refunds a one time purchase item (RefundHelper + Square RefundPayment API implemented; used for booking cancellation and session cancellation refunds)
 - [ ] 27. User cancels a monthly service and receives a prorated refund
 - [ ] 28. Studio comps a service or good
 - [ ] 29. Admin grants entitlement without payment (comp)
