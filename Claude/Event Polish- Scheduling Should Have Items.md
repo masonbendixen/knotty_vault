@@ -164,96 +164,36 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — Table Helpers Layer
 
-- [ ] **Create `cancellation_policies.h/cpp`** table helper in `sql_util/table_helpers/`
-  - `AddCancellationPolicy(Transaction&, name, description)` → `int64_t`
-  - `GetCancellationPolicy(Transaction&, int64_t id)` → `KeyValueTable`
-  - `GetCancellationPolicies(Transaction&)` → `KeyValueTableArray`
-  - `UpdateCancellationPolicy(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteCancellationPolicy(Transaction&, int64_t id)`
-- [ ] **Create `cancellation_policy_windows.h/cpp`** table helper in `sql_util/table_helpers/`
-  - `AddWindow(Transaction&, int64_t policyId, int64_t hoursBefore, int64_t refundPercent)` → `int64_t`
-  - `GetWindowsForPolicy(Transaction&, int64_t policyId)` → `KeyValueTableArray` (ordered by `hours_before DESC`)
-  - `UpdateWindow(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteWindow(Transaction&, int64_t id)`
-- [ ] **Tests** for both table helpers
-- [ ] **CMakeLists.txt** — Add new files
+- [x] **Create `cancellation_policies.h/cpp`** table helper — CRUD for cancellation_policies table
+- [x] **Create `cancellation_policy_windows.h/cpp`** table helper — Add/Get/Update/Delete windows ordered by hours_before DESC
+- [x] **Tests** — 5 tests for policies (add/get, get all, update, delete, not found), 4 tests for windows (add/get ordered, update, delete, empty)
+- [x] **CMakeLists.txt** — Added to table_helpers CMakeLists
 
 ### Backend — Square Client Layer
 
-- [ ] **Add `RefundPayment()` to `SquareClient`** virtual interface
-  ```cpp
-  struct RefundResult {
-      std::string refundId;
-      std::string status;
-      int64_t amountCents = 0;
-      std::string currency;
-      std::string rawJson;
-  };
-
-  virtual RefundResult RefundPayment(
-      const std::string& paymentId,
-      int64_t amountCents,
-      const std::string& currency,
-      const std::string& idempotencyKey,
-      const std::string& reason = "",
-      const RetryPolicy& retryPolicy = RetryPolicy::Default()) = 0;
-  ```
-  - Calls `POST /v2/refunds` on the Square API
-  - Requires `payment_id`, `amount_money`, `idempotency_key`, optional `reason`
-- [ ] **Implement in `square_client.cpp`** (production implementation)
-- [ ] **Add to test SquareClient** mock
-- [ ] **Tests** in `square_client_test.cpp` for the new method
+- [x] **`RefundResult` struct + `RefundPayment()` virtual method** added to `square_client.h`
+- [x] **Production implementation** in `square_client.cpp` — calls `/refunds` endpoint with `payment_id`, `amount_money`, `idempotency_key`, optional `reason`; parses refund response
+- [x] **Test mock** in `square_client_test_util.h/cpp` — `RefundPaymentArgs`, call tracking, `QueueRefundResult`/`QueueRefundError`
+- [x] **Tests** in `square_client_test.cpp` — success, partial refund, invalid request error (3 tests)
 
 ### Backend — Business Logic Layer (Payment)
 
-- [ ] **Create `RefundHelper` class** in `business_logic/payment/`
-  - `CalculateRefundPercent(Transaction&, int64_t cancellationPolicyId, int64_t eventStartTimeUs)` → `int64_t` (0-100)
-    - Loads the policy's windows ordered by `hours_before DESC`
-    - Calculates hours remaining = `(eventStartTimeUs - now_us()) / 3600000000`
-    - Finds the first window where `hours_remaining >= hours_before`
-    - Returns that window's `refund_percent`
-    - If no window matches (too close to event): returns 0
-    - If no policy assigned: returns 100 (full refund — default generous behavior)
-  - `ProcessRefund(Transaction&, int64_t purchaseId, int64_t refundPercent)` → `RefundInfo`
-    - Loads the purchase and its payment
-    - Calculates refund amount = `payment.amount_cents * refundPercent / 100`
-    - If `refundPercent == 0`: no refund, return info with zero amount
-    - If purchase has no payment (e.g., $0 comp): skip Square call, just record
-    - Calls `SquareClient::RefundPayment()` with the original payment's Square payment ID
-    - Records a new payment row with negative amount and `refund_for_payment_id` set
-    - Updates purchase status to `refunded` or `partially_refunded`
-    - Returns refund details
-- [ ] **Tests** in `refund_helper_test.cpp`:
-  - 100% refund within full-refund window
-  - 50% partial refund within partial window
-  - 0% refund past all windows
-  - No cancellation policy → 100% refund
-  - $0 purchase → no Square call
-- [ ] **CMakeLists.txt** — Add new files
+- [x] **`RefundHelper` class** in `business_logic/payment/refund_helper.h/cpp`
+  - `CalculateRefundPercent()` — loads policy windows DESC, matches hours remaining to tiers; no policy → 100%, no match → 0%
+  - `ProcessRefund()` — finds payment via purchase_payments, calculates refund amount, calls Square, records negative payment row with `refund_for_payment_id`, updates purchase status
+- [x] **Tests** in `refund_helper_test.cpp` — 8 tests: no policy → 100%, empty policy → 100%, full window, partial window, too late → 0%, full refund process, partial refund process, zero percent returns empty, no payment returns empty
+- [x] **CMakeLists.txt** — Added refund_helper.h/cpp and test
 
 ### Backend — Business Logic Layer (Scheduling)
 
-- [ ] **Update `BookingHelper::CancelBooking()`** — Integrate refund calculation
-  - After loading the booking, load the event session and product
-  - If product has `cancellation_policy_id`:
-    - Call `RefundHelper::CalculateRefundPercent()` to get the refund percentage
-    - Call `RefundHelper::ProcessRefund()` to issue the refund
-  - Else (no policy): full refund via `RefundHelper::ProcessRefund(100%)`
-  - Add `refundAmountCents`, `refundPercent`, `currency` to `CancelBookingResult`
-  - For **waitlisted** bookings: always 100% refund (they never got in)
-- [ ] **Update `CancelBookingResult`** struct — Add refund fields:
-  ```cpp
-  int64_t refundAmountCents = 0;
-  int64_t refundPercent = 0;
-  std::string currency;
-  ```
-- [ ] **Tests** in `booking_helper_test.cpp` — Cancel with refund policy, cancel without policy, cancel waitlisted (full refund)
+- [x] **`BookingHelper` updated** — Constructor takes optional `SquareClientPtr`; `CancelBooking()` now creates `RefundHelper` and processes refunds. Confirmed bookings use cancellation policy; waitlisted bookings always get 100% refund.
+- [x] **`CancelBookingResult` updated** — Added `refundAmountCents`, `refundPercent`, `currency` fields
+- [x] **Tests** in `booking_helper_test.cpp` — 3 new tests: cancel confirmed with no policy (full refund), cancel confirmed with tiered policy (partial refund), cancel waitlisted (always full refund)
 
 ### Backend — Endpoint Layer
 
-- [ ] **Update `cancel_booking.cpp`** — Include refund info in the JSON response
-  - Add `refund_amount_cents`, `refund_percent`, `currency` to the response JSON
-- [ ] **Tests** in cancel_booking endpoint test (if exists)
+- [x] **`cancel_booking.cpp`** — Passes `SquareClient` to `BookingHelper`; includes `refund_amount_cents`, `refund_percent`, `currency` in response JSON
+- [ ] **Tests** in cancel_booking endpoint test — existing tests still pass (no payment = no refund fields); new refund-specific endpoint tests deferred to integration testing
 
 ### Frontend — Types
 
