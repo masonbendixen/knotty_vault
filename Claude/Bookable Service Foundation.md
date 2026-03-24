@@ -117,13 +117,9 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 ### 1.4 Backend — Admin Endpoints
 
-- [ ] **Create `POST /api/admin/provider_availability`** endpoint
-  - Body: `{ provider_person_id, facility_id, date_us, start_time_us, end_time_us, is_blocked }`
-  - Creates an availability block (or blocked/unavailable block if `is_blocked=true`)
-  - Returns the created record
-  - Scenarios 25 and 29 use the same endpoint — `is_blocked` distinguishes available vs unavailable
-- [ ] **Tests** for provider availability endpoint
-- [ ] **Register endpoint** in `web_app.cpp` and `endpoints/CMakeLists.txt`
+- [x] **`admin_provider_availability.h/cpp`** — `POST /api/admin/provider_availability`, requires auth, body `{ provider_person_id, facility_id, date_us, start_time_us, end_time_us, is_blocked }`, returns created record with ID. `is_blocked=true` creates unavailable blocks (scenario 29).
+- [x] **`admin_provider_availability_test.cpp`** — 4 tests: create availability block, create blocked availability, requires auth (401), missing field (400)
+- [x] **Registered in `web_app.cpp`** and **`endpoints/CMakeLists.txt`**
 
 ### 1.5 Admin UI — Product Detail Page
 
