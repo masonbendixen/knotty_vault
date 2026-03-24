@@ -194,10 +194,22 @@ For the example above (base = 60min, buffer = 5min):
 
 **Why this matters**: A 120-minute slot with double buffer can always be equivalently replaced by two 60-minute slots with a buffer between them. If a 120-minute booking at 9:05 only had a single 5-minute buffer (ending at 11:10), then cancelling it and rebooking as two 60-minute massages would require: 9:05-10:05 (buffer to 10:10) + 10:10-11:10 (buffer to 11:15). The second massage's buffer extends to 11:15, which is past the original 11:10 buffer_end — creating a conflict with whatever was booked after. Double buffer ensures the time block is always subdivisible into smaller variants without overlap.
 
+**Bidirectional hole prevention**: The hole check applies in BOTH directions — a slot can't create an unusable gap *after* it (before the next booking or window end) OR *before* it (after the previous booking's buffer_end or window start).
+
+**Example**: Provider available 8:00am-4:00pm. Buffer: 5min. Smallest variant: 60min.
+- The valid start times from the window start are: **8:00am** and **9:05am** (and onward in 65-min steps from 8:00).
+- **8:00am is valid** — it's the window start, no gap before it.
+- **8:05am is NOT valid** — it leaves a 5-min gap before it (8:00-8:05) which is too small for any 60-min variant.
+- **8:10am, 8:15am, ... 9:00am are all NOT valid** — each leaves a gap at the start smaller than 60 minutes.
+- **9:05am IS valid** — it leaves exactly 65 minutes from 8:00 (enough for a 60min + 5min buffer). So either 8:00 is booked (and 9:05 follows naturally), or the 8:00-9:05 slot can fit a 60-min variant.
+- The same logic applies throughout: each candidate start time is checked to ensure the gap between the previous booking's buffer_end (or window start) and this slot's start can fit at least one variant + buffer, OR is exactly zero (the slot starts right at the boundary).
+
+In general, for a free window, valid start times are: `window_start`, `window_start + (smallest_duration + buffer)`, `window_start + 2*(smallest_duration + buffer)`, etc. — all rounded to 5-minute boundaries. Each of these is then checked per-variant to see which durations fit without creating a hole after it.
+
 **Key rules:**
 - Start times are on **5-minute boundaries** (configurable constant `kSlotAlignmentMinutes = 5`)
 - Duration and buffer values must be multiples of 5 (validated on input)
-- A slot is only offered if booking it would NOT create a gap smaller than the smallest active variant's duration for the product
+- A slot is only offered if booking it would NOT create a gap before OR after it that is smaller than the smallest active variant's duration (+ buffer) for the product. A zero-length gap (slot flush against boundary or adjacent booking) is always fine.
 - Long variants get proportional buffers: `num_buffers = ceil(duration / base_duration)`, where base_duration is the smallest active variant's duration for the product
 - The freed time after cancellation of a long variant can be split into smaller variant slots (the proportional buffers ensure this always works without overlap)
 - The algorithm generates slots per-variant (the frontend shows which durations are available at each start time)
@@ -213,7 +225,7 @@ For the example above (base = 60min, buffer = 5min):
     - Note: returns slots for ALL active variants, not a single variant. The frontend groups by start time and shows which durations are available.
     - Steps:
       1. Load the product to get `provider_type_id`, `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`
-      2. Load all active product variants for this product → get duration_minutes and buffer_minutes for each
+      2. Load all active product variants for this product → get duration_minutes and buffer_minutes for each. Determine `base_duration` = smallest variant's duration_minutes. Determine `min_slot` = base_duration + buffer (the smallest bookable unit of time).
       3. Determine the user's booking window based on their permissions (see Phase 2 booking window design below)
       4. If no specific provider requested: find all providers assigned to the product's provider type who are accepting bookings
       5. For each provider:
@@ -221,11 +233,14 @@ For the example above (base = 60min, buffer = 5min):
          b. Load existing bookable_service_sessions for the provider in the date range (ordered by start_time_us)
          c. Load provider buffer overrides for each variant
          d. Compute **free windows**: subtract booked sessions (using `buffer_end_us`) from availability windows
-         e. For each free window, for each variant:
-            - Calculate effective_buffer = `MAX(variant.buffer_minutes, provider_override.buffer_minutes)`
-            - The slot needs `duration + effective_buffer` minutes to fit (the buffer must fit within the window, or the slot ends at the window boundary with no gap after)
-            - Start time = window start, rounded up to nearest 5-minute boundary
-            - **Hole check**: If booking this slot would leave a gap after buffer_end that is smaller than the smallest variant's duration → don't offer this slot for this variant (offer a longer variant instead, or don't offer this start time at all)
+         e. For each free window, generate **valid start times**:
+            - First start = window_start (rounded up to 5-min boundary)
+            - Subsequent starts = previous_start + min_slot, rounded up to 5-min boundary
+            - This ensures no gap before any start time is smaller than min_slot (bidirectional hole prevention)
+         f. For each valid start time, for each variant:
+            - Calculate proportional buffer: `num_buffers = ceil(variant.duration / base_duration)`, `total_buffer = num_buffers * effective_buffer` where effective_buffer = `MAX(variant.buffer_minutes, provider_override.buffer_minutes)`
+            - The slot needs `duration + total_buffer` minutes to fit within the free window (unless the slot ends exactly at the window boundary, in which case no trailing buffer is needed within this window)
+            - **Trailing hole check**: If `slot.buffer_end` to `window_end` leaves a gap smaller than `min_slot` and greater than zero → don't offer this variant at this start time
             - If valid, add to results
       6. Check room availability: for the product's `required_room_type_id`, find rooms at the facility. For each slot, verify at least one room has capacity (check `concurrent_capacity` against overlapping sessions)
       7. Apply booking window filter (based on user's permissions)
@@ -285,19 +300,21 @@ Members get earlier access to service booking. This uses a **booking window matr
 - [ ] **Seed data**: Add default booking windows for seed products in `create_database.cpp`
 
 - [ ] **Tests** in `service_availability_helper_test.cpp`:
-  - Free window with no bookings → slots for all variants at 5-min aligned start times
-  - Existing booking → free window splits, slots generated from buffer_end of booking
-  - Hole check: 60min variant rejected when it would leave a 30min gap but 90min variant offered
+  - Free window with no bookings → slots at valid start times (window_start, window_start + min_slot, etc.)
+  - Existing booking → free window splits, next slot starts at buffer_end rounded to 5-min
+  - **Trailing hole check**: 60min variant rejected when it would leave a 30min gap after, but 90min variant offered
+  - **Leading hole check**: Start times like 8:05, 8:10 etc. rejected because they leave an unusable gap at the start of the window. Only 8:00 and 9:05 are valid (window_start and window_start + min_slot)
   - Multiple variants offered at same start time when all fit
-  - No variants offered at start time when none fit without creating a hole
-  - Buffer respected: next slot starts at buffer_end, rounded up to 5-min boundary
-  - Provider buffer override: larger override used
+  - No variants offered at start time when none fit without creating a hole in either direction
+  - Proportional buffer: 120min variant gets double buffer, 60min gets single buffer
+  - Provider buffer override: larger override used in MAX calculation
   - Blocked availability excluded
   - Room capacity limit enforced
   - Multiple providers → results grouped by provider
   - Booking window enforced per user permission
   - Past slots excluded
   - Provider with no availability → not shown
+  - End-of-window: last slot can skip trailing buffer if it fills exactly to window end
 
 - [ ] **CMakeLists.txt** — Add new files
 
