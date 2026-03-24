@@ -123,10 +123,10 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 ### 1.5 Admin UI — Product Detail Page
 
-- [ ] **Product detail page** — Add `provider_type_id` dropdown for bookable_service products (Access & Scheduling section)
-- [ ] **Product detail page** — Add `required_room_type_id` dropdown for bookable_service products
-- [ ] **Product detail page** — Add `advance_booking_days` and `booking_cutoff_hours` number inputs
-- [ ] **Product detail page** — Add `max_time_hole_minutes` number input
+- [x] **Product detail page** — Added `provider_type_id` dropdown (loads all provider_types, shown only for bookable_service kind)
+- [x] **Product detail page** — Added `required_room_type_id` dropdown (loads all location_room_types, shown only for bookable_service kind)
+- [x] **Product detail page** — Added `advance_booking_days` and `booking_cutoff_hours` number inputs (shown for all event/bookable_service kinds in Access & Scheduling)
+- [x] **Product detail page** — Added `max_time_hole_minutes` number input with step=5 (shown only for bookable_service kind under "Service Provider Settings" sub-section)
 
 ---
 
