@@ -206,10 +206,20 @@ For the example above (base = 60min, buffer = 5min):
 
 In general, for a free window, valid start times are: `window_start`, `window_start + (smallest_duration + buffer)`, `window_start + 2*(smallest_duration + buffer)`, etc. — all rounded to 5-minute boundaries. Each of these is then checked per-variant to see which durations fit without creating a hole after it.
 
+**End-of-window best-fit rule**: The last slot before the end of an availability window (or before the next booking) is a special case. A trailing gap is unavoidable if the remaining time doesn't divide evenly. In this case, the system offers only the **longest variant that fits** — not shorter ones that would leave a larger unused gap. Example: 110 minutes remaining, variants are 60/90/120min:
+- 120min → doesn't fit → **rejected**
+- 90min → fits, leaves 20min gap → **offered** (best fit)
+- 60min → fits, but leaves 50min gap → **rejected** (90min is a better fit and should be preferred)
+
+The logic: at the last valid start time before a window end, compute the remaining time. For each variant (sorted longest first), check if it fits. Offer the **first (longest) variant that fits**. Skip shorter variants because they'd waste more time. If no variant fits, don't offer this start time at all.
+
+Note: this only applies to the *last* slot in a window. Interior slots use the standard bidirectional hole check (which naturally handles this via the trailing gap rule).
+
 **Key rules:**
 - Start times are on **5-minute boundaries** (configurable constant `kSlotAlignmentMinutes = 5`)
 - Duration and buffer values must be multiples of 5 (validated on input)
 - A slot is only offered if booking it would NOT create a gap before OR after it that is smaller than the smallest active variant's duration (+ buffer) for the product. A zero-length gap (slot flush against boundary or adjacent booking) is always fine.
+- **Exception**: The last slot in a window may leave a trailing gap. In this case, only the longest fitting variant is offered (best-fit rule).
 - Long variants get proportional buffers: `num_buffers = ceil(duration / base_duration)`, where base_duration is the smallest active variant's duration for the product
 - The freed time after cancellation of a long variant can be split into smaller variant slots (the proportional buffers ensure this always works without overlap)
 - The algorithm generates slots per-variant (the frontend shows which durations are available at each start time)
@@ -237,10 +247,11 @@ In general, for a free window, valid start times are: `window_start`, `window_st
             - First start = window_start (rounded up to 5-min boundary)
             - Subsequent starts = previous_start + min_slot, rounded up to 5-min boundary
             - This ensures no gap before any start time is smaller than min_slot (bidirectional hole prevention)
-         f. For each valid start time, for each variant:
+         f. For each valid start time, determine if this is the **last start time** in the window (no room for another min_slot after it). Then for each variant (sorted **longest first**):
             - Calculate proportional buffer: `num_buffers = ceil(variant.duration / base_duration)`, `total_buffer = num_buffers * effective_buffer` where effective_buffer = `MAX(variant.buffer_minutes, provider_override.buffer_minutes)`
-            - The slot needs `duration + total_buffer` minutes to fit within the free window (unless the slot ends exactly at the window boundary, in which case no trailing buffer is needed within this window)
-            - **Trailing hole check**: If `slot.buffer_end` to `window_end` leaves a gap smaller than `min_slot` and greater than zero → don't offer this variant at this start time
+            - Check if `start + duration + total_buffer <= window_end` (or `start + duration <= window_end` if this is the very end of the window and no trailing buffer is needed)
+            - If this is NOT the last start time: **trailing hole check** — if `slot.buffer_end` to `window_end` leaves a gap smaller than `min_slot` and greater than zero → reject this variant
+            - If this IS the last start time: **best-fit rule** — offer only the **longest variant that fits**. Skip shorter variants (they'd waste more time). This is the one case where a trailing gap is acceptable.
             - If valid, add to results
       6. Check room availability: for the product's `required_room_type_id`, find rooms at the facility. For each slot, verify at least one room has capacity (check `concurrent_capacity` against overlapping sessions)
       7. Apply booking window filter (based on user's permissions)
@@ -314,7 +325,9 @@ Members get earlier access to service booking. This uses a **booking window matr
   - Booking window enforced per user permission
   - Past slots excluded
   - Provider with no availability → not shown
-  - End-of-window: last slot can skip trailing buffer if it fills exactly to window end
+  - **End-of-window best-fit**: 110min remaining, variants 60/90/120 → only 90min offered (longest that fits). 60min rejected despite fitting because 90min is a better fit.
+  - **End-of-window exact fit**: 65min remaining (60min + 5min buffer) → 60min offered, no trailing gap
+  - **End-of-window nothing fits**: 50min remaining, smallest variant 60min → no slot offered
 
 - [ ] **CMakeLists.txt** — Add new files
 
