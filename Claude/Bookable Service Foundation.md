@@ -445,21 +445,26 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
 
 5. **Date range for availability queries**: How far ahead should the availability endpoint look?
    - **Recommendation**: Accept `date_from` and `date_to` in the query, let the frontend control the range (typically 1-2 weeks). Default to 7 days if not specified.
-   - I want to be able to have various permissions have different booking windows that are allowed and then have a no permission window that allows anyone to book that window. I feel like getting first dibs on massage and service booking will be a selling point for various memberships. I do want the client to be ab
+   - Mason- I want to be able to have various permissions have different booking windows that are allowed and then have a no permission window that allows anyone to book that window. I feel like getting first dibs on massage and service booking will be a selling point for various memberships. I do want the client to be able to specify a range they would like to see but there might not be availability in that time based on their permission. Please modify requirements and this document accordingly (including the document upon which this is based).
 
 6. **Same cancel endpoint for services?**: Should cancelling a service booking use the same `cancel_booking` endpoint as events?
    - **Recommendation**: Yes, same endpoint. `BookingHelper::CancelBooking()` can handle both via `event_session_id` vs `service_session_id`. The cancellation policy comes from the product regardless.
+   - Mason- I'll go with your recommendation.
 
 7. **Scenario 66 — time hole enforcement**: The `max_time_hole_minutes` on products prevents orphaned gaps. Should this be:
    - **Option A**: Enforced at slot computation time (don't show slots that would create too-small gaps)
    - **Option B**: Enforced at booking time (reject bookings that create too-small gaps)
    - **Recommendation**: Option A — enforce at slot computation time. Don't show the slot to the user if booking it would create an unusable gap. Better UX than "you can see this slot but can't book it."
+   - Mason- Option A
 
 8. **How do we handle the case where a provider has no availability entered?** Should they show up in search results with zero slots, or be completely hidden?
    - **Recommendation**: Completely hidden — only providers with at least one non-blocked availability window in the date range should appear in results.
+   - Mason- I'll go with the recommendation.
 
 9. **Should the service booking page show the provider's photo?** We have the photo system — should we link provider photos to people records?
    - **Recommendation**: Nice-to-have stretch. For now, show provider name only. Photo integration can come when the provider portal is built.
+   - Mason- Yes, I want to show photos. I also want to have bios and a link to their bio.
 
 10. **Timezone handling for availability**: Provider availability is stored as microsecond timestamps. Should the admin enter availability in the facility's timezone? How does the frontend handle display?
     - **Recommendation**: Store as UTC microseconds (consistent with events). Admin enters in facility timezone, frontend converts. The facility record already has a `timezone` field. The existing `formatSessionTimeRange()` utility already handles timezone conversion for display.
+    - Mason- I'll go with your recommendation.
