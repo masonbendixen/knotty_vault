@@ -330,12 +330,12 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Manual Testing Scenarios
 
-- [ ] **Visibility**: Create a permission "member". Create an event product with `visibility_permission_id` pointing to "member". Verify non-members don't see the event on the upcoming page. Add the permission to a user's role. Verify they now see it.
-- [ ] **Booking permission**: Create an event product with `booking_permission_id`. Verify a user without the permission gets an error when booking. Add the permission; verify booking succeeds.
-- [ ] **Conflict prevention**: Book an event. Try to book a second event that overlaps in time. Verify the system rejects it. Cancel the first booking. Verify the second event can now be booked.
-- [ ] **Cancellation policy**: Create a cancellation policy with windows (48h → 100%, 24h → 50%, 0h → 0%). Assign to a product. Book the event. Cancel at various times and verify refund amounts.
-- [ ] **Reminders**: Set `reminder_hours` on a product. Book the event. Set the event time to be within the reminder window (use test helper `set_event_session_time`). Run `send_event_reminders`. Verify email sent. Run again — verify no duplicate.
-- [ ] **Session cancellation**: Create an event with multiple confirmed and waitlisted bookings. Admin cancels session with reason. Verify all bookings cancelled, refunds issued, emails sent.
+- [x] **Visibility**: Create a permission "member". Create an event product with `visibility_permission_id` pointing to "member". Verify non-members don't see the event on the upcoming page. Add the permission to a user's role. Verify they now see it. ✅ 2026-03-24
+- [x] **Booking permission**: Create an event product with `booking_permission_id`. Verify a user without the permission gets an error when booking. Add the permission; verify booking succeeds. ✅ 2026-03-24
+- [x] **Conflict prevention**: Book an event. Try to book a second event that overlaps in time. Verify the system rejects it. Cancel the first booking. Verify the second event can now be booked. ✅ 2026-03-24
+- [x] **Cancellation policy**: Create a cancellation policy with windows (48h → 100%, 24h → 50%, 0h → 0%). Assign to a product. Book the event. Cancel at various times and verify refund amounts. ✅ 2026-03-24
+- [x] **Reminders**: Set `reminder_hours` on a product. Book the event. Set the event time to be within the reminder window (use test helper `set_event_session_time`). Run `send_event_reminders`. Verify email sent. Run again — verify no duplicate. ✅ 2026-03-24
+- [x] **Session cancellation**: Create an event with multiple confirmed and waitlisted bookings. Admin cancels session with reason. Verify all bookings cancelled, refunds issued, emails sent. ✅ 2026-03-24
 
 ### Test Helper Commands Summary
 
