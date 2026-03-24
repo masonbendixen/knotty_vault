@@ -404,27 +404,39 @@ Members get earlier access to service booking. This is controlled by `advance_bo
 
 - [ ] **New component: `service-catalog`** at `/services`
   - Lists bookable_service products with variant options and prices
+  - Each product shows provider photos, names, and link to bio page
   - "Book" button navigates to service booking page
 
 ### 5.4 Frontend — Service Booking Page
 
 - [ ] **New component: `service-booking`** at `/shop/service/:productId`
-  - Step 1: Select variant (duration + price)
-  - Step 2: Select date (date picker)
-  - Step 3: Select time slot (fetches available slots, grouped by provider)
-  - Step 4: Confirm & Pay (payment method + book)
-  - Shows cancellation policy info
-  - Success confirmation with all details
+  - Step 1: Select date (date picker — week view)
+  - Step 2: View available slots grouped by provider. Each provider shows:
+    - Provider photo and name (linked to bio page)
+    - Available start times, each showing which variant durations are available
+    - Example: "9:05 AM — 60min, 90min, 120min" or "11:10 AM — 90min only"
+  - Step 3: Select a specific start time + duration → shows price, cancellation policy
+  - Step 4: Confirm & Pay (payment method + book via existing PaymentMethodComponent)
+  - Shows cancellation policy info (reuse existing `cancellationPolicyText` pattern)
+  - Success confirmation with provider, duration, time, location, room
+  - If user's booking window doesn't reach the selected date, show message explaining when booking opens (e.g., "Gold members can book 30 days ahead — upgrade your membership for earlier access")
 
 ### 5.5 Frontend — My Bookings Integration
 
 - [ ] **Update `my-events.component`** to show service bookings
-  - Service bookings show: service name, variant, provider, date/time, facility/room
-  - Cancel button works the same
+  - Service bookings show: service name, variant (duration), provider name + photo, date/time, facility/room
+  - Cancel button works the same (reuses existing cancel infrastructure with refund policy)
 
-### 5.6 Frontend — Tests
+### 5.6 Frontend — Provider Bio Page
 
-- [ ] **Component spec tests** for service-catalog, service-booking, updated my-events
+- [ ] **New component: `provider-bio`** at `/providers/:personId`
+  - Provider photo, name, bio text
+  - List of services they offer (provider_type_assignments → products)
+  - "Book with [provider name]" button linking to service booking page filtered to this provider
+
+### 5.7 Frontend — Tests
+
+- [ ] **Component spec tests** for service-catalog, service-booking, provider-bio, updated my-events
 
 ---
 
@@ -470,56 +482,24 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-1. **Product → Provider Type linkage**: The `products` table has no `provider_type_id` column. How does the system know which providers can serve a given bookable_service product? Options:
-   - **Option A**: Add `provider_type_id` FK to the `products` table (simplest — one provider type per product)
-   - **Option B**: Create a many-to-many `product_provider_types` join table (allows a product to be served by multiple provider types)
-   - **Option C**: Infer from product code/name convention (fragile, not recommended)
-   - **Recommendation**: Option A — add `provider_type_id` to products. A massage product maps to the "massage" provider type. If we need multi-type products later, we can add the join table.
-   - Mason- Let's go with Option A
+1. **Product → Provider Type linkage**: **Option A** — Add `provider_type_id` FK to the `products` table. One provider type per product.
 
-2. **Room auto-assignment strategy**: When a slot is booked, should the system:
-   - **Option A**: Assign the first available room of the required type (simplest)
-   - **Option B**: Assign the room that minimizes fragmentation (pack bookings into fewer rooms)
-   - **Recommendation**: Option A for now — first available room sorted by ID.
-   - Mason- Let's go with option A but let's have logic so that if a provider was in a previous room one the given day, try to keep them in that room if possible.
+2. **Room auto-assignment strategy**: **Option A with affinity** — First available room of the required type, but prefer the room the provider was already using earlier that day. Falls back to first available by ID if prior room is full.
 
-3. **Availability slot granularity**: Should slots be computed at a fixed interval or at exact availability boundaries?
-   - **Option A**: Fixed 15-minute intervals (cleaner UI — slots start at :00, :15, :30, :45)
-   - **Option B**: Exact boundaries (maximizes availability but messy start times like 10:47 AM)
-   - **Recommendation**: Option A — 15-minute intervals. Standard for salon/spa booking.
-   - Mason- I'm on the fence about this one. If the provider wants a buffer between massages, it forces them to 15min. That means that five massages is six hours. I'm thinking it might make sense to make the buffer and start times need to be on 5min boundaries. It avoids really weird start times like 10:47am. I don't know that 2:05pm is that much different than 2:15pm. It would also let a provider specify a 5min buffer which would mean 5:20 for five massages instead of six hours. What do you think? I don't want to deviate too much from industry standard but I also want to enable the providers to have flexibility.
+3. **Slot granularity**: **5-minute boundaries** with sequential (not interval-based) slot generation. Slots are NOT generated at fixed intervals. Instead, the algorithm computes free windows from provider availability minus existing bookings, and generates valid start times at 5-minute boundaries. Only slots that don't create orphaned gaps are offered. Duration and buffer values must be multiples of 5 minutes (validated on input). This gives providers flexible buffers (5, 10, 15, 20 min) while keeping start times clean (no 10:47am). Five 60-min massages with a 5-min buffer = 5h 20min instead of 6h with 15-min boundaries.
 
-4. **Provider selection UX**: When browsing slots, should the user:
-   - **Option A**: See all providers' availability merged, assigned a provider at booking time
-   - **Option B**: Select a specific provider first, then see their availability
-   - **Option C**: See slots grouped by provider, pick a specific slot+provider
-   - **Recommendation**: Option C — show slots grouped by provider name. User picks both time and provider. "Any provider" option could be a stretch feature.
-   - Mason- Let's go with Option C
+4. **Provider selection UX**: **Option C** — Slots grouped by provider. User picks both time and provider. Provider shows photo, name, and link to bio.
 
-5. **Date range for availability queries**: How far ahead should the availability endpoint look?
-   - **Recommendation**: Accept `date_from` and `date_to` in the query, let the frontend control the range (typically 1-2 weeks). Default to 7 days if not specified.
-   - Mason- I want to be able to have various permissions have different booking windows that are allowed and then have a no permission window that allows anyone to book that window. I feel like getting first dibs on massage and service booking will be a selling point for various memberships. I do want the client to be able to specify a range they would like to see but there might not be availability in that time based on their permission. Please modify requirements and this document accordingly (including the document upon which this is based).
+5. **Booking windows**: **Permission-based advance booking** — Different permission tiers get different advance booking windows. Product's `advance_booking_days` is the base window for anyone. Permission-based overrides allow members to book further ahead (e.g., Gold members can book 30 days ahead while public can only book 7 days ahead). The availability endpoint filters slots based on the requesting user's permissions. Frontend shows a message when dates are outside the user's window ("Gold members can book 30 days ahead — upgrade for earlier access").
 
-6. **Same cancel endpoint for services?**: Should cancelling a service booking use the same `cancel_booking` endpoint as events?
-   - **Recommendation**: Yes, same endpoint. `BookingHelper::CancelBooking()` can handle both via `event_session_id` vs `service_session_id`. The cancellation policy comes from the product regardless.
-   - Mason- I'll go with your recommendation.
+6. **Cancel endpoint**: **Same endpoint** — `cancel_booking` handles both event and service bookings via `event_session_id` vs `service_session_id`.
 
-7. **Scenario 66 — time hole enforcement**: The `max_time_hole_minutes` on products prevents orphaned gaps. Should this be:
-   - **Option A**: Enforced at slot computation time (don't show slots that would create too-small gaps)
-   - **Option B**: Enforced at booking time (reject bookings that create too-small gaps)
-   - **Recommendation**: Option A — enforce at slot computation time. Don't show the slot to the user if booking it would create an unusable gap. Better UX than "you can see this slot but can't book it."
-   - Mason- Option A
+7. **Time hole enforcement**: **Option A** — Enforced at slot computation time. Don't show slots that would create unusable gaps.
 
-8. **How do we handle the case where a provider has no availability entered?** Should they show up in search results with zero slots, or be completely hidden?
-   - **Recommendation**: Completely hidden — only providers with at least one non-blocked availability window in the date range should appear in results.
-   - Mason- I'll go with the recommendation.
+8. **Empty availability**: **Hidden** — Providers with no availability in the date range don't appear in results.
 
-9. **Should the service booking page show the provider's photo?** We have the photo system — should we link provider photos to people records?
-   - **Recommendation**: Nice-to-have stretch. For now, show provider name only. Photo integration can come when the provider portal is built.
-   - Mason- Yes, I want to show photos. I also want to have bios and a link to their bio.
+9. **Provider photos and bios**: **Yes** — Show provider photo, name, and link to bio page on the service catalog and booking pages. New `/providers/:personId` bio page.
 
-10. **Timezone handling for availability**: Provider availability is stored as microsecond timestamps. Should the admin enter availability in the facility's timezone? How does the frontend handle display?
-    - **Recommendation**: Store as UTC microseconds (consistent with events). Admin enters in facility timezone, frontend converts. The facility record already has a `timezone` field. The existing `formatSessionTimeRange()` utility already handles timezone conversion for display.
-    - Mason- I'll go with your recommendation.
+10. **Timezone handling**: **UTC microseconds** — Store as UTC, admin enters in facility timezone, frontend converts using facility's timezone field.

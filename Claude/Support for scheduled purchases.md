@@ -582,6 +582,19 @@ Friend must register first. "Book for someone else" uses FK picker autocomplete 
 ## Provider Pricing: Removed
 Provider-based rate overrides were considered and removed. All service pricing goes through `product_prices` (product + variant + permission tier). If a provider commands a premium, model as a separate product. See Alternatives Considered for full rationale.
 
+## Sequential Slot Computation (Scenario 66)
+Slots are NOT generated at fixed intervals (e.g., every 15 minutes). Instead, the algorithm computes **free windows** from provider availability minus existing bookings (using `buffer_end_us`), then generates valid start times at **5-minute boundaries**. For each start time, the system determines which variant durations fit without creating an orphaned gap smaller than the smallest variant's duration. This means:
+- Start times like 9:05, 10:10, 11:15 are typical (not restricted to :00/:15/:30/:45)
+- A 5-minute buffer between massages = 5h 20min for five 60-min massages (not 6h with 15-min boundaries)
+- Longer variants are offered when a shorter one would create an unusable gap
+- Duration and buffer values must be multiples of 5 minutes
+
+## Permission-Based Booking Windows
+Members with higher-tier permissions can book services further in advance. Product's `advance_booking_days` is the base window for anyone. Permission-specific overrides (via `product_prices.booking_advance_days`) allow longer windows. Example: Gold members book 30 days ahead, public books 7 days ahead. The availability endpoint filters slots based on the requesting user's permissions. Frontend shows an upgrade prompt when dates are outside the user's window.
+
+## Room Auto-Assignment with Provider Affinity
+When a service is booked, the system assigns a room of the required type. It prefers the room the provider was already using earlier that day (provider room affinity) to minimize room switching. Falls back to first available room by ID if the prior room is full or the provider hasn't been in any room that day.
+
 ---
 
 # Alternatives Considered
@@ -1399,29 +1412,29 @@ Implementation document: [[Scheduling thin slice]]
 - Basic service cancellation with full refund
 
 ### Phase 10: Service Products & Variants
-- Admin creates bookable_service products
-- Admin creates product_variants with duration, buffer, and pricing
+- Admin creates bookable_service products with `provider_type_id` linking to the provider type that can serve it
+- Admin creates product_variants with duration, buffer, and pricing (durations and buffers must be multiples of 5 minutes)
 - `product_prices` with `product_variant_id` for variant-specific pricing
 - Location room management via admin UI (rooms are already in schema from Phase 1)
 
 ### Phase 11: Provider Availability
 - Admin/scheduler enters availability blocks for providers
-- Provider unavailable blocks (lunch, etc.) within availability
+- Provider unavailable blocks (lunch, etc.) within availability (`is_blocked=true` on same table)
 - `provider_availability` table populated manually (template-based generation deferred to STRETCH)
 - `provider_type_assignments` wired up so providers are linked to service capabilities
+- Provider photos and bios displayed on service pages
 
 ### Phase 12: Availability Computation & Booking
-- Compute available time slots by intersecting: provider availability, existing bookings + buffers, location room availability
-- Sequential slot computation (scenario 66): next slot = previous booking end + MAX(variant buffer, provider buffer override). Prevent orphaned gaps that are too small for any service.
-- Calendar/list view in frontend showing available slots
-- User selects provider, variant (duration), and time slot
+- **Sequential slot computation** (scenario 66): NOT interval-based. Free windows computed from provider availability minus existing bookings. Slots generated at valid start points (5-minute boundaries). Only slots that don't create orphaned gaps (smaller than the smallest variant duration) are offered. Each start time lists which variant durations are available.
+- **Permission-based booking windows**: Members with higher-tier permissions can book further in advance. Product's `advance_booking_days` is the base window; permission-specific overrides allow longer windows (e.g., Gold members book 30 days ahead, public books 7 days ahead).
+- Slots grouped by provider (with photo, name, bio link). User picks both provider and time.
 - Booking creates: purchase + purchase_item + payment + booking + bookable_service_session
-- Room auto-assignment from pool of available rooms of required type
+- Room auto-assignment: prefer the room the provider was already using that day, fall back to first available room of required type
 
 ### Phase 13: Service Confirmation & Cancellation
 - Service booking confirmation email (provider name, location, duration, cancellation policy)
-- Full-refund cancellation within window
-- Release provider time slot and room on cancellation
+- Cancellation uses same `cancel_booking` endpoint as events — refund calculated via product's cancellation policy
+- Release provider time slot and room on cancellation (freed time becomes available for new bookings automatically)
 
 ## COULD HAVE — Rough Scope
 
