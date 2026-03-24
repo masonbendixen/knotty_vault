@@ -152,8 +152,9 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Frontend — Event Booking Page
 
-- [ ] **`event-booking.component.ts`** — Handle the `booking_conflict` error code. Display: "You already have a booking that overlaps with this event time."
-- [ ] **Component spec test** for booking conflict error handling
+- [x] **`event-booking.component.ts`** — Added `BOOKING_CONFLICT` case to `getErrorMessage()`, displays server detail message about overlapping bookings
+- [x] **`ApiError.ts`** — Added `BOOKING_CONFLICT: 'booking_conflict'` to `ErrorTypes`
+- [x] **Component spec test** — Verifies 409 booking conflict error displays "overlaps" message
 
 ---
 
