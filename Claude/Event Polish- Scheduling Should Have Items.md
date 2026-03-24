@@ -138,24 +138,17 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — Business Logic Layer
 
-- [ ] **`BookingHelper::BookEvent()`** — Add overlap check before creating the booking
-  - After loading the event session's `start_time_us` and `end_time_us`:
-  - Query the person's existing confirmed bookings that overlap:
-    ```sql
-    SELECT b.id FROM bookings b
-    JOIN event_sessions es ON b.event_session_id = es.id
-    WHERE b.person_id = {personId}
-    AND b.status = 'confirmed'
-    AND es.start_time_us < {endTimeUs}
-    AND es.end_time_us > {startTimeUs}
-    ```
-  - If any rows returned: return error with code `"booking_conflict"` and message "You already have a booking that overlaps with this event."
-  - This check goes after permission checks but before purchase creation
-- [ ] **Tests** in `booking_helper_test.cpp`:
-  - Non-overlapping bookings: allowed
-  - Overlapping bookings: rejected with `booking_conflict`
-  - Cancelled overlapping booking: allowed (only checks `confirmed` status)
-  - Waitlisted overlapping booking: decision — should waitlisted count? Probably yes, since the user already paid. Check `status IN ('confirmed', 'waitlisted')`.
+- [x] **`BookingHelper::BookEvent()`** — Added overlap check (step 5) after permission check and before capacity check. SQL query checks for existing `confirmed` or `waitlisted` bookings where the event session times overlap. Returns `BOOKING_CONFLICT` error code.
+- [x] **Tests** in `booking_helper_test.cpp` — 4 new tests:
+  - Overlapping bookings rejected with `BOOKING_CONFLICT`
+  - Non-overlapping bookings allowed (back-to-back sessions)
+  - Cancelled overlapping booking does not block (only checks confirmed/waitlisted)
+  - Waitlisted overlapping booking also blocks (since user already paid)
+
+### Backend — Endpoint Layer
+
+- [x] **`book_event.cpp`** — Returns HTTP 409 with `booking_conflict` type for `BOOKING_CONFLICT` error code
+- [x] **Test** in `book_event_test.cpp` — Verifies 409 response with `booking_conflict` type when booking overlapping sessions
 
 ### Frontend — Event Booking Page
 
