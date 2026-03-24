@@ -428,7 +428,7 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
    - **Option A**: Assign the first available room of the required type (simplest)
    - **Option B**: Assign the room that minimizes fragmentation (pack bookings into fewer rooms)
    - **Recommendation**: Option A for now — first available room sorted by ID.
-   - Mason- Let's go with option A but let's have logic so that if a provider was in a previous room
+   - Mason- Let's go with option A but let's have logic so that if a provider was in a previous room one the given day, try to keep them in that room if possible.
 
 3. **Availability slot granularity**: Should slots be computed at a fixed interval or at exact availability boundaries?
    - **Option A**: Fixed 15-minute intervals (cleaner UI — slots start at :00, :15, :30, :45)
