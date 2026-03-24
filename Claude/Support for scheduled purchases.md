@@ -490,6 +490,7 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 
 ## NICE TO HAVE - Bookable Services Foundation
 *Provider availability and service booking (massage, training, etc.)*
+[[Bookable Service Foundation]]
 
 | | # | Scenario | Rationale |
 |---|---|---|---|
