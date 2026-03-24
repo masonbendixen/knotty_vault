@@ -588,6 +588,7 @@ Slots are NOT generated at fixed intervals (e.g., every 15 minutes). Instead, th
 - A 5-minute buffer between massages = 5h 20min for five 60-min massages (not 6h with 15-min boundaries)
 - Longer variants are offered when a shorter one would create an unusable gap
 - Duration and buffer values must be multiples of 5 minutes
+- **Proportional buffers for long variants**: A variant whose duration is a multiple of the base (shortest) variant's duration gets proportional buffers: `num_buffers = ceil(duration / base_duration)`. Example: 120min variant with a 5min buffer gets 2× buffer (10min total). This ensures a long slot is always subdivisible into shorter variants without overlap — cancelling a 120-min booking always frees enough time for two 60-min bookings with a buffer between them.
 
 ## Permission-Based Booking Windows
 Members with higher-tier permissions can book services further in advance. Uses a dedicated `product_booking_windows` table — same pattern as `product_prices` with one row per product/permission combination. Each row specifies `advance_days` for that tier. `permission_id = NULL` is the base window for anyone. The availability endpoint resolves the user's best window (maximum `advance_days` across all their permissions) and filters slots accordingly. Frontend shows an upgrade prompt when dates are outside the user's window. Admin configures the booking window matrix on the product detail page, alongside the pricing matrix.
