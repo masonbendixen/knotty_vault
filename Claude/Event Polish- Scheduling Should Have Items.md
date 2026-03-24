@@ -291,58 +291,16 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — Business Logic Layer
 
-- [ ] **Create `SessionCancellationMail` email template** in `business_logic/scheduling/`
-  - `session_cancellation_mail.h/cpp`
-  - Struct: `SessionCancellationData { firstName, email, eventName, eventDate, eventTime, facilityName, cancellationReason, refundAmountCents, currency }`
-  - Template: "Event Cancelled" email with reason, refund info ("A refund of $X.XX has been issued" or "No payment was collected — no refund needed" for waitlisted)
-  - Red-themed header (unlike the green confirmation / orange waitlist)
+- [x] **`session_cancellation_mail.h/cpp`** — Red-themed "Event Cancelled" email with cancellation reason, refund amount for confirmed ("A full refund of $X.XX has been issued"), or "No payment was collected" for waitlisted
+- [x] **`session_cancellation_mail_test.cpp`** — 3 tests: with refund, waitlisted no payment, without reason
 
-- [ ] **Create `SessionCancellationHelper` class** in `business_logic/scheduling/`
-  - `session_cancellation_helper.h/cpp`
-  - Dependencies: `DatabaseHelper`, `SquareClientPtr`, `SecretsHelperPtr`, `MailHelperPtr`
-  - `CancelSession(Transaction&, int64_t sessionId, const std::string& reason)` → `SessionCancellationResult`
-  - Logic:
-    1. Load event session; verify status is `scheduled`
-    2. Set session status to `cancelled`, set `cancellation_reason`
-    3. Load all bookings for the session (`confirmed` + `waitlisted`)
-    4. For each **confirmed** booking:
-       - Issue 100% refund (studio-initiated cancellation = full refund regardless of policy)
-       - Set booking status to `cancelled`, set `cancelled_us` and `notes`
-       - Decrement `booked_count`
-       - Send cancellation email with refund info
-    5. For each **waitlisted** booking:
-       - Cancel the pending purchase (via `PurchaseHelper::CancelPurchase`)
-       - Set booking status to `cancelled`
-       - Send cancellation email (no refund info — they were waitlisted)
-    6. Return result: `{ confirmed_cancelled, waitlisted_cancelled, refunds_processed, total_refunded_cents }`
-  - `SessionCancellationResult` struct:
-    ```cpp
-    bool success = false;
-    std::string errorMessage;
-    int64_t confirmedCancelled = 0;
-    int64_t waitlistedCancelled = 0;
-    int64_t refundsProcessed = 0;
-    int64_t totalRefundedCents = 0;
-    ```
-
-- [ ] **Tests** in `session_cancellation_helper_test.cpp`:
-  - Cancel session with confirmed + waitlisted bookings
-  - Cancel session with only confirmed bookings
-  - Cancel empty session (no bookings)
-  - Cancel already-cancelled session (error)
-  - Verify emails sent to all attendees
-  - Verify refund amounts
+- [x] **`session_cancellation_helper.h/cpp`** — `CancelSession()` verifies session is scheduled, sets status to cancelled with reason, loads all confirmed+waitlisted bookings, issues 100% refund for confirmed (studio-initiated), cancels purchases for waitlisted, sends email to all, returns counts
+- [x] **`session_cancellation_helper_test.cpp`** — 5 tests: confirmed with refunds, mixed confirmed+waitlisted, empty session, already-cancelled error, not-found error
 
 ### Backend — Endpoint Layer
 
-- [ ] **Create `admin_cancel_session.h/cpp`** endpoint
-  - Route: `POST /api/admin/cancel_session/<int>`
-  - Requires authentication + admin permission
-  - Request body: `{ "reason": "..." }` (required)
-  - Calls `SessionCancellationHelper::CancelSession()`
-  - Returns JSON: `{ "success": true, "confirmed_cancelled": N, "waitlisted_cancelled": N, "refunds_processed": N, "total_refunded_cents": N }`
-- [ ] **Tests** for the endpoint
-- [ ] **CMakeLists.txt** — Add new files
+- [x] **`admin_cancel_session.h/cpp`** — `POST /api/admin/cancel_session/<int>`, requires auth, body `{ "reason": "..." }` required, returns `{ success, confirmed_cancelled, waitlisted_cancelled, refunds_processed, total_refunded_cents }`
+- [x] **Registered in `web_app.cpp`** and **`endpoints/CMakeLists.txt`**
 
 ### Frontend — Types
 
@@ -365,10 +323,7 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Test Helper Integration
 
-- [ ] **Add `cancel_session` command** to `test_helper/commands/booking_commands.cpp`
-  - Flags: `--session_id` (required), `--reason` (optional, default "Cancelled by admin via test helper")
-  - Calls `SessionCancellationHelper::CancelSession()` directly
-  - Prints results
+- [x] **`cancel_session` command** (alias `cs`) added to `booking_commands.cpp` — flags `--session_id` (required), `--reason` (optional), shows mail test mode warning, prints refund summary
 
 ---
 

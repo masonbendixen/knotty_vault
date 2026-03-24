@@ -645,7 +645,7 @@ void RunDashboard(TestHelperContext& context) {
 
 ### Phase 2: Commands
 - [x] `commands/subscription_commands.cpp` — list_subscriptions (ls), simulate_billing_failure (sb), run_billing (rb), expire_grace_periods (eg), advance_subscription_billing (ab), reset_subscription
-- [x] `commands/booking_commands.cpp` — list_event_sessions (les), list_bookings (lb), simulate_sold_out_event, cancel_booking (cb), promote_waitlist_entry (pw), process_waitlist_refunds, set_event_session_time, send_event_reminders (ser)
+- [x] `commands/booking_commands.cpp` — list_event_sessions (les), list_bookings (lb), simulate_sold_out_event, cancel_booking (cb), promote_waitlist_entry (pw), process_waitlist_refunds, set_event_session_time, send_event_reminders (ser), cancel_session (cs)
 - [x] `commands/user_commands.cpp` — create_test_user (cu) with --admin flag, list_users (lu)
 - [x] `commands/product_commands.cpp` — list_products (lp), list_entitlements (le)
 - [x] `commands/utility_commands.cpp` — set_secret (ss), set_card_expiration, check_expiring_cards, check_expiring_entitlements, send_test_email
