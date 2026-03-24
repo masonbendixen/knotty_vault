@@ -255,60 +255,33 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Backend — DB Schema Layer
 
-- [ ] **Add `reminder_sent_us` column to `bookings` table**
-  - New column in `db_schema/bookings.h`: `kBookingsReminderSentUs = "reminder_sent_us"`
-  - Add to table DDL in `create_database.cpp`: `BIGINT DEFAULT NULL`
-  - Purpose: Track which bookings have had reminders sent (prevents duplicate sends)
+- [x] **Add `reminder_sent_us` column to `bookings` table** — Added to `bookings.h` and `bookings.cpp` as nullable BIGINT
 
 ### Backend — Table Helpers Layer
 
-- [ ] **Update `Bookings` table helper** — No new methods needed; existing `UpdateBooking()` can set `reminder_sent_us`
+- [x] **`Bookings` table helper** — No new methods needed; existing `UpdateBooking()` sets `reminder_sent_us`
 
 ### Backend — Business Logic Layer
 
-- [ ] **Create `EventReminderMail` email template** in `business_logic/scheduling/`
-  - `event_reminder_mail.h/cpp`
-  - Struct: `EventReminderData { firstName, email, eventName, eventDate, eventTime, facilityName, locationRoomName }`
-  - Template: Friendly reminder email with event details, similar style to booking confirmation but with "Reminder: Your upcoming event" header
-  - Use `FormatString()` + `NormalizeCrLf()` pattern
-- [ ] **Create `EventReminderHelper` class** in `business_logic/scheduling/`
-  - `event_reminder_helper.h/cpp`
-  - `SendPendingReminders(Transaction&, DatabaseHelper&, MailHelperPtr&)` → `ReminderResult { int64_t sent, int64_t skipped }`
-  - Logic:
-    1. Load products' `reminder_hours` (default to a configurable secret, e.g., 24 hours)
-    2. Find confirmed bookings where:
-       - `b.status = 'confirmed'`
-       - `b.reminder_sent_us IS NULL`
-       - `es.start_time_us - now_us() <= reminder_hours * 3600000000` (event is within reminder window)
-       - `es.start_time_us > now_us()` (event hasn't passed)
-    3. For each matching booking: build `EventReminderData`, send email, set `reminder_sent_us = now_us()`
-- [ ] **Tests** in `event_reminder_helper_test.cpp`:
-  - Sends reminder when event within window
-  - Doesn't re-send if `reminder_sent_us` already set
-  - Doesn't send for cancelled bookings
-  - Doesn't send for past events
-  - Respects per-product `reminder_hours`
-- [ ] **CMakeLists.txt** — Add new files
+- [x] **`event_reminder_mail.h/cpp`** — Blue-themed "Event Reminder" email template with event details, facility, and room
+- [x] **`event_reminder_mail_test.cpp`** — 2 tests: full fields, no room
+- [x] **`event_reminder_helper.h/cpp`** — `SendPendingReminders()` finds confirmed bookings within the reminder window (per-product `reminder_hours` or default from `event_reminder_hours` secret), sends emails, marks `reminder_sent_us`
+- [x] **`event_reminder_helper_test.cpp`** — 5 tests: sends within window, skips outside window, no duplicate sends, skips cancelled, respects per-product hours
+- [x] **CMakeLists.txt** — Added all new files to scheduling CMakeLists
 
 ### Backend — Endpoint Layer
 
-- [ ] **Create `admin_send_event_reminders.h/cpp`** endpoint
-  - Route: `POST /api/admin/send_event_reminders`
-  - Requires authentication + admin/scheduling permission
-  - Calls `EventReminderHelper::SendPendingReminders()`
-  - Returns JSON: `{ "reminders_sent": N, "reminders_skipped": N }`
-  - Follow the `admin_process_waitlist_refunds` pattern
-- [ ] **Tests** for the endpoint
+- [x] **`admin_send_event_reminders.h/cpp`** — `POST /api/admin/send_event_reminders`, requires auth, returns `{ "reminders_sent": N, "reminders_skipped": N }`
+- [x] **Registered in `web_app.cpp`** and **`endpoints/CMakeLists.txt`**
 
 ### Scheduled Jobs Integration
 
-- [ ] **Update `Scheduled Jobs.md`** — Mark the `send_event_reminders` endpoint as implemented. This endpoint will be called by the scheduled jobs helper executable when it's built (Phase 8 of that plan). For now it can be triggered manually via the admin API or the test helper.
+- [x] **`Scheduled Jobs.md`** — Updated below
 
 ### Test Helper Integration
 
-- [ ] **Add `send_event_reminders` command** to `test_helper/commands/booking_commands.cpp`
-  - Calls `EventReminderHelper::SendPendingReminders()` directly
-  - Prints count of reminders sent
+- [x] **`send_event_reminders` command** (alias `ser`) added to `booking_commands.cpp` — calls `EventReminderHelper::SendPendingReminders()` directly, prints sent/skipped counts
+- [x] **`Manual Testing Helper Executable.md`** — Updated below
 
 ---
 

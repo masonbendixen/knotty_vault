@@ -529,9 +529,11 @@ build/
   - Need a `reminder_sent_us` column on `bookings` table (or a separate `booking_notifications` table)
   - Send reminder email with event details (name, date/time, location)
   - Return count of reminders sent
-- [ ] Create email template `event_reminder_mail.h/cpp`
-- [ ] Create `POST /api/admin/send_event_reminders` endpoint
-- [ ] Tests for notification logic and endpoint
+- [x] Create email template `event_reminder_mail.h/cpp` — Blue-themed reminder email with event details
+- [x] Create `POST /api/admin/send_event_reminders` endpoint — Finds confirmed bookings within reminder window, sends emails, marks `reminder_sent_us`
+- [x] Tests for notification logic (5 tests in `event_reminder_helper_test.cpp`) and email template (2 tests)
+- [x] Added `reminder_sent_us` column to `bookings` table
+- [x] Added `send_event_reminders` command (alias `ser`) to test helper executable
 
 ### 8b: Expired Token Cleanup
 - [ ] Create `TokenCleanup` in `business_logic/auth/`:
