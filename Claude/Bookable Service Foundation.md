@@ -434,16 +434,18 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
    - **Option A**: Fixed 15-minute intervals (cleaner UI — slots start at :00, :15, :30, :45)
    - **Option B**: Exact boundaries (maximizes availability but messy start times like 10:47 AM)
    - **Recommendation**: Option A — 15-minute intervals. Standard for salon/spa booking.
-   - Mason- I'm on the fence about this one. If the provider wants a buffer between massages, it forces them to 15min. That means that five massages
+   - Mason- I'm on the fence about this one. If the provider wants a buffer between massages, it forces them to 15min. That means that five massages is six hours. I'm thinking it might make sense to make the buffer and start times need to be on 5min boundaries. It avoids really weird start times like 10:47am. I don't know that 2:05pm is that much different than 2:15pm. It would also let a provider specify a 5min buffer which would mean 5:20 for five massages instead of six hours. What do you think? I don't want to deviate too much from industry standard but I also want to enable the providers to have flexibility.
 
 4. **Provider selection UX**: When browsing slots, should the user:
    - **Option A**: See all providers' availability merged, assigned a provider at booking time
    - **Option B**: Select a specific provider first, then see their availability
    - **Option C**: See slots grouped by provider, pick a specific slot+provider
    - **Recommendation**: Option C — show slots grouped by provider name. User picks both time and provider. "Any provider" option could be a stretch feature.
+   - Mason- Let's go with Option C
 
 5. **Date range for availability queries**: How far ahead should the availability endpoint look?
    - **Recommendation**: Accept `date_from` and `date_to` in the query, let the frontend control the range (typically 1-2 weeks). Default to 7 days if not specified.
+   - I want to be able to have various permissions have different booking windows that are allowed and then have a no permission window that allows anyone to book that window. I feel like getting first dibs on massage and service booking will be a selling point for various memberships. I do want the client to be ab
 
 6. **Same cancel endpoint for services?**: Should cancelling a service booking use the same `cancel_booking` endpoint as events?
    - **Recommendation**: Yes, same endpoint. `BookingHelper::CancelBooking()` can handle both via `event_session_id` vs `service_session_id`. The cancellation policy comes from the product regardless.
