@@ -197,34 +197,29 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Frontend — Types
 
-- [ ] **`scheduling.types.ts`** — Add refund fields to cancel booking response type:
-  ```typescript
-  refund_amount_cents?: number;
-  refund_percent?: number;
-  currency?: string;
-  ```
+- [x] **`scheduling.types.ts`** — Added `CancelBookingResponse` interface with `refund_amount_cents`, `refund_percent`, `currency` fields
+- [x] **`ServerAccess.ts`** (interface) — Updated `cancelBooking` return type to `CancelBookingResponse`
+- [x] **`ServerAccess.ts`** (proxy), **`ServerAccessNetwork.ts`**, **`ServerAccess.mock.ts`** — All updated to use `CancelBookingResponse`
 
 ### Frontend — My Events Page
 
-- [ ] **`my-events.component.ts/html`** — Show refund info after successful cancellation
-  - After cancel, display: "Booking cancelled. Refund of $X.XX (Y%) will be processed."
-  - If 0% refund: "Booking cancelled. No refund — cancellation policy window has passed."
+- [x] **`my-events.component.ts`** — Captures `CancelBookingResponse` from cancel, builds refund message via `buildRefundMessage()`: full refund, partial refund with %, or no-refund notice. Displayed as a dismissible green banner.
+- [x] **`my-events.component.html`** — Added `#cancel-result` banner with close button above the loading state
+- [x] **`my-events.component.scss`** — Added `.cancel-result-banner` style (green themed, flex with dismiss button)
 
 ### Frontend — Event Booking Page
 
-- [ ] **`event-booking.component.html`** — Show cancellation policy info on the booking page
-  - Below the price, show: "Free cancellation up to 48 hours before" or the relevant policy windows
-  - This requires the endpoint to return the product's cancellation policy info (add to `ResolvedEventSession`)
+- [ ] **`event-booking.component.html`** — Show cancellation policy info on the booking page (deferred — requires backend to include policy windows in the session response)
 
 ### Frontend — Tests
 
-- [ ] **Component spec tests** for my-events: refund display after cancellation
-- [ ] **Component spec tests** for event-booking: cancellation policy info display
+- [x] **Component spec tests** for my-events — 4 new tests: full refund message with formatted amount, partial refund message with percentage, no-refund message, banner dismiss
+- [ ] **Component spec tests** for event-booking: cancellation policy info display (deferred with the feature)
 
 ### Admin — Cancellation Policy Management
 
-- [ ] The `cancellation_policies` and `cancellation_policy_windows` tables are already exposed through the admin CRUD UI (they have admin metadata). Admin can create/edit policies and windows through the existing table editor. **No new admin UI needed** — the existing admin table UI handles this.
-- [ ] To assign a policy to a product: Admin edits the product and sets `cancellation_policy_id` via the existing admin CRUD UI (which shows FK pickers for `cancellation_policy_id`). **No new UI needed.**
+- [x] The `cancellation_policies` and `cancellation_policy_windows` tables are already exposed through the admin CRUD UI (they have admin metadata). Admin can create/edit policies and windows through the existing table editor. **No new admin UI needed.**
+- [x] To assign a policy to a product: Admin edits the product and sets `cancellation_policy_id` via the product detail page or the admin CRUD UI. **No new UI needed.**
 
 ---
 
