@@ -85,64 +85,35 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 ### 1.1 Backend — Table Helpers Layer
 
-- [ ] **Create `provider_types.h/cpp`** table helper
-  - `AddProviderType(Transaction&, code, name, description)` → `int64_t`
-  - `GetProviderType(Transaction&, int64_t id)` → `KeyValueTable`
-  - `GetProviderTypes(Transaction&)` → `KeyValueTableArray`
-  - `DeleteProviderType(Transaction&, int64_t id)`
-- [ ] **Tests** for provider_types table helper
+- [x] **`provider_types.h/cpp`** — CRUD: AddProviderType, GetProviderType, GetProviderTypes, DeleteProviderType
+- [x] **`provider_types_test.cpp`** — 4 tests: add/get, get all, delete, not found
 
-- [ ] **Create `provider_type_assignments.h/cpp`** table helper
-  - `AddAssignment(Transaction&, int64_t personId, int64_t providerTypeId)` → `int64_t`
-  - `GetAssignmentsForPerson(Transaction&, int64_t personId)` → `KeyValueTableArray`
-  - `GetAssignmentsForProviderType(Transaction&, int64_t providerTypeId)` → `KeyValueTableArray` (only `is_accepting_bookings = true`)
-  - `UpdateAssignment(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteAssignment(Transaction&, int64_t id)`
-- [ ] **Tests** for provider_type_assignments table helper
+- [x] **`provider_type_assignments.h/cpp`** — CRUD: AddAssignment, GetAssignmentsForPerson, GetAcceptingAssignmentsForProviderType (is_accepting_bookings=true), UpdateAssignment, DeleteAssignment
+- [x] **`provider_type_assignments_test.cpp`** — 4 tests: add/get, accepting filter, update, delete
 
-- [ ] **Create `provider_availability.h/cpp`** table helper
-  - `AddAvailability(Transaction&, int64_t providerPersonId, int64_t facilityId, int64_t dateUs, int64_t startTimeUs, int64_t endTimeUs, std::string_view source, bool isBlocked)` → `int64_t`
-  - `GetAvailabilityForProvider(Transaction&, int64_t providerPersonId, int64_t dateFromUs, int64_t dateToUs)` → `KeyValueTableArray` (ordered by start_time_us ASC)
-  - `GetAvailabilityForProviderOnDate(Transaction&, int64_t providerPersonId, int64_t dateUs)` → `KeyValueTableArray`
-  - `UpdateAvailability(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteAvailability(Transaction&, int64_t id)`
-- [ ] **Tests** for provider_availability table helper
+- [x] **`provider_availability.h/cpp`** — CRUD: AddAvailability (with is_blocked flag), GetAvailabilityForProvider (date range, ordered ASC), GetAvailabilityForProviderOnDate, UpdateAvailability, DeleteAvailability
+- [x] **`provider_availability_test.cpp`** — 5 tests: add/get, get on date, blocked, update, delete
 
-- [ ] **Create `provider_buffer_overrides.h/cpp`** table helper
-  - `AddOverride(Transaction&, int64_t providerPersonId, int64_t productVariantId, int64_t bufferMinutes)` → `int64_t`
-  - `GetOverride(Transaction&, int64_t providerPersonId, int64_t productVariantId)` → `KeyValueTable`
-  - `GetOverridesForProvider(Transaction&, int64_t providerPersonId)` → `KeyValueTableArray`
-  - `DeleteOverride(Transaction&, int64_t id)`
-- [ ] **Tests** for provider_buffer_overrides table helper
+- [x] **`provider_buffer_overrides.h/cpp`** — CRUD: AddOverride, GetOverride (by provider+variant), GetOverridesForProvider, DeleteOverride
+- [x] **`provider_buffer_overrides_test.cpp`** — 3 tests: add/get, get for provider, delete
 
-- [ ] **Create `bookable_service_sessions.h/cpp`** table helper
-  - `AddServiceSession(Transaction&, const KeyValueTable& values)` → `int64_t`
-  - `GetServiceSession(Transaction&, int64_t id)` → `KeyValueTable`
-  - `GetServiceSessionsForProvider(Transaction&, int64_t providerPersonId, int64_t dateFromUs, int64_t dateToUs)` → `KeyValueTableArray`
-  - `GetServiceSessionsForRoom(Transaction&, int64_t locationRoomId, int64_t dateFromUs, int64_t dateToUs)` → `KeyValueTableArray`
-  - `UpdateServiceSession(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteServiceSession(Transaction&, int64_t id)`
-- [ ] **Tests** for bookable_service_sessions table helper
+- [x] **`bookable_service_sessions.h/cpp`** — CRUD: AddServiceSession, GetServiceSession, GetServiceSessionsForProvider (excludes cancelled), GetServiceSessionsForRoom (excludes cancelled), UpdateServiceSession, DeleteServiceSession
+- [x] **`bookable_service_sessions_test.cpp`** — 4 tests: add/get, get for provider (excludes cancelled), get for room, update/delete
 
-- [ ] **Create `location_room_types.h/cpp`** table helper
-  - `AddRoomType(Transaction&, code, name, description)` → `int64_t`
-  - `GetRoomType(Transaction&, int64_t id)` → `KeyValueTable`
-  - `GetRoomTypes(Transaction&)` → `KeyValueTableArray`
-- [ ] **Tests** for location_room_types table helper
+- [x] **`location_room_types.h/cpp`** — CRUD: AddRoomType, GetRoomType, GetRoomTypes
+- [x] **`location_room_types_test.cpp`** — 3 tests: add/get, get all, not found
 
-- [ ] **CMakeLists.txt** — Add all new table helper files
+- [x] **CMakeLists.txt** — All 12 source files + 6 test files added
 
 ### 1.2 Backend — Schema Change
 
-- [ ] **Add `provider_type_id` FK to `products` table** — Links a bookable_service product to the provider type that can serve it (see Open Question #1)
-  - Add `kProductsProviderTypeId` to `db_schema/products.h`
-  - Add FK column in `products.cpp` DDL
-  - Add to admin metadata (friendly names, display templates)
+- [x] **`products.h`** — Added `kProductsProviderTypeId = "provider_type_id"`
+- [x] **`products.cpp`** — Added nullable FK column to `provider_types.id`
 
 ### 1.3 Backend — Seed Data
 
-- [ ] **`create_database.cpp`** — Add seed data for provider types (e.g., "massage", "personal_training", "yoga_private")
-- [ ] **`create_database.cpp`** — Add seed data for location room types (e.g., "massage_room", "treatment_room") if not already present
+- [x] **`create_database.cpp`** — Provider types already seeded: instructor, therapist. Added: personal_trainer.
+- [x] **`create_database.cpp`** — Location room types already seeded: studio, massage_room. Added: treatment_room.
 
 ### 1.4 Backend — Admin Endpoints
 
