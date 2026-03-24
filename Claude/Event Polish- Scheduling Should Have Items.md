@@ -304,22 +304,19 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Frontend — Types
 
-- [ ] **`scheduling.types.ts`** — Add cancel session response type
-- [ ] **`ServerAccess.ts`** — Add `adminCancelSession(sessionId: number, reason: string)` method
-- [ ] **`ServerAccess.mock.ts`** + **spec test** for mock
+- [x] **`scheduling.types.ts`** — Added `AdminCancelSessionResponse` interface
+- [x] **`ServerAccess.ts`** (interface) — Added `adminCancelSession(sessionId, reason)` method
+- [x] **`ServerAccess.ts`** (proxy), **`ServerAccessNetwork.ts`**, **`ServerAccess.mock.ts`** — All implemented
 
 ### Frontend — Event Session Card (Admin)
 
-- [ ] **`event-session-card.component.ts/html`** — Add "Cancel Session" button
-  - Only visible for sessions with `status === 'scheduled'`
-  - Opens a confirmation dialog with a reason text field
-  - On confirm: calls `adminCancelSession(sessionId, reason)`
-  - On success: reloads the session data (status will now be `cancelled`)
-  - Show result summary: "Session cancelled. X confirmed bookings refunded ($Y.YY total). Z waitlisted bookings cancelled."
+- [x] **`event-session-card.component.ts`** — Cancel session state/methods: dialog with reason input, API call, result summary with confirmed/waitlisted/refund counts. Emits `sessionCancelled` output event.
+- [x] **`event-session-card.component.html`** — "Cancel Session" button (scheduled only), red dialog with reason field, result banner
+- [x] **`event-session-card.component.scss`** — Styles for dialog, result banner, reason field
 
 ### Frontend — Tests
 
-- [ ] **Component spec tests** for event-session-card: cancel button visibility, confirmation dialog, success handling
+- [x] **Component spec tests** — 5 new tests: button visible/hidden by status, dialog opens, cancel with result, dialog dismiss
 
 ### Test Helper Integration
 
