@@ -598,6 +598,9 @@ Members with higher-tier permissions can book services further in advance. Uses 
 ## Room Auto-Assignment with Provider Affinity
 When a service is booked, the system assigns a room of the required type. It prefers the room the provider was already using earlier that day (provider room affinity) to minimize room switching. Falls back to first available room by ID if the prior room is full or the provider hasn't been in any room that day.
 
+## Max Time Hole Is Per-Provider, Not Per-Product
+The `max_time_hole_minutes` setting is on `provider_type_assignments`, not on `products`. This is a provider preference: providers control their own gap tolerance. A provider who lives nearby might accept large gaps (8-hour shift, doesn't mind 3-hour gaps between clients). A commuting provider might set a low tolerance to avoid wasting time — they'd rather start late or leave early than sit around. The slot computation algorithm reads `max_time_hole_minutes` from the provider's assignment when computing available slots.
+
 ---
 
 # Alternatives Considered

@@ -60,7 +60,8 @@ Already completed (no work needed): 20, 21, 24.
 - `product_variants` — id, product_id, code, name, duration_minutes, buffer_minutes, sort_order, is_active
 - `location_rooms` — id, facility_id, room_type_id, name, description, concurrent_capacity, is_active
 - `location_room_types` — id, code, name, description
-- `products` — has `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`, `max_time_hole_minutes`
+- `products` — has `provider_type_id`, `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`
+- `provider_type_assignments` — has `max_time_hole_minutes` (per-provider gap tolerance, nullable)
 
 **What doesn't exist:**
 - No table helpers for: provider_availability, provider_type_assignments, bookable_service_sessions, provider_types, provider_buffer_overrides, location_room_types
@@ -125,8 +126,10 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 - [x] **Product detail page** — Added `provider_type_id` dropdown (loads all provider_types, shown only for bookable_service kind)
 - [x] **Product detail page** — Added `required_room_type_id` dropdown (loads all location_room_types, shown only for bookable_service kind)
-- [x] **Product detail page** — Added `advance_booking_days` and `booking_cutoff_hours` number inputs (shown for all event/bookable_service kinds in Access & Scheduling)
-- [x] **Product detail page** — Added `max_time_hole_minutes` number input with step=5 (shown only for bookable_service kind under "Service Provider Settings" sub-section)
+- [x] **Product detail page** — Added `booking_cutoff_hours` number input (shown for all product kinds in Access & Scheduling)
+- [x] **`max_time_hole_minutes` moved to provider** — Now on `provider_type_assignments` table (per-provider, not per-product). Providers control their own gap tolerance. Removed from product detail page.
+- [x] **`advance_booking_days` deferred** — Will be implemented as permission-based booking window matrix in Phase 2
+- [x] **Seed data** — Massage changed to `bookable_service` kind with 5-min buffers. Provider type "Therapist" renamed to "Massage Therapist".
 
 ---
 
@@ -487,7 +490,8 @@ Members get earlier access to service booking. This uses a **booking window matr
 ### 6.3 Admin — Product Detail Updates
 
 - [ ] **Product detail page** — For bookable_service products, add dropdowns/inputs for:
-  - `provider_type_id`, `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`, `max_time_hole_minutes`
+  - `provider_type_id`, `required_room_type_id`, `booking_cutoff_hours`
+  - Note: `max_time_hole_minutes` is per-provider on `provider_type_assignments`, managed in the provider management UI. `advance_booking_days` is managed through the booking window matrix.
 
 ### 6.4 Test Helper Commands
 
