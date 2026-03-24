@@ -434,6 +434,7 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
    - **Option A**: Fixed 15-minute intervals (cleaner UI — slots start at :00, :15, :30, :45)
    - **Option B**: Exact boundaries (maximizes availability but messy start times like 10:47 AM)
    - **Recommendation**: Option A — 15-minute intervals. Standard for salon/spa booking.
+   - Mason- I'm on the fence about this one. If the provider wants a buffer between massages, it forces them to 15min. That means that five massages
 
 4. **Provider selection UX**: When browsing slots, should the user:
    - **Option A**: See all providers' availability merged, assigned a provider at booking time
