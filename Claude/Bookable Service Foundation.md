@@ -422,11 +422,13 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
    - **Option B**: Create a many-to-many `product_provider_types` join table (allows a product to be served by multiple provider types)
    - **Option C**: Infer from product code/name convention (fragile, not recommended)
    - **Recommendation**: Option A — add `provider_type_id` to products. A massage product maps to the "massage" provider type. If we need multi-type products later, we can add the join table.
+   - Mason- Let's go with Option A
 
 2. **Room auto-assignment strategy**: When a slot is booked, should the system:
    - **Option A**: Assign the first available room of the required type (simplest)
    - **Option B**: Assign the room that minimizes fragmentation (pack bookings into fewer rooms)
    - **Recommendation**: Option A for now — first available room sorted by ID.
+   - Mason- Let's go with option A but let's have logic so that if a provider was in a previous room
 
 3. **Availability slot granularity**: Should slots be computed at a fixed interval or at exact availability boundaries?
    - **Option A**: Fixed 15-minute intervals (cleaner UI — slots start at :00, :15, :30, :45)
