@@ -209,12 +209,38 @@ Backend work listed before frontend work in each phase. Tests required for every
 
 ### Frontend — Event Booking Page
 
-- [ ] **`event-booking.component.html`** — Show cancellation policy info on the booking page (deferred — requires backend to include policy windows in the session response)
+- [x] **`event-booking.component.ts`** — Added `cancellationPolicyText` getter that parses `cancellation_windows` into human-readable text (e.g., "Full refund if cancelled 48+ hours before. 50% refund if cancelled 24+ hours before. No refund after purchase.")
+- [x] **`event-booking.component.html`** — Amber info box with policy text shown below the price total inside the event details card
+- [x] **`event-booking.component.scss`** — Added `.cancellation-policy-info` style
+
+### Frontend — My Events Page (Cancellation Flow)
+
+- [x] **`my-events.component.ts`** — `onCancelClick` now fetches event session detail to get cancellation policy. Calculates applicable refund tier based on hours remaining. Shows no-refund warning gate when 0% refund applies.
+- [x] **`my-events.component.html`** — Three-step cancel: (1) policy text shown, (2) no-refund warning with extra confirmation if applicable, (3) standard "Are you sure?" confirmation
+- [x] **`my-events.component.scss`** — Styles for policy text (green/red), no-refund warning (amber), cancel confirmation container
 
 ### Frontend — Tests
 
-- [x] **Component spec tests** for my-events — 4 new tests: full refund message with formatted amount, partial refund message with percentage, no-refund message, banner dismiss
-- [ ] **Component spec tests** for event-booking: cancellation policy info display (deferred with the feature)
+- [x] **Component spec tests** for my-events — 7 new tests: full refund message, partial refund message, no-refund message, banner dismiss, policy text on cancel click, no-refund warning with extra confirmation, refund-available skips warning
+- [x] **Component spec tests** for event-booking — 3 new tests: tiered policy text, no-policy free cancellation, full-refund policy text
+
+### Backend — Cancellation Email & Policy in Session Response
+
+- [x] **`booking_cancellation_mail.h/cpp`** — Red-themed HTML email template with event details and conditional refund section (full, partial, or no-refund)
+- [x] **`booking_cancellation_mail_test.cpp`** — 3 tests: full refund, partial refund, no refund email body
+- [x] **`cancel_booking.cpp`** — Sends "Booking Cancelled" email with refund info to the cancelled person
+- [x] **`event_session_helper.h`** — Added `CancellationWindow` struct and `cancellationPolicyName`/`cancellationWindows` to `ResolvedEventSession`
+- [x] **`event_session_helper.cpp`** — `ResolveSessionPricing` loads product's cancellation policy name and windows from DB
+- [x] **`scheduling_key_value_table.cpp`** — Serializes `cancellation_policy_name` and `cancellation_windows` ("48:100;24:50;0:0" format)
+- [x] **`event_session_helper_test.cpp`** — 2 new tests: policy info returned, no policy fields empty
+- [x] **`scheduling_key_value_table_test.cpp`** — 2 new tests: policy serialized, policy omitted when empty
+- [x] **`scheduling.types.ts`** — Added `cancellation_policy_name` and `cancellation_windows` to `EventSession`
+
+### Admin — Cancellation Policy Management
+
+- [x] The `cancellation_policies` and `cancellation_policy_windows` tables are already exposed through the admin CRUD UI (they have admin metadata). Admin can create/edit policies and windows through the existing table editor. **No new admin UI needed.**
+- [x] To assign a policy to a product: Admin edits the product and sets `cancellation_policy_id` via the product detail page or the admin CRUD UI. **No new UI needed.**
+- [x] Three default policies seeded in `create_database.cpp`: Full Refund, Tiered (48h/24h/0h), No Refund
 
 ### Admin — Cancellation Policy Management
 
