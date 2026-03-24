@@ -246,12 +246,31 @@ The algorithm does NOT scan at fixed intervals. Instead, it works with **free wi
 
 ### Permission-Based Booking Windows (from Open Question #5)
 
-Members get earlier access to service booking. This is controlled by `advance_booking_days` on the product (base window for anyone) plus permission-based overrides.
+Members get earlier access to service booking. This uses a **booking window matrix** that mirrors the pricing matrix — configurable per product/permission combination, managed on the product detail page alongside pricing.
 
-- [ ] **Design**: Add a `booking_window_overrides` table (or reuse the existing permission infrastructure):
-  - Option: Add `booking_advance_days` column to `product_prices` — each permission tier already has a price row, so we can add a booking window column. If the user has a permission that maps to a price row with `booking_advance_days > 0`, they can book that many days ahead. Users without any matching permission use the product's default `advance_booking_days`.
-  - The availability endpoint checks: `slot.startTimeUs <= now + user_advance_days * 86400000000`
-  - Example: Product has `advance_booking_days = 7` (anyone can book 7 days ahead). Gold members have a product_price row with `booking_advance_days = 30` (they can book 30 days ahead).
+- [ ] **Design**: Create a `product_booking_windows` table:
+  ```
+  product_booking_windows
+    id              BIGSERIAL PRIMARY KEY
+    product_id      FK → products (required)
+    permission_id   FK → permissions (nullable — NULL = base window for anyone)
+    advance_days    BIGINT (how many days ahead this tier can book)
+    created_us      BIGINT
+    updated_us      BIGINT
+    UNIQUE(product_id, permission_id)
+  ```
+  - Same pattern as `product_prices`: one row per product/permission combination
+  - `permission_id = NULL` → base window for users without any matching permission (the "public" row)
+  - The availability endpoint resolves the user's best booking window: find all `product_booking_windows` rows for this product where the user has the permission, take the maximum `advance_days`
+  - The availability endpoint filters: `slot.startTimeUs <= now + best_advance_days * 86400000000`
+  - Example: Massage product has rows: `(permission=NULL, advance_days=7)`, `(permission=gold_membership, advance_days=30)`, `(permission=platinum, advance_days=60)`. A Gold member can book 30 days ahead; a non-member can book 7 days ahead.
+
+- [ ] **Admin UI**: Add a booking window matrix to the product detail page (similar to the pricing matrix). Rows = permissions, column = advance_days. Editable inline like price cells.
+
+- [ ] **DB schema**: Create `product_booking_windows` table in `db_schema/`
+- [ ] **Table helper**: Create `product_booking_windows.h/cpp` in `sql_util/table_helpers/`
+- [ ] **Tests** for table helper
+- [ ] **Seed data**: Add default booking windows for seed products in `create_database.cpp`
 
 - [ ] **Tests** in `service_availability_helper_test.cpp`:
   - Free window with no bookings → slots for all variants at 5-min aligned start times
@@ -492,7 +511,7 @@ Phase 6 (Admin UI) — Can start after Phase 1, parallel with Phases 3-5
 
 4. **Provider selection UX**: **Option C** — Slots grouped by provider. User picks both time and provider. Provider shows photo, name, and link to bio.
 
-5. **Booking windows**: **Permission-based advance booking** — Different permission tiers get different advance booking windows. Product's `advance_booking_days` is the base window for anyone. Permission-based overrides allow members to book further ahead (e.g., Gold members can book 30 days ahead while public can only book 7 days ahead). The availability endpoint filters slots based on the requesting user's permissions. Frontend shows a message when dates are outside the user's window ("Gold members can book 30 days ahead — upgrade for earlier access").
+5. **Booking windows**: **Permission-based booking window matrix** — Uses a dedicated `product_booking_windows` table (same pattern as `product_prices`). One row per product/permission combination, each specifying `advance_days`. `permission_id = NULL` is the base window for anyone. Admin configures the matrix on the product detail page alongside the pricing matrix. The availability endpoint resolves the user's best window (max `advance_days` across all their permissions) and filters slots accordingly. Frontend shows an upgrade prompt when dates are outside the user's window.
 
 6. **Cancel endpoint**: **Same endpoint** — `cancel_booking` handles both event and service bookings via `event_session_id` vs `service_session_id`.
 

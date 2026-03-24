@@ -590,7 +590,7 @@ Slots are NOT generated at fixed intervals (e.g., every 15 minutes). Instead, th
 - Duration and buffer values must be multiples of 5 minutes
 
 ## Permission-Based Booking Windows
-Members with higher-tier permissions can book services further in advance. Product's `advance_booking_days` is the base window for anyone. Permission-specific overrides (via `product_prices.booking_advance_days`) allow longer windows. Example: Gold members book 30 days ahead, public books 7 days ahead. The availability endpoint filters slots based on the requesting user's permissions. Frontend shows an upgrade prompt when dates are outside the user's window.
+Members with higher-tier permissions can book services further in advance. Uses a dedicated `product_booking_windows` table — same pattern as `product_prices` with one row per product/permission combination. Each row specifies `advance_days` for that tier. `permission_id = NULL` is the base window for anyone. The availability endpoint resolves the user's best window (maximum `advance_days` across all their permissions) and filters slots accordingly. Frontend shows an upgrade prompt when dates are outside the user's window. Admin configures the booking window matrix on the product detail page, alongside the pricing matrix.
 
 ## Room Auto-Assignment with Provider Affinity
 When a service is booked, the system assigns a room of the required type. It prefers the room the provider was already using earlier that day (provider room affinity) to minimize room switching. Falls back to first available room by ID if the prior room is full or the provider hasn't been in any room that day.
