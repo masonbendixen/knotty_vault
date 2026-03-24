@@ -165,7 +165,30 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 ## Phase 2: Availability Computation Algorithm (Scenarios 66, 30)
 
-**Goal**: Build the core algorithm that computes available time slots for a bookable service. This is the most complex piece — it must intersect provider availability, subtract existing bookings + buffers, check room availability, and prevent orphaned time holes.
+**Goal**: Build the core algorithm that computes available time slots for a bookable service. This is the most complex piece. The slot computation model is **sequential, not interval-based** — slots are generated from free windows between existing bookings, and only offered if they don't create unusable gaps.
+
+### Slot Computation Model (Scenario 66)
+
+The algorithm does NOT scan at fixed intervals. Instead, it works with **free windows** derived from provider availability minus existing bookings. For each free window, it generates the valid start times for each variant, ensuring no booking would create an orphaned gap.
+
+**Example**: Provider available 8am-2pm. Variants: 60min, 90min, 120min. Buffer: 5min.
+- Booking at 8:00-9:00 (60min massage, buffer ends 9:05)
+- Next available start: **9:05am** (buffer_end rounded up to 5-min boundary)
+- From 9:05am, the system lists slots for each variant that fits:
+  - 60min: 9:05-10:05 (buffer ends 10:10)
+  - 90min: 9:05-10:35 (buffer ends 10:40)
+  - 120min: 9:05-11:05 (buffer ends 11:10)
+- If someone books 10:40am, then the 9:05-10:35 window only fits:
+  - 60min: 9:05-10:05 ✓ (leaves 30min gap → too small for any variant → **rejected**)
+  - 90min: 9:05-10:35 ✓ (no gap, fills exactly → **offered**)
+  - So only the 90min variant is offered at 9:05am
+
+**Key rules:**
+- Start times are on **5-minute boundaries** (configurable constant `kSlotAlignmentMinutes = 5`)
+- Duration and buffer values should be multiples of 5 (validated on input)
+- A slot is only offered if booking it would NOT create a gap smaller than the smallest active variant's duration for the product
+- A 120min booking always means the buffer applies after the full duration — it's treated as one block, not two 60min blocks. However, the freed time after cancellation can be split into smaller slots.
+- The algorithm generates slots per-variant (the frontend shows which durations are available at each start time)
 
 ### 2.1 Backend — Business Logic Layer
 
@@ -174,22 +197,28 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
   - Dependencies: `DatabaseHelper`
 
   - **`ComputeAvailableSlots(Transaction&, request)` → `std::vector<AvailableSlot>`**
-    - Request: `{ productId, productVariantId, providerPersonId (optional), facilityId, dateFromUs, dateToUs }`
+    - Request: `{ productId, providerPersonId (optional), facilityId, dateFromUs, dateToUs, personId (for permission-based booking window) }`
+    - Note: returns slots for ALL active variants, not a single variant. The frontend groups by start time and shows which durations are available.
     - Steps:
-      1. Load the product variant to get `duration_minutes` and `buffer_minutes`
-      2. Load the product to get `required_room_type_id`, `provider_type_id`, `advance_booking_days`, `booking_cutoff_hours`, `max_time_hole_minutes`
-      3. If no specific provider requested: find all providers assigned to the product's provider type who are accepting bookings
-      4. For each provider:
+      1. Load the product to get `provider_type_id`, `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`
+      2. Load all active product variants for this product → get duration_minutes and buffer_minutes for each
+      3. Determine the user's booking window based on their permissions (see Phase 2 booking window design below)
+      4. If no specific provider requested: find all providers assigned to the product's provider type who are accepting bookings
+      5. For each provider:
          a. Load provider availability blocks for the date range (exclude `is_blocked = true`)
-         b. Load existing bookable_service_sessions for the provider in the date range
-         c. Load provider buffer override for this variant (if any) — effective buffer = `MAX(variant.buffer_minutes, override.buffer_minutes)`
-         d. For each availability window, subtract booked sessions (using `buffer_end_us` for gap calculation)
-         e. Generate candidate slots at 15-minute intervals within the remaining free windows
-         f. **Scenario 66**: Filter out slots that would create orphaned gaps smaller than the smallest active variant's `duration_minutes` for this product
-      5. Load room availability: for the product's `required_room_type_id`, find rooms at the facility, check `concurrent_capacity` against overlapping service sessions
-      6. Filter slots to only those where a room is available
-      7. Apply `advance_booking_days` and `booking_cutoff_hours` time filters
-      8. Return list of available slots
+         b. Load existing bookable_service_sessions for the provider in the date range (ordered by start_time_us)
+         c. Load provider buffer overrides for each variant
+         d. Compute **free windows**: subtract booked sessions (using `buffer_end_us`) from availability windows
+         e. For each free window, for each variant:
+            - Calculate effective_buffer = `MAX(variant.buffer_minutes, provider_override.buffer_minutes)`
+            - The slot needs `duration + effective_buffer` minutes to fit (the buffer must fit within the window, or the slot ends at the window boundary with no gap after)
+            - Start time = window start, rounded up to nearest 5-minute boundary
+            - **Hole check**: If booking this slot would leave a gap after buffer_end that is smaller than the smallest variant's duration → don't offer this slot for this variant (offer a longer variant instead, or don't offer this start time at all)
+            - If valid, add to results
+      6. Check room availability: for the product's `required_room_type_id`, find rooms at the facility. For each slot, verify at least one room has capacity (check `concurrent_capacity` against overlapping sessions)
+      7. Apply booking window filter (based on user's permissions)
+      8. Filter out slots in the past
+      9. Return results grouped by provider
 
   - **`AvailableSlot` struct**:
     ```cpp
@@ -199,23 +228,45 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
         int64_t facilityId = 0;
         std::string facilityName;
         int64_t startTimeUs = 0;
-        int64_t endTimeUs = 0;
-        int64_t bufferEndUs = 0;
+        int64_t endTimeUs = 0;       // start + duration (no buffer)
+        int64_t bufferEndUs = 0;     // end + buffer
+        int64_t productVariantId = 0;
+        std::string variantName;
+        int64_t durationMinutes = 0;
     };
     ```
 
+  - **`FreeWindow` helper struct** (internal):
+    ```cpp
+    struct FreeWindow {
+        int64_t startUs;  // Start of free time
+        int64_t endUs;    // End of free time (next booking start or availability end)
+    };
+    ```
+
+### Permission-Based Booking Windows (from Open Question #5)
+
+Members get earlier access to service booking. This is controlled by `advance_booking_days` on the product (base window for anyone) plus permission-based overrides.
+
+- [ ] **Design**: Add a `booking_window_overrides` table (or reuse the existing permission infrastructure):
+  - Option: Add `booking_advance_days` column to `product_prices` — each permission tier already has a price row, so we can add a booking window column. If the user has a permission that maps to a price row with `booking_advance_days > 0`, they can book that many days ahead. Users without any matching permission use the product's default `advance_booking_days`.
+  - The availability endpoint checks: `slot.startTimeUs <= now + user_advance_days * 86400000000`
+  - Example: Product has `advance_booking_days = 7` (anyone can book 7 days ahead). Gold members have a product_price row with `booking_advance_days = 30` (they can book 30 days ahead).
+
 - [ ] **Tests** in `service_availability_helper_test.cpp`:
-  - Provider with open availability → slots generated at 15-min intervals
-  - Provider with existing booking → gap created, slots around it
-  - Buffer time respected between consecutive slots
-  - Provider buffer override takes precedence when larger
-  - Blocked availability window excluded
-  - Room capacity limit respected (concurrent_capacity)
-  - No orphaned gaps smaller than minimum variant duration (scenario 66)
-  - Multiple providers → slots for each
-  - advance_booking_days and booking_cutoff_hours filters applied
-  - No slots outside provider availability windows
-  - No slots in the past
+  - Free window with no bookings → slots for all variants at 5-min aligned start times
+  - Existing booking → free window splits, slots generated from buffer_end of booking
+  - Hole check: 60min variant rejected when it would leave a 30min gap but 90min variant offered
+  - Multiple variants offered at same start time when all fit
+  - No variants offered at start time when none fit without creating a hole
+  - Buffer respected: next slot starts at buffer_end, rounded up to 5-min boundary
+  - Provider buffer override: larger override used
+  - Blocked availability excluded
+  - Room capacity limit enforced
+  - Multiple providers → results grouped by provider
+  - Booking window enforced per user permission
+  - Past slots excluded
+  - Provider with no availability → not shown
 
 - [ ] **CMakeLists.txt** — Add new files
 
@@ -229,11 +280,11 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 ### 2.3 Backend — Endpoint Layer
 
 - [ ] **Create `GET /api/available_service_slots`** endpoint
-  - Query params: `product_id`, `variant_id`, `date_from`, `date_to`, `provider_id` (optional), `facility_id` (optional)
-  - Requires authentication (need to resolve pricing for the user)
+  - Query params: `product_id`, `date_from`, `date_to`, `provider_id` (optional), `facility_id` (optional)
+  - Requires authentication (for pricing resolution AND booking window determination)
   - Calls `ServiceAvailabilityHelper::ComputeAvailableSlots()`
-  - Resolves pricing via CatalogHelper for the variant
-  - Returns JSON: `{ "slots": [...], "variant": { duration_minutes, name }, "currency", "amount_cents" }`
+  - Returns JSON: `{ "slots": [...], "variants": [{ id, name, duration_minutes, currency, amount_cents }] }`
+  - Each slot includes variant_id so the frontend knows which duration it represents
 - [ ] **Tests** for the endpoint
 - [ ] **Register** in `web_app.cpp` and `endpoints/CMakeLists.txt`
 
@@ -252,22 +303,26 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
     - Request: `{ productId, productVariantId, providerPersonId, facilityId, startTimeUs, personId, payerPersonId }`
     - Steps:
       1. Validate the slot is still available (re-compute to prevent race conditions)
-      2. Resolve pricing via CatalogHelper (variant-aware)
-      3. Create purchase + purchase_item
-      4. Find an available room of the required type → auto-assign (first available by ID)
-      5. Calculate endTimeUs = startTimeUs + duration_minutes * 60 * 1000000
-      6. Calculate bufferEndUs = endTimeUs + effective_buffer_minutes * 60 * 1000000
-      7. Create bookable_service_session record
-      8. Create booking record (with `service_session_id`, not `event_session_id`)
-      9. Return result
+      2. Verify the user's booking window permits this date (permission-based advance booking)
+      3. Resolve pricing via CatalogHelper (variant-aware)
+      4. Create purchase + purchase_item
+      5. **Room auto-assignment**: Find an available room of the required type. Prefer the room the provider was already using earlier that day (provider room affinity). If no prior room or it's unavailable, use the first available room by ID.
+      6. Calculate endTimeUs = startTimeUs + duration_minutes * 60 * 1000000
+      7. Calculate bufferEndUs = endTimeUs + effective_buffer_minutes * 60 * 1000000
+      8. Create bookable_service_session record
+      9. Create booking record (with `service_session_id`, not `event_session_id`)
+      10. Return result
 
 - [ ] **Tests** in `service_booking_helper_test.cpp`:
   - Successful booking creates purchase + session + booking
   - Slot no longer available → error
   - Room auto-assigned from available pool
+  - Room affinity: provider stays in same room when possible
+  - Room affinity: falls back to first available when prior room is full
   - Buffer end calculated correctly with provider override
   - Pricing resolved for variant
   - Booking conflict detection (existing booking at same time for same person)
+  - Booking window enforced (user without advance permission can't book too far ahead)
 
 ### 3.2 Backend — Email
 
