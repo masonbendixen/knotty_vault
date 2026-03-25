@@ -361,7 +361,7 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 4.1 Backend — Business Logic Layer
 
-- [ ] **Extend `BookingHelper::CancelBooking()`** to handle service bookings
+- [x] **Extend `BookingHelper::CancelBooking()`** to handle service bookings
   - When booking has `service_session_id` (not `event_session_id`):
     - Load the service session → get product_id, start_time_us
     - Load the product → get cancellation_policy_id
@@ -370,13 +370,13 @@ Members get earlier access to service booking. This uses a **booking window matr
     - Set service session status to `cancelled`
     - Freed slot becomes available automatically (availability computation ignores cancelled sessions)
   - No changes needed to `cancel_booking` endpoint — it already calls `BookingHelper::CancelBooking()`
-- [ ] **Tests** — Cancel service booking with refund, cancel service booking without payment
+- [x] **Tests** — Cancel service booking with refund, cancel service booking without payment
 
 ### 4.2 Backend — Email
 
-- [ ] **Send cancellation email** — Reuse existing `BookingCancellationMail` with service-specific details (provider, duration)
+- [x] **Send cancellation email** — Reuse existing `BookingCancellationMail` with service-specific details (provider, duration)
   - May need to extend the `BookingCancellationData` struct with optional service fields
-- [ ] **Tests**
+- [x] **Tests**
 
 ---
 
