@@ -299,7 +299,7 @@ Members get earlier access to service booking. This uses a **booking window matr
   - **End-of-window exact fit**: 65min remaining (60min + 5min buffer) → 60min offered, no trailing gap
   - **End-of-window nothing fits**: 50min remaining, smallest variant 60min → no slot offered
 
-- [ ] **CMakeLists.txt** — Add new files
+- [x] **CMakeLists.txt** — Added service_availability_helper.h/cpp and test
 
 ### 2.2 Backend — KVT Conversion
 
