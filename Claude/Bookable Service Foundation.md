@@ -277,7 +277,7 @@ Members get earlier access to service booking. This uses a **booking window matr
   - The availability endpoint filters: `slot.startTimeUs <= now + best_advance_days * 86400000000`
   - Example: Massage product has rows: `(permission=NULL, advance_days=7)`, `(permission=gold_membership, advance_days=30)`, `(permission=platinum, advance_days=60)`. A Gold member can book 30 days ahead; a non-member can book 7 days ahead.
 
-- [ ] **Admin UI**: Add a booking window matrix to the product detail page (similar to the pricing matrix). Rows = permissions, column = advance_days. Editable inline like price cells.
+- [x] **Admin UI**: Booking window matrix on product detail page — table with "Anyone" base row + one row per permission. Click-to-edit inline cells showing advance days. Creates/updates/deletes `product_booking_windows` rows. Reuses `pricing-matrix` CSS classes. Help text explains that higher-tier members get the best window across all their permissions.
 
 - [x] **DB schema**: `product_booking_windows.h/cpp` — id, product_id (FK), permission_id (FK nullable), advance_days, unique(product_id, permission_id). Added to make_database_info, db_schema CMakeLists, and create_database table creation.
 - [x] **Table helper**: `product_booking_windows.h/cpp` — AddWindow, GetWindowsForProduct (DESC), GetWindow (handles NULL permission), ResolveAdvanceDaysForUser (SQL MAX across base + user's permissions via role chain), UpdateWindow, DeleteWindow
