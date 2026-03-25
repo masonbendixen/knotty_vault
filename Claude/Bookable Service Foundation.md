@@ -386,26 +386,26 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 5.1 Frontend — Types
 
-- [ ] **`scheduling.types.ts`** — Add:
+- [x] **`scheduling.types.ts`** — Add:
   - `AvailableSlot`, `AvailableSlotsResponse`, `BookServiceRequest`, `BookServiceResponse`
 
 ### 5.2 Frontend — ServerAccess Layer
 
-- [ ] **`ServerAccess.ts`** (interface) — Add `getAvailableServiceSlots()` and `bookService()` methods
-- [ ] **`ServerAccessNetwork.ts`** — HTTP implementations
-- [ ] **`ServerAccess.mock.ts`** — Mock implementations
-- [ ] **`ServerAccess.mock.spec.ts`** — Tests
+- [x] **`ServerAccess.ts`** (interface) — Add `getAvailableServiceSlots()` and `bookService()` methods
+- [x] **`ServerAccessNetwork.ts`** — HTTP implementations
+- [x] **`ServerAccess.mock.ts`** — Mock implementations
+- [x] **`ServerAccess.mock.spec.ts`** — Tests
 
 ### 5.3 Frontend — Service Catalog Page
 
-- [ ] **New component: `service-catalog`** at `/services`
+- [x] **New component: `service-catalog`** at `/shop/services`
   - Lists bookable_service products with variant options and prices
   - Each product shows provider photos, names, and link to bio page
   - "Book" button navigates to service booking page
 
 ### 5.4 Frontend — Service Booking Page
 
-- [ ] **New component: `service-booking`** at `/shop/service/:productId`
+- [x] **New component: `service-booking`** at `/shop/service/:productId`
   - Step 1: Select date (date picker — week view)
   - Step 2: View available slots grouped by provider. Each provider shows:
     - Provider photo and name (linked to bio page)
@@ -419,20 +419,20 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 5.5 Frontend — My Bookings Integration
 
-- [ ] **Update `my-events.component`** to show service bookings
+- [x] **Update `my-events.component`** to show service bookings
   - Service bookings show: service name, variant (duration), provider name + photo, date/time, facility/room
   - Cancel button works the same (reuses existing cancel infrastructure with refund policy)
 
 ### 5.6 Frontend — Provider Bio Page
 
-- [ ] **New component: `provider-bio`** at `/providers/:personId`
+- [x] **New component: `provider-bio`** at `/providers/:personId`
   - Provider photo, name, bio text
   - List of services they offer (provider_type_assignments → products)
   - "Book with [provider name]" button linking to service booking page filtered to this provider
 
 ### 5.7 Frontend — Tests
 
-- [ ] **Component spec tests** for service-catalog, service-booking, provider-bio, updated my-events
+- [x] **Component spec tests** for service-catalog, service-booking, provider-bio, updated my-events
 
 ---
 
