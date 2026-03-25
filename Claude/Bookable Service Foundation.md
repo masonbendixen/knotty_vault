@@ -347,7 +347,7 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 3.5 Backend — Extend `my_bookings`
 
-- [ ] **Update `GET /api/my_bookings`** to include service bookings
+- [x] **Update `GET /api/my_bookings`** to include service bookings
   - Currently only returns event bookings (joins on `event_session_id`)
   - Add a second query for bookings with `service_session_id`
   - Include provider name, duration, room name in the response
