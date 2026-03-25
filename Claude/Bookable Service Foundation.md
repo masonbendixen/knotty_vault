@@ -442,27 +442,28 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 6.1 Frontend — Provider Availability Admin
 
-- [ ] **New component: `provider-availability`** at `/manage/providers/:personId/availability`
+- [x] **New component: `provider-availability`** at `/manage/providers/:personId/availability`
   - Weekly view of provider's availability blocks and booked sessions
   - Add/edit/delete availability blocks
 
 ### 6.2 Frontend — Provider List
 
-- [ ] **New component: `provider-list`** at `/manage/providers`
+- [x] **New component: `provider-list`** at `/manage/providers`
   - Lists people with provider_type_assignments
   - Link to availability management
 
 ### 6.3 Admin — Product Detail Updates
 
-- [ ] **Product detail page** — For bookable_service products, add dropdowns/inputs for:
+- [x] **Product detail page** — For bookable_service products, add dropdowns/inputs for:
   - `provider_type_id`, `required_room_type_id`, `booking_cutoff_hours`
   - Note: `max_time_hole_minutes` is per-provider on `provider_type_assignments`, managed in the provider management UI. `advance_booking_days` is managed through the booking window matrix.
+  - *(Completed in Phase 1.5)*
 
 ### 6.4 Test Helper Commands
 
-- [ ] **Add `list_providers` command** — Lists people with provider_type_assignments
-- [ ] **Add `add_provider_availability` command** — Creates availability blocks for a provider
-- [ ] **Add `list_available_slots` command** — Computes and displays available service slots
+- [x] **Add `list_providers` command** — Lists people with provider_type_assignments
+- [x] **Add `add_provider_availability` command** — Creates availability blocks for a provider
+- [x] **Add `list_available_slots` command** — Computes and displays available service slots
 
 ---
 
