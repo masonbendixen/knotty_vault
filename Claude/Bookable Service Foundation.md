@@ -279,10 +279,10 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 - [ ] **Admin UI**: Add a booking window matrix to the product detail page (similar to the pricing matrix). Rows = permissions, column = advance_days. Editable inline like price cells.
 
-- [ ] **DB schema**: Create `product_booking_windows` table in `db_schema/`
-- [ ] **Table helper**: Create `product_booking_windows.h/cpp` in `sql_util/table_helpers/`
-- [ ] **Tests** for table helper
-- [ ] **Seed data**: Add default booking windows for seed products in `create_database.cpp`
+- [x] **DB schema**: `product_booking_windows.h/cpp` — id, product_id (FK), permission_id (FK nullable), advance_days, unique(product_id, permission_id). Added to make_database_info, db_schema CMakeLists, and create_database table creation.
+- [x] **Table helper**: `product_booking_windows.h/cpp` — AddWindow, GetWindowsForProduct (DESC), GetWindow (handles NULL permission), ResolveAdvanceDaysForUser (SQL MAX across base + user's permissions via role chain), UpdateWindow, DeleteWindow
+- [x] **Tests**: 11 tests — CRUD, multiple windows ordering, get by product+permission, resolve for base user, gold member, platinum (max of all tiers), no windows returns 0, user without permission gets base only
+- [x] **Seed data**: Massage product gets base booking window of 7 days
 
 - [x] **Tests** in `service_availability_helper_test.cpp` — 35+ tests covering:
   - Pure algorithm (15): empty/small window, exact fit, multiple variants, bidirectional hole prevention, proportional buffers (120min double, 90min single), end-of-window best-fit, trailing hole, alignment, buffer override
