@@ -260,7 +260,7 @@ Note: this only applies to the *last* slot in a window. Interior slots use the s
 
 Members get earlier access to service booking. This uses a **booking window matrix** that mirrors the pricing matrix — configurable per product/permission combination, managed on the product detail page alongside pricing.
 
-- [ ] **Design**: Create a `product_booking_windows` table:
+- [x] **Design**: Create a `product_booking_windows` table:
   ```
   product_booking_windows
     id              BIGSERIAL PRIMARY KEY
