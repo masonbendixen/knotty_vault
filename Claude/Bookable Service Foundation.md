@@ -200,7 +200,7 @@ Note: this only applies to the *last* slot in a window. Interior slots use the s
 
 ### 2.1 Backend — Business Logic Layer
 
-- [ ] **Create `ServiceAvailabilityHelper` class** in `business_logic/scheduling/`
+- [x] **`ServiceAvailabilityHelper` class** created in `business_logic/scheduling/`
   - `service_availability_helper.h/cpp`
   - Dependencies: `DatabaseHelper`
 
@@ -284,24 +284,12 @@ Members get earlier access to service booking. This uses a **booking window matr
 - [ ] **Tests** for table helper
 - [ ] **Seed data**: Add default booking windows for seed products in `create_database.cpp`
 
-- [ ] **Tests** in `service_availability_helper_test.cpp`:
-  - Free window with no bookings → slots at valid start times (window_start, window_start + min_slot, etc.)
-  - Existing booking → free window splits, next slot starts at buffer_end rounded to 5-min
-  - **Trailing hole check**: 60min variant rejected when it would leave a 30min gap after, but 90min variant offered
-  - **Leading hole check**: Start times like 8:05, 8:10 etc. rejected because they leave an unusable gap at the start of the window. Only 8:00 and 9:05 are valid (window_start and window_start + min_slot)
-  - Multiple variants offered at same start time when all fit
-  - No variants offered at start time when none fit without creating a hole in either direction
-  - Proportional buffer: 120min variant gets double buffer, 60min gets single buffer
-  - Provider buffer override: larger override used in MAX calculation
-  - Blocked availability excluded
-  - Room capacity limit enforced
-  - Multiple providers → results grouped by provider
-  - Booking window enforced per user permission
-  - Past slots excluded
-  - Provider with no availability → not shown
-  - **End-of-window best-fit**: 110min remaining, variants 60/90/120 → only 90min offered (longest that fits). 60min rejected despite fitting because 90min is a better fit.
-  - **End-of-window exact fit**: 65min remaining (60min + 5min buffer) → 60min offered, no trailing gap
-  - **End-of-window nothing fits**: 50min remaining, smallest variant 60min → no slot offered
+- [x] **Tests** in `service_availability_helper_test.cpp` — 35+ tests covering:
+  - Pure algorithm (15): empty/small window, exact fit, multiple variants, bidirectional hole prevention, proportional buffers (120min double, 90min single), end-of-window best-fit, trailing hole, alignment, buffer override
+  - Doc scenarios (9): free window after booking with all variants, booking at 10:40 → only 90min, double buffer subdivisibility, five massages in 5h20m, multiple free windows, perfect fit, buffer end values match doc, no invalid start times
+  - Critical business (6): 120min OR two 60min in 130min window, 90min best-fit rejects 60min, interior/last slot variant interplay, cancelled double booking fits two 60s, 160min window variant mix, 195min window three 60s or 120+60
+  - Edge cases (13): 59min window, exact 60min, two variants only, single 120min, buffer override MAX, zero buffer, full day coverage, consistent spacing, 180min triple buffer, alignment edge cases
+  - Integration (6): basic availability, blocked excluded, booking splits window, provider hidden, buffer override, room capacity
 
 - [x] **CMakeLists.txt** — Added service_availability_helper.h/cpp and test
 
