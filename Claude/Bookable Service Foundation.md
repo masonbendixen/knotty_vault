@@ -295,21 +295,13 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 2.2 Backend — KVT Conversion
 
-- [ ] **Add to `scheduling_key_value_table.h/cpp`**:
-  - `AvailableSlotToKeyValueTable(const AvailableSlot&)` → `KeyValueTable`
-  - `AvailableSlotsToKeyValueTableArray(const std::vector<AvailableSlot>&)` → `KeyValueTableArray`
-- [ ] **Tests** for KVT conversion
+- [x] **`scheduling_key_value_table.h/cpp`** — Added `AvailableSlotToKeyValueTable` and `AvailableSlotsToKeyValueTableArray`
+- [x] **Tests** — 2 tests: single slot with all fields, array conversion
 
 ### 2.3 Backend — Endpoint Layer
 
-- [ ] **Create `GET /api/available_service_slots`** endpoint
-  - Query params: `product_id`, `date_from`, `date_to`, `provider_id` (optional), `facility_id` (optional)
-  - Requires authentication (for pricing resolution AND booking window determination)
-  - Calls `ServiceAvailabilityHelper::ComputeAvailableSlots()`
-  - Returns JSON: `{ "slots": [...], "variants": [{ id, name, duration_minutes, currency, amount_cents }] }`
-  - Each slot includes variant_id so the frontend knows which duration it represents
-- [ ] **Tests** for the endpoint
-- [ ] **Register** in `web_app.cpp` and `endpoints/CMakeLists.txt`
+- [x] **`GET /api/available_service_slots`** — params: `product_id`, `date_from`, `date_to`, `provider_id` (opt), `facility_id` (opt). Requires auth. Returns `{ "slots": [...], "variants": [{ id, name, duration_minutes, currency, amount_cents }] }`. Pricing resolved per-variant.
+- [x] **Registered** in `web_app.cpp` and `endpoints/CMakeLists.txt`
 
 ---
 
