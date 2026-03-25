@@ -311,7 +311,7 @@ Members get earlier access to service booking. This uses a **booking window matr
 
 ### 3.1 Backend — Business Logic Layer
 
-- [ ] **Create `ServiceBookingHelper` class** in `business_logic/scheduling/`
+- [x] **`ServiceBookingHelper` class** in `business_logic/scheduling/`
   - `service_booking_helper.h/cpp`
 
   - **`BookService(Transaction&, request)` → `BookServiceResult`**
