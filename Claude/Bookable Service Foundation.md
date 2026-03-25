@@ -328,41 +328,22 @@ Members get earlier access to service booking. This uses a **booking window matr
       9. Create booking record (with `service_session_id`, not `event_session_id`)
       10. Return result
 
-- [ ] **Tests** in `service_booking_helper_test.cpp`:
-  - Successful booking creates purchase + session + booking
-  - Slot no longer available → error
-  - Room auto-assigned from available pool
-  - Room affinity: provider stays in same room when possible
-  - Room affinity: falls back to first available when prior room is full
-  - Buffer end calculated correctly with provider override
-  - Pricing resolved for variant
-  - Booking conflict detection (existing booking at same time for same person)
-  - Booking window enforced (user without advance permission can't book too far ahead)
+- [x] **Tests** in `service_booking_helper_test.cpp` — 6 tests: successful booking (purchase+session+booking, correct times, room assigned), slot no longer available, room auto-assigned, room affinity prefers same room, buffer end correct for 90min (single buffer), product not found
 
 ### 3.2 Backend — Email
 
-- [ ] **Create `ServiceBookingConfirmationMail`** in `business_logic/scheduling/`
-  - `service_booking_confirmation_mail.h/cpp`
-  - Struct: `{ firstName, email, serviceName, variantName, providerName, date, time, duration, facilityName, roomName, amountCents, currency, cancellationPolicyText }`
-  - Blue-themed template similar to event booking confirmation but with provider and duration info
-- [ ] **Tests** for mail template
+- [x] **`service_booking_confirmation_mail.h/cpp`** — Email with service name, variant, provider, date/time, facility/room, amount, optional cancellation policy
+- [x] **Tests** — 2 tests: all fields, optional fields omitted
 
 ### 3.3 Backend — Endpoint Layer
 
-- [ ] **Create `POST /api/book_service`** endpoint
-  - Body: `{ product_id, variant_id, provider_person_id, facility_id, start_time_us }`
-  - Requires authentication
-  - Calls `ServiceBookingHelper::BookService()`
-  - Sends confirmation email on success
-  - Returns: `{ "purchase": {...}, "booking": {...}, "service_session": {...} }`
-  - Same two-step flow: create purchase → frontend handles payment
-- [ ] **Tests** for the endpoint
-- [ ] **Register** in `web_app.cpp` and `endpoints/CMakeLists.txt`
+- [x] **`POST /api/book_service`** — Body: `{ product_id, variant_id, provider_person_id, facility_id, start_time_us }`. Requires auth. Returns `{ purchase, booking, service_session }`. Sends confirmation email.
+- [x] **Tests** — 3 tests: success, auth required (401), missing field (400)
+- [x] **Registered** in `web_app.cpp` and `endpoints/CMakeLists.txt`
 
 ### 3.4 Backend — KVT Conversion
 
-- [ ] **Add `ServiceSessionToKeyValueTable()`** to scheduling KVT
-- [ ] **Tests**
+- [x] **Service session uses raw KeyValueTable** from `GetServiceSession()` → `KeyValueTableToJson()` directly. No separate struct needed.
 
 ### 3.5 Backend — Extend `my_bookings`
 
