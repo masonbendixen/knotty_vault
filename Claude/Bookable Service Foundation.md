@@ -155,12 +155,16 @@ The algorithm does NOT scan at fixed intervals. Instead, it works with **free wi
 
 **Multi-buffer rule for long variants**: A variant whose duration is a multiple of the base variant's duration gets proportional buffers. Specifically:
 
-`effective_buffers = ceil(variant.duration_minutes / base_variant.duration_minutes) * buffer_minutes`
+`num_buffers = (duration % base_duration == 0) ? (duration / base_duration) : 1`
+`total_buffer = num_buffers * buffer_minutes`
+
+Only exact multiples of the base duration get proportional buffers. This ensures subdivisibility: a 120min slot with 2 buffers can be replaced by two 60min slots with 1 buffer each. Non-multiples (like 90min) are single blocks that can't be subdivided, so they get 1 buffer.
 
 For the example above (base = 60min, buffer = 5min):
-- 60min → 1 buffer → buffer_end = end + 5min
-- 90min → 1 buffer → buffer_end = end + 5min (90 is not a multiple of 60, treated as a single block)
-- 120min → 2 buffers → buffer_end = end + 10min
+- 60min → 60/60 = 1, exact → 1 buffer → buffer_end = end + 5min
+- 90min → 90/60 = 1.5, not exact → 1 buffer → buffer_end = end + 5min
+- 120min → 120/60 = 2, exact → 2 buffers → buffer_end = end + 10min
+- 180min → 180/60 = 3, exact → 3 buffers → buffer_end = end + 15min
 
 **Why this matters**: A 120-minute slot with double buffer can always be equivalently replaced by two 60-minute slots with a buffer between them. If a 120-minute booking at 9:05 only had a single 5-minute buffer (ending at 11:10), then cancelling it and rebooking as two 60-minute massages would require: 9:05-10:05 (buffer to 10:10) + 10:10-11:10 (buffer to 11:15). The second massage's buffer extends to 11:15, which is past the original 11:10 buffer_end — creating a conflict with whatever was booked after. Double buffer ensures the time block is always subdivisible into smaller variants without overlap.
 
