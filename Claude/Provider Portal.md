@@ -124,42 +124,42 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 2.2 Frontend — Types & ServerAccess
 
-- [ ] **Add types** to `scheduling.types.ts`: `ProviderBooking`, `ProviderScheduleResponse`
-- [ ] **Add ServerAccess methods**: `getProviderBookings(status?)`, `getProviderSchedule(dateFrom, dateTo)`
-- [ ] **Update** ServerAccessNetwork, ServerAccessProxy, ServerAccessMock
-- [ ] **Mock spec tests**
+- [x] **Add types** to `scheduling.types.ts`: `ProviderBooking`, `ProviderAvailabilityBlock`, `ProviderScheduleBooking`, `ProviderScheduleResponse`
+- [x] **Add ServerAccess methods**: `getProviderBookings(status?)`, `getProviderSchedule(dateFrom, dateTo)`
+- [x] **Update** ServerAccessNetwork, ServerAccessProxy, ServerAccessMock
+- [x] **Mock spec tests** (4 tests)
 
 ### 2.3 Frontend — Provider Dashboard (Scenario 47)
 
-- [ ] **Update `staff-dashboard.component`** at `/staff`
+- [x] **Update `staff-dashboard.component`** at `/staff`
   - Add "My Service Bookings" card (links to `/staff/bookings`)
   - Add "My Schedule" card (links to `/staff/schedule`)
   - Add "Time Off Requests" card (links to `/staff/time-off`)
   - Only show service cards if user has `provider` permission
-- [ ] **Tests**
+- [x] **Tests** (6 tests: creates, heading, always shows events, shows/hides provider cards by permission)
 
 ### 2.4 Frontend — Provider Bookings Page (Scenarios 45, 55)
 
-- [ ] **New component: `provider-bookings`** at `/staff/bookings`
+- [x] **New component: `provider-bookings`** at `/staff/bookings`
   - Upcoming bookings: cards showing client name, service, variant, date/time, facility/room
   - Past bookings: collapsible accordion
   - Click a booking for detail view (client name, service, variant, duration, location, notes)
   - Cancel button on upcoming bookings (links to provider cancellation flow — Phase 4)
-- [ ] **Tests**
+- [x] **Tests** (10 tests)
 
 ### 2.5 Frontend — Provider Schedule View (Scenario 54)
 
-- [ ] **New component: `provider-schedule`** at `/staff/schedule`
+- [x] **New component: `provider-schedule`** at `/staff/schedule`
   - Week view showing availability blocks and booked sessions overlaid
   - Navigate by week (prev/next)
   - Availability shown as background blocks; bookings shown as cards within
   - Each booking card: client name, service, time
   - Color coding: available (green bg), booked (blue card), blocked (gray striped)
-- [ ] **Tests**
+- [x] **Tests** (9 tests)
 
 ### 2.6 Frontend — Routes
 
-- [ ] **Add routes** to staff.routes.ts: `/staff/bookings`, `/staff/schedule`, `/staff/time-off`
+- [x] **Add routes** to staff.routes.ts: `/staff/bookings`, `/staff/schedule` (time-off deferred to Phase 3)
 
 ---
 
