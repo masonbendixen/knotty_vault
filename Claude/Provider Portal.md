@@ -361,7 +361,10 @@ Phases 3, 4, and 5 can be worked on in parallel after Phase 2 is complete.
 	- Mason- Let's do auto approval if no bookings and then admin override needed if bookings are affected. I figure that the schedule will be posted for a bit before bookings are allowed and it would be nice to let the providers swap shifts easily until there are bookings.
 
 5. **Provider cancellation vs admin cancellation**: Scenario 56 says provider can cancel their own session. Should this be limited to sessions that haven't started yet (like the client cancellation check), or should providers be able to cancel sessions at any time? Also, should provider cancellation always result in a full refund (as stated in the scenario), or should it follow the product's cancellation policy?
+	- Mason- There should be a configurable window in which providers can cancel their own sessions. Once that window is past, the provider cancellation should result in a high priority notification to admins to do manual follow up like trying to call clients to let them know that their session has been cancelled. Client should definitely get a full refund for provider cancellation.
 
 6. **Notification preferences**: Should the system support provider notification preferences (email vs no-email, or digest vs individual)? Or is immediate email on every booking sufficient for the initial implementation?
+	- Mason- They should get email for every booking.
 
 7. **Existing manual availability vs template generation**: When generating availability from a template, what happens to existing manually-created availability blocks for the same dates? Should they be preserved (taking precedence), deleted, or should generation skip those dates entirely?
+	- Mason- Let's skip template generation for days that manually have availability blocks. We also should have a w
