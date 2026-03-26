@@ -349,12 +349,16 @@ Phases 3, 4, and 5 can be worked on in parallel after Phase 2 is complete.
 ## Open Questions
 
 1. **Provider permission assignment**: When an admin adds someone as a provider via the provider list page, should the system automatically assign them the `provider` role/permission so they can access the staff portal? Or should that be a separate manual step? (Currently adding a `provider_type_assignment` row does not grant any roles/permissions.)
+	- Mason- Yes, this sounds great.
 
 2. **Schedule template facility**: Template entries define day-of-week + start/end time but no facility. When generating concrete availability, the facility is specified. Should a provider's template be tied to a single facility, or should the generation step always require specifying which facility (supporting providers who work at multiple locations on different days)?
+	- Mason- I like the flexibility of allowing providers working at multiple locations on different days.
 
 3. **Time-off request window**: The scenario mentions "configurable window (e.g., min 2 weeks out, max 12 weeks out)." Should this be a server-configurable secret (like auth session duration), or is a hardcoded reasonable default acceptable for the initial implementation?
+	- Mason- No reason not to make this a configurable secret.
 
 4. **Shift change with existing bookings**: Scenario 52/53 note that if there are bookings during the shifted time, clients must be notified and given the option to cancel with full refund. Should the shift change be auto-approved only when no bookings exist, with admin override required when bookings are affected? Or should the admin always approve regardless?
+	- Mason- Let's do auto approval if no bookings and then admin override needed if bookings are affected. I figure that the schedule will be posted for a bit before bookings are allowed and it would be nice to let the providers swap shifts easily until there are bookings.
 
 5. **Provider cancellation vs admin cancellation**: Scenario 56 says provider can cancel their own session. Should this be limited to sessions that haven't started yet (like the client cancellation check), or should providers be able to cancel sessions at any time? Also, should provider cancellation always result in a full refund (as stated in the scenario), or should it follow the product's cancellation policy?
 
