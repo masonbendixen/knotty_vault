@@ -111,16 +111,16 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 2.1 Backend — Provider Bookings Endpoint
 
-- [ ] **Create `GET /api/provider/my_bookings`** endpoint
+- [x] **Create `GET /api/provider/my_bookings`** endpoint
   - Returns service bookings where `provider_person_id = session.GetPersonId()`
   - Supports `status=upcoming|past` filter
   - Joins: `bookings` → `bookable_service_sessions` → `products` / `product_variants` / `people` (client name) / `facilities` / `location_rooms`
   - Response: array of provider booking objects with client name, service, variant, time, facility, room, status
-- [ ] **Create `GET /api/provider/my_schedule`** endpoint
+- [x] **Create `GET /api/provider/my_schedule`** endpoint
   - Returns provider's availability blocks + overlaid bookings for a date range
   - Params: `date_from`, `date_to`
   - Response: `{ availability: [...], bookings: [...] }`
-- [ ] **Tests** for both endpoints
+- [x] **Tests** for both endpoints (4 tests for bookings: returns data, upcoming filter, empty, auth; 4 tests for schedule: returns availability+bookings, requires params, auth, empty for different date)
 
 ### 2.2 Frontend — Types & ServerAccess
 
