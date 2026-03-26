@@ -416,7 +416,7 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [ ] 63. Admin views analytics/reports for sessions
 - [x] 64. Booking conflicts are prevented (overlap check in BookEvent for confirmed + waitlisted bookings)
 - [x] 65. Timezone handling
-- [ ] 66. Sequential slot computation prevents schedule holes
+- [x] 66. Sequential slot computation prevents schedule holes (BSF Phase 2 — ServiceAvailabilityHelper with 5-min boundaries, proportional buffers, bidirectional hole prevention, end-of-window best-fit, 35+ algorithm tests)
 
 ---
 
