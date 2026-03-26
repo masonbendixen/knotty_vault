@@ -100,8 +100,8 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 1.4 Frontend — Provider Permission & Staff Guard Update
 
-- [ ] **Update `hasStaffAccess()`** in `auth.types.ts` to include `'provider'` permission
-- [ ] **Tests** for updated guard logic
+- [x] **Update `hasStaffAccess()`** in `auth.types.ts` to include `'provider'` permission
+- [x] **Tests** for updated guard logic (7 tests for hasStaffAccess: unauth, no perms, admin, instructor, admin_portal, provider, manage_products-only)
 
 ---
 
