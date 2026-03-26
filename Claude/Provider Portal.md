@@ -195,27 +195,27 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 3.3 Frontend — Provider Profile Section (Scenario 48)
 
-- [ ] **Add "Accepting Bookings" toggle** to provider dashboard or bookings page header
+- [x] **Add "Accepting Bookings" toggle** to provider bookings page header
   - Shows current status per provider type assignment
   - Toggle calls `POST /api/provider/toggle_accepting`
-- [ ] **Tests**
+- [x] **Tests** (5 new tests for toggle section display, load, and API call)
 
 ### 3.4 Frontend — Time-Off Request UI (Scenario 51)
 
-- [ ] **New component: `provider-time-off`** at `/staff/time-off`
+- [x] **New component: `provider-time-off`** at `/staff/time-off`
   - Submit form: date picker, optional reason text
   - List of submitted requests with status (pending, approved, denied)
   - Status badges with color coding
-- [ ] **Tests**
+- [x] **Tests** (14 tests)
 
 ### 3.5 Frontend — Admin Time-Off Review
 
-- [ ] **New component: `time-off-review`** at `/manage/time-off`
-  - List of pending time-off requests across all providers
+- [x] **New component: `time-off-review`** at `/manage/time-off`
+  - List of pending time-off requests across all providers with resolved names
   - Approve/Deny buttons with optional notes
-  - Shows warning if approving would affect existing bookings
-- [ ] **Add link** to manage dashboard
-- [ ] **Tests**
+  - Result banner showing bookings cancelled count
+- [x] **Add link** to manage dashboard (Time Off Requests card)
+- [x] **Tests** (14 tests)
 
 ---
 
