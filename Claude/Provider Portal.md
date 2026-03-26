@@ -65,38 +65,38 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 1.1 Backend — Database Setup
 
-- [ ] **Add `provider` permission** to seed data in `create_database.cpp`
+- [x] **Add `provider` permission** to seed data in `create_database.cpp`
   - New permission: `provider` ("Service provider — therapist, trainer, etc.")
   - New role: `Provider` with `provider` permission
-  - Update `StaffGuard` in the frontend to also check for `provider` permission (add to `hasStaffAccess`)
+  - Update `StaffGuard` in the frontend to also check for `provider` permission (add to `hasStaffAccess`) *(deferred to 1.4)*
 - [ ] **Auto-assign provider role** when adding a `provider_type_assignment`
   - In the provider list "Add Provider" flow, after inserting the assignment, also assign the `Provider` role to the person (if not already assigned)
   - This grants the `provider` permission so the person can access the staff portal immediately
-- [ ] **Register scheduling tables** in admin allowed lists (`PopulateAdminTopLevelTables` / `PopulateAdminNestedTables`)
+- [x] **Register scheduling tables** in admin allowed lists (`PopulateAdminTopLevelTables` / `PopulateAdminNestedTables`)
   - `schedule_templates`, `schedule_template_entries`, `time_off_requests`, `shift_change_requests`
 - [ ] **Tests** for permission setup (verify provider permission exists after DB init)
 
 ### 1.2 Backend — Table Helpers
 
-- [ ] **`schedule_templates` table helper**
+- [x] **`schedule_templates` table helper**
   - `AddScheduleTemplate()`, `GetScheduleTemplate()`, `GetTemplatesForProvider()`, `GetActiveTemplatesForProvider()`, `UpdateScheduleTemplate()`, `DeleteScheduleTemplate()`
-- [ ] **`schedule_template_entries` table helper**
+- [x] **`schedule_template_entries` table helper**
   - `AddEntry()`, `GetEntriesForTemplate()`, `UpdateEntry()`, `DeleteEntry()`, `DeleteEntriesForTemplate()`
-- [ ] **`time_off_requests` table helper**
+- [x] **`time_off_requests` table helper**
   - `AddRequest()`, `GetRequest()`, `GetRequestsForProvider()`, `GetPendingRequests()`, `UpdateRequest()`
-- [ ] **`shift_change_requests` table helper**
+- [x] **`shift_change_requests` table helper**
   - `AddRequest()`, `GetRequest()`, `GetRequestsForPerson()`, `GetPendingRequests()`, `UpdateRequest()`
-- [ ] **Tests** for all four table helpers
+- [x] **Tests** for all four table helpers
 
 ### 1.3 Backend — Provider Booking Notification Email (Scenario 46)
 
-- [ ] **Create `provider_booking_notification_mail.h/cpp`** in `business_logic/scheduling/`
+- [x] **Create `provider_booking_notification_mail.h/cpp`** in `business_logic/scheduling/`
   - `ProviderBookingNotificationData` struct: `providerFirstName`, `providerEmail`, `clientName`, `serviceName`, `variantName`, `date`, `time`, `facilityName`, `roomName`
   - `GenerateProviderBookingNotificationBody()` — HTML email template
-- [ ] **Send notification email from `book_service.cpp`** after successful booking
+- [x] **Send notification email from `book_service.cpp`** after successful booking
   - Fetch provider's email from people table
   - Send email with booking details
-- [ ] **Tests** for email body generation
+- [x] **Tests** for email body generation
 
 ### 1.4 Frontend — Provider Permission & Staff Guard Update
 
