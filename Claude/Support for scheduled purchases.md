@@ -393,6 +393,7 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [ ] 44. Admin reassigns a booking to a different provider
 
 ## Provider Portal
+[[Provider Portal]]
 - [ ] 45. Provider views their upcoming and past bookings
 - [ ] 46. Provider receives email when a session is booked with them
 - [ ] 47. Provider portal home page
