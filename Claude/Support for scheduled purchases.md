@@ -350,31 +350,31 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 - [x] 18. User joins a waitlist for a full event session (Phase 10.1 — pre-pay waitlist with auto-promotion)
 
 ## Bookable Service Products (Admin)
-- [ ] 19. Admin creates a bookable service type
+- [x] 19. Admin creates a bookable service type (BSF Phase 1 — bookable_service product kind, product detail page with provider type + room type + variants)
 - [x] 20. Admin configures duration variants for a bookable service (Phase 8 — product variants with duration/buffer)
 - [x] 21. Admin configures buffer time for a bookable service (Phase 8 — buffer_minutes on product_variants)
-- [ ] 22. Admin configures booking windows for a bookable service
+- [x] 22. Admin configures booking windows for a bookable service (BSF Phase 2.1 — product_booking_windows table, permission-based matrix on product detail page)
 - [ ] 23. Admin configures reminder window for a bookable service
 
 ## Location Resources (Admin)
 - [x] 24. Admin manages location resources (hierarchical)
 
 ## Provider Availability (Admin / Provider)
-- [ ] 25. Admin enters availability blocks for a provider
-- [ ] 27. Provider or admin configures provider-specific buffer overrides
-- [ ] 28. Provider or admin configures maximum time-hole tolerance
-- [ ] 29. Provider or admin enters unavailable blocks within availability
+- [x] 25. Admin enters availability blocks for a provider (BSF Phase 1 — provider_availability table helper + Phase 6 — admin availability UI + test helper command)
+- [x] 27. Provider or admin configures provider-specific buffer overrides (BSF Phase 1 — provider_buffer_overrides table helper)
+- [x] 28. Provider or admin configures maximum time-hole tolerance (BSF Phase 1 — max_time_hole_minutes on provider_type_assignments)
+- [x] 29. Provider or admin enters unavailable blocks within availability (BSF Phase 1 — is_blocked flag on provider_availability)
 
 ## Availability Search and Booking (Customer)
-- [ ] 30. User browses available service time slots
-- [ ] 31. User filters available slots by preferences
-- [ ] 32. User books a service appointment
-- [ ] 33. User receives booking confirmation email for service appointment
+- [x] 30. User browses available service time slots (BSF Phase 2 — ServiceAvailabilityHelper + available_service_slots endpoint + Phase 5 — service-booking component with week date picker + provider-grouped slots)
+- [x] 31. User filters available slots by preferences (BSF Phase 2/5 — filter by date, provider_id, facility_id via endpoint params)
+- [x] 32. User books a service appointment (BSF Phase 3 — ServiceBookingHelper + book_service endpoint + Phase 5 — booking page with PaymentMethodComponent)
+- [x] 33. User receives booking confirmation email for service appointment (BSF Phase 3 — ServiceBookingConfirmationMail with provider, variant, facility, room details)
 
 ## Cancellation Policy (Bookable Services)
-- [ ] 34. User cancels service booking within full-refund window
-- [ ] 35. User cancels service booking within partial-refund window
-- [ ] 36. User cancels service booking within no-refund window
+- [x] 34. User cancels service booking within full-refund window (BSF Phase 4 — CancelBooking extended for service bookings, refund via RefundHelper, service session set to cancelled)
+- [x] 35. User cancels service booking within partial-refund window (BSF Phase 4 — same tiered cancellation policy logic as events, applied to service bookings)
+- [x] 36. User cancels service booking within no-refund window (BSF Phase 4 — no-refund case handled, slot still released)
 
 ## Check-In and Attendance
 - [ ] 37. Staff checks in an attendee for an event or service
@@ -494,17 +494,17 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 
 | | # | Scenario | Rationale |
 |---|---|---|---|
-| [ ] | 19 | Admin creates a bookable service type | New product kind |
+| [x] | 19 | Admin creates a bookable service type | New product kind |
 | [x] | 20 | Admin configures duration variants | Multiple durations per service |
 | [x] | 21 | Admin configures buffer time | Prevent back-to-back |
 | [x] | 24 | Admin manages location resources | Room/space management |
-| [ ] | 25 | Admin enters availability blocks for provider | Provider scheduling |
-| [ ] | 29 | Provider enters unavailable blocks | Lunch breaks, etc. |
-| [ ] | 30 | User browses available service time slots | Core service booking UX |
-| [ ] | 32 | User books a service appointment | Core service booking flow |
-| [ ] | 33 | User receives confirmation email for service | Confirmation |
-| [ ] | 34 | User cancels service within full-refund window | Basic cancellation |
-| [ ] | 66 | Sequential slot computation prevents schedule holes | Core availability algorithm |
+| [x] | 25 | Admin enters availability blocks for provider | Provider scheduling |
+| [x] | 29 | Provider enters unavailable blocks | Lunch breaks, etc. |
+| [x] | 30 | User browses available service time slots | Core service booking UX |
+| [x] | 32 | User books a service appointment | Core service booking flow |
+| [x] | 33 | User receives confirmation email for service | Confirmation |
+| [x] | 34 | User cancels service within full-refund window | Basic cancellation |
+| [x] | 66 | Sequential slot computation prevents schedule holes | Core availability algorithm |
 
 ## COULD HAVE - Advanced Scheduling
 *Time holes, booking windows, provider overrides, waitlist*
@@ -513,14 +513,14 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 |---|---|---|---|
 | [ ] | 17 | User reschedules to different session | Better UX than cancel+rebook |
 | [x] | 18 | User joins waitlist for full event | Capture demand |
-| [ ] | 22 | Admin configures booking windows per permission | Member advantages |
+| [x] | 22 | Admin configures booking windows per permission | Member advantages |
 | [ ] | 23 | Admin configures reminder window for services | Reduce no-shows |
 | ~~[ ]~~ | ~~26~~ | ~~Admin configures provider rate overrides~~ | *REMOVED — see Alternatives Considered* |
-| [ ] | 27 | Provider-specific buffer overrides | Provider preferences |
-| [ ] | 28 | Maximum time-hole tolerance | Efficient scheduling |
-| [ ] | 31 | User filters available slots by preferences | Better search UX |
-| [ ] | 35 | User cancels service within partial-refund window | Tiered cancellation |
-| [ ] | 36 | User cancels service within no-refund window | Full cancellation policy |
+| [x] | 27 | Provider-specific buffer overrides | Provider preferences |
+| [x] | 28 | Maximum time-hole tolerance | Efficient scheduling |
+| [x] | 31 | User filters available slots by preferences | Better search UX |
+| [x] | 35 | User cancels service within partial-refund window | Tiered cancellation |
+| [x] | 36 | User cancels service within no-refund window | Full cancellation policy |
 | [ ] | 37 | Staff checks in attendee | Attendance tracking |
 | [ ] | 38 | Staff verifies identity for discounted bookings | Prevent abuse |
 | [ ] | 39 | Member books for non-member at non-member price | Gifting flow |
