@@ -69,6 +69,9 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
   - New permission: `provider` ("Service provider — therapist, trainer, etc.")
   - New role: `Provider` with `provider` permission
   - Update `StaffGuard` in the frontend to also check for `provider` permission (add to `hasStaffAccess`)
+- [ ] **Auto-assign provider role** when adding a `provider_type_assignment`
+  - In the provider list "Add Provider" flow, after inserting the assignment, also assign the `Provider` role to the person (if not already assigned)
+  - This grants the `provider` permission so the person can access the staff portal immediately
 - [ ] **Register scheduling tables** in admin allowed lists (`PopulateAdminTopLevelTables` / `PopulateAdminNestedTables`)
   - `schedule_templates`, `schedule_template_entries`, `time_off_requests`, `shift_change_requests`
 - [ ] **Tests** for permission setup (verify provider permission exists after DB init)
@@ -176,15 +179,16 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 3.2 Backend — Time-Off Request Endpoints
 
+- [ ] **Add configurable secrets** for time-off window: `time_off_min_advance_days` (default 14) and `time_off_max_advance_days` (default 84)
 - [ ] **Create `POST /api/provider/time_off_request`** endpoint
   - Provider submits: `requested_date_us`, `reason` (optional)
-  - Validates: date is in the future, within configurable window
+  - Validates: date is in the future, within the configurable min/max advance window (from secrets)
   - Sets `status = 'pending'`
 - [ ] **Create `GET /api/provider/my_time_off_requests`** endpoint
   - Returns all time-off requests for the logged-in provider
 - [ ] **Create `POST /api/admin/review_time_off/:requestId`** endpoint
   - Admin approves or denies: `{ action: "approve" | "deny", notes: "..." }`
-  - On approve: blocks the availability for that date (creates a blocked `provider_availability` entry or deletes existing availability for that date)
+  - On approve: creates a blocked `provider_availability` entry for that date (prevents template generation and booking)
   - On approve with existing bookings: cancels affected bookings with full refund + notification emails
 - [ ] **Tests**
 
@@ -220,14 +224,23 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 4.1 Backend — Provider Cancel Session
 
+- [ ] **Add configurable secret**: `provider_cancel_min_hours_before` (default 24) — providers can self-cancel up to this many hours before the session
 - [ ] **Create `POST /api/provider/cancel_session/:sessionId`** endpoint
   - Validates: provider is the assigned provider for this session
-  - Cancels the service session (sets status to `cancelled`)
-  - Cancels the associated booking
-  - Processes full refund (ignoring cancellation policy — provider-initiated)
-  - Sends cancellation email to client with note that provider cancelled
+  - **Within cancellation window** (session start > now + configurable hours):
+    - Cancels the service session (sets status to `cancelled`)
+    - Cancels the associated booking
+    - Processes full refund (always full — ignoring product cancellation policy for provider-initiated)
+    - Sends cancellation email to client: "Your provider has cancelled this appointment. Full refund issued."
+  - **Past cancellation window** (session too soon):
+    - Does NOT auto-cancel
+    - Creates a high-priority admin notification (email to admins) for manual follow-up
+    - Returns a response indicating escalation: "This session is within the cancellation window. An admin has been notified for manual follow-up."
 - [ ] **Create provider cancellation email template** (`provider_cancelled_session_mail.h/cpp`)
   - Different from client-initiated cancellation — message should explain "Your provider has cancelled this appointment" and mention full refund
+- [ ] **Create admin escalation email template** (`provider_cancel_escalation_mail.h/cpp`)
+  - Sent to admins when provider tries to cancel past the window
+  - Includes: provider name, client name, service, date/time, reason the provider wants to cancel
 - [ ] **Tests**
 
 ### 4.2 Frontend — Cancel Button on Provider Bookings
@@ -250,8 +263,9 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
   - `CreateTemplate()` — creates a schedule template with entries
   - `GenerateAvailability()` — generates `provider_availability` rows from a template for a date range
     - For each day in range: check if day_of_week matches a template entry
+    - **Skip dates that already have any manual availability** (`source = 'manual'`) — manual entries take precedence
+    - **Skip dates that have an approved time-off request** (blocked availability entry from time-off approval)
     - Create `provider_availability` row with `source = 'template'` and `schedule_template_id` FK
-    - Skip dates that already have manual overrides (source = 'manual') or approved time-off
   - `RegenerateAvailability()` — deletes template-generated rows and regenerates
 - [ ] **Create `POST /api/admin/schedule_template`** endpoint
   - Create a new template with weekly entries
@@ -297,6 +311,8 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
   - `CreateTradeRequest()` — provider proposes swapping shifts
   - `RespondToRequest()` — target provider accepts/declines
   - `ReviewRequest()` — scheduler approves/denies
+  - **Auto-approval**: if target accepts AND no bookings exist during the affected shifts, the request is auto-approved without scheduler review
+  - **Admin required**: if bookings exist during the affected shifts, the request requires scheduler approval and the admin UI shows which clients will be affected
   - On final approval:
     - Transfer: reassign availability block to new provider, update any existing bookings' `provider_person_id`, email affected clients
     - Trade: swap both availability blocks, update bookings, email clients
@@ -346,25 +362,14 @@ Phases 3, 4, and 5 can be worked on in parallel after Phase 2 is complete.
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-1. **Provider permission assignment**: When an admin adds someone as a provider via the provider list page, should the system automatically assign them the `provider` role/permission so they can access the staff portal? Or should that be a separate manual step? (Currently adding a `provider_type_assignment` row does not grant any roles/permissions.)
-	- Mason- Yes, this sounds great.
-
-2. **Schedule template facility**: Template entries define day-of-week + start/end time but no facility. When generating concrete availability, the facility is specified. Should a provider's template be tied to a single facility, or should the generation step always require specifying which facility (supporting providers who work at multiple locations on different days)?
-	- Mason- I like the flexibility of allowing providers working at multiple locations on different days.
-
-3. **Time-off request window**: The scenario mentions "configurable window (e.g., min 2 weeks out, max 12 weeks out)." Should this be a server-configurable secret (like auth session duration), or is a hardcoded reasonable default acceptable for the initial implementation?
-	- Mason- No reason not to make this a configurable secret.
-
-4. **Shift change with existing bookings**: Scenario 52/53 note that if there are bookings during the shifted time, clients must be notified and given the option to cancel with full refund. Should the shift change be auto-approved only when no bookings exist, with admin override required when bookings are affected? Or should the admin always approve regardless?
-	- Mason- Let's do auto approval if no bookings and then admin override needed if bookings are affected. I figure that the schedule will be posted for a bit before bookings are allowed and it would be nice to let the providers swap shifts easily until there are bookings.
-
-5. **Provider cancellation vs admin cancellation**: Scenario 56 says provider can cancel their own session. Should this be limited to sessions that haven't started yet (like the client cancellation check), or should providers be able to cancel sessions at any time? Also, should provider cancellation always result in a full refund (as stated in the scenario), or should it follow the product's cancellation policy?
-	- Mason- There should be a configurable window in which providers can cancel their own sessions. Once that window is past, the provider cancellation should result in a high priority notification to admins to do manual follow up like trying to call clients to let them know that their session has been cancelled. Client should definitely get a full refund for provider cancellation.
-
-6. **Notification preferences**: Should the system support provider notification preferences (email vs no-email, or digest vs individual)? Or is immediate email on every booking sufficient for the initial implementation?
-	- Mason- They should get email for every booking.
-
-7. **Existing manual availability vs template generation**: When generating availability from a template, what happens to existing manually-created availability blocks for the same dates? Should they be preserved (taking precedence), deleted, or should generation skip those dates entirely?
-	- Mason- Let's skip template generation for days that manually have availability blocks. We also should have a w
+| # | Question | Decision |
+|---|---|---|
+| 1 | **Provider permission assignment** — Auto-assign `provider` role when added as a provider? | **Yes, auto-assign.** When an admin adds a `provider_type_assignment`, the system should also give them the `provider` role so they can access the staff portal immediately. |
+| 2 | **Schedule template facility** — Tie templates to a facility or specify at generation time? | **Specify at generation time.** Templates define day/time patterns only. The facility is chosen when generating concrete availability rows. This supports providers who work at multiple locations on different days. |
+| 3 | **Time-off request window** — Hardcoded or configurable? | **Configurable secret.** Use server-configurable secrets for min/max advance days (like `time_off_min_advance_days` and `time_off_max_advance_days`). |
+| 4 | **Shift change with existing bookings** — Auto-approve or always admin? | **Auto-approve if no bookings; admin override required if bookings are affected.** The schedule is typically posted before bookings open, so providers should be able to swap shifts freely until clients book into them. |
+| 5 | **Provider cancellation window** — Any time or limited? Always full refund? | **Configurable cancellation window** (secret: `provider_cancel_min_hours_before`). Within window: provider cancels directly, client gets full refund. Past window: provider cancellation triggers high-priority admin notification for manual follow-up (calling clients). Client always gets full refund for provider-initiated cancellations regardless of the product's cancellation policy. |
+| 6 | **Notification preferences** — Email per booking or digest? | **Email for every booking.** No digest or preference system for now. |
+| 7 | **Template generation vs manual availability** — Conflict resolution? | **Skip days with manual blocks.** Template generation skips dates that already have manual availability entries. Approved time-off requests also block template generation for those dates (the time-off approval creates a blocked availability entry that prevents generation). |
