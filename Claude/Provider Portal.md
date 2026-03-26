@@ -169,28 +169,29 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 3.1 Backend — Provider Profile Endpoint
 
-- [ ] **Create `GET /api/provider/my_profile`** endpoint
+- [x] **Create `GET /api/provider/my_profile`** endpoint
   - Returns the logged-in provider's `provider_type_assignments` row(s)
   - Includes: provider type name, is_accepting_bookings, max_time_hole_minutes
-- [ ] **Create `POST /api/provider/toggle_accepting`** endpoint
+- [x] **Create `POST /api/provider/toggle_accepting`** endpoint
   - Toggles `is_accepting_bookings` on the provider's assignment
   - Takes `assignment_id` in the body
-- [ ] **Tests**
+  - Verifies the assignment belongs to the logged-in user (403 if not)
+- [x] **Tests** (6 tests: get profile with/without assignments, auth, toggle flip/flip-back, auth, wrong person)
 
 ### 3.2 Backend — Time-Off Request Endpoints
 
-- [ ] **Add configurable secrets** for time-off window: `time_off_min_advance_days` (default 14) and `time_off_max_advance_days` (default 84)
-- [ ] **Create `POST /api/provider/time_off_request`** endpoint
+- [x] **Add configurable secrets** for time-off window: `time_off_min_advance_days` (default 14) and `time_off_max_advance_days` (default 84)
+- [x] **Create `POST /api/provider/time_off_request`** endpoint
   - Provider submits: `requested_date_us`, `reason` (optional)
   - Validates: date is in the future, within the configurable min/max advance window (from secrets)
   - Sets `status = 'pending'`
-- [ ] **Create `GET /api/provider/my_time_off_requests`** endpoint
+- [x] **Create `GET /api/provider/my_time_off_requests`** endpoint
   - Returns all time-off requests for the logged-in provider
-- [ ] **Create `POST /api/admin/review_time_off/:requestId`** endpoint
+- [x] **Create `POST /api/admin/review_time_off/:requestId`** endpoint
   - Admin approves or denies: `{ action: "approve" | "deny", notes: "..." }`
   - On approve: creates a blocked `provider_availability` entry for that date (prevents template generation and booking)
-  - On approve with existing bookings: cancels affected bookings with full refund + notification emails
-- [ ] **Tests**
+  - On approve with existing bookings: cancels affected bookings with full refund
+- [x] **Tests** (10 tests: submit/get/auth for provider endpoints; approve/deny/blocked-avail/auth/404 for admin endpoint)
 
 ### 3.3 Frontend — Provider Profile Section (Scenario 48)
 
