@@ -263,8 +263,8 @@ A user with the `manage_schedules` permission (not necessarily full admin) creat
 **50. Scheduler overrides a provider's schedule for a specific day**
 The scheduler can make a manual override for a provider on a specific day — changing hours, adding availability, or removing availability. This overrides the template for that day only. Example: Jane normally works Mon 8am-2pm but the scheduler changes next Monday to 10am-6pm.
 
-**51. Provider requests a day off**
-Provider submits a time-off request for a specific date (with an optional reason, e.g., "vacation", "appointment"). The request must fall within a configurable window (e.g., min 2 weeks out, max 12 weeks out). A user with `manage_schedules` permission reviews and approves or denies the request. If approved and there are existing bookings during that time, they must be cancelled/rescheduled and the affected clients notified.
+**51. Provider requests time off**
+Provider submits a time-off request for a date range (start date + end date, with an optional reason, e.g., "vacation", "appointment"). Single-day requests set both dates to the same value. The request must fall within a configurable window (e.g., min 2 weeks out, max 12 weeks out, configurable via `time_off_min_advance_days` and `time_off_max_advance_days` secrets). A user with `manage_schedules` permission reviews and approves or denies the request. If approved, blocked availability is created for each day in the range at each facility, and any existing bookings during that time are cancelled with full refund.
 
 **52. Provider requests a shift transfer**
 Provider requests to transfer one of their shifts to another provider (e.g., "I want to give my Tuesday 8am-2pm shift to Sarah"). This generates a request in Sarah's provider portal. Sarah can accept or decline. If accepted, a user with `manage_schedules` permission must also approve. The transfer updates the schedule for the specific date(s) in question.

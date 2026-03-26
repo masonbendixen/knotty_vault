@@ -182,15 +182,16 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 - [x] **Add configurable secrets** for time-off window: `time_off_min_advance_days` (default 14) and `time_off_max_advance_days` (default 84)
 - [x] **Create `POST /api/provider/time_off_request`** endpoint
-  - Provider submits: `requested_date_us`, `reason` (optional)
-  - Validates: date is in the future, within the configurable min/max advance window (from secrets)
+  - Provider submits: `requested_date_us`, `requested_end_date_us` (defaults to same as start), `reason` (optional)
+  - Supports date ranges (e.g., week-long vacation) — single-day requests have matching start/end
+  - Validates: start date is in the future, end >= start, within the configurable min/max advance window
   - Sets `status = 'pending'`
 - [x] **Create `GET /api/provider/my_time_off_requests`** endpoint
   - Returns all time-off requests for the logged-in provider
 - [x] **Create `POST /api/admin/review_time_off/:requestId`** endpoint
   - Admin approves or denies: `{ action: "approve" | "deny", notes: "..." }`
-  - On approve: creates a blocked `provider_availability` entry for that date (prevents template generation and booking)
-  - On approve with existing bookings: cancels affected bookings with full refund
+  - On approve: creates blocked `provider_availability` entries for each day in the date range at each facility (prevents template generation and booking)
+  - On approve with existing bookings: cancels affected bookings across all days in the range with full refund
 - [x] **Tests** (10 tests: submit/get/auth for provider endpoints; approve/deny/blocked-avail/auth/404 for admin endpoint)
 
 ### 3.3 Frontend — Provider Profile Section (Scenario 48)
