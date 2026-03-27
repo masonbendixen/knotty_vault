@@ -226,8 +226,8 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 4.1 Backend — Provider Cancel Session
 
-- [ ] **Add configurable secret**: `provider_cancel_min_hours_before` (default 24) — providers can self-cancel up to this many hours before the session
-- [ ] **Create `POST /api/provider/cancel_session/:sessionId`** endpoint
+- [x] **Add configurable secret**: `provider_cancel_min_hours_before` (default 24) — providers can self-cancel up to this many hours before the session
+- [x] **Create `POST /api/provider/cancel_session/:sessionId`** endpoint
   - Validates: provider is the assigned provider for this session
   - **Within cancellation window** (session start > now + configurable hours):
     - Cancels the service session (sets status to `cancelled`)
@@ -236,14 +236,14 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
     - Sends cancellation email to client: "Your provider has cancelled this appointment. Full refund issued."
   - **Past cancellation window** (session too soon):
     - Does NOT auto-cancel
-    - Creates a high-priority admin notification (email to admins) for manual follow-up
-    - Returns a response indicating escalation: "This session is within the cancellation window. An admin has been notified for manual follow-up."
-- [ ] **Create provider cancellation email template** (`provider_cancelled_session_mail.h/cpp`)
+    - Sends URGENT email to all admins for manual follow-up
+    - Returns escalated response with message
+- [x] **Create provider cancellation email template** (`provider_cancelled_session_mail.h/cpp`)
   - Different from client-initiated cancellation — message should explain "Your provider has cancelled this appointment" and mention full refund
-- [ ] **Create admin escalation email template** (`provider_cancel_escalation_mail.h/cpp`)
+- [x] **Create admin escalation email template** (`provider_cancel_escalation_mail.h/cpp`)
   - Sent to admins when provider tries to cancel past the window
   - Includes: provider name, client name, service, date/time, reason the provider wants to cancel
-- [ ] **Tests**
+- [x] **Tests** (4 endpoint tests + 2 client email tests + 2 escalation email tests)
 
 ### 4.2 Frontend — Cancel Button on Provider Bookings
 
