@@ -247,11 +247,13 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 4.2 Frontend — Cancel Button on Provider Bookings
 
-- [ ] **Add cancel action** to provider bookings page
-  - Confirmation dialog: "Cancel this appointment? The client will be fully refunded."
-  - On confirm: call `POST /api/provider/cancel_session/:sessionId`
-  - Show success/error result
-- [ ] **Tests**
+- [x] **Add cancel action** to provider bookings page
+  - Click booking to expand → "Cancel Appointment" button (only for confirmed bookings)
+  - Confirmation with optional reason field: "Cancel this appointment? The client will be fully refunded."
+  - On confirm: calls `POST /api/provider/cancel_session/:sessionId`
+  - Result banner shows cancelled or escalated message
+  - Reloads bookings after cancel
+- [x] **Tests** (ServerAccess method + type added across interface/network/proxy/mock)
 
 ---
 
