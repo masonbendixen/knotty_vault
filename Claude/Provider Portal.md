@@ -285,21 +285,21 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 5.2 Frontend — Schedule Template Admin UI
 
-- [ ] **New component: `schedule-template-editor`** at `/manage/providers/:personId/templates`
+- [x] **New component: `schedule-template-editor`** at `/manage/providers/:personId/templates`
   - Create/edit templates: name, effective date range
-  - Weekly grid: checkboxes for each day, start/end time inputs
-  - "Generate Availability" button: date range picker + facility selector → calls generate endpoint
-  - List existing templates with active/inactive status
-- [ ] **Link from provider list** → "Templates" action button
-- [ ] **Tests**
+  - Weekly grid: checkboxes for each day, start/end time inputs (Mon-Sun)
+  - "Generate Availability" button per template: date range picker + facility selector → calls generate endpoint
+  - List existing templates with active/inactive status and entry chips
+- [x] **Link from provider list** → "Templates" action button
+- [x] **Tests** (24 component tests + 9 mock spec tests)
 
 ### 5.3 Frontend — Day Override UI
 
-- [ ] **Add override capability** to existing provider availability admin page
-  - "Override Day" button that creates a manual availability entry
-  - Visual indicator for template-generated vs manual entries
-  - Warning when overriding a template-generated day
-- [ ] **Tests**
+- [x] **Source badges** on provider availability admin page
+  - "Template" badge (blue) for template-generated entries
+  - "Manual" badge (green) for manual entries
+  - "Time Off" badge (red) for blocked entries
+- [x] **Tests** (updated existing + new badge tests)
 
 ---
 
