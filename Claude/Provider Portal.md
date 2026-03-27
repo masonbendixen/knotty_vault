@@ -263,26 +263,25 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 5.1 Backend — Schedule Template Business Logic
 
-- [ ] **Create `schedule_template_helper.h/cpp`** in `business_logic/scheduling/`
-  - `CreateTemplate()` — creates a schedule template with entries
+- [x] **Create `schedule_template_helper.h/cpp`** in `business_logic/scheduling/`
   - `GenerateAvailability()` — generates `provider_availability` rows from a template for a date range
     - For each day in range: check if day_of_week matches a template entry
     - **Skip dates that already have any manual availability** (`source = 'manual'`) — manual entries take precedence
     - **Skip dates that have an approved time-off request** (blocked availability entry from time-off approval)
     - Create `provider_availability` row with `source = 'template'` and `schedule_template_id` FK
   - `RegenerateAvailability()` — deletes template-generated rows and regenerates
-- [ ] **Create `POST /api/admin/schedule_template`** endpoint
+- [x] **Create `POST /api/admin/schedule_template`** endpoint
   - Create a new template with weekly entries
-- [ ] **Create `GET /api/admin/schedule_templates/:providerId`** endpoint
-  - List templates for a provider
-- [ ] **Create `POST /api/admin/generate_availability`** endpoint
+- [x] **Create `GET /api/admin/schedule_templates/:providerId`** endpoint
+  - List templates for a provider with nested entries
+- [x] **Create `POST /api/admin/generate_availability`** endpoint
   - Generate concrete availability rows from a template for a date range
   - Params: `template_id`, `date_from_us`, `date_to_us`, `facility_id`
-- [ ] **Create `POST /api/admin/override_availability`** endpoint (Scenario 50)
+- [x] **Create `POST /api/admin/override_availability`** endpoint (Scenario 50)
   - Add/modify a specific day's availability for a provider
   - Creates `provider_availability` with `source = 'manual'`
   - Manual entries take precedence over template-generated ones
-- [ ] **Tests**
+- [x] **Tests** (6 business logic tests + 5 endpoint tests)
 
 ### 5.2 Frontend — Schedule Template Admin UI
 
