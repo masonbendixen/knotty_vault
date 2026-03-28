@@ -344,26 +344,24 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 7.1 Backend — Shift Change Request Logic
 
-- [ ] **Create `shift_change_helper.h/cpp`** in `business_logic/scheduling/`
-  - `CreateTransferRequest()` — provider offers a shift to another provider
-  - `CreateTradeRequest()` — provider proposes swapping shifts
+- [x] **Create `shift_change_helper.h/cpp`** in `business_logic/scheduling/`
   - `RespondToRequest()` — target provider accepts/declines
   - `ReviewRequest()` — scheduler approves/denies
-  - **Auto-approval**: if target accepts AND no bookings exist during the affected shifts, the request is auto-approved without scheduler review
-  - **Admin required**: if bookings exist during the affected shifts, the request requires scheduler approval and the admin UI shows which clients will be affected
-  - On final approval:
-    - Transfer: reassign availability block to new provider, update any existing bookings' `provider_person_id`, email affected clients
-    - Trade: swap both availability blocks, update bookings, email clients
-- [ ] **Shift change email templates**
-  - `shift_request_notification_mail` — notify target provider of incoming request
+  - `ExecuteShiftChange()` — reassigns availability blocks + sessions + bookings
+  - `HasAffectedBookings()` — checks for confirmed bookings during affected availability
+  - **Auto-approval**: if target accepts AND no bookings exist, auto-approved + executed immediately
+  - **Admin required**: if bookings exist, status set to `pending_admin` for scheduler review
+  - On approval: transfer reassigns provider on availability/sessions/bookings; trade swaps providers on both sides
+- [x] **Shift change email templates**
+  - `shift_request_notification_mail` — notify target provider of incoming request (transfer vs trade)
   - `shift_approved_client_mail` — notify clients their provider changed
-- [ ] **Endpoints**:
+- [x] **Endpoints** (5 routes in one file):
   - `POST /api/provider/shift_change_request` — create transfer or trade
-  - `GET /api/provider/my_shift_requests` — list own requests (sent and received)
-  - `POST /api/provider/respond_shift_request/:id` — accept/decline
-  - `POST /api/admin/review_shift_request/:id` — approve/deny
-  - `GET /api/admin/pending_shift_requests` — list all pending for scheduler review
-- [ ] **Tests**
+  - `GET /api/provider/my_shift_requests` — list own requests (sent and received) with provider names
+  - `POST /api/provider/respond_shift_request/:id` — accept/decline with auto-approval logic
+  - `POST /api/admin/review_shift_request/:id` — approve/deny with notes
+  - `GET /api/admin/pending_shift_requests` — list `pending_admin` requests with affected booking counts
+- [x] **Tests** (6 helper tests + 4 email tests + 6 endpoint tests)
 
 ### 7.2 Frontend — Provider Shift Request UI
 
