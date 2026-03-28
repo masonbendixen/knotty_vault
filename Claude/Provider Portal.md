@@ -309,21 +309,22 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 6.1 Backend — Scheduling Exceptions
 
-- [ ] **Create `scheduling_exceptions` table** (or reuse `provider_availability` with a new `source = 'closure'`)
-  - Studio-wide closures: `facility_id` set, `provider_person_id = NULL`, `is_blocked = true`, `source = 'closure'`
-  - Provider-specific blocks: `provider_person_id` set, `is_blocked = true`, `source = 'admin_block'`
-  - Date range support: one row per day in the range (same pattern as time-off approval)
-- [ ] **Create `POST /api/admin/block_dates`** endpoint
+- [x] **Create `scheduling_exceptions` table**
+  - New table: `facility_id` (NOT NULL), `provider_person_id` (NULLABLE — NULL = studio-wide), `date_us`, `reason`
+  - One row per blocked day (same pattern as time-off)
+  - Registered in make_database_info, create_database, and admin allowed tables
+- [x] **Create `POST /api/admin/block_dates`** endpoint
   - Body: `{ facility_id, provider_person_id (optional), date_from_us, date_to_us, reason }`
-  - If `provider_person_id` is null: studio-wide closure for the facility
-  - If `provider_person_id` is set: block for that specific provider
-  - Creates blocked `provider_availability` rows for each day in the range
-  - Cancels any existing bookings in the range with full refund + notification
-- [ ] **Create `DELETE /api/admin/block_dates`** endpoint
-  - Removes blocked availability rows for a date range
-- [ ] **Update `GenerateAvailability`** to also skip dates with studio-wide closures (`source = 'closure'`)
-- [ ] **Update availability computation** to exclude dates blocked by closures
-- [ ] **Tests**
+  - Studio-wide (no provider): deletes all provider availability at the facility on those dates
+  - Provider-specific: deletes that provider's availability on those dates
+  - Cancels confirmed bookings on affected dates with full refund
+  - Returns `{ days_blocked, bookings_cancelled }`
+- [x] **Create `POST /api/admin/unblock_dates`** endpoint
+  - Removes scheduling_exceptions rows matching criteria and date range
+  - Returns `{ days_unblocked }`
+- [x] **Update `GenerateAvailability`** to skip dates with scheduling exceptions (provider-specific or studio-wide)
+- [x] **Update availability computation** (`ComputeAvailableSlots`) to exclude availability on exception dates
+- [x] **Tests** (6 endpoint tests + 2 template generation tests)
 
 ### 6.2 Frontend — Scheduling Exceptions UI
 
