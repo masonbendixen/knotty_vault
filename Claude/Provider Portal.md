@@ -365,21 +365,24 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 7.2 Frontend — Provider Shift Request UI
 
-- [ ] **New component: `shift-requests`** at `/staff/shift-requests`
-  - "Request Transfer" form: select shift (from own availability), select target provider
-  - "Request Trade" form: select own shift, select target provider + their shift
-  - List of pending/completed requests with status flow
-- [ ] **Tests**
+- [x] **New component: `shift-requests`** at `/staff/shift-requests`
+  - "Request Transfer" form: select own availability block, select target provider
+  - "Request Trade" form: select own block, select target provider, select target's block
+  - Availability dropdowns show date + time range for easy identification
+  - List of all requests with type badges (Transfer/Trade) and status badges
+  - Accept/Decline buttons for incoming pending requests
+  - Result banner, staff dashboard card
+- [x] **Tests** (19 component tests + 17 mock spec tests)
 
 ### 7.3 Frontend — Admin Shift Request Review
 
-- [ ] **New component: `shift-request-review`** at `/manage/shift-requests`
-  - List of pending shift requests (transfers and trades)
-  - Show both providers, shifts involved, any affected bookings
-  - Approve/Deny buttons
-  - Warning about client notifications
-- [ ] **Add link** to manage dashboard
-- [ ] **Tests**
+- [x] **New component: `shift-request-review`** at `/manage/shift-requests`
+  - List of `pending_admin` shift requests with type badges and provider names
+  - Affected bookings count with amber warning when > 0
+  - Review form: optional notes + Approve/Deny buttons
+  - Result banner
+- [x] **Add link** to manage dashboard ("Shift Requests" card) and staff dashboard
+- [x] **Tests** (18 component tests)
 
 ---
 
