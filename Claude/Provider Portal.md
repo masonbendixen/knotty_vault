@@ -303,11 +303,44 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ---
 
-## Phase 6: Shift Transfers & Trades (Scenarios 52, 53)
+## Phase 6: Scheduling Exceptions & Blackout Dates
+
+**Goal**: Admins can specify date ranges where scheduling is blocked — either studio-wide (closures, holidays) or per-provider. These exceptions prevent availability generation and booking for the affected dates.
+
+### 6.1 Backend — Scheduling Exceptions
+
+- [ ] **Create `scheduling_exceptions` table** (or reuse `provider_availability` with a new `source = 'closure'`)
+  - Studio-wide closures: `facility_id` set, `provider_person_id = NULL`, `is_blocked = true`, `source = 'closure'`
+  - Provider-specific blocks: `provider_person_id` set, `is_blocked = true`, `source = 'admin_block'`
+  - Date range support: one row per day in the range (same pattern as time-off approval)
+- [ ] **Create `POST /api/admin/block_dates`** endpoint
+  - Body: `{ facility_id, provider_person_id (optional), date_from_us, date_to_us, reason }`
+  - If `provider_person_id` is null: studio-wide closure for the facility
+  - If `provider_person_id` is set: block for that specific provider
+  - Creates blocked `provider_availability` rows for each day in the range
+  - Cancels any existing bookings in the range with full refund + notification
+- [ ] **Create `DELETE /api/admin/block_dates`** endpoint
+  - Removes blocked availability rows for a date range
+- [ ] **Update `GenerateAvailability`** to also skip dates with studio-wide closures (`source = 'closure'`)
+- [ ] **Update availability computation** to exclude dates blocked by closures
+- [ ] **Tests**
+
+### 6.2 Frontend — Scheduling Exceptions UI
+
+- [ ] **New component: `scheduling-exceptions`** at `/manage/scheduling-exceptions`
+  - "Block Dates" form: facility, optional provider, date range, reason
+  - List of active blocks with facility, provider (or "Studio-wide"), date range, reason
+  - Remove button to unblock
+- [ ] **Add link** to manage dashboard
+- [ ] **Tests**
+
+---
+
+## Phase 7: Shift Transfers & Trades (Scenarios 52, 53)
 
 **Goal**: Providers can request to give a shift to another provider (transfer) or swap shifts (trade). Requires target provider acceptance and scheduler approval.
 
-### 6.1 Backend — Shift Change Request Logic
+### 7.1 Backend — Shift Change Request Logic
 
 - [ ] **Create `shift_change_helper.h/cpp`** in `business_logic/scheduling/`
   - `CreateTransferRequest()` — provider offers a shift to another provider
@@ -330,7 +363,7 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
   - `GET /api/admin/pending_shift_requests` — list all pending for scheduler review
 - [ ] **Tests**
 
-### 6.2 Frontend — Provider Shift Request UI
+### 7.2 Frontend — Provider Shift Request UI
 
 - [ ] **New component: `shift-requests`** at `/staff/shift-requests`
   - "Request Transfer" form: select shift (from own availability), select target provider
@@ -338,7 +371,7 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
   - List of pending/completed requests with status flow
 - [ ] **Tests**
 
-### 6.3 Frontend — Admin Shift Request Review
+### 7.3 Frontend — Admin Shift Request Review
 
 - [ ] **New component: `shift-request-review`** at `/manage/shift-requests`
   - List of pending shift requests (transfers and trades)
@@ -358,7 +391,8 @@ Phase 2 (Schedule & Booking Views) — Depends on Phase 1. Provider-facing read 
 Phase 3 (Self-Service) — Depends on Phase 2. Toggle + time-off requests.
 Phase 4 (Provider Cancellation) — Depends on Phase 2. Provider cancels a session.
 Phase 5 (Templates & Generation) — Depends on Phase 1. Scheduler creates recurring patterns.
-Phase 6 (Shift Changes) — Depends on Phases 2 & 5. Transfer/trade requests.
+Phase 6 (Scheduling Exceptions) — Depends on Phase 5. Admin blocks dates for studio or providers.
+Phase 7 (Shift Changes) — Depends on Phases 2 & 5. Transfer/trade requests.
 ```
 
 Phases 3, 4, and 5 can be worked on in parallel after Phase 2 is complete.
