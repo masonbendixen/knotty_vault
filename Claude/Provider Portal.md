@@ -328,12 +328,13 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 6.2 Frontend — Scheduling Exceptions UI
 
-- [ ] **New component: `scheduling-exceptions`** at `/manage/scheduling-exceptions`
-  - "Block Dates" form: facility, optional provider, date range, reason
-  - List of active blocks with facility, provider (or "Studio-wide"), date range, reason
-  - Remove button to unblock
-- [ ] **Add link** to manage dashboard
-- [ ] **Tests**
+- [x] **New component: `scheduling-exceptions`** at `/manage/scheduling-exceptions`
+  - "Block Dates" form: facility, optional provider (dropdown with "Studio-wide" option), date range (from auto-fills to), reason
+  - List of grouped exceptions with facility name, "Studio-wide" (amber) or provider name (purple) badges, date range, reason
+  - "Unblock" button per group
+  - Result banner showing days blocked / bookings cancelled
+- [x] **Add link** to manage dashboard ("Scheduling Exceptions" card with block icon)
+- [x] **Tests** (17 component tests + 8 mock spec tests, 1500 total passing)
 
 ---
 
