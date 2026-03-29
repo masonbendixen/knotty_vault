@@ -396,83 +396,78 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### Desired Behavior
 
+**Hard block on too-close shifts:**
+- [ ] Add configurable secret `shift_change_booking_block_days` (default 7)
+- [ ] When creating a shift change request: if the affected shift has bookings AND the shift is within `shift_change_booking_block_days` days, **reject the request outright** — "This shift has client bookings within the next 7 days and cannot be transferred or traded."
+- [ ] This prevents last-minute disruption to clients
+
 **At request creation (requester side):**
 - [ ] Check for bookings on the affected shift date(s)
-- [ ] If bookings exist: show warning in the UI — "This shift has N client booking(s). If accepted, the request will require admin review before the shift change takes effect."
+- [ ] If bookings exist (but outside the block window): show warning — "This shift has N client booking(s). If accepted, the request will require admin review."
 - [ ] Include booking count in the API response: `{ id, status, affected_bookings: N }`
 - [ ] Requester can still submit despite the warning
 
 **At request viewing (target side):**
 - [ ] Show booking count on the request card — "⚠ N client booking(s) will be affected"
-- [ ] When target clicks Accept with bookings present: show confirmation — "This request affects N client booking(s) and will require admin review. Are you sure?"
+- [ ] When target clicks Accept with bookings: confirmation — "This request affects N client booking(s) and will require admin review. Are you sure?"
 
 **Admin review UI:**
-- [ ] Show full details of each affected booking:
-  - Client name, email
-  - Service name, variant, date/time
-  - Booking status
-- [ ] Warning banner: "Approving this shift change will reassign N booking(s) to a different provider. Affected clients will be notified and offered a free cancellation."
-- [ ] Admin can review each booking before approving
+- [ ] Show full details of each affected booking: client name, email, service, variant, date/time, status
+- [ ] Warning banner: "Approving will reassign N booking(s). Clients will be notified and offered free cancellation."
+- [ ] All-or-nothing: approve transfers all bookings, deny keeps everything as-is
 
 **On admin approval (client notification):**
 - [ ] Email each affected client:
   - "Your appointment on [date] at [time] has been reassigned from [old provider] to [new provider]."
   - "All other details remain the same."
-  - "If you'd like to cancel due to this change, you may do so with a full refund regardless of the normal cancellation policy."
-- [ ] Set a flag on the affected bookings allowing free cancellation (override the product's cancellation policy)
-  - Option A: Add `free_cancel_until_us` column to bookings — set to some window (e.g., 48h after notification)
-  - Option B: Add `provider_change_free_cancel` boolean flag on booking
-- [ ] The client's My Bookings page shows a notice: "Your provider has changed. Free cancellation available until [date]."
+  - "If you'd like to cancel due to this change, you may do so with a full refund."
+- [ ] Add `free_cancel_until_us` column to bookings table — set to session start minus `provider_change_free_cancel_hours` (default 2) hours
+  - This gives clients free cancellation up to 2 hours before the appointment
+- [ ] In-app notification on My Bookings page: "Your provider has changed" notice on the booking card with a clickable link to cancel with full refund
+- [ ] `BookingHelper::CancelBooking()` checks `free_cancel_until_us` — if set and `now < free_cancel_until_us`, bypass the cancellation policy and give full refund
 
 **On admin denial:**
-- [ ] No client notification needed — the shift stays as-is
-- [ ] Requester and target are notified that the request was denied
+- [ ] No client notification — shift stays as-is
+- [ ] Requester and target notified of denial (existing email pattern)
 
 ### 8.1 Backend
 
-- [ ] **Update `POST /api/provider/shift_change_request`** to return `affected_bookings` count
-- [ ] **Update `GET /api/provider/my_shift_requests`** to include `affected_bookings` per request
-- [ ] **Update `GET /api/admin/pending_shift_requests`** to include full booking details (client name, service, time) per request
-- [ ] **Update `ShiftChangeHelper::ExecuteShiftChange()`** to send client notification emails after reassignment
-- [ ] **Create client provider-change notification email** (`provider_change_client_mail.h/cpp`)
-- [ ] **Add free cancellation flag** to bookings table (schema change + migration)
-- [ ] **Update `BookingHelper::CancelBooking()`** to honor free cancellation flag (bypass cancellation policy)
+- [ ] **Add configurable secrets**: `shift_change_booking_block_days` (default 7), `provider_change_free_cancel_hours` (default 2)
+- [ ] **Update `POST /api/provider/shift_change_request`** — reject if bookings exist within block window; return `affected_bookings` count otherwise
+- [ ] **Update `GET /api/provider/my_shift_requests`** — include `affected_bookings` per request
+- [ ] **Update `GET /api/admin/pending_shift_requests`** — include full booking details (client name, service, time) per request
+- [ ] **Add `free_cancel_until_us` column** to bookings table (nullable BIGINT)
+- [ ] **Update `ShiftChangeHelper::ExecuteShiftChange()`** — after reassignment, set `free_cancel_until_us` on affected bookings, send client emails
+- [ ] **Create `provider_change_client_mail.h/cpp`** — email template for provider change notification
+- [ ] **Update `BookingHelper::CancelBooking()`** — if `free_cancel_until_us` is set and current time is before it, bypass cancellation policy (full refund)
 - [ ] **Tests**
 
 ### 8.2 Frontend — Provider Warnings
 
-- [ ] **Update shift-requests component**: show booking warning on request cards, confirmation dialog on accept with bookings
-- [ ] **Update create request flow**: show warning after submission if `affected_bookings > 0`
+- [ ] **Update shift-requests component**: show booking warning on request cards, confirmation dialog on accept with bookings, error message for blocked requests
 - [ ] **Tests**
 
 ### 8.3 Frontend — Admin Review Enhancement
 
-- [ ] **Update shift-request-review component**: show full booking details per request, warning banner about client notifications
+- [ ] **Update shift-request-review component**: show full booking details (client name, service, time) per request, warning banner about client notification + free cancellation
 - [ ] **Tests**
 
 ### 8.4 Frontend — Client Notification
 
-- [ ] **Update my-events component**: show "provider changed" notice on affected bookings with free cancellation badge
+- [ ] **Update my-events component**: show "Provider Changed" notice on affected bookings, "Cancel with full refund" button that bypasses normal cancellation policy, notice visible until `free_cancel_until_us`
 - [ ] **Tests**
 
 ---
 
-## Open Questions — Phase 8
+## Resolved Questions — Phase 8
 
-1. **Free cancellation window**: How long should clients have to cancel with a free refund after being notified of a provider change? Options: 24 hours, 48 hours, until the appointment, no time limit (free cancel any time before the appointment). What feels right?
-	- We need to email the client of the change. I feel like clients are really picky about therapists. My gut feeling is that they should be able to cancel with impunity after a provider change up to a configurable secret number hours before the massage that defaults to 2 hours. I also would like to full block shift trades / transfers within a configurable time frame if there are clients booked. Let's make this a secret and have it default to 7 days.
-
-2. **Client opt-in vs opt-out**: Should the provider change go through immediately (client can cancel afterward) or should the client have to confirm they're OK with the new provider before the change takes effect? Opt-in is more respectful but adds complexity and delays the process.
-	- I think it will be too painful to have clients need to approve this. This should be rare. Hence the change to not allow these things if it is too close to the session. But the request needs to go through as soon as both provider have agreed AND an admin signs off on it. The admin signing off on it is the better gate than the client.
-
-3. **Multiple bookings on one shift**: If a provider has 5 clients booked on a shift day and the shift is being transferred, should the admin be able to approve some bookings for transfer and reject others (keeping the original provider for select clients)? Or is it all-or-nothing?
-	- It's all or nothing. Presumably, if they can't do that shift, there is a reason for it.
-
-4. **Client preference**: Should clients be able to indicate "I only want [specific provider]" on their booking, which would automatically trigger a free cancellation if that provider changes? Or is manual review sufficient?
-	- I feel like most people do care who their provider is so I don't think that this is a useful setting to provide since I feel like everyone DOES care who there therapist is. Especially with hang ups on gender and so forth.
-
-5. **Notification channel**: Email only, or should there also be an in-app notification/banner when the client logs in? (Similar to the admin alerts pattern we used for escalated cancellations.)
-	- Would the in app notification allow the user to click on it to bring up the session so they could cancel it? If so, that's useful. Otherwise, I don't think it is that helpful.
+| # | Question | Decision |
+|---|---|---|
+| 1 | **Free cancellation window** | Clients get free cancellation after a provider change up to a configurable secret `provider_change_free_cancel_hours` (default 2) hours before the session. Additionally, shift trades/transfers with client bookings are **blocked entirely** if the session is within a configurable secret `shift_change_booking_block_days` (default 7) days. This prevents last-minute disruption — if someone wants to trade within 7 days and there are bookings, the system refuses the request outright. |
+| 2 | **Client opt-in vs opt-out** | **Opt-out.** The change goes through immediately once both providers agree + admin approves. Clients are notified by email and can cancel with a full refund. No client approval gate — admin approval is the gate. |
+| 3 | **Multiple bookings on one shift** | **All or nothing.** If admin approves a shift change, ALL bookings on that shift transfer to the new provider. No selective per-booking approval. |
+| 4 | **Client preference** | **Not implemented.** Most clients care about their provider, so there's no useful "I only want this provider" toggle — it would be redundant since everyone cares. The free cancellation window handles the case where a client doesn't want the new provider. |
+| 5 | **Notification channel** | **Email + in-app notification.** The in-app notification (on My Bookings page) should be clickable and link directly to the booking so the client can cancel from there. Uses the same pattern as admin alerts — a banner/notice on the booking card with a "Cancel with full refund" action. |
 
 ---
 
