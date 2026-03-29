@@ -460,6 +460,7 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 ## Open Questions — Phase 8
 
 1. **Free cancellation window**: How long should clients have to cancel with a free refund after being notified of a provider change? Options: 24 hours, 48 hours, until the appointment, no time limit (free cancel any time before the appointment). What feels right?
+	- We need to email the client of the change. I feel like clients are really picky about therapists. My gut feeling is that they should be able to cancel with impunity 
 
 2. **Client opt-in vs opt-out**: Should the provider change go through immediately (client can cancel afterward) or should the client have to confirm they're OK with the new provider before the change takes effect? Opt-in is more respectful but adds complexity and delays the process.
 
