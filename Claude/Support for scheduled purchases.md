@@ -394,18 +394,18 @@ Status updated March 2026. Checked items are fully implemented end-to-end.
 
 ## Provider Portal
 [[Provider Portal]]
-- [ ] 45. Provider views their upcoming and past bookings
-- [ ] 46. Provider receives email when a session is booked with them
-- [ ] 47. Provider portal home page
-- [ ] 48. Provider manages their service capabilities
-- [ ] 49. Scheduler creates schedule templates for providers
-- [ ] 50. Scheduler overrides a provider's schedule for a specific day
-- [ ] 51. Provider requests a day off
-- [ ] 52. Provider requests a shift transfer
-- [ ] 53. Provider requests a shift trade
-- [ ] 54. Provider views their published schedule
-- [ ] 55. Provider views booking details
-- [ ] 56. Provider cancels a session
+- [x] 45. Provider views their upcoming and past bookings (Provider Portal Phase 2 — provider-bookings component + my_bookings endpoint)
+- [x] 46. Provider receives email when a session is booked with them (Provider Portal Phase 1 — provider_booking_notification_mail, sent from book_service)
+- [x] 47. Provider portal home page (Provider Portal Phase 2 — staff-dashboard with provider cards)
+- [x] 48. Provider manages their service capabilities (Provider Portal Phase 3 — toggle_accepting endpoint + accepting bookings toggle UI)
+- [x] 49. Scheduler creates schedule templates for providers (Provider Portal Phase 5 — schedule_template_helper + admin endpoints + schedule-template-editor UI)
+- [x] 50. Scheduler overrides a provider's schedule for a specific day (Provider Portal Phase 5 — override_availability endpoint with source='manual')
+- [x] 51. Provider requests a day off (Provider Portal Phase 3 — time_off_request endpoint + provider-time-off UI + admin review workflow)
+- [x] 52. Provider requests a shift transfer (Provider Portal Phase 7 — shift_change_helper + shift-requests UI + Phase 8 client booking handling)
+- [x] 53. Provider requests a shift trade (Provider Portal Phase 7 — shift_change_helper trade type + Phase 8 client booking handling)
+- [x] 54. Provider views their published schedule (Provider Portal Phase 2 — provider-schedule component + my_schedule endpoint)
+- [x] 55. Provider views booking details (Provider Portal Phase 2 — provider-bookings detail view with client/service/variant/location)
+- [x] 56. Provider cancels a session (Provider Portal Phase 4 — cancel_session endpoint with escalation + provider cancellation emails)
 
 ## Additional Scenarios
 - [x] 57. Admin views all attendees for a specific event session
@@ -534,18 +534,18 @@ Organized into priority tiers. The MUST HAVE tier is designed to align with the 
 |---|---|---|---|
 | [ ] | 43 | Admin cancels user booking with full refund | Admin power |
 | [ ] | 44 | Admin reassigns booking to different provider | Handle provider changes |
-| [ ] | 45 | Provider views upcoming and past bookings | Provider awareness |
-| [ ] | 46 | Provider receives email on new booking | Provider notification |
-| [ ] | 47 | Provider portal home page | Self-service |
-| [ ] | 48 | Provider manages service capabilities | Toggle availability |
-| [ ] | 49 | Scheduler creates schedule templates for providers | Recurring weekly availability |
-| [ ] | 50 | Scheduler overrides provider schedule for a specific day | Day-level schedule changes |
-| [ ] | 51 | Provider requests a day off | Self-service time-off |
-| [ ] | 52 | Provider requests a shift transfer | Give shift to another provider |
-| [ ] | 53 | Provider requests a shift trade | Swap shifts between providers |
-| [ ] | 54 | Provider views their published schedule | Schedule transparency |
-| [ ] | 55 | Provider views booking details | Working view |
-| [ ] | 56 | Provider cancels a session | Provider flexibility |
+| [x] | 45 | Provider views upcoming and past bookings | Provider awareness |
+| [x] | 46 | Provider receives email on new booking | Provider notification |
+| [x] | 47 | Provider portal home page | Self-service |
+| [x] | 48 | Provider manages service capabilities | Toggle availability |
+| [x] | 49 | Scheduler creates schedule templates for providers | Recurring weekly availability |
+| [x] | 50 | Scheduler overrides provider schedule for a specific day | Day-level schedule changes |
+| [x] | 51 | Provider requests a day off | Self-service time-off |
+| [x] | 52 | Provider requests a shift transfer | Give shift to another provider |
+| [x] | 53 | Provider requests a shift trade | Swap shifts between providers |
+| [x] | 54 | Provider views their published schedule | Schedule transparency |
+| [x] | 55 | Provider views booking details | Working view |
+| [x] | 56 | Provider cancels a session | Provider flexibility |
 | [ ] | 61 | No-show tracking | Data quality |
 | [ ] | 62 | Admin comps a re-slot into another session | Handle customer issues |
 | [ ] | 63 | Admin views analytics/reports | Business intelligence |
