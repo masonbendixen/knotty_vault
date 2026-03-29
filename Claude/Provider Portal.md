@@ -460,9 +460,10 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 ## Open Questions — Phase 8
 
 1. **Free cancellation window**: How long should clients have to cancel with a free refund after being notified of a provider change? Options: 24 hours, 48 hours, until the appointment, no time limit (free cancel any time before the appointment). What feels right?
-	- We need to email the client of the change. I feel like clients are really picky about therapists. My gut feeling is that they should be able to cancel with impunity 
+	- We need to email the client of the change. I feel like clients are really picky about therapists. My gut feeling is that they should be able to cancel with impunity after a provider change up to a configurable secret number hours before the massage that defaults to 2 hours. I also would like to full block shift trades / transfers within a configurable time frame if there are clients booked. Let's make this a secret and have it default to 7 days.
 
 2. **Client opt-in vs opt-out**: Should the provider change go through immediately (client can cancel afterward) or should the client have to confirm they're OK with the new provider before the change takes effect? Opt-in is more respectful but adds complexity and delays the process.
+	- I think it will be too painful to have clients need to approve this.
 
 3. **Multiple bookings on one shift**: If a provider has 5 clients booked on a shift day and the shift is being transferred, should the admin be able to approve some bookings for transfer and reject others (keeping the original provider for select clients)? Or is it all-or-nothing?
 
