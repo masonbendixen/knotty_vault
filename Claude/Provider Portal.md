@@ -432,15 +432,15 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 8.1 Backend
 
-- [ ] **Add configurable secrets**: `shift_change_booking_block_days` (default 7), `provider_change_free_cancel_hours` (default 2)
-- [ ] **Update `POST /api/provider/shift_change_request`** — reject if bookings exist within block window; return `affected_bookings` count otherwise
-- [ ] **Update `GET /api/provider/my_shift_requests`** — include `affected_bookings` per request
-- [ ] **Update `GET /api/admin/pending_shift_requests`** — include full booking details (client name, service, time) per request
-- [ ] **Add `free_cancel_until_us` column** to bookings table (nullable BIGINT)
-- [ ] **Update `ShiftChangeHelper::ExecuteShiftChange()`** — after reassignment, set `free_cancel_until_us` on affected bookings, send client emails
-- [ ] **Create `provider_change_client_mail.h/cpp`** — email template for provider change notification
-- [ ] **Update `BookingHelper::CancelBooking()`** — if `free_cancel_until_us` is set and current time is before it, bypass cancellation policy (full refund)
-- [ ] **Tests**
+- [x] **Add configurable secrets**: `shift_change_booking_block_days` (default 7), `provider_change_free_cancel_hours` (default 2)
+- [x] **Update `POST /api/provider/shift_change_request`** — rejects if bookings exist within block window; returns `affected_bookings` count
+- [x] **Update `GET /api/provider/my_shift_requests`** — includes `affected_bookings` per request
+- [x] **Update `GET /api/admin/pending_shift_requests`** — includes full `affected_booking_details` array (client name/email, service, variant, times)
+- [x] **Add `free_cancel_until_us` column** to bookings table (nullable BIGINT) — requires DB reset
+- [x] **Update `ShiftChangeHelper::ExecuteShiftChange()`** — sets `free_cancel_until_us` on affected bookings, returns affected booking IDs; endpoint sends client emails on admin approval
+- [x] **Create `provider_change_client_mail.h/cpp`** — email notifying client of provider change with free cancellation offer
+- [x] **Update `BookingHelper::CancelBooking()`** — checks `free_cancel_until_us`; if set and not expired, bypasses cancellation policy for full refund
+- [x] **Tests** — 12 new tests: 4 shift_change_helper (count bookings, affected IDs), 2 booking_helper (free cancel override/expired), 4 endpoint (block window, booking details, free cancel set), 2 email template
 
 ### 8.2 Frontend — Provider Warnings
 
