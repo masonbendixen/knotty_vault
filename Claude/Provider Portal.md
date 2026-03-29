@@ -472,6 +472,7 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 	- I feel like most people do care who their provider is so I don't think that this is a useful setting to provide since I feel like everyone DOES care who there therapist is. Especially with hang ups on gender and so forth.
 
 5. **Notification channel**: Email only, or should there also be an in-app notification/banner when the client logs in? (Similar to the admin alerts pattern we used for escalated cancellations.)
+	- Would the in app notification allow the user to click on it to bring up the session so they could cancel it? If so, that's useful. Otherwise, I don't think it is that helpful.
 
 ---
 
