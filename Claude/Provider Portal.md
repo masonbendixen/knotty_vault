@@ -444,18 +444,18 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ### 8.2 Frontend — Provider Warnings
 
-- [ ] **Update shift-requests component**: show booking warning on request cards, confirmation dialog on accept with bookings, error message for blocked requests
-- [ ] **Tests**
+- [x] **Update shift-requests component**: amber booking warning on request cards, Accept confirmation dialog when bookings affected, backend block-window error shown in submit area
+- [x] **Tests** (7 new: warning shown/hidden, accept confirmation flow, direct accept without bookings, blocked error)
 
 ### 8.3 Frontend — Admin Review Enhancement
 
-- [ ] **Update shift-request-review component**: show full booking details (client name, service, time) per request, warning banner about client notification + free cancellation
-- [ ] **Tests**
+- [x] **Update shift-request-review component**: affected booking details section showing client names/emails/service/variant per request, blue info banner about client notification + free cancellation on approval
+- [x] **Tests** (4 new: booking details rendered, notification banner, hidden when no details)
 
 ### 8.4 Frontend — Client Notification
 
-- [ ] **Update my-events component**: show "Provider Changed" notice on affected bookings, "Cancel with full refund" button that bypasses normal cancellation policy, notice visible until `free_cancel_until_us`
-- [ ] **Tests**
+- [x] **Update my-events component**: blue "Provider Changed" notice with swap icon on bookings that have `free_cancel_until_us` in the future, existing cancel button provides the free refund automatically (backend handles via `CancelBooking`)
+- [x] **Tests** (6 new: notice shown/hidden based on `free_cancel_until_us` future/past/undefined)
 
 ---
 
