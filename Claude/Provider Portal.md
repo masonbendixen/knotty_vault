@@ -386,6 +386,91 @@ This plan implements scenarios 45–56 from Support for scheduled purchases.md. 
 
 ---
 
+## Phase 8: Shift Changes with Client Bookings
+
+**Goal**: When a shift transfer or trade involves dates that have client bookings, provide clear warnings to both providers, detailed information to the admin reviewer, and proactive client notification with a free cancellation option.
+
+### Current Behavior (Phase 7)
+- No-conflict shifts: auto-approved when target accepts. Works well.
+- Shifts with bookings: goes to `pending_admin`. Admin sees a booking count but no details. Clients are NOT notified. No special cancellation treatment.
+
+### Desired Behavior
+
+**At request creation (requester side):**
+- [ ] Check for bookings on the affected shift date(s)
+- [ ] If bookings exist: show warning in the UI — "This shift has N client booking(s). If accepted, the request will require admin review before the shift change takes effect."
+- [ ] Include booking count in the API response: `{ id, status, affected_bookings: N }`
+- [ ] Requester can still submit despite the warning
+
+**At request viewing (target side):**
+- [ ] Show booking count on the request card — "⚠ N client booking(s) will be affected"
+- [ ] When target clicks Accept with bookings present: show confirmation — "This request affects N client booking(s) and will require admin review. Are you sure?"
+
+**Admin review UI:**
+- [ ] Show full details of each affected booking:
+  - Client name, email
+  - Service name, variant, date/time
+  - Booking status
+- [ ] Warning banner: "Approving this shift change will reassign N booking(s) to a different provider. Affected clients will be notified and offered a free cancellation."
+- [ ] Admin can review each booking before approving
+
+**On admin approval (client notification):**
+- [ ] Email each affected client:
+  - "Your appointment on [date] at [time] has been reassigned from [old provider] to [new provider]."
+  - "All other details remain the same."
+  - "If you'd like to cancel due to this change, you may do so with a full refund regardless of the normal cancellation policy."
+- [ ] Set a flag on the affected bookings allowing free cancellation (override the product's cancellation policy)
+  - Option A: Add `free_cancel_until_us` column to bookings — set to some window (e.g., 48h after notification)
+  - Option B: Add `provider_change_free_cancel` boolean flag on booking
+- [ ] The client's My Bookings page shows a notice: "Your provider has changed. Free cancellation available until [date]."
+
+**On admin denial:**
+- [ ] No client notification needed — the shift stays as-is
+- [ ] Requester and target are notified that the request was denied
+
+### 8.1 Backend
+
+- [ ] **Update `POST /api/provider/shift_change_request`** to return `affected_bookings` count
+- [ ] **Update `GET /api/provider/my_shift_requests`** to include `affected_bookings` per request
+- [ ] **Update `GET /api/admin/pending_shift_requests`** to include full booking details (client name, service, time) per request
+- [ ] **Update `ShiftChangeHelper::ExecuteShiftChange()`** to send client notification emails after reassignment
+- [ ] **Create client provider-change notification email** (`provider_change_client_mail.h/cpp`)
+- [ ] **Add free cancellation flag** to bookings table (schema change + migration)
+- [ ] **Update `BookingHelper::CancelBooking()`** to honor free cancellation flag (bypass cancellation policy)
+- [ ] **Tests**
+
+### 8.2 Frontend — Provider Warnings
+
+- [ ] **Update shift-requests component**: show booking warning on request cards, confirmation dialog on accept with bookings
+- [ ] **Update create request flow**: show warning after submission if `affected_bookings > 0`
+- [ ] **Tests**
+
+### 8.3 Frontend — Admin Review Enhancement
+
+- [ ] **Update shift-request-review component**: show full booking details per request, warning banner about client notifications
+- [ ] **Tests**
+
+### 8.4 Frontend — Client Notification
+
+- [ ] **Update my-events component**: show "provider changed" notice on affected bookings with free cancellation badge
+- [ ] **Tests**
+
+---
+
+## Open Questions — Phase 8
+
+1. **Free cancellation window**: How long should clients have to cancel with a free refund after being notified of a provider change? Options: 24 hours, 48 hours, until the appointment, no time limit (free cancel any time before the appointment). What feels right?
+
+2. **Client opt-in vs opt-out**: Should the provider change go through immediately (client can cancel afterward) or should the client have to confirm they're OK with the new provider before the change takes effect? Opt-in is more respectful but adds complexity and delays the process.
+
+3. **Multiple bookings on one shift**: If a provider has 5 clients booked on a shift day and the shift is being transferred, should the admin be able to approve some bookings for transfer and reject others (keeping the original provider for select clients)? Or is it all-or-nothing?
+
+4. **Client preference**: Should clients be able to indicate "I only want [specific provider]" on their booking, which would automatically trigger a free cancellation if that provider changes? Or is manual review sufficient?
+
+5. **Notification channel**: Email only, or should there also be an in-app notification/banner when the client logs in? (Similar to the admin alerts pattern we used for escalated cancellations.)
+
+---
+
 ## Dependencies & Ordering
 
 ```
@@ -395,7 +480,8 @@ Phase 3 (Self-Service) — Depends on Phase 2. Toggle + time-off requests.
 Phase 4 (Provider Cancellation) — Depends on Phase 2. Provider cancels a session.
 Phase 5 (Templates & Generation) — Depends on Phase 1. Scheduler creates recurring patterns.
 Phase 6 (Scheduling Exceptions) — Depends on Phase 5. Admin blocks dates for studio or providers.
-Phase 7 (Shift Changes) — Depends on Phases 2 & 5. Transfer/trade requests.
+Phase 7 (Shift Changes — No Conflict) — Depends on Phases 2 & 5. Transfer/trade requests without bookings.
+Phase 8 (Shift Changes — With Client Bookings) — Depends on Phase 7. Handles client impact.
 ```
 
 Phases 3, 4, and 5 can be worked on in parallel after Phase 2 is complete.
