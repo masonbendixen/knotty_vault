@@ -743,6 +743,7 @@ This section documents the user scenarios the payment system must support, valid
 
 ### Handle in Future (Phases 5-6: Vouchers & Refunds)
 *Gift cards, coupons, and refunds*
+[[Vouchers and Refunds]]
 
 - [ ] 22. User redeems a voucher/gift card and fully consumes its value
 - [ ] 23. User redeems a voucher/gift card and has remaining balance
