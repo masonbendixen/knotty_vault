@@ -74,7 +74,7 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 1.1 Database Schema — `vouchers` table
 
-- [ ] **Create `db_schema/vouchers.h/cpp`** — Column constants: `id`, `code` (unique), `currency`, `initial_value_cents`, `remaining_value_cents`, `issued_to_person_id` (nullable FK → people, for account-linked vouchers), `issued_by_person_id` (nullable FK → people, admin who created), `is_active`, `expires_us` (nullable), `notes` (nullable), `created_us`, `updated_us`
+- [ ] **Create `db_schema/vouchers.h/cpp`** — Column constants: `id`, `code` (unique, auto-generated or admin-specified), `currency`, `initial_value_cents`, `remaining_value_cents`, `issued_to_person_id` (nullable FK → people; **null = bearer voucher** anyone can redeem, **set = store credit** only that person can redeem), `issued_by_person_id` (nullable FK → people, admin who created), `is_active`, `expires_us` (nullable), `notes` (nullable), `created_us`, `updated_us`
 - [ ] **Register in `make_database_info.cpp`**, `create_database.cpp` (`CreateTables`, `PopulateAdminTopLevelTables`, column data info, friendly names, display templates)
 - [ ] **Add to `CMakeLists.txt`** (db_schema)
 - [ ] **Tests** — table creation verified via existing `GlobalDatabaseTestSupport`
@@ -95,9 +95,11 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 ### 1.4 Business Logic — VoucherHelper
 
 - [ ] **Create `business_logic/payment/voucher_helper.h/cpp`** — Contains:
-  - `ValidateVoucher(transaction, code)` — checks exists, is_active, not expired, remaining > 0; returns voucher details or error
+  - `GenerateVoucherCode()` — generates a unique code (format: `KY-XXXX-XXXX` using alphanumeric chars)
+  - `ValidateVoucher(transaction, code, personId)` — checks exists, is_active, not expired, remaining > 0; if `issued_to_person_id` is set, verifies it matches `personId`; returns voucher details or error
   - `RedeemVoucher(transaction, code, amountCents, purchaseId, paymentId)` — atomically decrements `remaining_value_cents`, creates `voucher_redemptions` row; returns redeemed amount
-  - `CreateVoucher(transaction, request)` — admin creates a new voucher; generates unique code if not provided
+  - `CreateVoucher(transaction, request)` — creates a new voucher; auto-generates code if not provided, validates uniqueness if admin-specified
+  - `CreateStoreCredit(transaction, personId, amountCents, reason)` — creates a person-tied voucher (for refund-to-credit flow)
   - `GetVoucherBalance(transaction, code)` — returns remaining balance
 - [ ] **Add to `CMakeLists.txt`** (business_logic/payment)
 - [ ] **Tests** — `voucher_helper_test.cpp` (validate active/inactive/expired/depleted, full redemption, partial redemption, over-redemption capped at remaining)
@@ -115,7 +117,7 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 1.6 Admin UI — Voucher Management
 
-- [ ] **Create `pages/manage/vouchers/` component** — Table of vouchers (code, initial/remaining value, status, person, expiry), Create Voucher form, Deactivate button, expandable redemption history
+- [ ] **Create `pages/manage/vouchers/` component** — Table of vouchers (code, type [voucher/credit], initial/remaining value, status, person, expiry), Create Voucher form with auto-generated code (editable) + uniqueness check, Deactivate button, expandable redemption history
 - [ ] **Add route** in manage routing
 - [ ] **Add link** in manage dashboard
 - [ ] **ServerAccess methods** — `adminCreateVoucher`, `adminGetVouchers`, `adminDeactivateVoucher`, `adminGetVoucherRedemptions`
@@ -154,9 +156,16 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 2.4 Frontend — Voucher Balance Check
 
-- [ ] **Create `GET /api/check_voucher/{code}`** endpoint — returns voucher status, remaining balance (public, no admin required)
+- [ ] **Create `GET /api/check_voucher/{code}`** endpoint — returns voucher status, remaining balance (requires login, validates person for store credits)
 - [ ] **ServerAccess + mock** — `checkVoucher(code)`
 - [ ] **Tests** — endpoint test, mock spec
+
+### 2.5 Refund to Store Credit
+
+- [ ] **Update `RefundHelper`** — add `refundAsCredit` parameter to `ProcessRefund`; when true, instead of calling Square RefundPayment, creates a person-tied voucher via `VoucherHelper::CreateStoreCredit` with the refund amount
+- [ ] **Update cancellation endpoints** — add `refund_as_credit` option to `cancel_booking` and admin cancellation flows
+- [ ] **Update cancellation UI** — when cancelling, offer choice: "Refund to card" or "Refund as store credit"
+- [ ] **Tests** — refund creates store credit voucher, store credit redeemable on next purchase
 
 ---
 
@@ -177,7 +186,13 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 - [ ] **Register in `web_app.cpp`**
 - [ ] **Tests** — endpoint test (comp creates entitlement, $0 purchase recorded)
 
-### 3.3 Admin UI — Comp
+### 3.3 Comp Notification Email
+
+- [ ] **Create `business_logic/payment/comp_notification_mail.h/cpp`** — email template notifying recipient that a product has been comped to them (product name, notes from admin)
+- [ ] **Send email from comp flow** — after entitlement is created, send notification to recipient
+- [ ] **Tests** — email body generation test
+
+### 3.4 Admin UI — Comp
 
 - [ ] **Add comp action** to admin product or user management — "Comp this product to a user" with person picker and notes field
 - [ ] **ServerAccess methods** — `adminComp(productId, personId, notes)`
@@ -194,22 +209,28 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
   - Round down to avoid over-refunding
 - [ ] **Tests** — mid-period cancellation, last day, first day, already expired
 
-### 4.2 Subscription Cancellation with Refund
+### 4.2 User Subscription Cancellation (No Refund, Access Through Period End)
 
-- [ ] **Update subscription cancellation flow** — when user cancels mid-period:
-  - Calculate prorated refund for remaining days
-  - Process refund via `RefundHelper::ProcessRefund`
-  - Revoke entitlement (or let it expire at period end — this is an open question)
-- [ ] **Tests** — cancel mid-period gets prorated refund, cancel on last day gets nothing
+- [ ] **Update user subscription cancellation flow** — when user cancels mid-period:
+  - Mark subscription as cancelled (no new billing)
+  - Entitlement remains active until current period ends (no revocation)
+  - No refund issued
+  - Optionally offer refund-as-credit if desired (future enhancement)
+- [ ] **Tests** — user cancel mid-period: subscription cancelled, entitlement still active, no refund
 
-### 4.3 Admin Subscription Refund
+### 4.3 Admin Subscription Cancellation (Immediate Revoke + Prorated Refund)
 
-- [ ] **Update admin subscription management** — option to refund when cancelling a subscription
-- [ ] **Tests** — admin cancel with refund
+- [ ] **Update admin subscription cancellation flow** — admin override option:
+  - Admin can choose "Cancel immediately with prorated refund"
+  - Calculates prorated refund via `CalculateProratedRefund`
+  - Processes refund via `RefundHelper::ProcessRefund` (to card or as store credit)
+  - Revokes entitlement immediately
+- [ ] **Update admin subscription UI** — add "Cancel with refund" option alongside existing cancel
+- [ ] **Tests** — admin cancel with prorated refund, entitlement revoked, refund amount correct
 
 ---
 
-## Phase 5: Coupons (Scenario 24) — *Optional / Lower Priority*
+## Phase 5: Coupons (Scenario 24)
 
 ### 5.1 Database Schema — `coupons` and `coupon_redemptions`
 
@@ -231,25 +252,37 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ---
 
-## Open Questions
+## Phase 6: Voucher Expiry Notifications
 
-1. **Voucher code format**: Should voucher codes be auto-generated (e.g., `KY-XXXX-XXXX`) or admin-specified? Or both (admin can optionally provide a custom code)? This affects the `CreateVoucher` API and admin UI.
-   - Mason: I like the idea of both. Maybe auto generate one but let the admin replace the suggestion with their own creation. Only issue is checking for uniqueness if the admin specifies one.
+### 6.1 Expiry Notification Email
 
-2. **Voucher scope**: Should vouchers be tied to a specific person (like store credit) or bearer instruments (anyone with the code can use it)? The schema has `issued_to_person_id` as nullable — if set, only that person can redeem. Gift cards are typically bearer; store credit is person-tied.
-   - Mason: - voucher should not be tied to a person. A credit should be tied to a person.
+- [ ] **Create `business_logic/payment/voucher_expiry_mail.h/cpp`** — email template warning user their voucher/credit is about to expire (code, remaining balance, expiry date)
+- [ ] **Tests** — email body generation test
 
-3. **Refund to voucher**: When a refund is processed, should there be an option to refund as store credit (create a new voucher) instead of refunding to the card? This is common in retail and would add a `refund_as_credit` flag to cancellation flows.
-   - Mason: Sure, let's do that but we should also be able to refund to a card.
+### 6.2 Scheduled Expiry Check
 
-4. **Subscription cancellation timing**: When a user cancels mid-period, should the entitlement be revoked immediately or remain active until the period ends? Options: (a) immediate revocation + prorated refund, or (b) access through period end + no refund. Industry standard is (b), but studios sometimes prefer (a).
-   - Mason: Let's have user cancel be B but have an admin override to support A.
+- [ ] **Create expiry check logic** — query for vouchers where `expires_us` is within a notification window (e.g., 7 days) and `is_active = true` and `remaining_value_cents > 0`
+- [ ] **Send notifications** — for each expiring voucher, send email to the holder (bearer vouchers: `issued_by_person_id` or skip; store credits: `issued_to_person_id`)
+- [ ] **Track notification sent** — add `expiry_notified_us` column to `vouchers` to avoid duplicate notifications
+- [ ] **Trigger mechanism** — either a cron endpoint (`POST /api/admin/process_voucher_expiry`) or integrate into an existing periodic task
+- [ ] **Tests** — expiry within window gets notification, already notified skipped, expired vouchers not notified
 
-5. **Coupon priority**: Is the coupon system (scenario 24) needed now, or can it be deferred? The plan includes it as Phase 5 / lower priority. Coupons add complexity to pricing; vouchers cover most use cases.
-   - Mason: Let's support coupons.
+### 6.3 Expiry Enforcement
 
-6. **Comp notification**: When an admin comps a product, should the recipient receive an email notification? Similar to gift permission notification.
-   - Mason:
+- [ ] **On redemption, check expiry** — `ValidateVoucher` already checks `expires_us`; expired vouchers return error
+- [ ] **Deactivate expired vouchers** — the scheduled check can also set `is_active = false` on vouchers past `expires_us` (balance forfeited)
+- [ ] **Tests** — expired voucher cannot be redeemed
 
-7. **Voucher expiry behavior**: When a voucher expires, should the remaining balance be forfeited silently, or should the user be notified before expiry? Notification would need a scheduled job.
-   - Mason:
+---
+
+## Resolved Questions
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | **Voucher code format** | Both. Auto-generate a code (e.g., `KY-XXXX-XXXX`) but let the admin replace it with a custom one. Server validates uniqueness on custom codes. |
+| 2 | **Voucher scope** | Vouchers are **bearer** (not tied to a person — anyone with the code can use it). Store credits are **person-tied** (`issued_to_person_id` required). These are two distinct use cases on the same `vouchers` table, distinguished by whether `issued_to_person_id` is set. |
+| 3 | **Refund to voucher** | Support both: refund to card (existing) **and** refund as store credit (creates a person-tied voucher). The refund flow will offer a choice. |
+| 4 | **Subscription cancellation timing** | **User cancel**: access continues through end of period, no refund (option B). **Admin cancel**: option to revoke immediately with prorated refund (option A) as an override. |
+| 5 | **Coupon priority** | Coupons are in scope — keep Phase 5, not optional. |
+| 6 | **Comp notification** | Yes. Send an email to the recipient when an admin comps a product. |
+| 7 | **Voucher expiry behavior** | Notify user before expiry (scheduled job). If they don't use it, the remaining balance is forfeited at expiry. |
