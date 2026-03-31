@@ -128,7 +128,7 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 2.1 PaymentHelper — Voucher Payment Method
 
-- [ ] **Update `PaymentHelper`** — Add `PayWithVoucher(transaction, purchaseId, voucherCode)`:
+- [x] **Update `PaymentHelper`** — Add `PayWithVoucher(transaction, purchaseId, voucherCode)`:
   - Validates voucher via VoucherHelper
   - Calculates amount to redeem (min of voucher balance, remaining purchase balance)
   - Creates payment row with `provider="voucher"`, `provider_payment_id=voucher_code`
@@ -136,14 +136,14 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
   - Links payment to purchase via `purchase_payments`
   - Updates `purchases.paid_cents`
   - If fully paid, triggers entitlement creation
-- [ ] **Tests** — full voucher payment, partial voucher payment, voucher + remaining balance
+- [x] **Tests** — full voucher payment, partial voucher payment, voucher + card split, invalid code, currency mismatch, wrong person store credit, missing code (7 tests in `payment_helper_test.cpp`)
 
 ### 2.2 Split Payment Support
 
-- [ ] **Create `POST /api/purchase_pay_voucher/{purchaseId}`** endpoint — accepts `{ "voucher_code": "..." }`, applies voucher to purchase
-- [ ] **Update purchase status logic** — `partially_funded` when voucher covers part, `funded` when fully covered
-- [ ] **Allow card payment on partially-funded purchase** — existing `purchase_pay_card` should work if `paid_cents < total_cents`; verify and fix if needed
-- [ ] **Tests** — voucher then card, voucher covers full amount, invalid/expired voucher errors
+- [x] **Create `POST /api/purchase_pay_voucher/{purchaseId}`** endpoint — accepts `{ "voucher_code": "..." }`, applies voucher to purchase
+- [x] **Update purchase status logic** — `partially_funded` when voucher covers part, `funded` when fully covered (handled by existing `PurchaseHelper::RecordPayment`)
+- [x] **Allow card payment on partially-funded purchase** — fixed `purchase_pay_card` to accept both `pending` and `partially_funded` status
+- [x] **Tests** — voucher covers full amount, partial payment, voucher then card split, invalid code, missing code, not authenticated, expired voucher (7 tests in `purchase_pay_voucher_test.cpp`)
 
 ### 2.3 Frontend — Voucher Code Entry in Checkout
 
