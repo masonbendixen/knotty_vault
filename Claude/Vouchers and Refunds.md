@@ -147,24 +147,24 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 2.3 Frontend — Voucher Code Entry in Checkout
 
-- [ ] **Update payment control** — add "Apply Voucher" section with code input field and Apply button
-- [ ] **Show applied voucher** — display redeemed amount, remaining purchase balance
-- [ ] **ServerAccess methods** — `purchasePayVoucher(purchaseId, voucherCode)`
-- [ ] **Conditional card payment** — if voucher covers full amount, skip card entry; otherwise show card form for remainder
-- [ ] **Tests** — component spec
+- [x] **Update payment control** — add "Apply Voucher" section with code input field and Apply button in checkout component
+- [x] **Show applied voucher** — display redeemed amount, remaining purchase balance with green banner
+- [x] **ServerAccess methods** — `purchasePayVoucher(purchaseId, voucherCode)` and `checkVoucher(code)` added to interface, proxy, network, mock
+- [x] **Conditional card payment** — if voucher covers full amount, hide card entry and pay button, go straight to success; otherwise show card form for remaining balance
+- [x] **Tests** — 4 checkout component spec tests (full cover, partial, error, hide card form); 6 mock spec tests
 
 ### 2.4 Frontend — Voucher Balance Check
 
-- [ ] **Create `GET /api/check_voucher/{code}`** endpoint — returns voucher status, remaining balance (requires login, validates person for store credits)
-- [ ] **ServerAccess + mock** — `checkVoucher(code)`
-- [ ] **Tests** — endpoint test, mock spec
+- [x] **Create `GET /api/check_voucher/{code}`** endpoint — returns voucher status, remaining balance (requires login, validates person for store credits). Returns `{ valid: true/false, ... }` with HTTP 200 (not error)
+- [x] **ServerAccess + mock** — `checkVoucher(code)` added to all layers
+- [x] **Tests** — 6 endpoint tests (valid, nonexistent, expired, wrong person, not auth, correct person store credit); mock spec tests
 
 ### 2.5 Refund to Store Credit
 
-- [ ] **Update `RefundHelper`** — add `refundAsCredit` parameter to `ProcessRefund`; when true, instead of calling Square RefundPayment, creates a person-tied voucher via `VoucherHelper::CreateStoreCredit` with the refund amount
-- [ ] **Update cancellation endpoints** — add `refund_as_credit` option to `cancel_booking` and admin cancellation flows
-- [ ] **Update cancellation UI** — when cancelling, offer choice: "Refund to card" or "Refund as store credit"
-- [ ] **Tests** — refund creates store credit voucher, store credit redeemable on next purchase
+- [x] **Update `RefundHelper`** — added `refundAsCredit` parameter to `ProcessRefund`; when true, creates a person-tied voucher via `VoucherHelper::CreateStoreCredit` instead of Square RefundPayment, records payment with provider="voucher"
+- [x] **Update cancellation endpoints** — added `refund_as_credit` body parameter to `cancel_booking`; threaded through `BookingHelper::CancelBooking` to all `ProcessRefund` calls; response includes `store_credit_voucher_id` and `store_credit_voucher_code`
+- [x] **Update cancellation UI** — my-events component now shows "Refund as store credit instead of card refund" checkbox in cancel confirmation; refund message includes store credit voucher code when applicable
+- [x] **Tests** — 2 refund_helper tests (store credit creates voucher, records voucher payment); 1 cancel_booking endpoint test (refund_as_credit=true)
 
 ---
 
