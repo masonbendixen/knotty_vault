@@ -116,11 +116,11 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 1.6 Admin UI — Voucher Management
 
-- [ ] **Create `pages/manage/vouchers/` component** — Table of vouchers (code, type [voucher/credit], initial/remaining value, status, person, expiry), Create Voucher form with auto-generated code (editable) + uniqueness check, Deactivate button, expandable redemption history
-- [ ] **Add route** in manage routing
-- [ ] **Add link** in manage dashboard
-- [ ] **ServerAccess methods** — `adminCreateVoucher`, `adminGetVouchers`, `adminDeactivateVoucher`, `adminGetVoucherRedemptions`
-- [ ] **Tests** — component spec, mock spec
+- [x] **Create `pages/manage/vouchers/` component** — Table of vouchers (code, type [voucher/credit], initial/remaining value, status, person, expiry), Create Voucher form with dollar amount input (converts to cents), Deactivate button, expandable redemption history
+- [x] **Add route** in manage routing (`/manage/vouchers`)
+- [x] **Add link** in manage dashboard (card_giftcard icon, "Vouchers", "Manage gift cards and store credits")
+- [x] **ServerAccess methods** — `adminCreateVoucher`, `adminGetVouchers`, `adminDeactivateVoucher`, `adminGetVoucherRedemptions` (interface, proxy, network, mock)
+- [x] **Tests** — component spec (22 tests), mock spec (6 tests). All 1625 Angular tests pass.
 
 ---
 
