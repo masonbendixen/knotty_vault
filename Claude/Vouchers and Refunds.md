@@ -74,46 +74,45 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 1.1 Database Schema — `vouchers` table
 
-- [ ] **Create `db_schema/vouchers.h/cpp`** — Column constants: `id`, `code` (unique, auto-generated or admin-specified), `currency`, `initial_value_cents`, `remaining_value_cents`, `issued_to_person_id` (nullable FK → people; **null = bearer voucher** anyone can redeem, **set = store credit** only that person can redeem), `issued_by_person_id` (nullable FK → people, admin who created), `is_active`, `expires_us` (nullable), `notes` (nullable), `created_us`, `updated_us`
-- [ ] **Register in `make_database_info.cpp`**, `create_database.cpp` (`CreateTables`, `PopulateAdminTopLevelTables`, column data info, friendly names, display templates)
-- [ ] **Add to `CMakeLists.txt`** (db_schema)
-- [ ] **Tests** — table creation verified via existing `GlobalDatabaseTestSupport`
+- [x] **Create `db_schema/vouchers.h/cpp`** — Column constants: `id`, `code` (unique, auto-generated or admin-specified), `currency`, `initial_value_cents`, `remaining_value_cents`, `issued_to_person_id` (nullable FK → people; **null = bearer voucher** anyone can redeem, **set = store credit** only that person can redeem), `issued_by_person_id` (nullable FK → people, admin who created), `is_active`, `expires_us` (nullable), `notes` (nullable), `expiry_notified_us` (nullable), `created_us`, `updated_us`. Also added `kDatabaseInfoDefaultTrue` constant.
+- [x] **Register in `make_database_info.cpp`**, `create_database.cpp` (`CreateTables`, `PopulateAdminTopLevelTables`, `PopulateAdminNestedTables`, column data info, friendly names, table friendly names, display templates)
+- [x] **Add to `CMakeLists.txt`** (db_schema)
+- [x] **Tests** — table creation verified via existing `GlobalDatabaseTestSupport`
 
 ### 1.2 Database Schema — `voucher_redemptions` table
 
-- [ ] **Create `db_schema/voucher_redemptions.h/cpp`** — Column constants: `id`, `voucher_id` (FK → vouchers), `purchase_id` (FK → purchases), `payment_id` (FK → payments), `redeemed_cents`, `created_us`
-- [ ] **Register in `make_database_info.cpp`**, `create_database.cpp` (as nested table under vouchers)
-- [ ] **Add to `CMakeLists.txt`** (db_schema)
+- [x] **Create `db_schema/voucher_redemptions.h/cpp`** — Column constants: `id`, `voucher_id` (FK → vouchers), `purchase_id` (FK → purchases), `payment_id` (FK → payments), `redeemed_cents`, `created_us`
+- [x] **Register in `make_database_info.cpp`**, `create_database.cpp` (as nested table under vouchers)
+- [x] **Add to `CMakeLists.txt`** (db_schema)
 
 ### 1.3 Table Helpers
 
-- [ ] **Create `sql_util/table_helpers/vouchers.h/cpp`** — `AddVoucher`, `GetVoucherByCode`, `GetVoucherById`, `UpdateRemainingValue`, `DeactivateVoucher`
-- [ ] **Create `sql_util/table_helpers/voucher_redemptions.h/cpp`** — `AddRedemption`, `GetRedemptionsForVoucher`, `GetRedemptionsForPurchase`
-- [ ] **Add to `CMakeLists.txt`** (table_helpers)
-- [ ] **Tests** — `vouchers_test.cpp`, `voucher_redemptions_test.cpp`
+- [x] **Create `sql_util/table_helpers/vouchers.h/cpp`** — `AddVoucher`, `GetVoucherByCode`, `GetVoucherById`, `UpdateRemainingValue`, `DeactivateVoucher`, `GetVouchers`, `SetExpiryNotified`
+- [x] **Create `sql_util/table_helpers/voucher_redemptions.h/cpp`** — `AddRedemption`, `GetRedemptionsForVoucher`, `GetRedemptionsForPurchase`
+- [x] **Add to `CMakeLists.txt`** (table_helpers)
+- [x] **Tests** — `vouchers_test.cpp` (8 tests), `voucher_redemptions_test.cpp` (6 tests)
 
 ### 1.4 Business Logic — VoucherHelper
 
-- [ ] **Create `business_logic/payment/voucher_helper.h/cpp`** — Contains:
-  - `GenerateVoucherCode()` — generates a unique code (format: `KY-XXXX-XXXX` using alphanumeric chars)
-  - `ValidateVoucher(transaction, code, personId)` — checks exists, is_active, not expired, remaining > 0; if `issued_to_person_id` is set, verifies it matches `personId`; returns voucher details or error
-  - `RedeemVoucher(transaction, code, amountCents, purchaseId, paymentId)` — atomically decrements `remaining_value_cents`, creates `voucher_redemptions` row; returns redeemed amount
+- [x] **Create `business_logic/payment/voucher_helper.h/cpp`** — Contains:
+  - `GenerateVoucherCode()` — generates a unique code (format: `KY-XXXX-XXXX` using alphanumeric chars, excludes ambiguous I/O/0/1)
+  - `ValidateVoucher(transaction, code, personId)` — checks exists, is_active (handles 't'/'true'), not expired, remaining > 0; if `issued_to_person_id` is set, verifies it matches `personId`; returns VoucherInfo or nullopt with error message
+  - `RedeemVoucher(transaction, code, amountCents, purchaseId, paymentId)` — atomically decrements `remaining_value_cents`, creates `voucher_redemptions` row; returns redeemed amount (capped at remaining)
   - `CreateVoucher(transaction, request)` — creates a new voucher; auto-generates code if not provided, validates uniqueness if admin-specified
-  - `CreateStoreCredit(transaction, personId, amountCents, reason)` — creates a person-tied voucher (for refund-to-credit flow)
-  - `GetVoucherBalance(transaction, code)` — returns remaining balance
-- [ ] **Add to `CMakeLists.txt`** (business_logic/payment)
-- [ ] **Tests** — `voucher_helper_test.cpp` (validate active/inactive/expired/depleted, full redemption, partial redemption, over-redemption capped at remaining)
+  - `CreateStoreCredit(transaction, personId, amountCents, currency, reason)` — creates a person-tied voucher (for refund-to-credit flow)
+- [x] **Add to `CMakeLists.txt`** (business_logic/payment)
+- [x] **Tests** — `voucher_helper_test.cpp` (16 tests: generate code format/uniqueness, create with auto/custom/duplicate code, validate active/inactive/depleted/nonexistent/expired/person-check, redeem full/partial/capped, create store credit)
 
 ### 1.5 Admin Endpoints — Voucher Management
 
-- [ ] **Create `endpoints/admin_vouchers.cpp`** — Endpoints:
-  - `POST /api/admin/create_voucher` — creates a voucher (amount, currency, optional code, optional person, optional expiry, notes)
+- [x] **Create `endpoints/admin_vouchers.h/cpp`** — Endpoints:
+  - `POST /api/admin/create_voucher` — creates a voucher (amount, currency, optional code, optional person, optional expiry, notes); sets `issued_by_person_id` from admin session
   - `GET /api/admin/vouchers` — lists all vouchers with remaining balances
   - `POST /api/admin/deactivate_voucher/:id` — deactivates a voucher
   - `GET /api/admin/voucher/:id/redemptions` — lists redemption history
-- [ ] **Register in `web_app.cpp`**
-- [ ] **Add to `CMakeLists.txt`** (endpoints)
-- [ ] **Tests** — `admin_vouchers_test.cpp`
+- [x] **Register in `web_app.cpp`**
+- [x] **Add to `CMakeLists.txt`** (endpoints)
+- [x] **Tests** — `admin_vouchers_test.cpp` (6 tests: create success, create requires admin, create with custom code, get list, deactivate, get redemptions)
 
 ### 1.6 Admin UI — Voucher Management
 
