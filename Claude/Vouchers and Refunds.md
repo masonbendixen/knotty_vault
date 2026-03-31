@@ -233,12 +233,23 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ## Open Questions
 
-| # | Question | Context |
-|---|----------|---------|
-| 1 | **Voucher code format**: Should voucher codes be auto-generated (e.g., `KY-XXXX-XXXX`) or admin-specified? Or both (admin can optionally provide a custom code)? | Affects `CreateVoucher` API and admin UI |
-| 2 | **Voucher scope**: Should vouchers be tied to a specific person (like store credit) or bearer instruments (anyone with the code can use it)? The schema has `issued_to_person_id` as nullable — if set, only that person can redeem. | Gift cards = bearer, store credit = person-tied |
-| 3 | **Refund to voucher**: When a refund is processed, should there be an option to refund as store credit (create a new voucher) instead of refunding to the card? This is common in retail. | Would add a `refund_as_credit` flag to cancellation flows |
-| 4 | **Subscription cancellation timing**: When a user cancels mid-period, should the entitlement be revoked immediately or remain active until the period ends? Immediate revocation + prorated refund, or access through period end + no refund? | Industry standard is access through period end with no refund, but studios sometimes prefer immediate + prorated |
-| 5 | **Coupon priority**: Is the coupon system (scenario 24) needed now, or can it be deferred? The plan includes it as Phase 5 / lower priority. | Coupons add complexity to pricing; vouchers cover most use cases |
-| 6 | **Comp notification**: When an admin comps a product, should the recipient receive an email notification? | Similar to gift permission notification |
-| 7 | **Voucher expiry behavior**: When a voucher expires, should the remaining balance be forfeited silently, or should the user be notified before expiry? | Notification would need a scheduled job |
+1. **Voucher code format**: Should voucher codes be auto-generated (e.g., `KY-XXXX-XXXX`) or admin-specified? Or both (admin can optionally provide a custom code)? This affects the `CreateVoucher` API and admin UI.
+   - Mason: I like the idea of both. Maybe auto generate one but let the admin replace the suggestion with their own creation. Only issue is checking for uniqueness if the admin specifies one.
+
+2. **Voucher scope**: Should vouchers be tied to a specific person (like store credit) or bearer instruments (anyone with the code can use it)? The schema has `issued_to_person_id` as nullable — if set, only that person can redeem. Gift cards are typically bearer; store credit is person-tied.
+   - Mason: - voucher should not be tied to a person. A credit should be tied to a person.
+
+3. **Refund to voucher**: When a refund is processed, should there be an option to refund as store credit (create a new voucher) instead of refunding to the card? This is common in retail and would add a `refund_as_credit` flag to cancellation flows.
+   - Mason: Sure, let's do that but we should also be able to refund to a card.
+
+4. **Subscription cancellation timing**: When a user cancels mid-period, should the entitlement be revoked immediately or remain active until the period ends? Options: (a) immediate revocation + prorated refund, or (b) access through period end + no refund. Industry standard is (b), but studios sometimes prefer (a).
+   - Mason: Let's have user cancel be B but have an admin override to support A.
+
+5. **Coupon priority**: Is the coupon system (scenario 24) needed now, or can it be deferred? The plan includes it as Phase 5 / lower priority. Coupons add complexity to pricing; vouchers cover most use cases.
+   - Mason: Let's support coupons.
+
+6. **Comp notification**: When an admin comps a product, should the recipient receive an email notification? Similar to gift permission notification.
+   - Mason:
+
+7. **Voucher expiry behavior**: When a voucher expires, should the remaining balance be forfeited silently, or should the user be notified before expiry? Notification would need a scheduled job.
+   - Mason:
