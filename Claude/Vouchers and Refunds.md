@@ -205,22 +205,16 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 4.2 User Subscription Cancellation (No Refund, Access Through Period End)
 
-- [ ] **Update user subscription cancellation flow** — when user cancels mid-period:
-  - Mark subscription as cancelled (no new billing)
-  - Entitlement remains active until current period ends (no revocation)
-  - No refund issued
-  - Optionally offer refund-as-credit if desired (future enhancement)
-- [ ] **Tests** — user cancel mid-period: subscription cancelled, entitlement still active, no refund
+- [x] **Already implemented** — existing `CancelSubscription` method sets status to `cancelled`, `cancellation_effective_us` to `current_period_end_us`, does not revoke entitlements, does not issue refunds. User and admin UIs both use this flow for end-of-period cancellation.
+- [x] **Tests** — 4 existing tests: CancelSubscriptionSuccess, CancelSubscriptionWrongPerson, CancelSubscriptionAlreadyCancelled, CancelPastDueSubscription
 
 ### 4.3 Admin Subscription Cancellation (Immediate Revoke + Prorated Refund)
 
-- [ ] **Update admin subscription cancellation flow** — admin override option:
-  - Admin can choose "Cancel immediately with prorated refund"
-  - Calculates prorated refund via `CalculateProratedRefund`
-  - Processes refund via `RefundHelper::ProcessRefund` (to card or as store credit)
-  - Revokes entitlement immediately
-- [ ] **Update admin subscription UI** — add "Cancel with refund" option alongside existing cancel
-- [ ] **Tests** — admin cancel with prorated refund, entitlement revoked, refund amount correct
+- [x] **`AdminCancelWithRefund` in `SubscriptionHelper`** — finds current period's completed charge, calculates prorated refund via `CalculateProratedRefund`, processes refund via `RefundHelper::ProcessRefund` (to card or as store credit), revokes current entitlement, marks subscription cancelled with immediate effect (`cancellation_effective_us = now`, not end-of-period)
+- [x] **`POST /api/admin/subscriptions/{id}/cancel_with_refund` endpoint** — requires `manage_subscriptions` permission, accepts `{ reason, refund_as_credit }`, returns subscription + refund details + optional store credit voucher
+- [x] **Admin subscription detail UI** — split existing cancel button into "Cancel with Prorated Refund" (immediate revoke + refund) and "Cancel (End of Period)" (existing behavior). Cancel-with-refund shows confirmation card with reason textarea and refund-as-credit checkbox. Success shows green banner with refund amount and voucher code.
+- [x] **ServerAccess** — `adminCancelSubscriptionWithRefund(subscriptionId, reason?, refundAsCredit?)` added to interface, proxy, network, mock
+- [x] **Tests** — 4 business logic tests (prorated to card, as store credit, not found, already cancelled), 4 mock spec tests (auth, not found, success, store credit), component spec test updated for dual cancel buttons
 
 ---
 
