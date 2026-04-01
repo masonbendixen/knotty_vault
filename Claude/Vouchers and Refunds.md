@@ -200,10 +200,8 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 4.1 Prorated Refund Calculation
 
-- [ ] **Add `CalculateProratedRefund` to `RefundHelper`** — given a subscription billing period (start/end dates) and cancellation date, calculate the unused portion:
-  - `refundCents = (daysRemaining / totalDays) * periodAmountCents`
-  - Round down to avoid over-refunding
-- [ ] **Tests** — mid-period cancellation, last day, first day, already expired
+- [x] **Add `CalculateProratedRefund` to `RefundHelper`** — static method that calculates refund for unused portion of a billing period. Given period start/end, cancellation time, and period amount, returns `(remainingUs * periodAmountCents) / totalDurationUs` (integer truncation rounds down). Returns 0 if period ended or invalid; returns full amount if cancellation is at or before period start.
+- [x] **Tests** — 8 tests: mid-period (20/30 days), first day (full refund), before period start (full refund), last day (1/30), already expired (0), at period end (0), rounds down (5/7 * $100 = $71.42), invalid period (0)
 
 ### 4.2 User Subscription Cancellation (No Refund, Access Through Period End)
 
