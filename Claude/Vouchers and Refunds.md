@@ -170,16 +170,11 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ## Phase 3: Comps & Admin-Granted Entitlements (Scenarios 28, 29)
 
-### 3.1 System Purchase for Comps
+### 3.1 Comp as Store Credit Voucher
 
-- [x] **Create comp purchase flow** — creates a `$0 system purchase`:
-  - `purchases` row: `total_cents=0`, `paid_cents=0`, `status="funded"`, `payer_person_id=target person`
-  - `payments` row: `provider="comp"`, `amount_cents=0`, `status="COMPLETED"`, unique `provider_payment_id`
-  - `purchase_payments` linking row
-  - Creates entitlement directly via `CreateEntitlement` (bypasses purchase_items since no price schedule for comps)
-  - Auto-assigns entitlement to target person
-- [x] **Created `CompHelper`** — `CreateComp(transaction, request)` orchestrates the above. Two constructors (with/without mail). Validates product exists and is active.
-- [x] **Tests** — 7+ tests in `comp_helper_test.cpp`: success, invalid product, inactive product, invalid person, sends email, works without mail helper, default notes
+- [x] **Create comp flow** — looks up product price from catalog, creates a person-tied store credit voucher for that amount via `VoucherHelper::CreateStoreCredit`. The person sees the voucher in their "Vouchers & Credits" page and uses the code when booking.
+- [x] **Created `CompHelper`** — `CreateComp(transaction, request)` validates product, looks up base price, creates voucher, sends notification email with voucher code. Returns `CompResult` with `voucherId`, `voucherCode`, `voucherAmountCents`, `currency`.
+- [x] **Tests** — 8 tests in `comp_helper_test.cpp`: creates voucher with correct amount, voucher tied to person (not redeemable by others), invalid product, inactive product, invalid person IDs, sends email with voucher code, works without mail helper
 
 ### 3.2 Admin Comp Endpoint
 
