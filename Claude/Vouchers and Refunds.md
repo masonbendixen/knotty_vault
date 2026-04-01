@@ -172,24 +172,26 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 3.1 System Purchase for Comps
 
-- [ ] **Create comp purchase flow** — rather than making `purchase_id` nullable on entitlements (which breaks audit trail), create a `$0 system purchase`:
+- [x] **Create comp purchase flow** — creates a `$0 system purchase`:
   - `purchases` row: `total_cents=0`, `paid_cents=0`, `status="funded"`, `payer_person_id=target person`
-  - `payments` row: `provider="comp"`, `amount_cents=0`, `status="COMPLETED"`
+  - `payments` row: `provider="comp"`, `amount_cents=0`, `status="COMPLETED"`, unique `provider_payment_id`
   - `purchase_payments` linking row
-  - Then create entitlement normally with this purchase
-- [ ] **Add to `PaymentHelper` or create `CompHelper`** — `CreateComp(transaction, productId, personId, notes)` orchestrates the above
+  - Creates entitlement directly via `CreateEntitlement` (bypasses purchase_items since no price schedule for comps)
+  - Auto-assigns entitlement to target person
+- [x] **Created `CompHelper`** — `CreateComp(transaction, request)` orchestrates the above. Two constructors (with/without mail). Validates product exists and is active.
+- [x] **Tests** — 7+ tests in `comp_helper_test.cpp`: success, invalid product, inactive product, invalid person, sends email, works without mail helper, default notes
 
 ### 3.2 Admin Comp Endpoint
 
-- [ ] **Create `POST /api/admin/comp`** endpoint — accepts `{ "product_id": N, "person_id": N, "notes": "reason" }`; creates $0 purchase + payment + entitlement
-- [ ] **Register in `web_app.cpp`**
-- [ ] **Tests** — endpoint test (comp creates entitlement, $0 purchase recorded)
+- [x] **Create `POST /api/admin/comp`** endpoint — accepts `{ "product_id": N, "person_id": N, "notes": "reason" }`; creates $0 purchase + payment + entitlement
+- [x] **Register in `web_app.cpp`**
+- [x] **Tests** — 6 endpoint tests in `admin_comp_test.cpp`: success, requires admin, product not found, not authenticated, missing product_id, missing person_id
 
 ### 3.3 Comp Notification Email
 
-- [ ] **Create `business_logic/payment/comp_notification_mail.h/cpp`** — email template notifying recipient that a product has been comped to them (product name, notes from admin)
-- [ ] **Send email from comp flow** — after entitlement is created, send notification to recipient
-- [ ] **Tests** — email body generation test
+- [x] **Create `business_logic/payment/comp_notification_mail.h/cpp`** — email template notifying recipient that a product has been comped to them (product name, notes from admin). Follows payment_confirmation_mail pattern with FormatString + NormalizeCrLf.
+- [x] **Send email from comp flow** — CompHelper sends notification after entitlement creation
+- [x] **Tests** — 5 tests in `comp_notification_mail_test.cpp`: contains product name, first name, notes when present, omits notes when empty, valid HTML structure
 
 ### 3.4 Admin UI — Comp
 
