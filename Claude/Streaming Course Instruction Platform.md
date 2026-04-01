@@ -34,6 +34,8 @@ I need to create a platform to deliver this content. For managing recording of s
 
 In creating this platform and consuming media from people I do video lessons from, I feel like there is a business opportunity here since I'm already developing a platform for me. The athletic content producers generally use Patreon. Patreon is mostly a blog site that collects payment. The content producers generally post a schedule for the week with Zoom links for their online classes. People attend the online classes and both learn the material and also do the material and ask questions. After the class is over, the Zoom recording is posted. 
 
-There are several issues with this. The Zoom video recordings are low quality. Zoom has limited storage space so the people generally can only keep videos up for a week or two and delete them so you have to download the videos quickly or they will be gone leaving a blog full of dead links. The videos do not look professional and have no branding or anything like that. They videos also tend to be very long for
+There are several issues with this. The Zoom video recordings are low quality. Zoom has limited storage space so the people generally can only keep videos up for a week or two and delete them so you have to download the videos quickly or they will be gone leaving a blog full of dead links. The videos do not look professional and have no branding or anything like that. They videos also tend to be very long for the amount of information present in them because so much of it is student questions.
+
+I would like to create a platform 
 
 # Place plan here
