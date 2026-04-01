@@ -195,9 +195,9 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 3.4 Admin UI — Comp
 
-- [ ] **Add comp action** to admin product or user management — "Comp this product to a user" with person picker and notes field
-- [ ] **ServerAccess methods** — `adminComp(productId, personId, notes)`
-- [ ] **Tests** — component spec, mock spec
+- [x] **Created standalone comp page** at `/manage/comps` with product dropdown (active products only), person autocomplete picker, optional notes field, and submit button. Dashboard card with "redeem" icon added.
+- [x] **ServerAccess methods** — `adminComp(productId, personId, notes)` added to interface, proxy, network, mock
+- [x] **Tests** — 11 component spec tests (create, load products, render form, submit validation, success/error messages, person autocomplete), 2 mock spec tests (success, auth), manage route and dashboard card
 
 ---
 
