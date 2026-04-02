@@ -42,6 +42,13 @@ I would like to create a platform to help tackle this issue. Phase one would be 
 - Support an edit mode where the person goes through and:
 	- Trims sections out of the stream so they don't appear in the final product
 	- Do voice overs over parts of the video stream
-	- Allow the insertion of overlays
+	- Allow the insertion of overlays on top of the video stream
+	- Allow the insertion of slides / presentation style material
+	- Allow taking the multiple video inputs and choosing split screen and PIP at various scene transition points
+	- Inserting intro video
+	- Inserting a trailer
+- Support live stream and higher quality local capture while recording
+
+The idea is that people would distribute these instructional videos ahead of a Q&A session that is scheduled at a later date. People could watch these videos and become familiar with them and even try the video and come prepared with high quality questions for the Q&A session. The Q&A session would be live streamed via the website. People can click, ask a video question. The host would see the question and choose to accept a question. This would cause the client to stream their video via WebRTC and get a lower late
 
 # Place plan here
