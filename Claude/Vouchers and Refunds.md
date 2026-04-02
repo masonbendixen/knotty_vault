@@ -238,9 +238,12 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 5.3 Coupon Endpoints & UI
 
-- [ ] **Admin CRUD** — create/list/deactivate coupons
-- [ ] **Checkout integration** — coupon code input, shows discount applied
-- [ ] **Tests**
+- [x] **Admin CRUD endpoints** — `POST /api/admin/create_coupon`, `GET /api/admin/coupons`, `POST /api/admin/deactivate_coupon/{id}`, `GET /api/admin/coupon/{id}/redemptions` in `admin_coupons.h/cpp`; registered in `web_app.cpp` and `CMakeLists.txt`
+- [x] **Admin CRUD endpoint tests** — 9 tests in `admin_coupons_test.cpp` (create success, create with max uses, create with product ID, create requires admin, create not authenticated, get list, deactivate success, deactivate not found, get redemptions success, get redemptions not found)
+- [x] **Coupon types** — `CouponInfo`, `CouponRedemption`, `CreateCouponRequest` types in `payment.types.ts`; `coupon_code` added to `CreatePurchaseRequest`; `discount_cents` added to `Purchase` interface
+- [x] **ServerAccess methods** — `adminGetCoupons`, `adminCreateCoupon`, `adminDeactivateCoupon`, `adminGetCouponRedemptions` added to interface, proxy, network, and mock layers; 6 mock spec tests
+- [x] **Admin coupon management UI** — `CouponManagementComponent` at `/manage/coupons` with create form (code, discount type/value, max uses, validity dates), coupon list with filtering, deactivate, expandable redemption history; dashboard card with "discount" icon; 20 component spec tests
+- [x] **Checkout integration** — coupon code input in checkout component before voucher section; applies coupon via `coupon_code` in `createPurchase` request; shows discount in order summary; disables coupon input after purchase created; 5 checkout coupon spec tests
 
 ---
 
