@@ -36,6 +36,11 @@ In creating this platform and consuming media from people I do video lessons fro
 
 There are several issues with this. The Zoom video recordings are low quality. Zoom has limited storage space so the people generally can only keep videos up for a week or two and delete them so you have to download the videos quickly or they will be gone leaving a blog full of dead links. The videos do not look professional and have no branding or anything like that. They videos also tend to be very long for the amount of information present in them because so much of it is student questions.
 
-I would like to create a platform 
+I would like to create a platform to help tackle this issue. Phase one would be to create a program that automates creating high quality instructional videos and then running Q&A sessions that are also recorded and distributed. For creating the instructional video, the app would:
+
+- Sync recording of multiple input sources like different camera angles and audio input via a microphone and capture the input sources locally.
+- Support an edit mode where the person goes through and:
+	- Trims sections out of the stream so they don't appear in the final product
+	- Do voice overs over parts of the video stream
 
 # Place plan here
