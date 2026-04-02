@@ -57,6 +57,4 @@ Phase 2 would be taking this concept but going to studios. Instead of putting ou
 
 This would allow studios to get access to new material and allow their local instructors to grow and learn. It also establishes a relationship between the content producer and the studio and the students. They are used to seeing the content producer. Could even grant a lower tier membership to the students of the studio or require them to purchase a low tier membership. This opens the door for in person workshops and having an established relationship.
 
-After adding enough studios and content producers, phase 3
-
-# Place plan here
+After adding enough studios and content producers, phase 3 would involve letting content producers to choose to place content in a platform membership. People would subscribe to the platform and the platform would track which content is getting which percentage of viewership and do a revenue sharing model based on platform subscriptions based on percentage of viewership.
