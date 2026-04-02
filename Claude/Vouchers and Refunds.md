@@ -244,6 +244,8 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 - [x] **ServerAccess methods** — `adminGetCoupons`, `adminCreateCoupon`, `adminDeactivateCoupon`, `adminGetCouponRedemptions` added to interface, proxy, network, and mock layers; 6 mock spec tests
 - [x] **Admin coupon management UI** — `CouponManagementComponent` at `/manage/coupons` with create form (code, discount type/value, max uses, validity dates), coupon list with filtering, deactivate, expandable redemption history; dashboard card with "discount" icon; 20 component spec tests
 - [x] **Checkout integration** — coupon code input in checkout component before voucher section; applies coupon via `coupon_code` in `createPurchase` request; shows discount in order summary; disables coupon input after purchase created; 5 checkout coupon spec tests
+- [x] **Event booking integration** — added `couponCode` to `BookEventRequest`, `book_event` endpoint parses `coupon_code` from body, event-booking component has coupon input + `onApplyCoupon()`, `bookEvent()` passes coupon code through all layers; 2 backend tests (coupon applies discount, invalid coupon fails) + 3 frontend spec tests
+- [x] **Service booking integration** — added `couponCode` to `BookServiceRequest`, `book_service` endpoint parses `coupon_code` from body, service-booking component has coupon input + `onApplyCoupon()` + `buildServiceRequest()` helper, `bookService()` passes `coupon_code` through request type; 1 backend test (coupon applies discount) + 1 frontend spec test
 
 ---
 
