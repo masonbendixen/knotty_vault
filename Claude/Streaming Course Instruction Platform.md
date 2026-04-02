@@ -42,5 +42,6 @@ I would like to create a platform to help tackle this issue. Phase one would be 
 - Support an edit mode where the person goes through and:
 	- Trims sections out of the stream so they don't appear in the final product
 	- Do voice overs over parts of the video stream
+	- Allow the insertion of overlays
 
 # Place plan here
