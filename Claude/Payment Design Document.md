@@ -745,15 +745,15 @@ This section documents the user scenarios the payment system must support, valid
 *Gift cards, coupons, and refunds*
 [[Vouchers and Refunds]]
 
-- [ ] 22. User redeems a voucher/gift card and fully consumes its value
-- [ ] 23. User redeems a voucher/gift card and has remaining balance
-- [ ] 24. User uses a percentage-based discount coupon
-- [ ] 25. User pays with multiple payment sources (card + voucher, two cards)
-- [x] 26. Studio refunds a one time purchase item (RefundHelper + Square RefundPayment API implemented; used for booking cancellation and session cancellation refunds)
-- [ ] 27. User cancels a monthly service and receives a prorated refund
-- [ ] 28. Studio comps a service or good
-- [ ] 29. Admin grants entitlement without payment (comp)
-- [ ] 30. Admin credits user account for future purchase (as voucher)
+- [x] 22. User redeems a voucher/gift card and fully consumes its value (Vouchers Phase 1-2: VoucherHelper, purchase_pay_voucher endpoint, checkout/event/service voucher UI)
+- [x] 23. User redeems a voucher/gift card and has remaining balance (Vouchers Phase 2: split payment, partially_funded status, card payment on remaining balance)
+- [x] 24. User uses a percentage-based discount coupon (Vouchers Phase 5: CouponHelper, coupons/coupon_products tables, check_coupon endpoint, coupon UI in all booking flows)
+- [x] 25. User pays with multiple payment sources (card + voucher) (Vouchers Phase 2: purchase_payments junction, voucher then card split payment)
+- [x] 26. Studio refunds a one time purchase item (RefundHelper + Square RefundPayment API; booking cancellation and session cancellation refunds)
+- [x] 27. User cancels a monthly service and receives a prorated refund (Vouchers Phase 4: CalculateProratedRefund, AdminCancelWithRefund, subscription detail UI)
+- [x] 28. Studio comps a service or good (Vouchers Phase 3: CompHelper creates store credit voucher, comp notification email, admin comp endpoint + UI)
+- [x] 29. Admin grants entitlement without payment (comp) (Vouchers Phase 3: comp flow creates voucher-funded purchase + entitlement)
+- [x] 30. Admin credits user account for future purchase (as voucher) (Vouchers Phase 1: CreateStoreCredit, admin create_voucher endpoint; Phase 2.5: refund-as-credit option)
 
 ### Low Priority (Post-MVP)
 *Complex edge cases and admin features*
@@ -998,15 +998,14 @@ Business logic decision at entitlement creation time.
 | `voucher_redemptions` | redeemed_cents < initial_value_cents |
 
 #### 24. Percentage-based discount coupon
-**Not Supported** ✗
+**Supported** ✓
 
-**Gap**: No `coupons` table. Would need:
-```
-coupons (id, code, discount_type ["percentage", "fixed"],
-         discount_value, max_uses, current_uses,
-         valid_from_us, valid_to_us, is_active)
-coupon_redemptions (id, coupon_id, purchase_id, discount_cents)
-```
+| Table | Fields Used |
+|-------|-------------|
+| `coupons` | code, discount_type, discount_value, max_uses, current_uses, valid_from/to_us, is_active |
+| `coupon_products` | coupon_id, product_id (many-to-many product restriction) |
+| `coupon_redemptions` | coupon_id, purchase_id, discount_cents |
+| `purchases` | discount_cents tracks coupon discount |
 
 #### 25. Multiple payment sources
 **Supported** ✓
@@ -1026,34 +1025,37 @@ coupon_redemptions (id, coupon_id, purchase_id, discount_cents)
 | `entitlements` | revoked_us, revoked_reason set |
 
 #### 27. Prorated subscription refund
-**Supported** ✓
+**Supported** ✓ — **Implemented**
 
 | Table | Fields Used |
 |-------|-------------|
 | `payments` | Negative amount_cents (prorated calculation) |
-| `entitlements` | revoked_us set |
-| `square_subscriptions` | status updated |
+| `subscriptions` | status='cancelled', cancellation_effective_us=now |
+| `entitlements` | Revoked by AdminCancelWithRefund |
+
+CalculateProratedRefund computes unused portion. AdminCancelWithRefund processes refund to card or as store credit.
 
 #### 28. Comp service or good
-**Partially Supported** ⚠️
+**Supported** ✓ — **Implemented**
 
 | Table | Fields Used |
 |-------|-------------|
-| `payments` | provider="comp", amount_cents=0 |
-| `purchases` | total_cents=0, paid_cents=0, status="funded" |
+| `vouchers` | Store credit voucher created for product price |
+| `purchases` | Created when person uses the comp voucher |
+| `payments` | provider="voucher" when redeemed |
 
-Works if we allow $0 purchases. Alternative: create entitlement directly without purchase.
+CompHelper looks up product price, creates person-tied store credit voucher, sends notification email.
 
 #### 29. Admin grants entitlement without payment
-**Partially Supported** ⚠️
+**Supported** ✓ — **Implemented**
 
 | Table | Fields Used |
 |-------|-------------|
-| `entitlements` | purchase_id is currently required FK |
+| `vouchers` | Comp creates store credit for product price |
+| `purchases` | Person uses voucher → creates purchase at $0 net cost |
+| `entitlements` | Created through normal purchase fulfillment pipeline |
 
-**Gap**: `entitlements.purchase_id` is NOT NULL. Options:
-1. Make purchase_id nullable for admin-granted entitlements
-2. Create a "system" purchase with $0 total for audit trail (recommended)
+Uses option 2 (system purchase for audit trail) via the comp → voucher → purchase flow.
 
 #### 30. Admin credits account (as voucher)
 **Supported** ✓
