@@ -69,6 +69,9 @@ Commands:
   change_subscription_product   Upgrade or downgrade a subscription's product
   set_secret                    Set a configuration secret value
   list_products                 Show all subscription products
+  list_vouchers                 Show all vouchers (optionally for a person)
+  create_expiring_voucher       Create a store credit voucher expiring in N days
+  process_voucher_expiry        Send expiry warnings and deactivate expired vouchers
 
 Common flags:
   --command=<name>              Command to run (required)

@@ -253,22 +253,28 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 6.1 Expiry Notification Email
 
-- [ ] **Create `business_logic/payment/voucher_expiry_mail.h/cpp`** — email template warning user their voucher/credit is about to expire (code, remaining balance, expiry date)
-- [ ] **Tests** — email body generation test
+- [x] **Create `business_logic/payment/voucher_expiry_mail.h/cpp`** — HTML email template with `{voucher_code}`, `{remaining_balance}`, `{expiration_date}`, `{days_remaining}`, `{first_name}` placeholders. Uses `FormatString` + `NormalizeCrLf` pattern. Warning-themed header (amber).
+- [x] **Tests** — 6 tests in `voucher_expiry_mail_test.cpp`: contains code, first name, remaining balance, expiration date, days remaining, valid HTML structure
 
 ### 6.2 Scheduled Expiry Check
 
-- [ ] **Create expiry check logic** — query for vouchers where `expires_us` is within a notification window (e.g., 7 days) and `is_active = true` and `remaining_value_cents > 0`
-- [ ] **Send notifications** — for each expiring voucher, send email to the holder (bearer vouchers: `issued_by_person_id` or skip; store credits: `issued_to_person_id`)
-- [ ] **Track notification sent** — add `expiry_notified_us` column to `vouchers` to avoid duplicate notifications
-- [ ] **Trigger mechanism** — either a cron endpoint (`POST /api/admin/process_voucher_expiry`) or integrate into an existing periodic task
-- [ ] **Tests** — expiry within window gets notification, already notified skipped, expired vouchers not notified
+- [x] **Create `voucher_expiry_notification.h/cpp`** — `ProcessVoucherExpiry()` function that: queries vouchers expiring within window (`is_active`, `remaining > 0`, `expires_us` within window, `expiry_notified_us IS NULL`); sends emails to store credit holders (`issued_to_person_id`); skips bearer vouchers (marks as notified); tracks via `SetExpiryNotified`; also deactivates already-expired vouchers (Phase 6.3)
+- [x] **Added `GetExpiringVouchers` and `GetExpiredActiveVouchers`** queries to `vouchers.h/cpp` table helper
+- [x] **Added `voucher_expiry_reminder_days` secret** in `secret_keys.h` + `secret_values.cpp` (default 7 days)
+- [x] **`POST /api/admin/process_voucher_expiry` endpoint** — requires `manage_subscriptions` permission; returns `{total_expiring, total_notified, total_deactivated, notifications[]}`
+- [x] **Tests** — 7 notification tests (notifies expiring store credit, skips already notified, deactivates expired, skips bearer voucher, skips depleted, skips outside window, does not deactivate non-expired); 3 endpoint tests (notifies, deactivates, requires permission)
 
 ### 6.3 Expiry Enforcement
 
-- [ ] **On redemption, check expiry** — `ValidateVoucher` already checks `expires_us`; expired vouchers return error
-- [ ] **Deactivate expired vouchers** — the scheduled check can also set `is_active = false` on vouchers past `expires_us` (balance forfeited)
-- [ ] **Tests** — expired voucher cannot be redeemed
+- [x] **On redemption, check expiry** — `ValidateVoucher` already checks `expires_us`; expired vouchers return error (existing behavior, verified)
+- [x] **Deactivate expired vouchers** — `ProcessVoucherExpiry` Phase 2 finds active vouchers past `expires_us` and calls `DeactivateVoucher` on each (balance forfeited)
+- [x] **Tests** — `DeactivatesExpiredVouchers` test in notification suite + `DoesNotDeactivateNonExpiredVoucher` test
+
+### 6.4 Test Helper & Scheduled Jobs
+
+- [x] **Test helper commands** — `list_vouchers` (alias `lv`), `create_expiring_voucher` (alias `cev`, creates store credit expiring in N days), `process_voucher_expiry` (alias `pve`, sends warnings + deactivates expired) in `voucher_commands.h/cpp`
+- [x] **Scheduled Jobs doc updated** — added `process_voucher_expiry` to existing endpoints table (daily, 2:30 AM)
+- [x] **Manual Testing Helper doc updated** — added scenarios 12-14 (list_vouchers, create_expiring_voucher, process_voucher_expiry) with example workflow
 
 ---
 
