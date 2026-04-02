@@ -53,6 +53,10 @@ The idea is that people would distribute these instructional videos ahead of a Q
 
 The host video and client streams would all be saved as separate video sources. Later editing would have all the features of the creational video support but also capture all the client streams separately and allow the host to later remix and choose when to make people full screen / split screen / PIP / etc as well as being able to trim.
 
-Phase 2 would be taking this concept but going to studios. Instead of putting out content to individual students, studios would subscribe and enroll their instructors. The provider would put out content. Teachers from enrolled 
+Phase 2 would be taking this concept but going to studios. Instead of putting out content to individual students, studios would subscribe and enroll their instructors. The provider would put out content. Teachers from enrolled studios would review the content, try it, and then attend a live streamed Q&A session to ask for information. That session would be conducted like the student Q&A from phase 1. Then classes would be taught at the studio with the local instructor playing the content producer video progressions, pausing playback, demoing locally, and then guiding students through the material.
+
+This would allow studios to get access to new material and allow their local instructors to grow and learn. It also establishes a relationship between the content producer and the studio and the students. They are used to seeing the content producer. Could even grant a lower tier membership to the students of the studio or require them to purchase a low tier membership. This opens the door for in person workshops and having an established relationship.
+
+After adding enough studios and content producers, phase 3
 
 # Place plan here
