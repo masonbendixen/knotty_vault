@@ -49,6 +49,10 @@ I would like to create a platform to help tackle this issue. Phase one would be 
 	- Inserting a trailer
 - Support live stream and higher quality local capture while recording
 
-The idea is that people would distribute these instructional videos ahead of a Q&A session that is scheduled at a later date. People could watch these videos and become familiar with them and even try the video and come prepared with high quality questions for the Q&A session. The Q&A session would be live streamed via the website. People can click, ask a video question. The host would see the question and choose to accept a question. This would cause the client to stream their video via WebRTC and get a lower late
+The idea is that people would distribute these instructional videos ahead of a Q&A session that is scheduled at a later date. People could watch these videos and become familiar with them and even try the video and come prepared with high quality questions for the Q&A session. The Q&A session would be live streamed via the website. People can click, ask a video question. The host would see the question and choose to accept a question. This would cause the client to stream their video via WebRTC and get a lower latency WebRTC connection to the host. The host could choose between staying full screen, putting the audience full screen, making the audience splitscreen, making the audience PIP with the host full screen, or making the audience full screen with the host PIP. The host could end this audience session at any time and also switch to another.
+
+The host video and client streams would all be saved as separate video sources. Later editing would have all the features of the creational video support but also capture all the client streams separately and allow the host to later remix and choose when to make people full screen / split screen / PIP / etc as well as being able to trim.
+
+Phase 
 
 # Place plan here

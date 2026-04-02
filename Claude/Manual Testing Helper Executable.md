@@ -224,6 +224,60 @@ Common flags:
 2. Join with product_prices for current pricing
 3. Print each product: id, code, name, price
 
+### 12. `list_vouchers` — View Voucher State
+
+**What it does**: Lists all vouchers, or vouchers for a specific person. Alias: `lv`.
+
+**Flags**:
+- `--person_id=<id>` (optional — filter by issued_to_person_id)
+- `--all` (optional — show all vouchers)
+
+**Operations**:
+1. Query vouchers table (all or filtered by person)
+2. Print each voucher: id, code, remaining value, active status, expiration date
+
+### 13. `create_expiring_voucher` — Create Test Voucher Expiring Soon
+
+**What it does**: Creates a store credit voucher that expires in a configurable number of days. Useful for testing expiry notification emails without waiting. Alias: `cev`.
+
+**Flags**:
+- `--person_id=<id>` (required — person to issue the voucher to)
+- `--amount_cents=<n>` (optional, default: 5000 = $50.00)
+- `--days=<n>` (optional, default: 3 — days until expiry)
+- `--code=<code>` (optional — auto-generated if blank)
+
+**Operations**:
+1. Create a store credit voucher tied to the specified person
+2. Set `expires_us` to `now + days`
+3. Print the created voucher details (id, code, amount, person, expiration date)
+
+**Example workflow**:
+```bash
+# Create a voucher expiring in 2 days for person 5
+knottyyoga_test_helper --command=create_expiring_voucher --person_id=5 --days=2
+
+# Process expiry — sends warning email (captured by default)
+knottyyoga_test_helper --command=process_voucher_expiry
+
+# With real email sending
+knottyyoga_test_helper --command=process_voucher_expiry --send_real_email
+```
+
+### 14. `process_voucher_expiry` — Send Expiry Warnings & Deactivate Expired
+
+**What it does**: Calls `ProcessVoucherExpiry()` directly. Sends expiry warning emails for vouchers expiring within the configurable window (default 7 days, controlled by `voucher_expiry_reminder_days` secret). Also deactivates vouchers that have already expired. Alias: `pve`.
+
+**Flags**:
+- `--send_real_email` (optional — actually send emails; default: capture only)
+
+**Operations**:
+1. Query for active vouchers expiring within the reminder window that haven't been notified yet
+2. For store credits (issued_to_person_id set): send warning email to the person
+3. For bearer vouchers (no person): mark as notified but skip email
+4. Mark all notified vouchers with `expiry_notified_us` to prevent duplicate emails
+5. Find and deactivate active vouchers whose `expires_us` has already passed
+6. Print results: total expiring, notifications sent, vouchers deactivated
+
 ## Dependencies
 
 | Library | Conan Package | Purpose |

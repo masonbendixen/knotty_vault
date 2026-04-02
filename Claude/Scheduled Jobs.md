@@ -47,8 +47,9 @@ These endpoints are fully implemented in the web server and just need an externa
 | 2 | `/api/admin/expire_grace_periods` | POST | Daily | 1:30 AM (after billing) | Finds `past_due` subscriptions past their grace period, sets to `expired`, revokes entitlements. |
 | 3 | `/api/admin/check_expiring_entitlements` | POST | Daily | 2:00 AM | Sends reminder emails for entitlements expiring within configurable window (default 7 days, via `entitlement_expiry_reminder_days` secret). |
 | 4 | `/api/admin/check_expiring_cards` | POST | Monthly | 1st of month, 3:00 AM | Notifies users whose saved cards expire this month or next. |
+| 5 | `/api/admin/process_voucher_expiry` | POST | Daily | 2:30 AM | Sends expiry warning emails for vouchers expiring within configurable window (default 7 days, via `voucher_expiry_reminder_days` secret). Also deactivates already-expired vouchers. |
 
-All four require `manage_subscriptions` permission. All are idempotent — running multiple times in a day causes no harm (though notification endpoints may send duplicate emails).
+All five require `manage_subscriptions` permission. All are idempotent — running multiple times in a day causes no harm (though notification endpoints may send duplicate emails).
 
 **Source**: `endpoints/admin_run_billing.cpp`, `endpoints/admin_expire_grace_periods.cpp`, `endpoints/admin_check_expiring_entitlements.cpp`, `endpoints/admin_check_expiring_cards.cpp`
 
