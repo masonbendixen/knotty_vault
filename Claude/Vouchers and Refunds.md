@@ -222,15 +222,19 @@ This plan implements scenarios 22–30 from Payment Design Document.md (the "Han
 
 ### 5.1 Database Schema — `coupons` and `coupon_redemptions`
 
-- [ ] **Create `db_schema/coupons.h/cpp`** — `id`, `code` (unique), `discount_type` ("percentage" or "fixed"), `discount_value` (percentage 0-100 or cents), `max_uses` (nullable), `current_uses`, `valid_from_us`, `valid_to_us`, `is_active`, `applies_to_product_id` (nullable, for product-specific coupons), `created_us`, `updated_us`
-- [ ] **Create `db_schema/coupon_redemptions.h/cpp`** — `id`, `coupon_id` (FK), `purchase_id` (FK), `discount_cents`, `created_us`
-- [ ] **Register tables** in `make_database_info.cpp`, `create_database.cpp`
+- [x] **Create `db_schema/coupons.h/cpp`** — `id`, `code` (unique), `discount_type` ("percentage" or "fixed"), `discount_value` (percentage 0-100 or cents), `max_uses` (nullable), `current_uses`, `valid_from_us`, `valid_to_us`, `is_active`, `applies_to_product_id` (nullable FK → products), `created_us`, `updated_us`
+- [x] **Create `db_schema/coupon_redemptions.h/cpp`** — `id`, `coupon_id` (FK → coupons), `purchase_id` (FK → purchases), `discount_cents`, `created_us`
+- [x] **Register tables** in `make_database_info.cpp`, `create_database.cpp` (CreateTables, PopulateAdminTopLevelTables, PopulateAdminNestedTables, column data info, friendly names, table friendly names, display templates, enum bindings)
+- [x] **Add `discount_cents` column to `purchases` table** — tracks coupon discount on each purchase (defaults to 0, backward-compatible)
+- [x] **Table helpers** — `sql_util/table_helpers/coupons.h/cpp` (AddCoupon, GetCouponById, GetCouponByCode, GetCoupons, IncrementCurrentUses, DeactivateCoupon, DeleteCoupon) and `coupon_redemptions.h/cpp` (AddRedemption, GetRedemptionsForCoupon, GetRedemptionsForPurchase)
+- [x] **Tests** — 10 coupons table helper tests, 6 coupon_redemptions table helper tests
 
 ### 5.2 Coupon Business Logic
 
-- [ ] **Create `business_logic/payment/coupon_helper.h/cpp`** — `ValidateCoupon`, `ApplyCoupon` (modifies purchase total), `GetCouponDiscount` (calculates discount for a given cart)
-- [ ] **Integration with purchase creation** — apply coupon code during `purchase_create` to reduce `total_cents`
-- [ ] **Tests** — percentage discount, fixed discount, expired, max uses reached, product-specific
+- [x] **Create `business_logic/payment/coupon_helper.h/cpp`** — `CreateCoupon` (validates code uniqueness, discount type/range), `ValidateCoupon` (checks active, validity window, max uses, product-specific), `GetCouponDiscount` (static, calculates percentage or fixed discount capped at subtotal), `ApplyCoupon` (increments usage, creates redemption record)
+- [x] **Integration with purchase creation** — `CreatePurchaseRequest` accepts optional `couponCode`; `PurchaseHelper::CreatePurchase` validates coupon, calculates discount, adjusts `total_cents`, stores `discount_cents` on purchase, records coupon redemption; `purchase_create` endpoint parses `coupon_code` from request body
+- [x] **Updated `PurchaseInfo`/`PurchaseInfoToKeyValueTable`** — includes `discountCents` field, serialized as `discount_cents` in JSON response
+- [x] **Tests** — 22 coupon_helper tests (create percentage/fixed/with max uses/with product/duplicate code/empty code/invalid type/percentage over 100, validate success/not found/inactive/expired/not yet valid/max uses/product-specific wrong/correct, discount percentage/fixed/exceeds subtotal/rounds down/with tax/100%, apply increments and creates redemption); 9 purchase_create endpoint tests (percentage coupon, fixed coupon, invalid code, expired coupon, max used, product-specific wrong product, creates redemption record, fixed exceeds subtotal); 2 payment_key_value_table tests updated
 
 ### 5.3 Coupon Endpoints & UI
 
