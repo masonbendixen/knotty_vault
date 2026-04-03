@@ -464,17 +464,17 @@ Defines what access a product grants when purchased.
 ## Vouchers
 
 ### vouchers
-| Column | Type | Notes |
-|--------|------|-------|
-| id | BIGSERIAL | PK |
-| code | VARCHAR(64) | Unique |
-| currency | VARCHAR(3) | |
-| initial_value_cents | BIGINT | |
-| remaining_value_cents | BIGINT | |
-| is_active | BOOLEAN | |
-| expires_us | BIGINT | Nullable |
-| created_us | BIGINT | |
-| updated_us | BIGINT | |
+| Column                | Type        | Notes    |
+| --------------------- | ----------- | -------- |
+| id                    | BIGSERIAL   | PK       |
+| code                  | VARCHAR(64) | Unique   |
+| currency              | VARCHAR(3)  |          |
+| initial_value_cents   | BIGINT      |          |
+| remaining_value_cents | BIGINT      |          |
+| is_active             | BOOLEAN     |          |
+| expires_us            | BIGINT      | Nullable |
+| created_us            | BIGINT      |          |
+| updated_us            | BIGINT      |          |
 
 ### voucher_redemptions
 | Column | Type | Notes |
