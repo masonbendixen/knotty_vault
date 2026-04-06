@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 4/3/2026
-Version: 0.1
+Last Updated: 4/6/2026
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -38,64 +38,48 @@ Also, please create a section noting the changes we will need to make to [[Payme
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
-# Plan: Couple's Massage, Spa Capacity, Add-On Bundles
+# Plan: Spa, Add-On Bundles, Shopping Cart, and Book-for-Others
 
-## Critique and Analysis of Requirements
+## Scope Summary (Post-Discussion)
 
-Before diving into the plan, here are my observations, concerns, and suggestions about the requirements as written.
+Based on our brainstorming discussion, here's what's in scope and what's been decided:
 
-### What I Like About This Design
-- **Linking add-on scheduling to the base product** (spa visit extended by massage duration) is clever and creates real customer value
-- **Drop-in support** fills an important gap — not all visits are pre-planned
-- **Early check-in with capacity awareness** prevents overcrowding while being flexible
-- **Room-level capacity** already exists in the codebase (`location_rooms.concurrent_capacity`), so spa capacity tracking has a foundation
+### In Scope
+1. **Spa product with capacity-tracked booking** — room-level capacity enforcement, 5-min slot intervals, variants for different durations/times-of-day
+2. **Late Night Spa** — separate product (not variant) for visibility/permission control, platinum members only
+3. **Staff check-in with capacity enforcement** — fire code compliance, early check-in window, capacity gate
+4. **Add-on bundles** — `product_addons` table, automatic discounts, duration extension for spa when bundled with massage
+5. **Shopping cart** — multi-item purchases with implicit add-on discount detection
+6. **Booking for someone else** — extends purchase sharing to bookable services, with invite flow for non-members
+7. **Drop-in bookings with on-the-fly account creation** — staff portal, auto-generated password with must-change flag
+8. **Linked cancellation** — booking groups, cancel-all policy, special handling when provider cancels base
+9. **Rename "Membership Sharing" to "Purchase Sharing"**
+10. **iCal attachments** on booking confirmation emails
+11. **Occupancy dashboard** — real-time for staff and read-only for users
+12. **Fix PayCardResponse TypeScript type** — entitlements array, not count
 
-### Concerns and Pushback
+### Deferred / Dropped
+- **Couple's massage** — Dropped. Not worth the multi-provider slot complexity. Users can simply book two massages at the same time. The "book for someone else" feature covers the gifting use case.
+- **Multi-visit passes** ("Buy 5 spa entries, get 1 free") — Good idea but separate work item
+- **Recurring spa bookings** — Interesting but separate work item
+- **Spa waitlist** — Deferred until capacity becomes an issue
+- **Booking modification** (reschedule without cancel+rebook) — Nice-to-have, defer unless cheap
+- **Bundle analytics dashboard** — Good idea but separate work item
+- **Class attendance templates** — Very different feature, separate work item
 
-**1. Couple's massage as multi-provider slots is a major complexity increase**
+### Key Design Decisions Made
 
-The current service booking model is fundamentally 1-provider-1-client-1-room. A couple's massage requires: finding 2 providers available simultaneously, booking 2 rooms (or 1 double room), creating 2 linked service sessions, handling partial cancellation, and a completely new slot computation algorithm. This is not an extension of the existing system — it's essentially a parallel booking engine.
+**DD1: No virtual spa "provider" account.** The provider-based availability model doesn't fit self-service rooms (spa, gym). A room with capacity > 1 needs a different availability mechanism — likely room-level operating hours rather than provider availability blocks. The room's `concurrent_capacity` gates bookings; operating hours gate when bookings are possible. This needs a new concept: **room schedules** (operating hours per room).
 
-**Alternative suggestion**: For v1, model couple's massage as a single booking with one "lead" provider. The admin schedules two therapists for the slot manually (or it's inherent to the room type). The system books the time slot and the room, and the provider assignment is handled operationally. This is how most spa booking systems work — the couple books a "couple's massage" slot, and the front desk assigns therapists.
+**DD2: Spa variants are early bird, off-peak, peak. Late night is a separate product** with visibility restricted to platinum members via `visibility_permission_id`.
 
-Mason- If it needs to be handled operationally, how can the person book it? I suppose couple's massage isn't that important to me to be honest. I'm not putting in a room specifically for it so it really would just be two people who would be getting massages with different providers in different rooms at the same time. I'm not sure that it is worth the complexity to the system to change the model to support this when someone can pretty easily just book two massages at the same time slot (or close enough). I wanted to have a multi-seat product though. I think that this exposes a couple of things. We should allow someone to book a massage for someone else. We are already renaming Membership sharing to product sharing. I think we need to modify massage booking to allow someone to book a massage for someone else for whom they have enabled product sharing. It would also be nice to also change the membership and massage booking so that they can book this for someone else and either auto complete someone for whom they have already configured product sharing or allow them to type the email address of someone else. If this person is already a member but not configured for product sharing for this person, it would send them a request to allow product sharing and then share this product once enabled. If they aren't a member, it would send email to create an account with this email and then, after creating an account, this would prompt them to accept product sharing from this person and then after agreeing to that, share the product or membership gifted. This sounds like a lot of work but I want to enable things like gift cards, guest passes, and gifted massages as a vehicle for getting new customers.
+**DD3: Add-on discount vs coupon — better discount wins, unused one not consumed.** If a coupon gives 20% off and the add-on bundle gives 15% off, the 20% coupon applies and the bundle discount is not consumed. The coupon IS consumed. This requires tracking which discount was actually applied.
 
-**2. The add-on model as described creates complex scheduling dependencies**
+**DD4: Provider cancels base of bundle — don't cancel the add-on.** Cancel the massage, keep the spa booked at the bundle discount, give the customer free cancellation on the spa, and email them about the change. This is fairer than yanking both bookings.
 
-The requirement says: "the length of the spa visit is automatically extended by the length of the massage" and canceling either component cancels everything. This creates tightly coupled scheduling where a 60-min massage + spa means the spa booking must account for the massage duration, and capacity calculations depend on services in other rooms.
+**DD5: Duration extension is base variant duration.** 90-min massage + 60-min spa = 150-min spa visit. The `extends_duration_by_base` flag on `product_addons` controls this.
 
-**Alternative suggestion**: Keep add-on pricing simple (discounted spa when purchased with massage) but schedule them independently. The user books massage at 2pm and spa at 3pm (or whenever). The system discounts the spa price. They're linked for cancellation purposes but not for capacity calculation. This dramatically simplifies the implementation while delivering the same customer value.
-
-Mason- my issue is that if I make spa entry three hours during off peak and then two hours during peak. It is best if someone uses the spa for a bit to have the steam room and sauna loosen them up a bit pre massage and then again post massage to make the massage easier for the provider and then to warm up again post massage (which pushes blood to the surface and makes them cold). This means they won't book the massage at the before or after the spa entry. That means that a 90min massage would consume a LOT of the spa time. Hence wanting to extend the length of the spa visit by the length of the massage.
-
-**3. Check-in as a capacity gate adds real-time operational complexity**
-
-"Checking in early would exceed spa capacity, they must wait" means the check-in UI needs real-time capacity tracking and the ability to queue people. This is essentially a real-time occupancy management system.
-
-**Simpler alternative**: Check-in is just a timestamp for record-keeping. If someone arrives early, the staff makes a judgment call. Enforce capacity only at booking time, not at check-in time. Add a "current occupancy" dashboard for the spa staff but don't gate check-in on it.
-
-Mason- the issue is that there are legal limits on capacity for fire code safety.
-
-**4. Drop-in with account creation is a significant scope increase**
-
-Creating accounts on the fly during a drop-in (collect name/email, auto-generate password, email them) is an entirely separate workflow that touches auth, registration, and email. It's useful but orthogonal to the booking features.
-
-**Suggestion**: Phase drop-ins separately. For v1, staff can only do drop-in bookings for existing accounts. Account creation during drop-in comes in a later phase.
-
-Mason- I want to make collecting new customers to be something easy. We already have account creation support. This would be auto generating a password and emailing it to them. Since we don't support booking as a guest, since we want to funnel people through the account creation process, we should make creating an account for a new person as easy as possible especially for people who just randomly show up for a drop in session. I think that the only significant change here is that we should add a way to mark that a person HAS to change their password the next time they log in and make these auto created accounts have that flag set.
-
-### Suggested Additional Work Items
-
-1. **Staff check-in endpoint** — `POST /api/staff/checkin/{bookingId}` — the `checked_in_us` column exists but there's no endpoint to set it
-	- Mason- Let's do this. We also need UI to be able to check people in with a list of people booked in the next configurable time period that defaults to 90min but also allows auto complete of a person.
-2. **Spa occupancy dashboard** — real-time view of current and upcoming capacity for staff
-	- Mason- Let's do this and also include massage bookings.
-3. **Product add-on admin UI** — admin interface for configuring which products can be add-ons to which
-	- Mason- Let's do this.
-4. **iCal attachment for booking emails** — mentioned in Support for scheduled purchases as a future item, relevant here
-	- Mason- Let's do this for massage bookings, event sessions, and one time purchases (like spa visits).
-5. **Rename "Membership Sharing" to "Purchase Sharing"** — simple UI text change in gift-permissions component
-	- Let's absolutely do this.
+**DD6: Shopping cart for bundle UX.** Users book products independently into a cart. When items in the cart have add-on relationships, the discount is shown and applied automatically. This is the most flexible approach and enables multi-product purchases generally.
 
 ---
 
@@ -103,33 +87,37 @@ Mason- I want to make collecting new customers to be something easy. We already 
 
 ### What Already Exists
 
-| Component                                                    | Status                     | Relevant For                         |
-| ------------------------------------------------------------ | -------------------------- | ------------------------------------ |
-| `location_rooms.concurrent_capacity`                         | Exists                     | Spa capacity tracking                |
-| `product_variants` with `duration_minutes`, `buffer_minutes` | Exists                     | Massage/spa variants                 |
-| `bookable_service_sessions` with `location_room_id`          | Exists                     | Room assignment                      |
-| `bookings.checked_in_us`                                     | Column exists, no endpoint | Check-in tracking                    |
-| `bookings.status` includes "attended", "no_show"             | Exists                     | Attendance tracking                  |
-| Service availability helper (5-min slot alignment)           | Exists                     | Spa slot computation                 |
-| `FindAvailableRoom()` with provider affinity                 | Exists                     | Room assignment                      |
-| Cancellation with tiered refund policies                     | Exists                     | Cancel/refund                        |
-| Gift permissions / seat assignment                           | Exists                     | Couple's booking recipient selection |
-| Product booking windows (permission-based advance booking)   | Exists                     | Early bird variants                  |
-| `SeatAssignmentComponent` (standalone)                       | Exists                     | Assigning second person              |
-| Coupon system with multi-product restriction                 | Exists                     | Add-on discounts                     |
+| Component | Status | Relevant For |
+|-----------|--------|--------------|
+| `location_rooms.concurrent_capacity` | Exists | Spa capacity tracking |
+| `product_variants` with `duration_minutes`, `buffer_minutes` | Exists | Massage/spa variants |
+| `bookable_service_sessions` with `location_room_id` | Exists | Room assignment |
+| `bookings.checked_in_us` | Column exists, no endpoint | Check-in tracking |
+| `bookings.status` includes "attended", "no_show" | Exists | Attendance tracking |
+| Service availability helper (5-min slot alignment) | Exists | Spa slot computation |
+| `FindAvailableRoom()` with provider affinity | Exists | Room assignment |
+| Cancellation with tiered refund policies | Exists | Cancel/refund |
+| Gift permissions / seat assignment | Exists | Purchase sharing |
+| Product booking windows (permission-based advance booking) | Exists | Early bird access |
+| Coupon system with multi-product restriction | Exists | Discount infrastructure |
+| `CreatePurchaseRequest` accepts `items[]` array | Exists | Multi-item purchases (backend ready) |
+| `CatalogHelper::GetQuote` resolves prices for multiple items | Exists | Multi-item pricing |
+| Account creation / registration flow | Exists | Drop-in account creation base |
 
-### What's Missing
+### What Needs to Be Built
 
-| Gap | Impact |
-|-----|--------|
-| No concept of linked/grouped bookings | Couple's massage, bundle cancellation |
-| No room capacity enforcement during booking | Spa capacity |
-| No check-in endpoint | Staff check-in |
-| No drop-in booking flow | Walk-in customers |
-| No add-on/bundle product relationship table | Bundle pricing |
-| No multi-provider simultaneous slot computation | Couple's massage availability |
-| No account-on-the-fly creation | Drop-in for new customers |
-| Service availability doesn't check room capacity | Spa overbooking prevention |
+| Gap | Feature Area |
+|-----|-------------|
+| Room-level operating hours schedule | Spa availability (replaces virtual provider) |
+| Room capacity check during slot computation | Spa overbooking prevention |
+| Check-in endpoint + capacity enforcement | Staff check-in with fire code compliance |
+| Must-change-password flag on accounts | Drop-in account creation |
+| `product_addons` table + discount logic | Bundle pricing |
+| `booking_groups` + `booking_group_members` | Linked cancellation |
+| Shopping cart frontend | Multi-item purchase UX |
+| Book-for-others flow with invite | Gifting / sharing |
+| iCal generation + email attachment | Calendar integration |
+| Occupancy dashboard (staff + public) | Real-time capacity view |
 
 ---
 
@@ -137,531 +125,447 @@ Mason- I want to make collecting new customers to be something easy. We already 
 
 ### New Tables
 
+#### `room_schedules`
+Operating hours for rooms that can be self-service booked (spa, gym). Replaces the "virtual provider" concept.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | BIGSERIAL | PK |
+| `location_room_id` | BIGINT | FK → location_rooms |
+| `day_of_week` | SMALLINT | 0=Sunday, 6=Saturday |
+| `open_time_minutes` | INT | Minutes from midnight (e.g., 360 = 6:00 AM) |
+| `close_time_minutes` | INT | Minutes from midnight (e.g., 1320 = 10:00 PM) |
+| `is_active` | BOOLEAN | DEFAULT TRUE |
+| `created_us` | BIGINT | |
+| `updated_us` | BIGINT | |
+
+This table defines when a room is bookable. Multiple entries per room per day are allowed (e.g., 6am-12pm and 2pm-10pm with a maintenance gap).
+
 #### `product_addons`
 Defines which products can be add-ons to which base products, and the discount.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | BIGSERIAL | PK |
-| `base_product_id` | BIGINT | FK → products (the main product, e.g., massage) |
-| `addon_product_id` | BIGINT | FK → products (the add-on, e.g., spa entry) |
+| `base_product_id` | BIGINT | FK → products |
+| `addon_product_id` | BIGINT | FK → products |
 | `discount_type` | VARCHAR(32) | "percentage" or "fixed" |
 | `discount_value` | BIGINT | Percentage 0-100 or cents |
-| `is_stackable` | BOOLEAN | DEFAULT FALSE — can this discount combine with other discounts? |
-| `extends_duration_by_base` | BOOLEAN | DEFAULT FALSE — does base product duration extend the add-on? |
+| `is_stackable` | BOOLEAN | DEFAULT FALSE |
+| `extends_duration_by_base` | BOOLEAN | DEFAULT FALSE |
 | `is_active` | BOOLEAN | DEFAULT TRUE |
 | `created_us` | BIGINT | |
 | `updated_us` | BIGINT | |
 
-**Unique constraint**: `(base_product_id, addon_product_id)` — each pairing defined once.
+**Unique constraint**: `(base_product_id, addon_product_id)`
 
 #### `booking_groups`
-Links bookings that are part of the same logical unit (couple's massage, base + add-on bundle).
+Links bookings that are part of the same logical unit (bundle).
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | BIGSERIAL | PK |
-| `group_type` | VARCHAR(32) | "couple" or "bundle" |
+| `group_type` | VARCHAR(32) | "bundle" |
 | `purchase_id` | BIGINT | FK → purchases |
-| `cancel_policy` | VARCHAR(32) | "cancel_all" (default) — canceling any member cancels all |
 | `created_us` | BIGINT | |
 
 #### `booking_group_members`
-Junction table linking individual bookings to a group.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | BIGSERIAL | PK |
 | `booking_group_id` | BIGINT | FK → booking_groups |
 | `booking_id` | BIGINT | FK → bookings |
-| `role` | VARCHAR(32) | "base" or "addon" (for bundles), "primary" or "secondary" (for couples) |
+| `role` | VARCHAR(32) | "base" or "addon" |
 | `created_us` | BIGINT | |
 
 ### Modified Tables
 
-#### `products` — add columns
-| Column | Type | Notes |
-|--------|------|-------|
-| `checkin_window_minutes` | BIGINT | Nullable, default NULL. How many minutes before booked time can check-in happen. NULL = no early check-in. |
+#### `products`
+| New Column | Type | Notes |
+|------------|------|-------|
+| `checkin_window_minutes` | BIGINT | Nullable. Minutes before booked time check-in is allowed. |
+| `requires_room_schedule` | BOOLEAN | DEFAULT FALSE. If true, availability is driven by room_schedules instead of provider_availability. |
 
-#### `location_rooms` — already has `concurrent_capacity`
-No schema change needed. Existing `concurrent_capacity` field will be used for spa capacity tracking.
+#### `people`
+| New Column | Type | Notes |
+|------------|------|-------|
+| `must_change_password` | BOOLEAN | DEFAULT FALSE. If true, force password change on next login. |
 
 ---
 
-## Design Decisions
+## Implementation Phases
 
-### DD1: Couple's Massage — Booking Model
+### Phase 0: Quick Fixes and Foundation
+*Small, high-impact cleanups*
 
-**Decision**: Model as **two separate linked bookings** in a booking group, not as a single multi-seat booking.
+#### 0.1 Rename "Membership Sharing" to "Purchase Sharing"
+- [ ] Update `gift-permissions.component.html` — title, section headers, descriptions
+- [ ] Update account dashboard card in `user.component.html` — title and subtitle
+- [ ] Tests: component spec
 
-**Rationale**: 
-- Each person gets their own booking (visible in their "My Bookings")
-- Each person can be assigned a different provider
-- Cancellation of either cancels both (via booking_group)
-- The payer pays once (single purchase with two purchase items)
-- Seat assignment uses the existing gift permission / seat assignment flow
+#### 0.2 Fix PayCardResponse TypeScript Type
+- [ ] `payment.types.ts`: Change `PayCardResponse.entitlements_created: number` to `entitlements: Entitlement[]`
+- [ ] Same for `PayVoucherResponse`
+- [ ] Update `ServerAccessMock` to return entitlement arrays
+- [ ] Fix any tests constructing these types
+- [ ] Tests: mock spec, checkout spec, event-booking spec
 
-**Flow**:
-1. User selects "Couple's Massage" product (which has `seats_default = 2`)
-2. UI shows available time slots where 2+ providers have overlapping availability and 2+ rooms of the required type are free
-3. User selects a time slot
-4. User assigns person 2 (self, or via gift permission search)
-5. For each person, user selects a preferred provider from available ones
-6. System creates: 1 purchase (2 items), 2 service sessions, 2 bookings, 1 booking group
-7. Both people see the booking in their "My Bookings"
+#### 0.3 Add `must_change_password` to People
+- [ ] Add column to `db_schema/people.h/cpp` (BOOLEAN, DEFAULT FALSE)
+- [ ] Register in admin column metadata
+- [ ] Update login flow: if `must_change_password` is true after successful auth, redirect to change password page
+- [ ] Tests: schema, login redirect
 
-### DD2: Spa Capacity Enforcement
+---
 
-**Decision**: Enforce capacity at **booking time** using the room's `concurrent_capacity`.
+### Phase 1: Room Schedules and Spa Infrastructure
+*The foundation for capacity-tracked room booking*
 
-**How**: When computing available spa slots, query all bookings overlapping each potential slot's time window. If the count of overlapping active bookings equals `concurrent_capacity`, the slot is unavailable. This check happens at 5-minute intervals (existing slot alignment).
+#### 1.1 `room_schedules` Table
+- [ ] Create `db_schema/room_schedules.h/cpp`
+- [ ] Register in `make_database_info.cpp`, `create_database.cpp` (all admin metadata)
+- [ ] Add to `CMakeLists.txt`
+- [ ] Create table helper: `AddRoomSchedule`, `GetSchedulesForRoom`, `GetScheduleForRoomAndDay`
+- [ ] Tests: table helper CRUD
 
-**Check-in**: Check-in at the staff portal is a simple timestamp update. If the user arrives early, staff decides — no system gate on capacity at check-in time. This keeps the operational flow simple. A "Current Occupancy" indicator on the check-in screen shows staff the current count vs capacity as a visual aid.
+#### 1.2 Add `checkin_window_minutes` and `requires_room_schedule` to Products
+- [ ] Add columns to `db_schema/products.h/cpp`
+- [ ] Register in admin column metadata
+- [ ] Tests: schema
 
-### DD3: Add-On Bundle — Purchase and Scheduling
+#### 1.3 Room-Based Availability Computation
+- [ ] Create `RoomAvailabilityHelper` (or extend service availability)
+- [ ] For products where `requires_room_schedule = true`:
+  - Use `room_schedules` to determine open hours (not provider_availability)
+  - Compute available slots at 5-min intervals during open hours
+  - For each slot, count overlapping active bookings in the room
+  - Exclude slots where booking count would reach `concurrent_capacity` for any moment during the booking duration
+- [ ] Endpoint: extend `GET /api/available_service_slots` to handle room-schedule-based products
+- [ ] Tests: extensive availability tests — open hours, capacity limits, overlapping bookings
 
-**Decision**: Add-ons are **separate products linked by the `product_addons` table** with an automatic discount applied at purchase creation time.
+#### 1.4 Spa Product and Room Setup
+- [ ] Add "Spa" room type in database seed data
+- [ ] Add "Spa" room to facility with `concurrent_capacity` (e.g., 15)
+- [ ] Add room_schedules entries for spa operating hours
+- [ ] Create "Spa Entry" product (`kind = "bookable_service"`, `requires_room_schedule = true`) with variants:
+  - Early Bird 60 Min ($25)
+  - Off-Peak 60 Min ($30)
+  - Peak 60 Min ($40)
+  - 30 Min ($20)
+  - 90 Min ($50)
+- [ ] Create "Late Night Recovery Spa" as separate product with `visibility_permission_id` set to platinum member permission
+  - 30 Min ($15)
+- [ ] Set `checkin_window_minutes = 15` on both spa products
+- [ ] Tests: products created correctly
 
-**Booking flow**:
-1. User books the base product (e.g., massage) normally
-2. After selecting a time slot, a "Add-Ons" section appears showing available add-ons
-3. User clicks an add-on (e.g., "Spa Entry")
-4. System shows available spa time slots that are compatible:
-   - For `extends_duration_by_base = true`: spa slot starts at or before massage start, spa duration = spa variant duration + massage duration
-   - Available slots checked against spa room capacity
-5. User selects a spa time slot
-6. System creates a single purchase with 2 items: base product (full price) + add-on (discounted price)
-7. Both bookings are linked via a booking group
-8. Canceling either cancels both; if provider cancels base, full refund for everything
+#### 1.5 Staff Check-In Endpoint
+- [ ] Create `POST /api/staff/checkin/{bookingId}` endpoint
+- [ ] Validates: booking exists, booking is confirmed, checked_in_us not already set
+- [ ] Check-in window: if `checkin_window_minutes` is set, allow check-in that many minutes before start time
+- [ ] **Capacity gate for early check-in**: if checking in before booked start time, query current occupancy of the room. If at capacity, return error "Room is at capacity — please wait"
+- [ ] Sets `bookings.checked_in_us = now_us()`
+- [ ] Register in `web_app.cpp` and `CMakeLists.txt`
+- [ ] Tests: success, already checked in, too early, capacity blocked, late check-in (allowed, no extension)
 
-### DD4: Check-In Window
+#### 1.6 Staff Check-In UI
+- [ ] Create check-in page in staff portal at `/staff/checkin`
+- [ ] Show upcoming bookings for the next configurable window (default 90 min, configurable via input)
+- [ ] Person autocomplete search to find a specific person's bookings
+- [ ] Each booking row: person name, product, variant, time, status, "Check In" button
+- [ ] Current occupancy indicator per room: "Spa: 8/15" with color coding (green < 70%, amber < 90%, red >= 90%)
+- [ ] Route and staff dashboard card
+- [ ] Tests: component spec
 
-**Decision**: Use a `checkin_window_minutes` column on `products` (not on variants, since check-in policy is per product type).
+#### 1.7 Occupancy Dashboard
+- [ ] Create `GET /api/room_occupancy/{roomId}` endpoint — returns current count, capacity, and upcoming 2-hour window with projected counts
+- [ ] Staff dashboard widget showing all rooms with current occupancy
+- [ ] Public-facing endpoint (no auth required): `GET /api/public/room_occupancy/{roomId}` — returns just current count and capacity
+- [ ] Frontend: occupancy indicator on the spa service booking page so users can see how busy it is before booking
+- [ ] Tests: endpoint tests, component spec
 
-Default behavior: if `checkin_window_minutes` is NULL, no early check-in allowed (or staff discretion). If set to 15, the staff check-in endpoint allows check-in up to 15 minutes before the booked start time.
+---
 
-### DD5: Drop-In Bookings
+### Phase 2: Shopping Cart
+*Multi-item purchase capability — prerequisite for add-on bundles*
 
-**Decision**: Phase separately. For v1, drop-in only works for existing accounts. Staff searches for the person and creates a booking on-the-fly if there's capacity. Account-on-the-fly creation comes in a later phase.
+#### 2.1 Cart Service (Frontend)
+- [ ] Create `CartService` — in-memory cart state management (array of cart items)
+- [ ] Each cart item: `{ productId, variantId?, quantity, scheduledStartTimeUs?, providerPersonId?, facilityId?, forPersonId? }`
+- [ ] Methods: `addItem()`, `removeItem()`, `clearCart()`, `getItems()`, `getItemCount()`
+- [ ] Observable `cartItems$` for reactive UI updates
+- [ ] Persist cart in localStorage for page refresh survival
+- [ ] Tests: service spec
 
-### DD6: "Late Night Post-Workout Spa" and "Early Bird"
+#### 2.2 Cart UI Component
+- [ ] Create `CartComponent` (standalone) — slide-out panel or dropdown from header
+- [ ] Shows cart items with product name, variant, price, scheduled time (if applicable)
+- [ ] Remove item button per row
+- [ ] Subtotal display
+- [ ] "Checkout" button → navigates to cart checkout page
+- [ ] Cart item count badge in header nav
+- [ ] Tests: component spec
 
-**Decision**: These are just **product variants** with specific pricing and availability windows.
+#### 2.3 Cart Checkout Page
+- [ ] Create `CartCheckoutComponent` at `/shop/cart`
+- [ ] Shows all items with line totals
+- [ ] Detects add-on relationships and shows bundle discount applied
+- [ ] Coupon code input (applied to the whole purchase)
+- [ ] Voucher code input
+- [ ] Payment method
+- [ ] Creates a single multi-item purchase via `createPurchase()`
+- [ ] Tests: component spec
 
-- "Early Bird Spa (Mon-Wed 6am-9am)" — a variant of the Spa Entry product with lower price and restricted availability (the availability blocks for this variant only exist during early morning hours)
-- "Late Night Post-Workout Spa (Thu 9pm-10pm)" — another variant with specific availability
+#### 2.4 Add to Cart Buttons
+- [ ] Update service booking flow: after selecting a slot, "Add to Cart" button (in addition to "Book and Pay Now")
+- [ ] Update catalog/product browse: "Add to Cart" on products
+- [ ] Update event booking: "Add to Cart" option
+- [ ] If user adds a product that has add-ons, show a suggestion: "Save X% — add Spa Entry to your cart"
+- [ ] Tests: integration tests
 
-Provider availability determines when these are bookable. The admin creates availability blocks for the spa "provider" (or treats the spa as a self-service room) during these specific windows.
+---
 
-**Challenge**: The current provider availability model is person-based. A spa is a room, not a person. 
+### Phase 3: Add-On Bundles
+*Product relationships with automatic discounts*
 
-**Solution**: Create a virtual "Spa" provider (a staff account) that represents the spa. The spa's availability determines when spa bookings can be made. The room capacity limits concurrent bookings. This reuses the existing provider availability infrastructure without modification.
+#### 3.1 `product_addons` Table
+- [ ] Create `db_schema/product_addons.h/cpp`
+- [ ] Register in `make_database_info.cpp`, `create_database.cpp` (all admin metadata, nested under products)
+- [ ] Add to `CMakeLists.txt`
+- [ ] Create table helper: `AddProductAddon`, `GetAddonsForProduct`, `GetBaseProductsForAddon`
+- [ ] Tests: table helper CRUD
+
+#### 3.2 `booking_groups` and `booking_group_members` Tables
+- [ ] Create `db_schema/booking_groups.h/cpp` and `booking_group_members.h/cpp`
+- [ ] Register in `make_database_info.cpp`, `create_database.cpp`
+- [ ] Create table helpers
+- [ ] Tests: table helper CRUD
+
+#### 3.3 Add-On Discount Logic
+- [ ] Create `business_logic/payment/addon_helper.h/cpp`
+- [ ] `GetAvailableAddons(productId)` — returns addon products with discount info
+- [ ] `CalculateAddonDiscount(baseProductId, addonProductId, addonPriceCents)` — computes discounted price
+- [ ] Discount vs coupon logic: if `is_stackable = false`, compare add-on discount to coupon discount. Apply the better one. The unused discount is not consumed (coupon use count not incremented if add-on discount was better).
+- [ ] Tests: percentage discount, fixed discount, stackability, coupon interaction
+
+#### 3.4 Purchase Creation with Add-On Discounts
+- [ ] Extend purchase creation: when a purchase contains items that have add-on relationships, automatically apply the add-on discount
+- [ ] The detection is based on `product_addons` table: if item A is a base and item B is its addon, apply discount to B
+- [ ] Track which discount was applied per item (add-on vs coupon)
+- [ ] Tests: purchase with add-on priced correctly, coupon vs add-on interaction
+
+#### 3.5 Duration Extension for Bundled Bookings
+- [ ] When booking base + add-on together and `extends_duration_by_base = true`:
+  - Adjust add-on booking end time: `addon_end = addon_start + addon_variant_duration + base_variant_duration`
+  - Factor extended duration into room capacity check
+- [ ] Create booking_group linking both bookings
+- [ ] Tests: extended duration calculated correctly, capacity check uses extended time
+
+#### 3.6 Linked Cancellation
+- [ ] Update `BookingHelper::CancelBooking` to check booking groups
+- [ ] When user cancels ANY member of a bundle group: cancel ALL members, refund per individual product policy
+- [ ] When **provider** cancels the **base** product:
+  - Cancel the base booking with full refund
+  - Do NOT cancel the add-on — keep it booked at the bundle discount price
+  - Give the add-on a `free_cancel_until_us` override (e.g., 24 hours from now) so the customer can cancel with full refund if they want
+  - Send email: "Your massage was cancelled by the provider. Your spa visit is still booked. You may cancel with a full refund if you prefer."
+- [ ] Tests: user cancel → all cancelled, provider cancel base → base cancelled + addon kept + free cancel window
+
+#### 3.7 Admin Add-On Configuration
+- [ ] Use existing nested admin table CRUD (`product_addons` registered as nested under products)
+- [ ] Verify admin can create/view/edit add-on relationships through the dashboard
+- [ ] Tests: can CRUD add-on relationships
+
+#### 3.8 Add-On Suggestions in Shopping Cart
+- [ ] When an item is added to cart, check if it has add-ons
+- [ ] Show suggestion card: "Add Spa Entry and save 20%! [Add to Cart]"
+- [ ] When add-on is in cart alongside its base, show the discounted price on the add-on line item with strikethrough on original price
+- [ ] Tests: component spec
+
+---
+
+### Phase 4: Book for Someone Else
+*Extends purchase sharing to bookable services with invite flow*
+
+#### 4.1 Service Booking for Another Person
+- [ ] Extend service booking UI: "Who is this booking for?" selector
+  - Default: "Myself"
+  - Option: search from existing purchase sharing contacts (gift permission grantees)
+  - Option: enter email address of someone else
+- [ ] If person has purchase sharing enabled → book directly for them
+- [ ] The booking shows up in the recipient's "My Bookings"
+- [ ] The purchase is under the payer's account
+- [ ] Tests: book for self, book for sharing contact, purchase attributed to payer
+
+#### 4.2 Invite Non-Member via Email
+- [ ] If user enters an email address of someone who isn't a member:
+  - System sends an invitation email: "X has booked a Massage for you at Knotty Yoga! Create your account to view your booking."
+  - The invitation includes a link to register
+  - After registration, the person is prompted to accept purchase sharing from the gifter
+  - Once accepted, the booking becomes visible in their "My Bookings"
+- [ ] If the email belongs to an existing member but purchase sharing isn't set up:
+  - Send a purchase sharing request
+  - Once accepted, the booking becomes visible
+- [ ] Tests: invite flow for non-member, request flow for existing member
+
+#### 4.3 Same Patterns for Event Booking
+- [ ] Extend event booking with the same "Who is this for?" flow
+- [ ] Tests: event booking for another person
+
+---
+
+### Phase 5: Drop-In Bookings
+*Staff-initiated on-the-fly bookings for walk-in customers*
+
+#### 5.1 Staff Drop-In Endpoint
+- [ ] Create `POST /api/staff/dropin_booking` endpoint
+- [ ] Accepts: productId, variantId, personId, facilityId, roomId
+- [ ] Creates booking starting now (rounded to next 5-min boundary)
+- [ ] Checks room capacity before creating
+- [ ] Creates purchase at standard product price
+- [ ] Tests: success, capacity exceeded
+
+#### 5.2 On-the-Fly Account Creation
+- [ ] Create `POST /api/staff/create_quick_account` endpoint
+- [ ] Accepts: firstName, lastName, email
+- [ ] Creates account with auto-generated password
+- [ ] Sets `must_change_password = true`
+- [ ] Sends welcome email with temporary password and "please change immediately" message
+- [ ] Returns the new person_id for immediate use in drop-in booking
+- [ ] Tests: success, duplicate email, email sent
+
+#### 5.3 Staff Drop-In UI
+- [ ] Add to staff check-in page: "Walk-In Booking" section
+- [ ] Search for existing person or "New Customer" button
+- [ ] New Customer: collect first name, last name, email → create account → proceed to booking
+- [ ] Select product/variant, show current room capacity
+- [ ] Create booking button
+- [ ] Tests: component spec
+
+---
+
+### Phase 6: iCal and Email Enhancements
+
+#### 6.1 iCal Generation Utility
+- [ ] Create `util/ical/ical_generator.h/cpp`
+- [ ] Generate `.ics` file content from: title, start time, end time, location, description
+- [ ] Timezone-aware using facility timezone
+- [ ] Tests: generated ICS is valid format
+
+#### 6.2 Attach iCal to Booking Confirmation Emails
+- [ ] Update `ServiceBookingConfirmationMail` to attach .ics
+- [ ] Update `WaitlistConfirmationBody` / event booking email to attach .ics
+- [ ] Update any spa booking confirmation to attach .ics
+- [ ] The mail helper needs to support attachments — check if mailio supports this, extend if needed
+- [ ] Tests: email body includes attachment
+
+#### 6.3 Confirmation Email for Bundles
+- [ ] When a bundle is booked (base + add-on), send a single confirmation showing both components
+- [ ] Include note about linked cancellation policy
+- [ ] Include iCal with multiple events (or two separate .ics files)
+- [ ] Tests: email content
+
+---
+
+### Phase 7: Polish
+
+#### 7.1 Purchase Detail Page
+- [ ] Create `GET /api/purchases/{id}` endpoint with entitlements + assignments
+- [ ] Create `PurchaseDetailComponent` at `/my/purchases/:id`
+- [ ] Integrate `SeatAssignmentComponent` for multi-seat entitlements
+- [ ] Link from purchase history and checkout success
+
+#### 7.2 Checkout Success Enhancement
+- [ ] Show entitlements and seat assignment after payment
+- [ ] Link to purchase detail page
+
+#### 7.3 My Bookings Enhancement for Bundles
+- [ ] Show linked bookings grouped together
+- [ ] "Bundled with: Spa Entry" label
+- [ ] Cancellation warning: "Canceling will also cancel your Spa Entry booking"
+
+#### 7.4 Catalog Multi-Seat Badge
+- [ ] Add `seats_default` to catalog response
+- [ ] Show "For N people" badge on multi-seat products
+- [ ] Show seat info in checkout
+
+#### 7.5 Update Design Documents
+- [ ] Update Payment Design Document with new scenarios and tables
+- [ ] Update Support for scheduled purchases with new scenarios
+- [ ] Mark completed checkboxes
 
 ---
 
 ## Documents to Update
 
 ### Payment Design Document
-- Add scenario for couple's service purchase (multi-provider, linked booking)
-- Add scenario for add-on bundle purchase
-- Add scenario for drop-in booking
-- Add scenario for check-in workflow
-- Update data model section with new tables: `product_addons`, `booking_groups`, `booking_group_members`
-- Update `products` table with `checkin_window_minutes`
+- Add scenario: User purchases a bundled product (add-on with discount)
+- Add scenario: User books a service for someone else (book-for-others)
+- Add scenario: Staff creates drop-in booking for walk-in customer
+- Add scenario: Staff checks in attendee with capacity enforcement
+- Add scenario: User views real-time room occupancy
+- Update data model with: `room_schedules`, `product_addons`, `booking_groups`, `booking_group_members`
+- Update `products` table with `checkin_window_minutes`, `requires_room_schedule`
+- Update `people` table with `must_change_password`
 
 ### Support for scheduled purchases
-- Add new scenarios:
-  - Staff checks in attendee (scenario 37 — will be partially implemented)
-  - Couple books a service together
-  - User purchases base product with add-on
-  - User does a drop-in booking
-  - Spa capacity management
-- Update scenario 23 (reminder window for services — may be partially addressed)
-- Move relevant items from COULD HAVE / STRETCH as they get implemented
-
----
-
-## Implementation Phases
-
-### Phase 0: Rename and Quick Fixes
-*Prerequisite cleanup*
-
-#### 0.1 Rename "Membership Sharing" to "Purchase Sharing"
-- [ ] Update `gift-permissions.component.html` — change title text and card descriptions
-- [ ] Update the account dashboard card in `user.component.html`
-- [ ] Tests: component spec
-
-#### 0.2 Fix PayCardResponse TypeScript Type
-- [ ] `payment.types.ts`: Change `PayCardResponse.entitlements_created: number` to `entitlements: Entitlement[]`
-- [ ] Same for `PayVoucherResponse`
-- [ ] Update mock, fix any broken tests
-
----
-
-### Phase 1: Spa Product and Capacity Infrastructure
-*Database, business logic, then UI — bottom up*
-
-#### 1.1 Create Spa Product, Room, and Variants
-- [ ] Add "Spa" room type to database seed data
-- [ ] Add "Spa" room to existing facility with `concurrent_capacity` (e.g., 15)
-- [ ] Create "Spa Entry" product (`kind = "bookable_service"`) with variants:
-  - 30 Min Spa ($20)
-  - 60 Min Spa ($35)
-  - 90 Min Spa ($50)
-  - Early Bird 60 Min Spa ($25) — lower price variant
-  - Late Night Recovery 30 Min ($15) — lower price variant
-- [ ] Create virtual "Spa Attendant" provider with availability blocks for spa hours
-- [ ] Tests: verify products and rooms are created
-
-#### 1.2 Room Capacity Check in Service Availability
-- [ ] Update `ServiceAvailabilityHelper::ComputeAvailableSlots()` to check room capacity
-- [ ] For each potential slot, count overlapping active bookings in the same room
-- [ ] If count >= `concurrent_capacity`, exclude the slot
-- [ ] The existing `FindAvailableRoom()` already checks room availability for 1:1 sessions — extend it to support concurrent rooms (capacity > 1)
-- [ ] Tests: `service_availability_helper_test.cpp` — slots excluded when room at capacity
-
-#### 1.3 Add `checkin_window_minutes` to Products
-- [ ] Add column to `db_schema/products.h/cpp` (nullable BIGINT)
-- [ ] Register in admin column metadata
-- [ ] Add to `ProductInfo` struct if needed
-- [ ] Tests: schema creation
-
-#### 1.4 Staff Check-In Endpoint
-- [ ] Create `POST /api/staff/checkin/{bookingId}` endpoint
-- [ ] Validates: booking exists, booking is confirmed, checked_in_us is not already set
-- [ ] If product has `checkin_window_minutes`: validates current time is within window before booking start time
-- [ ] Sets `bookings.checked_in_us = now_us()`
-- [ ] Returns updated booking
-- [ ] Register in `web_app.cpp` and `CMakeLists.txt`
-- [ ] Tests: success, already checked in, too early, not found
-
-#### 1.5 Staff Check-In UI
-- [ ] Create check-in page in staff portal at `/staff/checkin`
-- [ ] Search for bookings by person name/email or upcoming bookings for today
-- [ ] Show booking details with "Check In" button
-- [ ] Show current spa occupancy indicator (count of checked-in-but-not-ended bookings vs capacity)
-- [ ] Route and dashboard card
-- [ ] Tests: component spec
-
----
-
-### Phase 2: Add-On Products and Bundle Pricing
-*The add-on relationship and discounted bundle purchases*
-
-#### 2.1 `product_addons` Table
-- [ ] Create `db_schema/product_addons.h/cpp`
-- [ ] Register in `make_database_info.cpp`, `create_database.cpp` (all admin metadata)
-- [ ] Add to `CMakeLists.txt`
-- [ ] Create table helper: `AddProductAddon`, `GetAddonsForProduct`, `GetAddonRelationship`
-- [ ] Tests: table helper CRUD
-
-#### 2.2 `booking_groups` and `booking_group_members` Tables
-- [ ] Create `db_schema/booking_groups.h/cpp` and `booking_group_members.h/cpp`
-- [ ] Register in `make_database_info.cpp`, `create_database.cpp`
-- [ ] Add to `CMakeLists.txt`
-- [ ] Create table helpers
-- [ ] Tests: table helper CRUD
-
-#### 2.3 Add-On Discount Logic
-- [ ] Create `business_logic/payment/addon_helper.h/cpp`
-- [ ] `GetAvailableAddons(productId)` — returns addon products with discount info
-- [ ] `CalculateAddonDiscount(baseProductId, addonProductId, addonPriceCents)` — computes discounted price
-- [ ] Stackability check: if `is_stackable = false` and the purchase already has a coupon discount, skip the add-on discount (or apply the better one)
-- [ ] Tests: percentage discount, fixed discount, stackability
-
-#### 2.4 Purchase Creation with Add-Ons
-- [ ] Extend `CreatePurchaseRequest` with optional `addon_for_purchase_item_id` on each item (links add-on items to their base)
-- [ ] In `PurchaseHelper::CreatePurchase`, if an item has `addon_for_purchase_item_id`, look up the add-on relationship and apply discount
-- [ ] Modify `purchase_items` with optional `addon_for_purchase_item_id` FK
-- [ ] Tests: purchase with add-on has correct discounted price
-
-#### 2.5 Linked Booking Creation for Bundles
-- [ ] Extend `ServiceBookingHelper` to support creating a booking group when add-ons are included
-- [ ] When booking base + add-on:
-  - Create base booking normally
-  - Create add-on booking (e.g., spa session) with start time from request
-  - If `extends_duration_by_base`: adjust add-on end time = addon_duration + base_duration
-  - Create booking_group linking both
-- [ ] Tests: bundle booking created correctly, durations correct
-
-#### 2.6 Linked Cancellation
-- [ ] Update `BookingHelper::CancelBooking` to check for booking groups
-- [ ] If booking is part of a group with `cancel_policy = "cancel_all"`: cancel all members
-- [ ] If provider cancels the base product: full refund for all group members (override individual policies)
-- [ ] Tests: cancel one → cancels all, provider cancel → full refund
-
-#### 2.7 Add-On UI in Service Booking
-- [ ] After user selects a base service slot, show "Add-Ons" section
-- [ ] Load available add-ons via `getAvailableAddons(productId)`
-- [ ] For each add-on, show: name, original price, discounted price, "Save X%"
-- [ ] On selecting an add-on: show available time slots (spa slots with capacity check)
-- [ ] For `extends_duration_by_base`: show the total duration and note the extension
-- [ ] Warn if selected spa slot doesn't allow full duration
-- [ ] Create combined booking (base + add-on) in single payment flow
-- [ ] Tests: component spec
-
-#### 2.8 Admin Add-On Configuration UI
-- [ ] Create admin page for managing add-on relationships
-- [ ] Or: use existing nested admin table CRUD (product_addons shows under products)
-- [ ] Tests: can create and view add-on relationships
-
----
-
-### Phase 3: Couple's Massage
-*Multi-provider, multi-person bookable service*
-
-#### 3.1 Couple's Massage Product Setup
-- [ ] Create "Couple's Massage" product (`kind = "bookable_service"`, `seats_default = 2`)
-- [ ] Create variants: 60 Min ($200), 90 Min ($280), 120 Min ($350)
-- [ ] Assign same provider type as regular massage
-- [ ] Create a "Couple's Room" room type with capacity 2 (or use two individual rooms)
-
-#### 3.2 Multi-Provider Slot Computation
-- [ ] Create `CoupleAvailabilityHelper` (or extend `ServiceAvailabilityHelper`)
-- [ ] Compute slots where 2+ providers of the required type are simultaneously available
-- [ ] Also require 2 rooms of the required type (or 1 room with capacity >= 2)
-- [ ] Return slots with list of available provider pairs
-- [ ] Tests: extensive slot computation tests
-
-#### 3.3 Multi-Provider Slot Endpoint
-- [ ] Create `GET /api/available_couple_slots` (or extend existing slots endpoint with `?seats=2`)
-- [ ] Returns: time slots with available provider pairs
-- [ ] Tests: endpoint tests
-
-#### 3.4 Couple's Booking Endpoint
-- [ ] Extend `POST /api/book_service` or create `POST /api/book_couple_service`
-- [ ] Accepts: productId, variantId, startTimeUs, person1Id, person2Id, provider1Id, provider2Id
-- [ ] Creates: 1 purchase (2 items), 2 service sessions, 2 bookings, 1 booking group (type=couple)
-- [ ] Auto-assigns each person to their respective booking
-- [ ] Payer may be different from either recipient
-- [ ] Tests: success, provider conflict, room conflict, auth
-
-#### 3.5 Person Selection in Couple's Booking UI
-- [ ] After slot selection, show person assignment step
-- [ ] Default: person 1 = payer, person 2 = search (uses gift permission grantees or direct email)
-- [ ] Allow both persons to be different from payer (gift scenario)
-- [ ] Provider selection per person from available providers at that slot
-- [ ] Tests: component spec
-
-#### 3.6 Couple's Cancellation
-- [ ] Canceling either booking cancels the group (via Phase 2.6 infrastructure)
-- [ ] If either provider cancels: full refund for both
-- [ ] Both users see cancellation in their "My Bookings"
-- [ ] Tests: cascading cancellation
-
----
-
-### Phase 4: Drop-In Bookings
-*Staff-initiated on-the-fly bookings*
-
-#### 4.1 Staff Drop-In Endpoint
-- [ ] Create `POST /api/staff/dropin_booking` endpoint
-- [ ] Accepts: productId, variantId, personId (existing account), facilityId
-- [ ] Creates booking starting now (or at specified time)
-- [ ] Checks room capacity before creating
-- [ ] Creates purchase with immediate payment (or deferred payment?)
-- [ ] Tests: success, capacity exceeded, invalid product
-
-#### 4.2 Staff Drop-In UI
-- [ ] Add to staff check-in page: "Walk-In Booking" section
-- [ ] Search for person, select product/variant
-- [ ] Show current capacity — if room, show "X/Y occupied"
-- [ ] Create booking button
-- [ ] Tests: component spec
-
-#### 4.3 Drop-In Account Creation (v2 — later phase)
-- [ ] Extend drop-in UI with "New Customer" option
-- [ ] Collect: first name, last name, email
-- [ ] Create account with auto-generated password
-- [ ] Email the password with "please change immediately" message
-- [ ] Then create the booking for this new account
-- [ ] Tests: account creation + booking in one flow
-
----
-
-### Phase 5: Polish and Integration
-*Tying everything together*
-
-#### 5.1 Purchase Detail Page
-- [ ] Create `/my/purchases/:id` with items, payments, entitlements, seat assignment
-- [ ] (As described in [[Payment Should Have- Multi Seat and Bundled Pricing]])
-
-#### 5.2 Checkout Success Enhancement
-- [ ] Show entitlements and seat assignment after payment
-- [ ] For couple's bookings: show both bookings
-
-#### 5.3 Booking Confirmation Emails for Bundles
-- [ ] Bundle booking sends confirmation showing both components
-- [ ] Include note about linked cancellation policy
-
-#### 5.4 My Bookings Enhancement
-- [ ] Show linked bookings grouped together
-- [ ] "Part of bundle with: Spa Entry" label
-- [ ] Cancellation warning: "Canceling will also cancel: Spa Entry"
-
-#### 5.5 Update Payment Design Document and Support for Scheduled Purchases
-- [ ] Add new scenarios to both documents
-- [ ] Update data model sections with new tables
-- [ ] Update completion checkboxes
+- Update scenario 37 (Staff checks in attendee) — will be fully implemented
+- Add scenario: Room capacity enforcement during booking
+- Add scenario: Drop-in booking with account creation
+- Add scenario: Bundle booking with linked cancellation
+- Add scenario: Shopping cart multi-item purchase
 
 ---
 
 ## Open Questions
 
-### OQ1: Should the virtual "Spa Attendant" provider be a real person account or a system concept?
+### OQ1: How should room-schedule-based products appear in the service booking UI?
 
-Spa doesn't have a "provider" in the traditional sense — it's a self-service space. But the availability system is provider-based.
+Currently the service booking page groups slots by provider. For spa products, there is no provider — slots are defined by room operating hours and limited by room capacity. The UI would need to either:
 
-**My suggestion**: Use a real staff account labeled "Spa" that represents the spa facility. Its availability blocks represent spa operating hours. This avoids changes to the availability system.
+(a) Show slots without provider grouping — just a flat list of available times
+(b) Show slots grouped by room (if multiple spa rooms exist)
+(c) Look the same as provider-based slots but label them as "Self-Service" or the room name
 
-Mason- You mean an actual account that people log in as? This feels kludgy. The existing provider model also can only be booked once for any given time span. There area also concepts like trades / shift swaps, time holes, buffer between bookings, and things like that which don't fit this model. I need to be able to set the capacity for the "room / facility". 
+**My suggestion**: Option (a) for v1. The spa booking page shows available time slots as a simple grid (like event session booking), not grouped by provider. The room assignment happens automatically. This is the simplest UX and matches what users expect from a spa — they don't pick a "provider," they pick a time.
 
-### OQ2: What happens to the spa booking if the massage runs long?
+### OQ2: Can add-on relationships be bidirectional?
 
-If massage takes 70 min instead of 60 min, does the spa time shift?
+If Massage is a base and Spa is an add-on, can Spa also be a base with Massage as an add-on? Example: someone books a spa visit first and wants to add a massage.
 
-**My suggestion**: No — bookings have fixed times. The extension is calculated at booking time. If the massage runs over, that's an operational issue, not a system issue.
+**My suggestion**: Yes, allow it. The `product_addons` table supports this — just create two entries (Massage→Spa and Spa→Massage) with potentially different discounts. The shopping cart detects whichever relationship applies based on what's in the cart.
 
-Mason- I agree.
+### OQ3: How should the room capacity check work for extended-duration bundles?
 
-### OQ3: Should "early bird" and "late night" be separate products or variants of the same product?
+When someone books a 90-min massage + 60-min spa (= 150 min spa), should the capacity check verify all 150 minutes have capacity, or just the originally-selected spa start time?
 
-Separate products are simpler for admin but clutter the catalog. Variants keep it clean but limit pricing flexibility.
+**My suggestion**: Check the full 150-minute window. For each 5-minute interval within the 150-min spa booking, verify the room count stays under capacity. This is the only way to truly enforce fire code limits. It may eliminate some slots that would otherwise appear available, but that's correct behavior.
 
-**My suggestion**: Variants of the same "Spa Entry" product. The admin configures different availability windows for each variant's "provider" schedule.
+### OQ4: What products should show the "Add to Cart" option vs "Book and Pay Now"?
 
-Mason- We will realistically eventually have early bird, off peak, peak, and late night. I feel like early bird, off peak, and peak should be variants of the same product. Late night will be a special thing for platinum fitness members will get a certain number of comps for a month and then be able to buy at a radically reduced price after exhausting their comps but it won't be open to anyone else but them so I'd rather have it as a separate product to be able control the visibility which I can't do for a variant.
+Should all products get "Add to Cart," or just some? Events, services, and one-time products all have different booking flows.
 
-### OQ4: How should the add-on discount interact with coupons?
+**My suggestion**: Show both options on all bookable products. "Book and Pay Now" is the single-item express checkout (existing flow). "Add to Cart" puts it in the cart for multi-item purchase later. For scheduled services and events, the user still selects a time slot before adding to cart — the cart item includes the scheduled time.
 
-If someone has a 20% coupon AND the spa add-on has a 15% bundle discount, do they stack?
+### OQ5: Should the shopping cart persist across sessions?
 
-**My suggestion**: Default: non-stackable (`is_stackable = false`). The better discount wins. If admin marks the add-on as stackable, both apply (coupon on the already-discounted price).
+If a user adds a massage to their cart and closes the browser, should it be there when they come back?
 
-Mason- Let's do that but if we essentially don't use one or the other, the unused one should not be consumed.
+**My suggestion**: Persist in localStorage with a reasonable TTL (e.g., 24 hours). Scheduled items in the cart should be validated when the cart is loaded — if the slot has been taken, warn the user and remove the item. Non-scheduled items (one-time products without a time) persist indefinitely until TTL.
 
-### OQ5: Can a spa entry be booked standalone (without massage)?
+### OQ6: For the invite flow (book-for-others), what happens to the booking if the invitee never creates an account?
 
-The requirements describe it as both an add-on AND a standalone product.
+The booking was created and paid for, but the recipient hasn't accepted.
 
-**My suggestion**: Yes — the spa entry product exists independently. The add-on relationship just provides a discount when purchased with massage.
+**My suggestion**: The booking exists and is valid regardless. The payer can see it in their purchases. The booking is "unclaimed" — it shows the recipient's email but isn't linked to an account yet. When the recipient eventually creates an account with that email, the booking automatically appears in their "My Bookings." If the payer cancels before the recipient signs up, normal cancellation applies.
 
-Mason- Yes, spa entry very much is a separate product and the majority of the bookings won't include massage.
+### OQ7: For the occupancy dashboard, what counts as "occupied"?
 
-### OQ6: For couple's massage, can the two people choose different variants (e.g., person 1 gets 60 min, person 2 gets 90 min)?
+Options: (a) all confirmed bookings overlapping now, (b) only checked-in bookings, (c) checked-in bookings whose end time hasn't passed.
 
-This complicates pricing and scheduling significantly.
+**My suggestion**: Option (c) — a person is "occupying" the room from check-in until their booked end time. If they haven't checked in yet but their booking started, they DON'T count (they might be a no-show). If they checked in and their end time has passed, they DON'T count (they should have left). This gives the most accurate real-time picture.
 
-**My suggestion**: For v1, both get the same variant. The "Couple's Massage" product has its own variants with combined pricing. Different-variant couples massage is a v2 feature.
+### OQ8: What specific variants and pricing should the spa products have?
 
-Mason- Per the discussion above, I'm not sure we will even do couple's massage.
+The plan lists some approximate prices. Are these the right variants and prices, or do you want to adjust?
 
-### OQ7: What's the refund policy when the provider cancels the base of a bundle?
-
-Requirements say full refund. But does that include add-ons that might have a no-refund policy?
-
-**My suggestion**: Yes — if the provider cancels the base, the entire bundle is fully refunded regardless of individual component policies. This is fair because the customer didn't choose to cancel.
-
-Mason- I agree. I suppose the issue is that if someone books a massage and spa visit and the provider cancels the massage. We should definitely cancel the massage but it is unclear that we should cancel the spa visit. The person might still want to attend the spa and cancelling that might free the last slot that gets booked which would anger the person. We should still give them the bundled discount and allow them cancellation with no window but not cancel the spa entry but send them email saying that their massage was cancelled by the provider and let them know their spa visit is still booked but that they can cancel with a full refund if they want.
-
-### OQ8: Should the duration extension for add-ons be based on the base product's variant duration, or a fixed amount?
-
-If someone books a 90-min massage + 60-min spa, the spa becomes 150 min? That seems like a lot.
-
-**My suggestion**: Use the base variant's `duration_minutes`. For a 90-min massage + 60-min spa, the spa visit is 150 min total. If this feels too long, the admin can create a "Spa Add-On" product with shorter variants (30 min) that only extends by the base duration.
-
-Mason- It absolutely should be 150min.
-
-### OQ9: Do we need the "Membership Sharing" rename to "Purchase Sharing" right away, or can it wait?
-
-It's a simple text change but touches the user-facing UI.
-
-**My suggestion**: Do it in Phase 0 as a quick win. It's a 2-file change.
-
-Mason- let's do that.
-
-### OQ10: For drop-ins: should the system create a purchase at full price, or should there be a drop-in pricing tier?
-
-Drop-in customers at spas often pay a premium (no reservation discount).
-
-**My suggestion**: For v1, use the product's standard pricing. Drop-in-specific pricing can be added later via a "drop-in" permission tier in the existing pricing system.
-
-Mason- Let's use standard pricing for now.
-
----
-
-## Discussion: How to Expose Add-On Selection to Users
-
-This is the trickiest UX question in the entire feature set. Here are several approaches I considered:
-
-### Approach A: Post-Slot Add-On Modal (Your Suggestion)
-After the user selects a massage time slot, an "Add-Ons" button appears. Clicking it opens a modal showing available add-ons (e.g., Spa Entry) with discounted pricing. Selecting an add-on shows compatible spa time slots.
-
-**Pros**: Clean separation of base booking from add-on. Familiar e-commerce pattern.
-**Cons**: Two-step slot selection (massage time, then spa time) could be confusing. What if no spa slots are available at the chosen massage time?
-
-### Approach B: Combined Availability View
-Show a single booking page where the user first picks a massage slot, and the add-on slots are immediately shown below (filtered to compatible times). No modal — it's all one flow.
-
-**Pros**: User sees the full picture at once. No surprise about unavailable spa times.
-**Cons**: More complex UI. What if there are 5 add-ons? The page gets long.
-
-### Approach C: Bundle Product with Embedded Scheduling
-Create a "Massage + Spa Bundle" product that, when booked, asks for both time slots in sequence. The product IS the bundle — not a base with add-ons.
-
-**Pros**: Simplest for the user — they're booking one thing.
-**Cons**: Combinatorial explosion of bundle products (60-min massage + 30-min spa, 60-min massage + 60-min spa, 90-min + 30-min, ...). Admin has to create each combination.
-
-### Approach D: Cart-Based Bundling
-The user adds a massage to a shopping cart, then adds a spa entry. The system detects the add-on relationship and applies the discount. Scheduling happens per-item in the cart.
-
-**Pros**: Maximum flexibility. Reuses general multi-item purchase infrastructure.
-**Cons**: Requires building a shopping cart system (major feature). The "detect and apply discount" logic is implicit, which may confuse users who don't realize they're getting a discount.
-
-### My Recommendation: Approach A with enhancements from B
-
-Use the post-slot modal (Approach A), but show a preview of add-on availability before the user opens it. After selecting a massage slot, the booking page shows a card like:
-
-```
-🧖 Add-Ons Available
-  Spa Entry — $35 → $25 (save 29%)
-  ✓ Slots available before/after your massage
-  [Add to Booking]
-```
-
-If no compatible spa slots exist, the card shows "No available spa times for this date" in gray. This gives the user the key information (discount, availability) without forcing a modal interaction.
-
-Clicking "Add to Booking" expands into an inline section (not a modal) showing compatible spa time slots. The user picks one, and both bookings are confirmed together.
-
-Mason - I think that the shopping cart approach would be the most flexible and, in some ways, the simplest. We could still tell people when booking either product about the bundle savings and then do it implicitly in the shopping cart.
-
----
-
-## Complementary Work Items
-
-These are related features that would pair well with this implementation:
-
-1. **Shopping cart** — Multi-item purchases are already supported on the backend. A cart UI would enable buying massage + spa + other products without the formal add-on relationship.
-	- Mason- Let's do a shopping cart. This makes things simpler for things like bundles or even something like a couple's massage.
-
-2. **Package deals / multi-visit passes** — "Buy 5 spa entries, get 1 free" type deals. Uses the existing entitlement system with seats_total = 6, seats_used decremented per visit.
-	- Mason- I like this idea. A natural thing would also be things like a four person / six person / eight person group spa visit for friends.
-
-3. **Recurring spa bookings** — "Every Tuesday 6pm spa entry" as a subscription-like recurring booking.
-	- Mason- I don't hate this idea if it can be done cheaply with a nice UI since it encourages repeat visits. I also want to be able to mark class attendance and have people be able to have a class attendance template for which classes they generally plan to attend but that is quite a bit different since there is no payment for classes. They are included in the membership so this would just be a personal planning thing. The basic idea would be that people make a template of what they plan to attend and then they have a calendar that they can see there planned attendances and they can go in and mark that classes that they won't make and classes not on their template that they plan to attend this week. As the studio gets more crowded, this will probably be mandatory to attend a class since we need the classes to be pretty full.
-
-4. **Waitlist for spa** — If spa is at capacity, allow users to join a waitlist for a specific time window.
-	- Mason- I like this idea. I hope we hit this issue :P
-
-5. **Real-time occupancy API** — WebSocket or polling endpoint showing current spa occupancy for a dashboard.
-	- Mason- Let's do this and build a dashboard. It would be nice if users can see that as well to determine if it is worth trying to come.
-
-6. **Booking modification** — Reschedule a booking without cancel+rebook (scenario 17 from Support for scheduled purchases).
-	- Mason- This does need to respect the cancellation windows but I'm okay with doing this if the implementation isn't that expensive. This isn't a hugely important scenario to me since they can easily cancel and rebook but I suppose this is a nice to have if not a lot of work and if the UI for it isn't that weird (which is my worry- I'd hate to replicate the booking UI)
-
-7. **iCal email attachments** — Send `.ics` files with booking confirmations so users can add to their calendar.
-	- Mason- Oh absolutely, and let's do this for event sessions, massage bookings, and one time things and anything with a specific time.
-
-8. **Admin dashboard for bundle analytics** — Track how often add-ons are purchased, revenue from bundle discounts vs individual sales.
-	- Mason- This is a great idea. Let's do it.
+**My suggestion**: Let's finalize the exact product catalog as part of Phase 1.4 when we create the seed data. The plan uses placeholder prices — you can adjust them before implementation.
