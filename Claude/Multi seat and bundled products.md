@@ -82,6 +82,8 @@ Creating accounts on the fly during a drop-in (collect name/email, auto-generate
 
 **Suggestion**: Phase drop-ins separately. For v1, staff can only do drop-in bookings for existing accounts. Account creation during drop-in comes in a later phase.
 
+Mason- I want to make collecting new customers to be something easy. We already have account creation support. This would be auto generating a password and emailing it to them. Since we don't support booking as a guest, since we want to funnel people through the account creation process, we should make creating an account for a new person as easy as possible. 
+
 ### Suggested Additional Work Items
 
 1. **Staff check-in endpoint** — `POST /api/staff/checkin/{bookingId}` — the `checked_in_us` column exists but there's no endpoint to set it
