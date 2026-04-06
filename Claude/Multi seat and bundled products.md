@@ -66,13 +66,15 @@ The requirement says: "the length of the spa visit is automatically extended by 
 
 **Alternative suggestion**: Keep add-on pricing simple (discounted spa when purchased with massage) but schedule them independently. The user books massage at 2pm and spa at 3pm (or whenever). The system discounts the spa price. They're linked for cancellation purposes but not for capacity calculation. This dramatically simplifies the implementation while delivering the same customer value.
 
-Mason- my issue is that if I make spa entry three hours during off peak and then two hours during peak. It is best if 
+Mason- my issue is that if I make spa entry three hours during off peak and then two hours during peak. It is best if someone uses the spa for a bit to have the steam room and sauna loosen them up a bit pre massage and then again post massage to make the massage easier for the provider and then to warm up again post massage (which pushes blood to the surface and makes them cold). This means they won't book the massage at the before or after the spa entry. That means that a 90min massage would consume a LOT of the spa time. Hence wanting to extend the length of the spa visit by the length of the massage.
 
 **3. Check-in as a capacity gate adds real-time operational complexity**
 
 "Checking in early would exceed spa capacity, they must wait" means the check-in UI needs real-time capacity tracking and the ability to queue people. This is essentially a real-time occupancy management system.
 
 **Simpler alternative**: Check-in is just a timestamp for record-keeping. If someone arrives early, the staff makes a judgment call. Enforce capacity only at booking time, not at check-in time. Add a "current occupancy" dashboard for the spa staff but don't gate check-in on it.
+
+Mason- the issue is that there are legal limits on capacity for fire code safety.
 
 **4. Drop-in with account creation is a significant scope increase**
 
