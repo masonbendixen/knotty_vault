@@ -649,13 +649,16 @@ These are related features that would pair well with this implementation:
 	- Mason- I like this idea. A natural thing would also be things like a four person / six person / eight person group spa visit for friends.
 
 3. **Recurring spa bookings** — "Every Tuesday 6pm spa entry" as a subscription-like recurring booking.
-	- Mason- I don't hate this idea if it can be done cheaply with a ni
+	- Mason- I don't hate this idea if it can be done cheaply with a nice UI since it encourages repeat visits. I also want to be able to mark class attendance and have people be able to have a class attendance template for which classes they generally plan to attend but that is quite a bit different since there is no payment for classes. They are included in the membership so this would just be a personal planning thing. The basic idea would be that people make a template of what they plan to attend and then they have a calendar that they can see there planned attendances and they can go in and mark that classes that they won't make and classes not on their template that they plan to attend this week. As the studio gets more crowded, this will probably be mandatory to attend a class since we need the classes to be pretty full.
 
 4. **Waitlist for spa** — If spa is at capacity, allow users to join a waitlist for a specific time window.
+	- Mason- I like this idea. I hope we hit this issue :P
 
 5. **Real-time occupancy API** — WebSocket or polling endpoint showing current spa occupancy for a dashboard.
+	- Mason- Let's do this and build a dashboard. It would be nice if users can see that as well to determine if it is worth trying to come.
 
 6. **Booking modification** — Reschedule a booking without cancel+rebook (scenario 17 from Support for scheduled purchases).
+	- This does need to respect the cancellation windows but I'm okay with doing this if the impementation isn't that expensive.
 
 7. **iCal email attachments** — Send `.ics` files with booking confirmations so users can add to their calendar.
 
