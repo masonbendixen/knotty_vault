@@ -89,10 +89,13 @@ Mason- I want to make collecting new customers to be something easy. We already 
 1. **Staff check-in endpoint** — `POST /api/staff/checkin/{bookingId}` — the `checked_in_us` column exists but there's no endpoint to set it
 	- Mason- Let's do this. We also need UI to be able to check people in with a list of people booked in the next configurable time period that defaults to 90min but also allows auto complete of a person.
 2. **Spa occupancy dashboard** — real-time view of current and upcoming capacity for staff
-	- Mason- Let's do this.
+	- Mason- Let's do this and also include massage bookings.
 3. **Product add-on admin UI** — admin interface for configuring which products can be add-ons to which
+	- Mason- Let's do this.
 4. **iCal attachment for booking emails** — mentioned in Support for scheduled purchases as a future item, relevant here
+	- Mason- Let's do this for massage bookings, event sessions, and one time purchases (like spa visits).
 5. **Rename "Membership Sharing" to "Purchase Sharing"** — simple UI text change in gift-permissions component
+	- Let's absolutely do this.
 
 ---
 
@@ -100,20 +103,20 @@ Mason- I want to make collecting new customers to be something easy. We already 
 
 ### What Already Exists
 
-| Component | Status | Relevant For |
-|-----------|--------|--------------|
-| `location_rooms.concurrent_capacity` | Exists | Spa capacity tracking |
-| `product_variants` with `duration_minutes`, `buffer_minutes` | Exists | Massage/spa variants |
-| `bookable_service_sessions` with `location_room_id` | Exists | Room assignment |
-| `bookings.checked_in_us` | Column exists, no endpoint | Check-in tracking |
-| `bookings.status` includes "attended", "no_show" | Exists | Attendance tracking |
-| Service availability helper (5-min slot alignment) | Exists | Spa slot computation |
-| `FindAvailableRoom()` with provider affinity | Exists | Room assignment |
-| Cancellation with tiered refund policies | Exists | Cancel/refund |
-| Gift permissions / seat assignment | Exists | Couple's booking recipient selection |
-| Product booking windows (permission-based advance booking) | Exists | Early bird variants |
-| `SeatAssignmentComponent` (standalone) | Exists | Assigning second person |
-| Coupon system with multi-product restriction | Exists | Add-on discounts |
+| Component                                                    | Status                     | Relevant For                         |
+| ------------------------------------------------------------ | -------------------------- | ------------------------------------ |
+| `location_rooms.concurrent_capacity`                         | Exists                     | Spa capacity tracking                |
+| `product_variants` with `duration_minutes`, `buffer_minutes` | Exists                     | Massage/spa variants                 |
+| `bookable_service_sessions` with `location_room_id`          | Exists                     | Room assignment                      |
+| `bookings.checked_in_us`                                     | Column exists, no endpoint | Check-in tracking                    |
+| `bookings.status` includes "attended", "no_show"             | Exists                     | Attendance tracking                  |
+| Service availability helper (5-min slot alignment)           | Exists                     | Spa slot computation                 |
+| `FindAvailableRoom()` with provider affinity                 | Exists                     | Room assignment                      |
+| Cancellation with tiered refund policies                     | Exists                     | Cancel/refund                        |
+| Gift permissions / seat assignment                           | Exists                     | Couple's booking recipient selection |
+| Product booking windows (permission-based advance booking)   | Exists                     | Early bird variants                  |
+| `SeatAssignmentComponent` (standalone)                       | Exists                     | Assigning second person              |
+| Coupon system with multi-product restriction                 | Exists                     | Add-on discounts                     |
 
 ### What's Missing
 
@@ -511,6 +514,8 @@ Provider availability determines when these are bookable. The admin creates avai
 Spa doesn't have a "provider" in the traditional sense — it's a self-service space. But the availability system is provider-based.
 
 **My suggestion**: Use a real staff account labeled "Spa" that represents the spa facility. Its availability blocks represent spa operating hours. This avoids changes to the availability system.
+
+Mason- You mean an actual account that people log in as? This feels kludgy. The existing provider model also can only be booked once for any given time span. There area also concepts like trades / shift swaps and things like that which don't fit this model. 
 
 ### OQ2: What happens to the spa booking if the massage runs long?
 
