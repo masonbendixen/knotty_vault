@@ -82,12 +82,14 @@ Creating accounts on the fly during a drop-in (collect name/email, auto-generate
 
 **Suggestion**: Phase drop-ins separately. For v1, staff can only do drop-in bookings for existing accounts. Account creation during drop-in comes in a later phase.
 
-Mason- I want to make collecting new customers to be something easy. We already have account creation support. This would be auto generating a password and emailing it to them. Since we don't support booking as a guest, since we want to funnel people through the account creation process, we should make creating an account for a new person as easy as possible. 
+Mason- I want to make collecting new customers to be something easy. We already have account creation support. This would be auto generating a password and emailing it to them. Since we don't support booking as a guest, since we want to funnel people through the account creation process, we should make creating an account for a new person as easy as possible especially for people who just randomly show up for a drop in session. I think that the only significant change here is that we should add a way to mark that a person HAS to change their password the next time they log in and make these auto created accounts have that flag set.
 
 ### Suggested Additional Work Items
 
 1. **Staff check-in endpoint** — `POST /api/staff/checkin/{bookingId}` — the `checked_in_us` column exists but there's no endpoint to set it
+	- Mason- Let's do this. We also need UI to be able to check people in with a list of people booked in the next configurable time period that defaults to 90min but also allows auto complete of a person.
 2. **Spa occupancy dashboard** — real-time view of current and upcoming capacity for staff
+	- Mason- Let's do this.
 3. **Product add-on admin UI** — admin interface for configuring which products can be add-ons to which
 4. **iCal attachment for booking emails** — mentioned in Support for scheduled purchases as a future item, relevant here
 5. **Rename "Membership Sharing" to "Purchase Sharing"** — simple UI text change in gift-permissions component
