@@ -563,7 +563,7 @@ Requirements say full refund. But does that include add-ons that might have a no
 
 **My suggestion**: Yes — if the provider cancels the base, the entire bundle is fully refunded regardless of individual component policies. This is fair because the customer didn't choose to cancel.
 
-Mason- I agree. I suppose the issue is that if someone books a massage and spa visit and the provider cancels the massage. We should definitely cancel the massage but it is unclear that we should cancel the spa visit. The person might still want to attend the spa and cancelling that might free t
+Mason- I agree. I suppose the issue is that if someone books a massage and spa visit and the provider cancels the massage. We should definitely cancel the massage but it is unclear that we should cancel the spa visit. The person might still want to attend the spa and cancelling that might free the last slot that gets booked which would anger the person. We should still give them the bundled discount and allow them cancellation with no window but not cancel the spa entry but send them email saying that their massage was cancelled by the provider and let them know their spa visit is still booked but that they can cancel with a full refund if they want.
 
 ### OQ8: Should the duration extension for add-ons be based on the base product's variant duration, or a fixed amount?
 
@@ -571,17 +571,23 @@ If someone books a 90-min massage + 60-min spa, the spa becomes 150 min? That se
 
 **My suggestion**: Use the base variant's `duration_minutes`. For a 90-min massage + 60-min spa, the spa visit is 150 min total. If this feels too long, the admin can create a "Spa Add-On" product with shorter variants (30 min) that only extends by the base duration.
 
+Mason- It absolutely should be 150min.
+
 ### OQ9: Do we need the "Membership Sharing" rename to "Purchase Sharing" right away, or can it wait?
 
 It's a simple text change but touches the user-facing UI.
 
 **My suggestion**: Do it in Phase 0 as a quick win. It's a 2-file change.
 
+Mason- let's do that.
+
 ### OQ10: For drop-ins: should the system create a purchase at full price, or should there be a drop-in pricing tier?
 
 Drop-in customers at spas often pay a premium (no reservation discount).
 
 **My suggestion**: For v1, use the product's standard pricing. Drop-in-specific pricing can be added later via a "drop-in" permission tier in the existing pricing system.
+
+Mason- Let's use standard pricing for now.
 
 ---
 
