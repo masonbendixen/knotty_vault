@@ -658,8 +658,10 @@ These are related features that would pair well with this implementation:
 	- Mason- Let's do this and build a dashboard. It would be nice if users can see that as well to determine if it is worth trying to come.
 
 6. **Booking modification** — Reschedule a booking without cancel+rebook (scenario 17 from Support for scheduled purchases).
-	- This does need to respect the cancellation windows but I'm okay with doing this if the implementation isn't that expensive.
+	- Mason- This does need to respect the cancellation windows but I'm okay with doing this if the implementation isn't that expensive. This isn't a hugely important scenario to me since they can easily cancel and rebook but I suppose this is a nice to have if not a lot of work and if the UI for it isn't that weird (which is my worry- I'd hate to replicate the booking UI)
 
 7. **iCal email attachments** — Send `.ics` files with booking confirmations so users can add to their calendar.
+	- Mason- Oh absolutely, and let's do this for event sessions, massage bookings, and one time things and anything with a specific time.
 
 8. **Admin dashboard for bundle analytics** — Track how often add-ons are purchased, revenue from bundle discounts vs individual sales.
+	- Mason- This is a great idea. Let's do it.
