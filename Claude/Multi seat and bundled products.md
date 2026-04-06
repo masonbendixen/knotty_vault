@@ -531,7 +531,7 @@ Separate products are simpler for admin but clutter the catalog. Variants keep i
 
 **My suggestion**: Variants of the same "Spa Entry" product. The admin configures different availability windows for each variant's "provider" schedule.
 
-Mason- We will realistically eventually have early bird, off peak, peak, and late night. I feel like early bird, off peak, and peak should be variants of the same product. Late night will be a special thing for platinum fitness members will get a certain number of comps for a month and then be able to buy at a radically reduced price after exhausting their comps but it won't be open to anyone else but them so I'd ra
+Mason- We will realistically eventually have early bird, off peak, peak, and late night. I feel like early bird, off peak, and peak should be variants of the same product. Late night will be a special thing for platinum fitness members will get a certain number of comps for a month and then be able to buy at a radically reduced price after exhausting their comps but it won't be open to anyone else but them so I'd rather have it as a separate product to be able control the visibility which I can't do for a variant.
 
 ### OQ4: How should the add-on discount interact with coupons?
 
@@ -539,11 +539,15 @@ If someone has a 20% coupon AND the spa add-on has a 15% bundle discount, do the
 
 **My suggestion**: Default: non-stackable (`is_stackable = false`). The better discount wins. If admin marks the add-on as stackable, both apply (coupon on the already-discounted price).
 
+Mason- Let's do that but if we essentially don't use one or the other, the unused one should not be consumed.
+
 ### OQ5: Can a spa entry be booked standalone (without massage)?
 
 The requirements describe it as both an add-on AND a standalone product.
 
 **My suggestion**: Yes — the spa entry product exists independently. The add-on relationship just provides a discount when purchased with massage.
+
+Mason- Yes, spa entry very much is a separate product and the majority of the bookings won't include massage.
 
 ### OQ6: For couple's massage, can the two people choose different variants (e.g., person 1 gets 60 min, person 2 gets 90 min)?
 
@@ -551,11 +555,15 @@ This complicates pricing and scheduling significantly.
 
 **My suggestion**: For v1, both get the same variant. The "Couple's Massage" product has its own variants with combined pricing. Different-variant couples massage is a v2 feature.
 
+Mason- Per the discussion above, I'm not sure we will even do couple's massage.
+
 ### OQ7: What's the refund policy when the provider cancels the base of a bundle?
 
 Requirements say full refund. But does that include add-ons that might have a no-refund policy?
 
 **My suggestion**: Yes — if the provider cancels the base, the entire bundle is fully refunded regardless of individual component policies. This is fair because the customer didn't choose to cancel.
+
+Mason- I agree. I suppose the issue is that if someone books a massage and spa visit and the provider cancels the massage. We should definitely cancel the massage but it is unclear that we should cancel the spa visit. The person might still want to attend the spa and cancelling that might free t
 
 ### OQ8: Should the duration extension for add-ons be based on the base product's variant duration, or a fixed amount?
 
