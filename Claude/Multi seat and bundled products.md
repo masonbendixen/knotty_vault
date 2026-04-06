@@ -515,7 +515,7 @@ Spa doesn't have a "provider" in the traditional sense — it's a self-service s
 
 **My suggestion**: Use a real staff account labeled "Spa" that represents the spa facility. Its availability blocks represent spa operating hours. This avoids changes to the availability system.
 
-Mason- You mean an actual account that people log in as? This feels kludgy. The existing provider model also can only be booked once for any given time span. There area also concepts like trades / shift swaps and things like that which don't fit this model. 
+Mason- You mean an actual account that people log in as? This feels kludgy. The existing provider model also can only be booked once for any given time span. There area also concepts like trades / shift swaps, time holes, buffer between bookings, and things like that which don't fit this model. I need to be able to set the capacity for the "room / facility". 
 
 ### OQ2: What happens to the spa booking if the massage runs long?
 
@@ -523,11 +523,15 @@ If massage takes 70 min instead of 60 min, does the spa time shift?
 
 **My suggestion**: No — bookings have fixed times. The extension is calculated at booking time. If the massage runs over, that's an operational issue, not a system issue.
 
+Mason- I agree.
+
 ### OQ3: Should "early bird" and "late night" be separate products or variants of the same product?
 
 Separate products are simpler for admin but clutter the catalog. Variants keep it clean but limit pricing flexibility.
 
 **My suggestion**: Variants of the same "Spa Entry" product. The admin configures different availability windows for each variant's "provider" schedule.
+
+Mason- We will realistically eventually have early bird, off peak, peak, and late night. I feel like early bird, off peak, and peak should be variants of the same product. Late night will be a special thing for platinum fitness members will get a certain number of comps for a month and then be able to buy at a radically reduced price after exhausting their comps but it won't be open to anyone else but them so I'd ra
 
 ### OQ4: How should the add-on discount interact with coupons?
 
