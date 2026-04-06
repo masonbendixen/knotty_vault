@@ -634,6 +634,8 @@ If no compatible spa slots exist, the card shows "No available spa times for thi
 
 Clicking "Add to Booking" expands into an inline section (not a modal) showing compatible spa time slots. The user picks one, and both bookings are confirmed together.
 
+Mason - I think that the shopping cart approach would be the most flexible and, in some ways, the simplest. We could still tell people when booking either product about the bundle savings and then do it implicitly in the shopping cart.
+
 ---
 
 ## Complementary Work Items
@@ -641,10 +643,13 @@ Clicking "Add to Booking" expands into an inline section (not a modal) showing c
 These are related features that would pair well with this implementation:
 
 1. **Shopping cart** — Multi-item purchases are already supported on the backend. A cart UI would enable buying massage + spa + other products without the formal add-on relationship.
+	- Mason- Let's do a shopping cart. This makes things simpler for things like bundles or even something like a couple's massage.
 
 2. **Package deals / multi-visit passes** — "Buy 5 spa entries, get 1 free" type deals. Uses the existing entitlement system with seats_total = 6, seats_used decremented per visit.
+	- Mason- I like this idea. A natural thing would also be things like a four person / six person / eight person group spa visit for friends.
 
 3. **Recurring spa bookings** — "Every Tuesday 6pm spa entry" as a subscription-like recurring booking.
+	- Mason- I don't hate this idea if it can be done cheaply with a ni
 
 4. **Waitlist for spa** — If spa is at capacity, allow users to join a waitlist for a specific time window.
 
