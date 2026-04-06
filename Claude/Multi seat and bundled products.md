@@ -58,6 +58,8 @@ The current service booking model is fundamentally 1-provider-1-client-1-room. A
 
 **Alternative suggestion**: For v1, model couple's massage as a single booking with one "lead" provider. The admin schedules two therapists for the slot manually (or it's inherent to the room type). The system books the time slot and the room, and the provider assignment is handled operationally. This is how most spa booking systems work — the couple books a "couple's massage" slot, and the front desk assigns therapists.
 
+Mason- If it needs to be handled operationally, how can the person book it? I suppose couple's massage isn't that important to me to be honest. I'm not putting in a room specifically for it so it really would just be two people who would be getting massages with different providers in different rooms at the same time. I'm not sure that it is worth the complexity to the system to change the model to support this when someone can pretty easily just book two massages at the same
+
 **2. The add-on model as described creates complex scheduling dependencies**
 
 The requirement says: "the length of the spa visit is automatically extended by the length of the massage" and canceling either component cancels everything. This creates tightly coupled scheduling where a 60-min massage + spa means the spa booking must account for the massage duration, and capacity calculations depend on services in other rooms.
