@@ -658,7 +658,7 @@ These are related features that would pair well with this implementation:
 	- Mason- Let's do this and build a dashboard. It would be nice if users can see that as well to determine if it is worth trying to come.
 
 6. **Booking modification** — Reschedule a booking without cancel+rebook (scenario 17 from Support for scheduled purchases).
-	- This does need to respect the cancellation windows but I'm okay with doing this if the impementation isn't that expensive.
+	- This does need to respect the cancellation windows but I'm okay with doing this if the implementation isn't that expensive.
 
 7. **iCal email attachments** — Send `.ics` files with booking confirmations so users can add to their calendar.
 
