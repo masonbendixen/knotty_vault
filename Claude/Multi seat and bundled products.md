@@ -297,6 +297,76 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Route in manage routes, dashboard card with "schedule" icon
 - [x] Tests: 5 backend endpoint tests, 12 component spec tests, 3 mock spec tests
 
+#### 1.9 Room Schedule Template Redesign
+
+The simple `room_schedules` table (day-of-week + open/close) is insufficient. Need a template-based system with date ranges and day overrides, similar to the existing provider schedule templates. Also:
+- Default spa hours should be 11am-9pm (not 6am-10pm)
+- Need ability to click on existing schedule entries to modify them
+- Need date-specific overrides (holiday hours, maintenance days)
+- Need templates with start date and optional end date
+- Need "copy template" functionality to create a new template from an existing one
+- Need multi-day selection: check multiple days of the week, set times, "Add days" button
+
+**Data Model Changes:**
+
+New tables replacing `room_schedules`:
+
+**`room_schedule_templates`**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | BIGSERIAL | PK |
+| `location_room_id` | BIGINT | FK → location_rooms |
+| `name` | VARCHAR | e.g. "Summer Hours", "Winter Hours" |
+| `effective_from_us` | BIGINT | When this template takes effect |
+| `effective_to_us` | BIGINT | Nullable — when it ends (null = indefinite) |
+| `is_active` | BOOLEAN | DEFAULT TRUE |
+| `created_us` | BIGINT | |
+| `updated_us` | BIGINT | |
+
+**`room_schedule_template_entries`** (the weekly pattern)
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | BIGSERIAL | PK |
+| `template_id` | BIGINT | FK → room_schedule_templates |
+| `day_of_week` | INT | 0=Sunday, 6=Saturday |
+| `open_time_minutes` | INT | Minutes from midnight |
+| `close_time_minutes` | INT | Minutes from midnight |
+| `created_us` | BIGINT | |
+
+**`room_schedule_overrides`** (specific date overrides)
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | BIGSERIAL | PK |
+| `location_room_id` | BIGINT | FK → location_rooms |
+| `override_date_us` | BIGINT | The specific date being overridden (midnight) |
+| `open_time_minutes` | INT | Nullable — null means CLOSED for this date |
+| `close_time_minutes` | INT | Nullable |
+| `reason` | VARCHAR | e.g. "Holiday hours", "Maintenance" |
+| `created_us` | BIGINT | |
+
+**Availability resolution logic:**
+1. Find the active template for the room whose `effective_from_us <= now` and (`effective_to_us IS NULL` or `effective_to_us > now`)
+2. For the requested date, check if there's an override → use override times (or closed if times are null)
+3. If no override, use the template's entry for that day of week
+4. If no template entry for that day, room is closed
+
+**UI:**
+- Template list: show all templates for a room, create new, copy from existing
+- Template editor: weekly grid with multi-day selection + "Add days" + click to delete
+- Override list: show upcoming overrides, create new override for a specific date
+- The current `room_schedules` table entries should be migrated to a template
+
+**Implementation plan:**
+- [ ] Create new tables: `room_schedule_templates`, `room_schedule_template_entries`, `room_schedule_overrides`
+- [ ] Register in make_database_info, create_database (all admin metadata)
+- [ ] Create table helpers for all three tables
+- [ ] Update `RoomAvailabilityHelper` to use templates + overrides instead of `room_schedules`
+- [ ] Update admin endpoints: template CRUD, entry CRUD with multi-day "Add days", override CRUD, copy template
+- [ ] Update seed data: create default "Standard Hours" template with 11am-9pm every day
+- [ ] Update admin UI: template list, template editor with multi-day add, override editor
+- [ ] Fix the service booking page to actually show spa slots
+- [ ] Tests for all layers
+
 ---
 
 ### Phase 2: Shopping Cart
