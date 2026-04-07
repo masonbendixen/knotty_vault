@@ -357,15 +357,16 @@ New tables replacing `room_schedules`:
 - The current `room_schedules` table entries should be migrated to a template
 
 **Implementation plan:**
-- [ ] Create new tables: `room_schedule_templates`, `room_schedule_template_entries`, `room_schedule_overrides`
-- [ ] Register in make_database_info, create_database (all admin metadata)
-- [ ] Create table helpers for all three tables
-- [ ] Update `RoomAvailabilityHelper` to use templates + overrides instead of `room_schedules`
-- [ ] Update admin endpoints: template CRUD, entry CRUD with multi-day "Add days", override CRUD, copy template
-- [ ] Update seed data: create default "Standard Hours" template with 11am-9pm every day
-- [ ] Update admin UI: template list, template editor with multi-day add, override editor
+- [x] Create new tables: `room_schedule_templates`, `room_schedule_template_entries`, `room_schedule_overrides`
+- [x] Register in make_database_info, create_database (all admin metadata)
+- [x] Create table helpers for all three tables (12 tests in `room_schedule_templates_test.cpp`)
+- [x] Update `RoomAvailabilityHelper` to use templates + overrides instead of `room_schedules` (6 tests)
+- [x] Update admin endpoints: template CRUD, entry CRUD with multi-day "Add days", override CRUD (13 endpoint tests)
+- [x] Update `available_service_slots_test.cpp` to use templates instead of old `room_schedules`
+- [x] Update seed data: create default "Standard Hours" template with 11am-9pm every day
+- [x] Update frontend ServerAccess: types, interface, proxy, network, mock, mock tests (12 mock tests)
+- [x] Update admin UI: template list, template editor with multi-day add, override editor (21 component tests)
 - [ ] Fix the service booking page to actually show spa slots
-- [ ] Tests for all layers
 
 ---
 
