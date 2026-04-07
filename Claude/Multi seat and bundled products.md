@@ -199,16 +199,16 @@ Links bookings that are part of the same logical unit (bundle).
 *Small, high-impact cleanups*
 
 #### 0.1 Rename "Membership Sharing" to "Purchase Sharing"
-- [ ] Update `gift-permissions.component.html` — title, section headers, descriptions
-- [ ] Update account dashboard card in `user.component.html` — title and subtitle
-- [ ] Tests: component spec
+- [x] Update `gift-permissions.component.html` — title and description text
+- [x] Update account dashboard card in `user.component.html` — title and subtitle
+- [x] Tests: updated `user.component.spec.ts` assertion for card text
 
 #### 0.2 Fix PayCardResponse TypeScript Type
-- [ ] `payment.types.ts`: Change `PayCardResponse.entitlements_created: number` to `entitlements: Entitlement[]`
-- [ ] Same for `PayVoucherResponse`
-- [ ] Update `ServerAccessMock` to return entitlement arrays
-- [ ] Fix any tests constructing these types
-- [ ] Tests: mock spec, checkout spec, event-booking spec
+- [x] `payment.types.ts`: Changed `PayCardResponse.entitlements_created: number` to `entitlements: Entitlement[]`
+- [x] Same for `PayVoucherResponse`
+- [x] `ServerAccessNetwork.ts`: Removed lossy mapping that was converting entitlements array to count
+- [x] `ServerAccessMock`: Updated `purchasePayCard()` and `purchasePayVoucher()` to return entitlement arrays
+- [x] Fixed all tests: mock spec, checkout spec, event-booking spec, service-booking spec (14 occurrences)
 
 #### 0.3 Add `must_change_password` to People
 - [ ] Add column to `db_schema/people.h/cpp` (BOOLEAN, DEFAULT FALSE)

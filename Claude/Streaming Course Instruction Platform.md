@@ -490,12 +490,16 @@ These are questions and decisions that need input before proceeding further:
 ### Business Model Questions
 
 1. **Platform-first or content-first?** Should Phase 1 focus on building the platform tools (recording app, hosting, Q&A infrastructure) and selling them to other creators immediately? Or should it focus entirely on producing and distributing Knotty Yoga's own content, with the platform features being internal-only until they are proven?
+	- Mason- There should be a MVP phase focused on Knotty Yoga's content but I should also take one or two friend's business needs and support them as a beta for the product.
 
 2. **Pricing philosophy**: For studio licensing, is the goal to undercut Les Mills aggressively (making it accessible to small studios) or to price at a premium based on the specialized, niche content?
+	- Mason- I think that most acrobatics studios probably can't afford high prices. If we scaled to higher volume things like yoga studios and so forth, we can revisit this, but for now, I would like to keep it accessible.
 
 3. **Revenue sharing split**: For the Phase 3 marketplace, what split feels right? 70/30 (creator/platform) is standard for app stores, but Spotify takes 30-35% and YouTube takes 45%. A 75/25 or 80/20 split would be a differentiator for attracting creators.
+	- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can.
 
 4. **Free tier**: Should there be free content on the platform for discovery (like YouTube) or should everything be behind a paywall from day one?
+	- I think a free tier will be important for marketing. 
 
 5. **Scope of Phase 1**: How much editing capability should the desktop app have? A full non-linear editor is an enormous engineering effort. An alternative is to focus on guided workflows (trim, reorder, add intro/outro) and leave complex editing to DaVinci Resolve, with the app handling import of the final edited file.
 
