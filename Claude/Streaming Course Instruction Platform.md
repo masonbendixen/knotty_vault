@@ -496,16 +496,18 @@ These are questions and decisions that need input before proceeding further:
 	- Mason- I think that most acrobatics studios probably can't afford high prices. If we scaled to higher volume things like yoga studios and so forth, we can revisit this, but for now, I would like to keep it accessible.
 
 3. **Revenue sharing split**: For the Phase 3 marketplace, what split feels right? 70/30 (creator/platform) is standard for app stores, but Spotify takes 30-35% and YouTube takes 45%. A 75/25 or 80/20 split would be a differentiator for attracting creators.
-	- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can. Let's discuss this more.
+	- Mason- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can. Let's discuss this more.
 
 4. **Free tier**: Should there be free content on the platform for discovery (like YouTube) or should everything be behind a paywall from day one?
-	- I think a free tier will be important for marketing. 
+	- Mason- I think a free tier will be important for marketing. 
 
 5. **Scope of Phase 1**: How much editing capability should the desktop app have? A full non-linear editor is an enormous engineering effort. An alternative is to focus on guided workflows (trim, reorder, add intro/outro) and leave complex editing to DaVinci Resolve, with the app handling import of the final edited file.
+	- Mason- I don't want to tackle a full non-linear editor but I want to support capturing multiple video / audio sources with timestamp information and being able to on the fly toggle between full screen for a given source, pip for a main source and a sub source, and split screen. For instance, I want to support multiple camera angles as well as audience questions video streams. For the livestream, the creator can toggle back and forth between these live but we should also save all the streams and allow a edit mode where the creator can go back after the fact and selectively choose when to switch between video sources for all of these modes. I also want to support adding voice over and even PIP commenting during editing.
 
 ### Technical Questions
 
 6. **Desktop app technology**: Electron (cross-platform, JavaScript/TypeScript, large ecosystem, heavier) vs. native (C++/Qt for performance, matches existing backend expertise, harder cross-platform) vs. Tauri (Rust-based, lighter than Electron, smaller ecosystem)?
+	- QT/C++ works pretty well for Windows and Mac which is what I care about.
 
 7. **Self-hosted vs. cloud for LiveKit**: Self-hosting LiveKit reduces per-session costs but requires infrastructure management. LiveKit Cloud eliminates ops burden but costs ~$50-60 per Q&A session. At what scale does self-hosting become worthwhile?
 
