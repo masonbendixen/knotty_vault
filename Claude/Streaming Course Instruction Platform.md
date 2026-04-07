@@ -534,6 +534,7 @@ These are questions and decisions that need input before proceeding further:
 
 14. **Certification timeline**: How important is building the certification infrastructure early vs. focusing on content production and distribution first? Certification creates a moat but adds significant regulatory and operational complexity.
 
+
 ### Competitive Positioning Questions
 
 15. **Naming and positioning**: Should the platform be positioned as a "tool for creators" (like Teachable/Kajabi — the creator is the brand) or as a "destination for students" (like Alo Moves — the platform is the brand)? Or can it credibly be both at different phases?
