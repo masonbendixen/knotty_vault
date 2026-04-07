@@ -45,7 +45,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 Based on our brainstorming discussion, here's what's in scope and what's been decided:
 
 ### In Scope
-1. **Spa product with capacity-tracked booking** — room-level capacity enforcement, 5-min slot intervals, variants for different durations/times-of-day
+1. **Room-based bookable products with capacity tracking** — room-level capacity enforcement, configurable slot intervals, variants for different durations/times-of-day. Applies to spa, swim spa (30-min increments), rock climbing wall (capacity-limited), and future similar products.
 2. **Late Night Spa** — separate product (not variant) for visibility/permission control, platinum members only
 3. **Staff check-in with capacity enforcement** — fire code compliance, early check-in window, capacity gate
 4. **Add-on bundles** — `product_addons` table, automatic discounts, duration extension for spa when bundled with massage
@@ -516,72 +516,38 @@ Links bookings that are part of the same logical unit (bundle).
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-### OQ1: How should room-schedule-based products appear in the service booking UI?
+### RQ1: Room-schedule-based product UI
 
-Currently the service booking page groups slots by provider. For spa products, there is no provider — slots are defined by room operating hours and limited by room capacity. The UI would need to either:
+**Decision**: Option (a) — flat time slot grid, no provider grouping. This applies to spa, swim spa, rock climbing wall, and any future room-based bookable product. The room-schedule concept is general purpose — it's for anything that is bookable by time slot with capacity, without a specific provider. The room assignment is automatic.
 
-(a) Show slots without provider grouping — just a flat list of available times
-(b) Show slots grouped by room (if multiple spa rooms exist)
-(c) Look the same as provider-based slots but label them as "Self-Service" or the room name
+**Additional scope note**: The swim spa (bookable in 30-min increments) and rock climbing wall (capacity-limited, no attendant) are additional products that will use this same `requires_room_schedule` infrastructure. All three (spa, swim spa, climbing wall) will need rooms with capacity and operating hour schedules.
 
-**My suggestion**: Option (a) for v1. The spa booking page shows available time slots as a simple grid (like event session booking), not grouped by provider. The room assignment happens automatically. This is the simplest UX and matches what users expect from a spa — they don't pick a "provider," they pick a time.
+### RQ2: Add-on relationships are bidirectional
 
-- Mason- We only have one spa. There will also be a swim spa that is bookable in 30min increments. There will also be a rock climbing wall that will have a max capacity and no attendant like the spa (well there will be staff but not bookable). I have a big need for things that are bookable by time slot. I think option A is best.
+**Decision**: Yes. Create entries in both directions if desired (Massage→Spa and Spa→Massage). With the cart-based approach, directionality matters less — the cart detects any add-on relationship between items regardless of which was added first.
 
-### OQ2: Can add-on relationships be bidirectional?
+### RQ3: Room capacity check covers full booking duration
 
-If Massage is a base and Spa is an add-on, can Spa also be a base with Massage as an add-on? Example: someone books a spa visit first and wants to add a massage.
+**Decision**: Check every 5-minute interval of the full booking duration (including duration extension from bundles). If any interval would exceed room capacity, the slot is unavailable. This is required for fire code compliance.
 
-**My suggestion**: Yes, allow it. The `product_addons` table supports this — just create two entries (Massage→Spa and Spa→Massage) with potentially different discounts. The shopping cart detects whichever relationship applies based on what's in the cart.
+### RQ4: "Add to Cart" on all purchasing flows except subscriptions
 
-- Mason- yeah, it makes sense to make these bidirectional. If we go with the cart based approach, which I think we are, this really doesn't matter that much.
+**Decision**: All products show both "Book and Pay Now" (existing express checkout) and "Add to Cart" — except subscriptions, which require a card on file and monthly billing, so they stay as their own dedicated flow.
 
-### OQ3: How should the room capacity check work for extended-duration bundles?
+### RQ5: Cart persists with configurable TTL
 
-When someone books a 90-min massage + 60-min spa (= 150 min spa), should the capacity check verify all 150 minutes have capacity, or just the originally-selected spa start time?
+**Decision**: Cart persists in localStorage. TTL is controlled by a configuration secret. Scheduled items are re-validated on cart load — if the slot was taken, warn the user and remove the item.
 
-**My suggestion**: Check the full 150-minute window. For each 5-minute interval within the 150-min spa booking, verify the room count stays under capacity. This is the only way to truly enforce fire code limits. It may eliminate some slots that would otherwise appear available, but that's correct behavior.
+### RQ6: Unclaimed bookings remain valid
 
-- Mason- yes, the spa needs to have capacity for the whole booking (note the spa, not the massage room that only services one person and is full with one booking)
+**Decision**: Bookings exist and are valid regardless of whether the recipient has created an account. The payer sees it in their purchases. When the recipient creates an account with the matching email, the booking automatically appears in their "My Bookings." Normal cancellation applies if the payer cancels before signup.
 
-### OQ4: What products should show the "Add to Cart" option vs "Book and Pay Now"?
+### RQ7: Occupancy = checked-in with end time not passed
 
-Should all products get "Add to Cart," or just some? Events, services, and one-time products all have different booking flows.
+**Decision**: Option (c). A person counts as "occupying" a room from check-in until their booked end time. Not checked in yet = not occupying. End time passed = not occupying. This gives the most accurate real-time picture for staff and public dashboards.
 
-**My suggestion**: Show both options on all bookable products. "Book and Pay Now" is the single-item express checkout (existing flow). "Add to Cart" puts it in the cart for multi-item purchase later. For scheduled services and events, the user still selects a time slot before adding to cart — the cart item includes the scheduled time.
+### RQ8: Product catalog finalized during implementation
 
-- Mason- Yes, I like presenting both options for all purchasing flows except subscriptions (which require a card on file and cause a monthly payment anyway)
-
-### OQ5: Should the shopping cart persist across sessions?
-
-If a user adds a massage to their cart and closes the browser, should it be there when they come back?
-
-**My suggestion**: Persist in localStorage with a reasonable TTL (e.g., 24 hours). Scheduled items in the cart should be validated when the cart is loaded — if the slot has been taken, warn the user and remove the item. Non-scheduled items (one-time products without a time) persist indefinitely until TTL.
-
-- Mason - yeah, I'd like it to persist for some configurable time window (a configuration secret)
-
-### OQ6: For the invite flow (book-for-others), what happens to the booking if the invitee never creates an account?
-
-The booking was created and paid for, but the recipient hasn't accepted.
-
-**My suggestion**: The booking exists and is valid regardless. The payer can see it in their purchases. The booking is "unclaimed" — it shows the recipient's email but isn't linked to an account yet. When the recipient eventually creates an account with that email, the booking automatically appears in their "My Bookings." If the payer cancels before the recipient signs up, normal cancellation applies.
-
-- Mason- I like your suggestion.
-
-### OQ7: For the occupancy dashboard, what counts as "occupied"?
-
-Options: (a) all confirmed bookings overlapping now, (b) only checked-in bookings, (c) checked-in bookings whose end time hasn't passed.
-
-**My suggestion**: Option (c) — a person is "occupying" the room from check-in until their booked end time. If they haven't checked in yet but their booking started, they DON'T count (they might be a no-show). If they checked in and their end time has passed, they DON'T count (they should have left). This gives the most accurate real-time picture.
-
-- Mason- Let's go with your suggestion.
-
-### OQ8: What specific variants and pricing should the spa products have?
-
-The plan lists some approximate prices. Are these the right variants and prices, or do you want to adjust?
-
-**My suggestion**: Let's finalize the exact product catalog as part of Phase 1.4 when we create the seed data. The plan uses placeholder prices — you can adjust them before implementation.
-
-- Mason- That sounds good to me.
+**Decision**: Exact variants and pricing will be finalized during Phase 1.4 seed data creation. Placeholder prices in the plan are approximate.
