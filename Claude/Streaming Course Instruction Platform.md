@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 4/2/2026
-Version: 0.2
+Last Updated: 4/7/2026
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -26,9 +26,9 @@ I am working on an idea for a business proposal and want help fleshing it out. I
 
 ## Executive Summary
 
-This document proposes a three-phase platform for producing, distributing, and licensing fitness instructional content — initially serving Knotty Yoga's own needs, then expanding to serve independent content creators, studios, and eventually a marketplace of subscribers.
+This document proposes a multi-phase platform for producing, distributing, and licensing fitness instructional content. The MVP phase will serve Knotty Yoga's own content needs alongside 1-2 beta creator partners, proving the product before scaling to additional content creators, studios, and eventually a marketplace of subscribers. The platform targets a global audience from day one, with initial beta creators including partners in Canada.
 
-The platform addresses a clear gap in the fitness technology landscape: no existing product combines **high-quality produced instructional video**, **interactive live Q&A sessions**, and **B2B studio content licensing** in a single offering. Creators currently cobble together Patreon (payments/community), Zoom (live classes), and YouTube/Vimeo (hosting) — a fragmented experience that produces low-quality results for both creator and student.
+The platform addresses a clear gap in the fitness technology landscape: no existing product combines **high-quality produced instructional video**, **interactive live Q&A sessions**, and **B2B studio content licensing** in a single offering. Creators currently cobble together Patreon (payments/community), Zoom (live classes), and YouTube/Vimeo (hosting) — a fragmented experience that produces low-quality results for both creator and student. This platform positions as a clean replacement for Patreon — not an integration or supplement, but a superior alternative that creators migrate to.
 
 The specialized modalities at play — aerial acrobatics, partner acrobatics, flexibility, and yoga — have virtually no dedicated digital infrastructure. This is both a niche opportunity and a natural moat: the content requires genuine expertise, safety training, and multi-angle demonstration that generic fitness platforms cannot replicate.
 
@@ -108,7 +108,7 @@ The hybrid fitness model — combining in-person and digital — is the fastest-
 
 ## Content Needs (Knotty Yoga)
 
-Before scaling to serve other creators, the platform must first serve Knotty Yoga's own content production needs:
+The MVP phase focuses on Knotty Yoga's own content while also onboarding 1-2 beta creator partners to validate the platform against real external needs:
 
 | Content Type | Description | Distribution |
 |---|---|---|
@@ -118,7 +118,7 @@ Before scaling to serve other creators, the platform must first serve Knotty Yog
 | Partner massage | Guided partner massage and bodywork sequences | Members / course |
 | Teacher training curriculum | Portions of the yoga teacher training and massage certification programs | Enrolled students |
 
-This diverse set of needs — spanning free public content, member-only streaming, structured courses, and accredited certification material — means the platform must support multiple content types and access levels from day one.
+This diverse set of needs — spanning free public content, member-only streaming, structured courses, and accredited certification material — means the platform must support multiple content types and access levels from day one. A **free tier** will be available for discovery and marketing purposes — select content from creators will be publicly accessible to drive awareness and conversion to paid tiers.
 
 ---
 
@@ -150,13 +150,25 @@ The recording application must support:
 
 ### Editing Capabilities
 
-After recording, the application provides guided post-production:
+The editing mode is **not a full non-linear editor** — that would be an enormous engineering effort better left to tools like DaVinci Resolve. Instead, it is a focused, guided post-production workflow built around the platform's core strength: multi-source video management.
 
-- **Timeline trimming**: Remove false starts, dead air, off-topic tangents, and retakes from the recorded sources.
-- **Voice-over recording**: Record narration over specific sections of the video — for example, adding explanation over a slow-motion replay of a technique.
-- **Overlay insertion**: Add text annotations, arrows, safety callouts, or anatomical diagrams over the video at specific timestamps. Critical for acrobatics content where spotting positions and hand placement need highlighting.
+**Multi-source layout editing** (the primary editing capability):
+- All captured video/audio sources from a recording session are available on a synchronized timeline, aligned by their timestamp information.
+- The creator can scrub through the timeline and set **layout transition points** — choosing at each point which source arrangement to display:
+  - **Full-screen**: Any single source fills the frame (e.g., overhead camera, front camera, or an audience member's video stream during Q&A).
+  - **Picture-in-picture**: A primary source fills the frame with a secondary source inset in a corner (e.g., instructor full-screen with audience member PIP, or wide shot with close-up PIP).
+  - **Split-screen**: Two sources displayed side-by-side (e.g., front and side camera angles simultaneously).
+- During a live stream, the creator toggles between these layouts in real time. But crucially, **all individual streams are saved** so the creator can go back in edit mode and re-decide every layout transition with the benefit of hindsight. The live switching decisions are just the initial defaults — everything is re-editable.
+- This same workflow applies to both instructional recordings (multiple camera angles) and Q&A sessions (host stream + multiple audience member streams).
+
+**Voice-over and PIP commentary**:
+- The creator can record new voice-over narration at any point on the timeline — for example, adding explanation over a slow-motion replay of a technique.
+- The creator can record **PIP commentary** — a new video+audio recording of themselves that is overlaid as a picture-in-picture on the existing footage. This allows the creator to "commentate" on their own performance, point out details, or add teaching notes after the fact.
+
+**Additional editing features**:
+- **Timeline trimming**: Remove false starts, dead air, off-topic tangents, and retakes.
+- **Overlay insertion**: Add text annotations, arrows, safety callouts, or anatomical diagrams at specific timestamps. Critical for acrobatics content where spotting positions and hand placement need highlighting.
 - **Slide/presentation insertion**: Insert presentation-style material (anatomy slides, progression charts, theory content) between video segments.
-- **Multi-angle compositing**: Choose which camera angle is primary at each point in the timeline. Switch between full-screen, split-screen, and picture-in-picture layouts at scene transition points.
 - **Branded intro/outro**: Automatically prepend and append branded intro and outro sequences with the class title, instructor name, level, and duration dynamically inserted.
 - **Audio post-processing**: Noise reduction, loudness normalization, and optional background music mixing.
 
@@ -334,9 +346,9 @@ Based on extensive evaluation of available tools and services:
 |-----------|---------------|-----------|
 | Recording engine | **OBS Studio** (standalone, controlled via obs-websocket) | Industry standard. The WebSocket API (built-in since v28) provides comprehensive remote control: scene switching, source management, recording start/stop, filter configuration. Embedding libobs directly is technically possible but impractical — controlling the standalone app via WebSocket from a custom UI is far simpler and more maintainable. |
 | Multi-camera sync | **NDI over LAN** (via obs-ndi plugin) | NDI (Network Device Interface) enables sending camera feeds from dedicated capture devices to OBS over the local network. Better sync than USB cameras. Works with professional cameras via HDMI-to-NDI converters. |
-| Custom control UI | **Desktop app (Electron or native)** communicating with OBS via WebSocket | Provides a simplified, fitness-focused UI on top of OBS. Instructor sees big buttons: "Start Recording," "Switch to Overhead Camera," "Begin Q&A." The complexity of OBS is hidden. |
+| Custom control UI | **Qt/C++ desktop app** communicating with OBS via WebSocket | A native Qt/C++ application provides a simplified, fitness-focused UI on top of OBS. Instructor sees big buttons: "Start Recording," "Switch to Overhead Camera," "Begin Q&A." The complexity of OBS is hidden. Qt/C++ targets Windows and Mac cleanly (Linux support is straightforward if needed later). This also matches the existing backend expertise on the project. |
 
-**Alternative to consider**: For simpler setups (single camera + screen share), a fully browser-based recording solution using the MediaRecorder API and WebRTC could eliminate the OBS dependency entirely. This trades multi-camera flexibility for simplicity. The custom desktop app could support both modes — OBS-based for professional multi-camera setups and browser-based for simpler recordings.
+**OBS as a dependency**: OBS Studio has a standard installer for Windows (`.exe` via the OBS website) and Mac (`.dmg`). It is a one-time install with no configuration needed by the end user — our Qt app would handle all OBS configuration via the WebSocket API, including setting up sources, scenes, and recording settings. The creator never needs to open or interact with OBS directly. The installer is lightweight (~150-250 MB) and widely trusted (open source, millions of users). This is a low barrier to entry — comparable to installing any other desktop application. The Qt app could even check for OBS on launch and guide the user through installation if it is missing.
 
 #### Post-Processing
 
@@ -533,12 +545,15 @@ These are questions and decisions that need input before proceeding further:
 	- Mason- Global from day one. One of the people I would target initially for a content producer is in Canada.
 
 14. **Certification timeline**: How important is building the certification infrastructure early vs. focusing on content production and distribution first? Certification creates a moat but adds significant regulatory and operational complexity.
-
+	- Mason- Let's focus on the technical first. I will hand pick people at the start so certification will be entirely by referral.
 
 ### Competitive Positioning Questions
 
 15. **Naming and positioning**: Should the platform be positioned as a "tool for creators" (like Teachable/Kajabi — the creator is the brand) or as a "destination for students" (like Alo Moves — the platform is the brand)? Or can it credibly be both at different phases?
+	- Mason- Start with the creator is the brand and then develop a brand once we have enough creators on the platform.
 
 16. **Relationship with Patreon**: Many target creators already have Patreon audiences. Should the platform offer Patreon integration (e.g., sync membership tiers) to ease migration, or position as a clean replacement?
+	- Mason- Clean replacement.
 
 17. **Partnership opportunities**: Are there existing organizations (AcroYoga International, aerial arts associations, Yoga Alliance) that would benefit from endorsing or partnering with the platform?
+	- Mason- Yes but at a much later point. Let's not worry about that for the first phase but I like the idea eventually.
