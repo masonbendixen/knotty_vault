@@ -606,8 +606,11 @@ Mason- This is where I'm not sure and could use helping calculate. I was thinkin
    - Time-limited free trials (first 7 days of any course)
 	- Mason- Creator should decide. Might do teasers or trailers or content that is interesting but mainly piques interest.
 
-4. **Centralized music licensing scope**: Royalty-free music services (Epidemic Sound, Artlist) cover distribution on your own platform. But if studios play content in a commercial setting (in-class), the licensing requirements may differ from online distribution. This needs investigation — specifically whether Epidemic Sound / Artlist commercial licenses cover in-studio public performance, or if a separate blanket license is needed.
+1. **Centralized music licensing scope**: Royalty-free music services (Epidemic Sound, Artlist) cover distribution on your own platform. But if studios play content in a commercial setting (in-class), the licensing requirements may differ from online distribution. This needs investigation — specifically whether Epidemic Sound / Artlist commercial licenses cover in-studio public performance, or if a separate blanket license is needed.
+	- Mason- Okay, let's dive into this. I more am thinking of light duty background sound and opening video title / trailer stuff than actual music during the class. Honestly, AI generated psuedo music / sound would be fine. We aren't going to need commercial music.
 
-5. **Multi-platform content strategy**: If creators will use YouTube/Instagram for discovery, should the platform offer tools to generate short-form clips (Reels, Shorts, TikToks) from full-length content? This would be a compelling feature: upload a full class, and the platform auto-generates 30-60 second highlight clips with branding for social media distribution.
+2. **Multi-platform content strategy**: If creators will use YouTube/Instagram for discovery, should the platform offer tools to generate short-form clips (Reels, Shorts, TikToks) from full-length content? This would be a compelling feature: upload a full class, and the platform auto-generates 30-60 second highlight clips with branding for social media distribution.
+	- Mason- that does sound like a nice thing to do but definitely not a MVP or must have or should have. More of a nice to have or stretch goal. In other words, I love the idea and would like to do it eventually.
 
-6. **Platform naming**: Does this platform have a working name, or should one be developed? The name will shape how creators and students perceive and remember it.
+3. **Platform naming**: Does this platform have a working name, or should one be developed? The name will shape how creators and students perceive and remember it.
+	- Mason- Yes, we need to think of a name but I don't want to block the progress on that.

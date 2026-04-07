@@ -269,13 +269,18 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Tests: 6 tests in `staff_checkin_test.cpp` — success, already checked in, too early (outside window), capacity blocked (room full), not found (404), late check-in (allowed, time not extended)
 
 #### 1.6 Staff Check-In UI
-- [ ] Create check-in page in staff portal at `/staff/checkin`
-- [ ] Show upcoming bookings for the next configurable window (default 90 min, configurable via input)
-- [ ] Person autocomplete search to find a specific person's bookings
-- [ ] Each booking row: person name, product, variant, time, status, "Check In" button
-- [ ] Current occupancy indicator per room: "Spa: 8/15" with color coding (green < 70%, amber < 90%, red >= 90%)
-- [ ] Route and staff dashboard card
-- [ ] Tests: component spec
+- [x] Created `GET /api/staff/upcoming_checkins` endpoint — returns bookings within configurable window (default 90 min), with person/product/room/facility info, plus room occupancy counts; 2 endpoint tests
+- [x] Added `staffGetUpcomingCheckins()` and `staffCheckin()` to ServerAccess interface, proxy, network, mock; added `CheckinBooking`, `RoomOccupancy`, `UpcomingCheckinsResponse` types; 3 mock spec tests
+- [x] Created `StaffCheckInComponent` at `/staff/check-in` with:
+  - Configurable time window input (default 90 min)
+  - Search filter by person name/email/product
+  - Booking cards with person name, product, variant, time, room, Check In button
+  - "Checked In" badge for already checked-in bookings
+  - Room occupancy indicators with color coding (green < 70%, amber 70-90%, red >= 90%)
+  - Auto-refresh every 30 seconds
+  - Success/error messages for check-in actions
+- [x] Route added to `staff.routes.ts`, dashboard card with "how_to_reg" icon added first in staff dashboard
+- [x] Tests: 10 component spec tests (create, load, empty state, search filter, checked-in detection, occupancy calculation/class, check-in success/failure, error loading, heading display)
 
 #### 1.7 Occupancy Dashboard
 - [ ] Create `GET /api/room_occupancy/{roomId}` endpoint — returns current count, capacity, and upcoming 2-hour window with projected counts
