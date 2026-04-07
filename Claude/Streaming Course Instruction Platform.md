@@ -521,14 +521,16 @@ These are questions and decisions that need input before proceeding further:
 ### Content and Market Questions
 
 10. **Content exclusivity**: Should creators who place content in the Phase 3 marketplace be required to keep it exclusive (not also on Patreon/YouTube)? Or should the platform allow non-exclusive content to reduce the barrier to entry?
-	- No, I don't want to lock them in. At best, they will need to transition people from Patreon to my platform and probably coexist for a while if not indefinitely. YouTube / Instagram for discovery will remain highly important.
+	- Mason- No, I don't want to lock them in. At best, they will need to transition people from Patreon to my platform and probably coexist for a while if not indefinitely. YouTube / Instagram for discovery will remain highly important.
 
 11. **Music licensing**: Should the platform handle music licensing centrally (like Les Mills does) for studio-licensed content? This is a significant operational complexity but a major value-add for studios. Without it, studios need their own ASCAP/BMI licenses.
-	- Yes, we should deal with finding no royalty music.
+	- Mason- Yes, we should deal with finding no royalty music.
 
 12. **Quality control**: How much curation should the marketplace have? Fully open (anyone can publish, like Udemy — large catalog but variable quality) vs. curated (invitation/application, like Alo Moves — smaller catalog but consistent quality)?
+	- Mason- We will vet for quality.
 
 13. **Geographic scope**: Is this a local/regional play (Pacific Northwest acrobatics community) initially, or does the niche nature of the content mean the audience is inherently global from day one?
+	- Mason- Global from day one. One of the people I would target initially for a content producer is in Canada.
 
 14. **Certification timeline**: How important is building the certification infrastructure early vs. focusing on content production and distribution first? Certification creates a moat but adds significant regulatory and operational complexity.
 
