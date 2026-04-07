@@ -290,6 +290,20 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Created `RoomOccupancyBadgeComponent` — standalone reusable badge, fetches public occupancy by room ID, shows "X/Y" with color coding, auto-refreshes every 60s
 - [x] Tests: 5 backend endpoint tests, 3 mock spec tests
 
+#### 1.8 Room Schedule Admin UI
+- [ ] Create a manage page at `/manage/room-schedules` (or nested under facilities/rooms)
+- [ ] Load rooms that have schedules (or all rooms with `concurrent_capacity > 1`)
+- [ ] For each room, show a weekly grid: days across the top, time down the left side
+- [ ] Filled cells represent open hours, empty cells represent closed
+- [ ] Admin can click to add/edit/remove schedule blocks
+- [ ] Time inputs should use hour:minute pickers (not raw minute numbers)
+- [ ] Support multiple windows per day (e.g., 6am-12pm and 2pm-10pm with a maintenance gap)
+- [ ] Save via existing `room_schedules` table helper (AddRoomSchedule, DeleteSchedule)
+- [ ] Add admin endpoint `GET /api/admin/room_schedules/{roomId}` and `POST /api/admin/room_schedules` for CRUD (or use existing generic CRUD)
+- [ ] Dashboard card in manage portal
+- [ ] Route in manage routes
+- [ ] Tests: component spec, endpoint tests if new endpoints are created
+
 ---
 
 ### Phase 2: Shopping Cart
