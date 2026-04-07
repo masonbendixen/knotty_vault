@@ -528,17 +528,23 @@ Currently the service booking page groups slots by provider. For spa products, t
 
 **My suggestion**: Option (a) for v1. The spa booking page shows available time slots as a simple grid (like event session booking), not grouped by provider. The room assignment happens automatically. This is the simplest UX and matches what users expect from a spa — they don't pick a "provider," they pick a time.
 
+- Mason- We only have one spa. There will also be a swim spa that is bookable in 30min increments. There will also be a rock climbing wall that will have a max capacity and no attendant like the spa (well there will be staff but not bookable). I have a big need for things that are bookable by time slot. I think option A is best.
+
 ### OQ2: Can add-on relationships be bidirectional?
 
 If Massage is a base and Spa is an add-on, can Spa also be a base with Massage as an add-on? Example: someone books a spa visit first and wants to add a massage.
 
 **My suggestion**: Yes, allow it. The `product_addons` table supports this — just create two entries (Massage→Spa and Spa→Massage) with potentially different discounts. The shopping cart detects whichever relationship applies based on what's in the cart.
 
+- Mason- yeah, it makes sense to make these bidirectional. If we go with the cart based approach, which I think we are, this really doesn't matter that much.
+
 ### OQ3: How should the room capacity check work for extended-duration bundles?
 
 When someone books a 90-min massage + 60-min spa (= 150 min spa), should the capacity check verify all 150 minutes have capacity, or just the originally-selected spa start time?
 
 **My suggestion**: Check the full 150-minute window. For each 5-minute interval within the 150-min spa booking, verify the room count stays under capacity. This is the only way to truly enforce fire code limits. It may eliminate some slots that would otherwise appear available, but that's correct behavior.
+
+- Mason- yes, the spa needs to have capacity for the whole booking (note the spa, not the massage room that only services one person and is )
 
 ### OQ4: What products should show the "Add to Cart" option vs "Book and Pay Now"?
 
