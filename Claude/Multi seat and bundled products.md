@@ -291,18 +291,11 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Tests: 5 backend endpoint tests, 3 mock spec tests
 
 #### 1.8 Room Schedule Admin UI
-- [ ] Create a manage page at `/manage/room-schedules` (or nested under facilities/rooms)
-- [ ] Load rooms that have schedules (or all rooms with `concurrent_capacity > 1`)
-- [ ] For each room, show a weekly grid: days across the top, time down the left side
-- [ ] Filled cells represent open hours, empty cells represent closed
-- [ ] Admin can click to add/edit/remove schedule blocks
-- [ ] Time inputs should use hour:minute pickers (not raw minute numbers)
-- [ ] Support multiple windows per day (e.g., 6am-12pm and 2pm-10pm with a maintenance gap)
-- [ ] Save via existing `room_schedules` table helper (AddRoomSchedule, DeleteSchedule)
-- [ ] Add admin endpoint `GET /api/admin/room_schedules/{roomId}` and `POST /api/admin/room_schedules` for CRUD (or use existing generic CRUD)
-- [ ] Dashboard card in manage portal
-- [ ] Route in manage routes
-- [ ] Tests: component spec, endpoint tests if new endpoints are created
+- [x] Created 4 admin endpoints in `admin_room_schedules.h/cpp`: `GET /api/admin/rooms_with_schedules` (rooms with capacity > 1), `GET /api/admin/room_schedules/{roomId}`, `POST /api/admin/room_schedules` (with validation), `POST /api/admin/room_schedules/{id}/delete`. All require manage_products permission.
+- [x] Added `adminGetRoomsWithSchedules`, `adminGetRoomSchedules`, `adminCreateRoomSchedule`, `adminDeleteRoomSchedule` to ServerAccess interface/proxy/network/mock with `SchedulableRoom` and `RoomScheduleEntry` types
+- [x] Created `RoomScheduleEditorComponent` at `/manage/room-schedules` with room selector, 7-day weekly grid, hour:minute pickers (AM/PM, 15-min increments), delete buttons, multiple windows per day support
+- [x] Route in manage routes, dashboard card with "schedule" icon
+- [x] Tests: 5 backend endpoint tests, 12 component spec tests, 3 mock spec tests
 
 ---
 
