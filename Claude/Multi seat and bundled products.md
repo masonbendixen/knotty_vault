@@ -251,28 +251,22 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Tests: 5 tests in `room_availability_helper_test.cpp` — basic slots from schedule, capacity limits slots, no schedule → no slots, full-duration capacity check (60-min blocked by overlapping 30-min booking), cancelled booking doesn't block capacity
 
 #### 1.4 Spa Product and Room Setup
-- [ ] Add "Spa" room type in database seed data
-- [ ] Add "Spa" room to facility with `concurrent_capacity` (e.g., 15)
-- [ ] Add room_schedules entries for spa operating hours
-- [ ] Create "Spa Entry" product (`kind = "bookable_service"`, `requires_room_schedule = true`) with variants:
-  - Early Bird 60 Min ($25)
-  - Off-Peak 60 Min ($30)
-  - Peak 60 Min ($40)
-  - 30 Min ($20)
-  - 90 Min ($50)
-- [ ] Create "Late Night Recovery Spa" as separate product with `visibility_permission_id` set to platinum member permission
-  - 30 Min ($15)
-- [ ] Set `checkin_window_minutes = 15` on both spa products
-- [ ] Tests: products created correctly
+- [x] Added "Spa", "Swim Spa", "Climbing Wall" room types in `PopulateLocationRoomTypes`
+- [x] Added "Spa" room to facility with `concurrent_capacity = 15` in `PopulateLocationRooms`
+- [x] Added room_schedules entries for spa: all 7 days, 6:00 AM - 10:00 PM
+- [x] Created "Spa Entry" product (`bookable_service`, `requires_room_schedule = true`, `checkin_window_minutes = 15`, tiered cancellation policy) with 5 variants: 30 Min ($20), Early Bird 60 Min ($25), Off-Peak 60 Min ($30), Peak 60 Min ($40), 90 Min ($50)
+- [x] Created "Late Night Recovery Spa" as separate product with `visibility_permission_id` set to platinum_fitness permission, 30 Min ($15)
+- [x] Added `platinum_fitness` permission to seed data
+- [x] All variant prices registered in `PopulateProductPrices`
 
 #### 1.5 Staff Check-In Endpoint
-- [ ] Create `POST /api/staff/checkin/{bookingId}` endpoint
-- [ ] Validates: booking exists, booking is confirmed, checked_in_us not already set
-- [ ] Check-in window: if `checkin_window_minutes` is set, allow check-in that many minutes before start time
-- [ ] **Capacity gate for early check-in**: if checking in before booked start time, query current occupancy of the room. If at capacity, return error "Room is at capacity — please wait"
-- [ ] Sets `bookings.checked_in_us = now_us()`
-- [ ] Register in `web_app.cpp` and `CMakeLists.txt`
-- [ ] Tests: success, already checked in, too early, capacity blocked, late check-in (allowed, no extension)
+- [x] Created `POST /api/staff/checkin/{bookingId}` in `staff_checkin.h/cpp`
+- [x] Validates: booking exists, status is "confirmed", not already checked in
+- [x] Check-in window: if product has `checkin_window_minutes`, rejects check-in earlier than that window
+- [x] Capacity gate: if checking in before booked start time and room has a capacity limit, counts currently occupying people (checked in + end time not passed) and rejects if at capacity
+- [x] Sets `bookings.checked_in_us = now_us()` — late check-in allowed, no duration extension
+- [x] Registered in `web_app.cpp` and `CMakeLists.txt`
+- [x] Tests: 6 tests in `staff_checkin_test.cpp` — success, already checked in, too early (outside window), capacity blocked (room full), not found (404), late check-in (allowed, time not extended)
 
 #### 1.6 Staff Check-In UI
 - [ ] Create check-in page in staff portal at `/staff/checkin`
