@@ -496,7 +496,7 @@ These are questions and decisions that need input before proceeding further:
 	- Mason- I think that most acrobatics studios probably can't afford high prices. If we scaled to higher volume things like yoga studios and so forth, we can revisit this, but for now, I would like to keep it accessible.
 
 3. **Revenue sharing split**: For the Phase 3 marketplace, what split feels right? 70/30 (creator/platform) is standard for app stores, but Spotify takes 30-35% and YouTube takes 45%. A 75/25 or 80/20 split would be a differentiator for attracting creators.
-	- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can.
+	- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can. Let's discuss this more.
 
 4. **Free tier**: Should there be free content on the platform for discovery (like YouTube) or should everything be behind a paywall from day one?
 	- I think a free tier will be important for marketing. 
