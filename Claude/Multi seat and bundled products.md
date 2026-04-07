@@ -544,7 +544,7 @@ When someone books a 90-min massage + 60-min spa (= 150 min spa), should the cap
 
 **My suggestion**: Check the full 150-minute window. For each 5-minute interval within the 150-min spa booking, verify the room count stays under capacity. This is the only way to truly enforce fire code limits. It may eliminate some slots that would otherwise appear available, but that's correct behavior.
 
-- Mason- yes, the spa needs to have capacity for the whole booking (note the spa, not the massage room that only services one person and is )
+- Mason- yes, the spa needs to have capacity for the whole booking (note the spa, not the massage room that only services one person and is full with one booking)
 
 ### OQ4: What products should show the "Add to Cart" option vs "Book and Pay Now"?
 
@@ -552,11 +552,15 @@ Should all products get "Add to Cart," or just some? Events, services, and one-t
 
 **My suggestion**: Show both options on all bookable products. "Book and Pay Now" is the single-item express checkout (existing flow). "Add to Cart" puts it in the cart for multi-item purchase later. For scheduled services and events, the user still selects a time slot before adding to cart — the cart item includes the scheduled time.
 
+- Mason- Yes, I like presenting both options for all purchasing flows except subscriptions (which require a card on file and cause a monthly payment anyway)
+
 ### OQ5: Should the shopping cart persist across sessions?
 
 If a user adds a massage to their cart and closes the browser, should it be there when they come back?
 
 **My suggestion**: Persist in localStorage with a reasonable TTL (e.g., 24 hours). Scheduled items in the cart should be validated when the cart is loaded — if the slot has been taken, warn the user and remove the item. Non-scheduled items (one-time products without a time) persist indefinitely until TTL.
+
+- Mason - yeah, I'd like it to persist for some configurable time window (a configuration secret)
 
 ### OQ6: For the invite flow (book-for-others), what happens to the booking if the invitee never creates an account?
 
@@ -564,14 +568,20 @@ The booking was created and paid for, but the recipient hasn't accepted.
 
 **My suggestion**: The booking exists and is valid regardless. The payer can see it in their purchases. The booking is "unclaimed" — it shows the recipient's email but isn't linked to an account yet. When the recipient eventually creates an account with that email, the booking automatically appears in their "My Bookings." If the payer cancels before the recipient signs up, normal cancellation applies.
 
+- Mason- I like your suggestion.
+
 ### OQ7: For the occupancy dashboard, what counts as "occupied"?
 
 Options: (a) all confirmed bookings overlapping now, (b) only checked-in bookings, (c) checked-in bookings whose end time hasn't passed.
 
 **My suggestion**: Option (c) — a person is "occupying" the room from check-in until their booked end time. If they haven't checked in yet but their booking started, they DON'T count (they might be a no-show). If they checked in and their end time has passed, they DON'T count (they should have left). This gives the most accurate real-time picture.
 
+- Mason- Let's go with your suggestion.
+
 ### OQ8: What specific variants and pricing should the spa products have?
 
 The plan lists some approximate prices. Are these the right variants and prices, or do you want to adjust?
 
 **My suggestion**: Let's finalize the exact product catalog as part of Phase 1.4 when we create the seed data. The plan uses placeholder prices — you can adjust them before implementation.
+
+- Mason- That sounds good to me.
