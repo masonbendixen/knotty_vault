@@ -589,6 +589,8 @@ This is the most significant open business model question. Here are the trade-of
 
 **Input needed**: What are the projected infrastructure costs per creator per month? This will determine whether 20% is viable or if 30% is necessary to sustain the platform.
 
+Mason- This is where I'm not sure and could use helping calculate. I was thinking of starting with unlisted YouTube videos to avoid the storage / CDN fees. Payment processing is a given. I'm not sure about LiveKit. There are obvious disadvantages to YouTube unlisted but the cost is
+
 ### Additional Questions for Future Discussion
 
 1. **Beta creator selection**: Who are the 1-2 friends/colleagues you're considering for the beta? Understanding their specific content types and current workflows will help shape the MVP feature set.
