@@ -211,10 +211,15 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Fixed all tests: mock spec, checkout spec, event-booking spec, service-booking spec (14 occurrences)
 
 #### 0.3 Add `must_change_password` to People
-- [ ] Add column to `db_schema/people.h/cpp` (BOOLEAN, DEFAULT FALSE)
-- [ ] Register in admin column metadata
-- [ ] Update login flow: if `must_change_password` is true after successful auth, redirect to change password page
-- [ ] Tests: schema, login redirect
+- [x] Add column to `db_schema/people.h/cpp` (BOOLEAN, DEFAULT FALSE)
+- [x] Register in admin column data info and column friendly names in `create_database.cpp`
+- [x] Include `must_change_password` in `get_user_info` endpoint response
+- [x] Clear `must_change_password` flag in `update_user_password` endpoint after successful password change
+- [x] Add `must_change_password` to frontend `UserInfo` type and `AuthData` type
+- [x] Propagate flag in `AuthService.udpateAuthData()`
+- [x] Login component: redirect to change password page if `mustChangePassword` is true
+- [x] AuthGuard: redirect to change password page if `mustChangePassword` is true (except when already on that page)
+- [x] Tests: `get_user_info_test.cpp` — default false + flag set returns true; `update_user_password_test.cpp` — flag cleared after password change
 
 ---
 

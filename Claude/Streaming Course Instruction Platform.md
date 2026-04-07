@@ -507,13 +507,16 @@ These are questions and decisions that need input before proceeding further:
 ### Technical Questions
 
 6. **Desktop app technology**: Electron (cross-platform, JavaScript/TypeScript, large ecosystem, heavier) vs. native (C++/Qt for performance, matches existing backend expertise, harder cross-platform) vs. Tauri (Rust-based, lighter than Electron, smaller ecosystem)?
-	- QT/C++ works pretty well for Windows and Mac which is what I care about.
+	- QT/C++ works pretty well for Windows and Mac which is what I care about. Even supporting Linux wouldn't be that hard.
 
 7. **Self-hosted vs. cloud for LiveKit**: Self-hosting LiveKit reduces per-session costs but requires infrastructure management. LiveKit Cloud eliminates ops burden but costs ~$50-60 per Q&A session. At what scale does self-hosting become worthwhile?
+	- What is LiveKit and why do we need it?
 
 8. **Video hosting choice**: Start with the cheapest option (Bunny.net) for validation, or invest in Mux from the start for better API, analytics, and player? The cost difference is significant at scale.
+	- Mason- Can you explain this to me?
 
 9. **OBS dependency**: Is requiring instructors to install and configure OBS (even if controlled via a custom UI) an acceptable user experience? Or should the MVP support browser-based recording (single camera) as the default with OBS as an advanced option?
+	- Mason- I think that we will want the power of OBS. Is installing it a hard barrier of entry? Do they have a bundled installer?
 
 ### Content and Market Questions
 
