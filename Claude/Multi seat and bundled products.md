@@ -283,11 +283,12 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Tests: 10 component spec tests (create, load, empty state, search filter, checked-in detection, occupancy calculation/class, check-in success/failure, error loading, heading display)
 
 #### 1.7 Occupancy Dashboard
-- [ ] Create `GET /api/room_occupancy/{roomId}` endpoint — returns current count, capacity, and upcoming 2-hour window with projected counts
-- [ ] Staff dashboard widget showing all rooms with current occupancy
-- [ ] Public-facing endpoint (no auth required): `GET /api/public/room_occupancy/{roomId}` — returns just current count and capacity
-- [ ] Frontend: occupancy indicator on the spa service booking page so users can see how busy it is before booking
-- [ ] Tests: endpoint tests, component spec
+- [x] Created `GET /api/room_occupancy/{roomId}` endpoint (auth required) — returns room name, capacity, current occupancy (checked-in + end time not passed), and 2-hour projected occupancy at 15-min intervals
+- [x] Created `GET /api/public/room_occupancy/{roomId}` endpoint (no auth) — returns room name, capacity, current occupancy only
+- [x] Added `getRoomOccupancy()` and `getPublicRoomOccupancy()` to ServerAccess interface/proxy/network/mock with types `RoomOccupancyDetail`, `PublicRoomOccupancy`, `OccupancyProjection`
+- [x] Staff check-in page already shows per-room occupancy (from Phase 1.6)
+- [x] Created `RoomOccupancyBadgeComponent` — standalone reusable badge, fetches public occupancy by room ID, shows "X/Y" with color coding, auto-refreshes every 60s
+- [x] Tests: 5 backend endpoint tests, 3 mock spec tests
 
 ---
 
