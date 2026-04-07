@@ -238,14 +238,17 @@ Links bookings that are part of the same logical unit (bundle).
 - [x] Register in admin column data info and column friendly names
 
 #### 1.3 Room-Based Availability Computation
-- [ ] Create `RoomAvailabilityHelper` (or extend service availability)
-- [ ] For products where `requires_room_schedule = true`:
-  - Use `room_schedules` to determine open hours (not provider_availability)
-  - Compute available slots at 5-min intervals during open hours
-  - For each slot, count overlapping active bookings in the room
-  - Exclude slots where booking count would reach `concurrent_capacity` for any moment during the booking duration
-- [ ] Endpoint: extend `GET /api/available_service_slots` to handle room-schedule-based products
-- [ ] Tests: extensive availability tests — open hours, capacity limits, overlapping bookings
+- [x] Create `RoomAvailabilityHelper` (`room_availability_helper.h/cpp`) with `ComputeAvailableSlots()` that:
+  - Checks `requires_room_schedule = true` on the product
+  - Loads room_schedules to determine operating hours per day-of-week
+  - Iterates each day in the date range, finds the room's schedule windows
+  - Generates slots at 5-min intervals for each variant during open hours
+  - Uses `HasCapacityForFullDuration()` — checks every 5-min interval of the booking against room capacity
+  - `CountOverlappingBookings()` counts non-cancelled bookable_service_sessions overlapping a time window
+  - Returns `AvailableSlot` with `providerPersonId = 0` (room-based, no provider)
+- [x] Added `GetDayOfWeek()` and `GetMidnightUs()` to `DateTimeUtil` for timezone-aware day/midnight calculation
+- [x] Extended `GET /api/available_service_slots` endpoint: checks `requires_room_schedule` on product, delegates to `RoomAvailabilityHelper` if true, falls back to `ServiceAvailabilityHelper` otherwise
+- [x] Tests: 5 tests in `room_availability_helper_test.cpp` — basic slots from schedule, capacity limits slots, no schedule → no slots, full-duration capacity check (60-min blocked by overlapping 30-min booking), cancelled booking doesn't block capacity
 
 #### 1.4 Spa Product and Room Setup
 - [ ] Add "Spa" room type in database seed data
