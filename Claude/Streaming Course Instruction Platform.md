@@ -589,19 +589,22 @@ This is the most significant open business model question. Here are the trade-of
 
 **Input needed**: What are the projected infrastructure costs per creator per month? This will determine whether 20% is viable or if 30% is necessary to sustain the platform.
 
-Mason- This is where I'm not sure and could use helping calculate. I was thinking of starting with unlisted YouTube videos to avoid the storage / CDN fees. Payment processing is a given. I'm not sure about LiveKit. There are obvious disadvantages to YouTube unlisted but the cost is
+Mason- This is where I'm not sure and could use helping calculate. I was thinking of starting with unlisted YouTube videos to avoid the storage / CDN fees. Payment processing is a given. I'm not sure about LiveKit. There are obvious disadvantages to YouTube unlisted but the cost is great. 
 
 ### Additional Questions for Future Discussion
 
 1. **Beta creator selection**: Who are the 1-2 friends/colleagues you're considering for the beta? Understanding their specific content types and current workflows will help shape the MVP feature set.
+	- Mason- One is Jenn Bruyer. She is an aerialist and all of her content is aerial. She publishes several videos a week that are recorded zoom meetings published on Patreon. PJ Perry is another. She does rope, straps conditioning, pilates, and handstands. He main appeal to most people is probably just rope though. She goes way deeper into rope and has a strong anatomy component.
 
 2. **MVP timeline and sequencing**: Should the MVP build recording/editing first and Q&A live sessions second? Or are both needed from day one? The recording workflow is technically simpler and delivers immediate value even without live streaming.
+	- Mason- We really need to do both. Both people currently really lean on the live Q&A thing to do a virtual "class" format. That has pluses and minuses, in my opinion, and I think the split model of putting out content and then doing a Q&A session after people have looked at it would be better but it is a different model and I know that they will want to support the interactive format as well.
 
 3. **Free tier boundaries**: What content belongs in the free tier? Options include:
    - First lesson of every course free (the "preview" model)
    - Select full courses permanently free (loss leaders)
    - Creator-controlled: each creator decides what to make free
    - Time-limited free trials (first 7 days of any course)
+	- Mason- Creator should decide. Might do teasers or trailers or content that is interesting but mainly piques interest.
 
 4. **Centralized music licensing scope**: Royalty-free music services (Epidemic Sound, Artlist) cover distribution on your own platform. But if studios play content in a commercial setting (in-class), the licensing requirements may differ from online distribution. This needs investigation — specifically whether Epidemic Sound / Artlist commercial licenses cover in-studio public performance, or if a separate blanket license is needed.
 
