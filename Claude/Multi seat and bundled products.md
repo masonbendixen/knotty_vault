@@ -227,16 +227,15 @@ Links bookings that are part of the same logical unit (bundle).
 *The foundation for capacity-tracked room booking*
 
 #### 1.1 `room_schedules` Table
-- [ ] Create `db_schema/room_schedules.h/cpp`
-- [ ] Register in `make_database_info.cpp`, `create_database.cpp` (all admin metadata)
-- [ ] Add to `CMakeLists.txt`
-- [ ] Create table helper: `AddRoomSchedule`, `GetSchedulesForRoom`, `GetScheduleForRoomAndDay`
-- [ ] Tests: table helper CRUD
+- [x] Create `db_schema/room_schedules.h/cpp` — id, location_room_id (FK), day_of_week (INT), open_time_minutes (INT), close_time_minutes (INT), is_active, created_us, updated_us
+- [x] Register in `make_database_info.cpp`, `create_database.cpp` (all admin sections)
+- [x] Add to db_schema and table_helpers CMakeLists
+- [x] Create table helper `room_schedules.h/cpp`: AddRoomSchedule, GetSchedulesForRoom, GetScheduleForRoomAndDay, GetScheduleById, DeleteSchedule
+- [x] Tests: 5 tests in `room_schedules_test.cpp`
 
 #### 1.2 Add `checkin_window_minutes` and `requires_room_schedule` to Products
-- [ ] Add columns to `db_schema/products.h/cpp`
-- [ ] Register in admin column metadata
-- [ ] Tests: schema
+- [x] Add `checkin_window_minutes` (nullable BIGINT) and `requires_room_schedule` (BOOLEAN, DEFAULT FALSE) to `products.h/cpp`
+- [x] Register in admin column data info and column friendly names
 
 #### 1.3 Room-Based Availability Computation
 - [ ] Create `RoomAvailabilityHelper` (or extend service availability)

@@ -238,9 +238,9 @@ This is the Les Mills model — but open to independent creators rather than loc
 - **Workshop pipeline** — established studio relationships create warm audiences for premium in-person events.
 - **Brand building** — students in multiple cities see and learn from the creator's content.
 
-### Pricing Model Considerations
+### Pricing Model
 
-The Les Mills model ($500-2,500/program/quarter) is proven but expensive for small studios. A tiered approach may work better:
+**Decision: prioritize accessibility.** Most acrobatics studios are small operations that cannot afford Les Mills-style pricing ($500-2,500/program/quarter). The initial pricing must be low enough that a small studio can try it without significant financial risk. As the platform scales to higher-volume modalities like general yoga, pricing can be revisited upward.
 
 | Tier | Target | Price Range | Includes |
 |------|--------|-------------|----------|
@@ -266,32 +266,50 @@ A **user-centric payment model** (Deezer's approach since 2023, SoundCloud's "Fa
 
 ### Platform Take Rate
 
-Typical SaaS marketplace take rates range from 15-30%:
+The goal is to **strongly appeal to content creators** — a generous split is a key differentiator for attracting and retaining the best creators in a niche market. The current thinking is between 70/30 and 80/20 (creator/platform).
 
-| Platform | Take Rate |
-|----------|-----------|
-| YouTube (ads) | 45% |
-| Udemy (organic) | 63% |
-| Coursera | 55-70% |
-| Spotify | 30-35% |
-| App stores | 15-30% |
-| **Recommended range** | **20-30%** |
+| Platform | Take Rate | Creator Gets |
+|----------|-----------|-------------|
+| YouTube (ads) | 45% | 55% |
+| Udemy (organic) | 63% | 37% |
+| Coursera | 55-70% | 30-45% |
+| Spotify | 30-35% | 65-70% |
+| App stores | 15-30% | 70-85% |
+| **Option A** | **30%** | **70%** |
+| **Option B** | **20%** | **80%** |
 
-The platform retains 20-30% for infrastructure, development, and marketing. The remaining 70-80% is distributed to creators via the user-centric model.
+An **80/20 split** would be a headline differentiator — "creators keep 80%" is a compelling pitch against Patreon (which takes 5-12% but offers far less). The trade-off is less platform revenue to fund infrastructure and growth. A **70/30 split** is still very competitive (better than Spotify, YouTube, Coursera, and Udemy) and leaves more room for platform investment.
 
-### Opt-In Structure
+**Open decision** — this needs further discussion based on projected infrastructure costs and growth targets. See Open Questions below.
 
-Not all creator content should be in the marketplace. Creators should be able to:
+### Opt-In Structure and Content Exclusivity
+
+**Decision: no exclusivity requirements.** Creators are not locked in and are not required to remove content from other platforms. They will likely need to coexist on Patreon during a transition period (or indefinitely). YouTube and Instagram remain critical for discovery and driving traffic to the platform.
+
+Creators can:
 
 - Keep some courses exclusive to their own direct subscribers (premium content, certifications).
 - Place selected courses in the platform marketplace for broader reach and discovery.
 - Set their own pricing for direct subscriptions while the marketplace has a single platform price.
+- Continue to publish free/teaser content on YouTube and Instagram for audience building.
 
-This gives creators control while the marketplace provides discovery and audience building.
+This gives creators control and reduces the switching cost. The platform wins by being genuinely better, not by locking people in.
+
+### Positioning and Branding
+
+**Decision: creator-first branding.** In the early phases, the creator is the brand — each creator's platform page is their storefront with their branding, their domain (or subdomain), and their identity. The platform is the infrastructure, not the destination.
+
+As the creator base grows and the Phase 3 marketplace launches, the platform develops its own brand identity as a curated destination. But the initial pitch to creators is: "this is *your* platform, with *your* brand."
+
+### Quality Control
+
+**Decision: curated marketplace.** Creators will be vetted for quality — this is not an open marketplace where anyone can publish. Initially, creators are hand-picked by invitation and referral. As the platform grows, an application and review process will be established. This ensures a consistent quality bar (the Alo Moves model, not the Udemy model).
 
 ---
 
-## Phase 4 (Potential): Certification and Accreditation
+## Phase 4 (Future): Certification and Accreditation
+
+**Decision: defer to later phases.** The technical platform comes first. Certification will initially be handled entirely by referral and hand-picked invitation, not through platform infrastructure. The features below describe the eventual vision once the core platform is proven.
 
 ### Opportunity
 
@@ -358,7 +376,7 @@ Based on extensive evaluation of available tools and services:
 | Branded intro/outro generation | **Remotion** (React-based programmatic video) | Define branded templates in React/TypeScript. Pass in class metadata (title, instructor, duration, level) and render unique intros for each video automatically. Integrates into a Node.js or serverless pipeline. |
 | Manual editing for premium content | **DaVinci Resolve** (free tier) | Industry-leading color grading, Fusion for motion graphics, Fairlight for audio. The free tier includes full editing, multi-track timeline, and most effects. Has a Python/Lua scripting API for batch operations. Use this for hero content, promotional videos, and certification course material — not for every class recording. |
 | Audio cleanup | **FFmpeg audio filters** (loudnorm, arnndn) + **RNNoise** | Automated loudness normalization (EBU R128 standard) and AI-based noise reduction. RNNoise is open source, runs in real-time on CPU, and is available as an FFmpeg filter. Handles HVAC hum, room echo, and ambient noise. |
-| Royalty-free music | **Epidemic Sound** or **Artlist** | Both offer commercial licenses covering distribution on your own platform. Epidemic Sound at ~$15/month personal / $49/month commercial. Artlist at ~$17/month annual. Essential for class background music and intro/outro audio. |
+| Royalty-free music | **Epidemic Sound** or **Artlist** | Both offer commercial licenses covering distribution on your own platform. Epidemic Sound at ~$15/month personal / $49/month commercial. Artlist at ~$17/month annual. Essential for class background music and intro/outro audio. **Decision: the platform will handle music licensing centrally** — creators and studios get access to a licensed music library as part of the platform, eliminating the need for separate ASCAP/BMI licenses. This is a significant value-add (Les Mills bundles music licensing and studios cite it as one of the top reasons they license). |
 
 **Alternative audio tools worth evaluating:**
 - **NVIDIA Broadcast SDK (Maxine)**: Real-time AI noise removal for NVIDIA GPU users. Excellent quality, free.
@@ -373,29 +391,57 @@ Based on extensive evaluation of available tools and services:
 
 #### Live Streaming and Interactive Video
 
+**What problem does this solve?** The Q&A sessions described in Phase 1 require real-time, low-latency, bidirectional video — the host needs to see and hear the audience member asking a question, and the audience member needs to see and hear the host, with minimal delay (under 500ms). This is fundamentally different from one-way video streaming (like watching a YouTube live stream). Standard streaming protocols like HLS/RTMP have 3-30 seconds of latency, which makes conversation impossible. **WebRTC** is the browser-native protocol for real-time bidirectional video (it is what powers Zoom, Google Meet, and Discord video calls).
+
+**Why do we need a media server?** WebRTC works peer-to-peer for 1-on-1 calls, but our Q&A sessions have a host, a featured audience member, and potentially dozens or hundreds of viewers. A **media server** sits in the middle and efficiently routes video streams: it receives the host's video once and distributes it to all connected clients, rather than requiring the host to send a separate copy to each viewer. Without a media server, the host's upload bandwidth would be overwhelmed with more than a few viewers.
+
+**LiveKit** is the recommended media server — it is open source, modern, and purpose-built for exactly this use case. It provides:
+- A "stage" pattern where participants join with audio/video off and can be promoted to active speakers by the host (the "raise hand" → accept workflow).
+- Simultaneous WebRTC for active participants (low latency) and HLS egress for passive viewers (scalable via CDN).
+- Server-side recording of all participant tracks as separate files — essential for the post-production re-editing workflow.
+- Server SDKs in Go, Node, Python, and C++. Client SDKs for JavaScript/React, Swift, Android, and Flutter.
+
 | Component | Recommendation | Rationale |
 |-----------|---------------|-----------|
-| Interactive sessions (WebRTC) | **LiveKit** (open source, self-hosted or cloud) | Modern WebRTC SFU (Selective Forwarding Unit). Handles the "raise hand" → promote audience member → host layout control workflow natively via its "stage" pattern. Participants join with audio/video disabled, can be promoted to speaker by the host. Server-side SDKs available in Go, Node, Python, C++, and more. Client SDKs for JavaScript/React, Swift, Android, Flutter. |
-| Broadcast to viewers | **LiveKit Egress** → HLS via CDN | LiveKit can simultaneously serve WebRTC to active participants and egress (bridge) the session to HLS for large audiences. Sub-second latency for the host and featured student; 2-6 second latency for the audience via HLS. |
-| Session recording | **LiveKit Recording** | Captures all participant tracks as separate files. This is essential for post-production re-editing of Q&A sessions. |
+| Interactive sessions (WebRTC) | **LiveKit** (open source, self-hosted or cloud) | Handles the "raise hand" → promote audience member → host layout control workflow natively. |
+| Broadcast to viewers | **LiveKit Egress** → HLS via CDN | Sub-second latency for active participants; 2-6 second latency for passive viewers via HLS. |
+| Session recording | **LiveKit Recording** | Captures all participant tracks as separate files for post-production re-editing. |
 
-**LiveKit Cloud pricing**: $0.004/participant-minute for audio, $0.016 for video. For a Q&A session with 1 host + 1 featured student + 50 viewers watching 60 minutes: approximately $50-60.
+**Deployment options**:
+- **Self-hosted** (free): Run LiveKit on your own server (a Linux VPS). No per-session cost beyond the server itself. Requires infrastructure management. A single $20-40/month VPS can handle small-to-medium sessions.
+- **LiveKit Cloud** (managed): $0.004/participant-minute for audio, $0.016 for video. A Q&A session with 1 host + 1 featured student + 50 viewers for 60 minutes costs approximately $50-60. Zero ops burden. Best for starting out — switch to self-hosted later if session volume makes it cost-effective.
 
 **Alternatives considered:**
-- **Janus Gateway** (free, open source, C-based): Lower-level than LiveKit, more development work. Better if you want maximum control and have C expertise.
-- **MediaSoup** (free, open source): A library, not a server — you build everything on top. Maximum flexibility but most development effort.
+- **Janus Gateway** (free, open source, C-based): Lower-level than LiveKit, more development work. Good if you want maximum control and have C expertise. Has been around longer, well-proven.
+- **MediaSoup** (free, open source): A library, not a server — you build all room management, recording, and signaling on top. Maximum flexibility but most development effort.
 - **Ant Media Server**: Enterprise features (clustering, SRT, hardware encoding) require paid license ($50-2,000/month).
-- **AWS IVS (Interactive Video Service)**: Managed service. $2.36/hour per live channel + delivery costs. Good if deeply invested in AWS. Has a Web Broadcast SDK for browser-based streaming without OBS.
-- **Mux Live**: $0.07/minute encoding + $0.014/GB delivery. Excellent API but no built-in bidirectional video — better as a supplement to LiveKit for VOD hosting.
+- **AWS IVS (Interactive Video Service)**: Managed service. $2.36/hour per live channel + delivery costs. Has a Web Broadcast SDK for browser-based streaming.
+
+Given the existing C++ expertise on this project, **Janus Gateway** is also a strong contender — it is written in C, highly performant, and offers more low-level control. The trade-off is more development work vs. LiveKit's more batteries-included approach.
 
 #### Video Hosting and Delivery (On-Demand)
 
+**What problem does this solve?** Once an instructional video or Q&A session has been edited and finalized, it needs to be stored, encoded into multiple quality levels (so it plays smoothly on both fast WiFi and slow mobile connections), and delivered to viewers worldwide through a CDN (Content Delivery Network — a global network of servers that serves video from a location near the viewer to minimize buffering).
+
+You *could* do all of this yourself: store videos on a server, use FFmpeg to encode them into multiple bitrates, generate HLS (HTTP Live Streaming) playlists, and serve them through a CDN like CloudFront. But video hosting services handle all of this automatically — upload a video and they return a player-ready URL with adaptive bitrate streaming, content protection (signed URLs so only paying subscribers can watch), thumbnail generation, and analytics.
+
+**The trade-off is cost vs. engineering effort.** A video hosting service costs money per minute of video stored and per GB delivered, but saves significant development and operations work. Self-hosting is cheaper at scale but requires building and maintaining the entire encoding/delivery pipeline.
+
 | Component | Recommendation | Rationale |
 |-----------|---------------|-----------|
-| Primary option | **Mux** | Best-in-class API for developers. Automatic adaptive bitrate encoding, signed URLs for content protection, thumbnail/storyboard generation, Mux Player web component, Mux Data for quality-of-experience analytics. Pricing: $0.07/min encoding + $0.007/min/month storage + $0.014/GB delivery. |
-| Budget alternative | **Cloudflare Stream** | Simpler pricing ($5/1,000 min stored + $1/1,000 min delivered), Cloudflare's massive global CDN (300+ PoPs). Fewer advanced features than Mux but very cost-effective. Good if already using Cloudflare. |
+| Primary option | **Mux** | Best-in-class developer API. Automatic adaptive bitrate encoding, signed URLs for content protection, thumbnail/storyboard generation, built-in web player component, engagement analytics. Pricing: $0.07/min encoding + $0.007/min/month storage + $0.014/GB delivery. |
+| Budget alternative | **Cloudflare Stream** | Simpler pricing ($5/1,000 min stored + $1/1,000 min delivered), massive global CDN (300+ PoPs). Fewer advanced features than Mux but very cost-effective. |
 | Budget alternative | **Bunny.net Stream** | Extremely aggressive pricing ($0.005/min stored + $0.005/GB delivered). Often 5-10x cheaper than competitors. Adequate API and features. Best for cost-conscious early stages. |
-| Full control option | **AWS MediaConvert + CloudFront** | Maximum control over encoding pipeline. DRM support via MediaPackage. Many moving parts (S3 + MediaConvert + CloudFront + Lambda). Significant engineering investment but scales well. |
+| Full control option | **AWS MediaConvert + CloudFront** | Maximum control over the encoding pipeline. DRM support. Many moving parts to manage. Significant engineering investment but scales well and has the lowest per-unit cost at volume. |
+
+**Cost example** — a library of 100 hours of content viewed by 500 subscribers averaging 5 hours/month each:
+| Provider | Monthly storage | Monthly delivery (~2,500 hours viewed, ~1.5TB) | Total/month |
+|----------|----------------|--------------------------------------------------|-------------|
+| Bunny.net | ~$1.50 | ~$7.50 | ~$9 |
+| Cloudflare Stream | $30 | $150 | ~$180 |
+| Mux | $42 | $21 | ~$63 + encoding |
+
+Recommendation: **Start with Bunny.net or Cloudflare Stream** for the MVP to keep costs minimal. Migrate to Mux when the analytics, player, and API features justify the higher cost — likely when you have enough revenue that the cost difference is negligible relative to subscription income.
 
 #### Payments and Subscriptions
 
@@ -477,8 +523,8 @@ Content creators frequently do in-person workshops at studios. The platform coul
 
 | Source | Pricing | Revenue To Platform |
 |--------|---------|---------------------|
-| Platform subscription (consumer) | $15-30/month | 20-30% (remainder distributed to creators via user-centric model) |
-| Advertising/sponsorship (optional) | CPM-based | 100% or revenue share |
+| Platform subscription (consumer) | $15-30/month | 20-30% (under discussion — see Open Questions) |
+| Free tier | $0 (select content for discovery) | $0 (marketing/conversion funnel) |
 
 ---
 
@@ -487,7 +533,7 @@ Content creators frequently do in-person workshops at studios. The platform coul
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Cold start: need creators and students simultaneously | High | Start with Knotty Yoga's own content. The platform solves a real internal need regardless of marketplace adoption. |
-| Creators already have established Patreon audiences and resist switching | Medium | Position as complementary, not replacement. Offer migration tools. Demonstrate the quality improvement in produced content. |
+| Creators already have established Patreon audiences and resist switching | Medium | Position as a clean replacement that is demonstrably better. Allow coexistence during transition — no exclusivity requirement. The quality improvement in produced content and the elimination of the Zoom/Patreon/YouTube patchwork is the pitch. |
 | Technical complexity of multi-source recording + live WebRTC | Medium | Use established tools (OBS + LiveKit) rather than building from scratch. Phase the build — recording and VOD first, live Q&A second. |
 | Les Mills or a large player builds something similar | Low-Medium | Niche focus (acrobatics, partner work, aerial) is unlikely to attract enterprise competitors. The open marketplace model is fundamentally different from closed ecosystems. |
 | Video hosting costs scale unpredictably | Medium | Start with cost-effective hosting (Bunny.net or Cloudflare Stream). Move to Mux for premium features only when revenue justifies it. |
@@ -495,65 +541,68 @@ Content creators frequently do in-person workshops at studios. The platform coul
 
 ---
 
+## Resolved Decisions
+
+Summary of decisions made (for reference):
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Platform-first or content-first? | MVP focused on Knotty Yoga + 1-2 beta creator partners |
+| 2 | Studio licensing pricing | Accessible pricing for small acrobatics studios; revisit when scaling to yoga |
+| 3 | Revenue sharing split | Under discussion — between 70/30 and 80/20 (creator/platform) |
+| 4 | Free tier | Yes — free content for discovery and marketing |
+| 5 | Editing scope | Multi-source layout switching (full/PIP/split) + voice-over + PIP commentary; not a full NLE |
+| 6 | Desktop app technology | Qt/C++ (Windows + Mac, Linux easy to add) |
+| 7 | LiveKit | Explained in Technical Architecture; decision on self-hosted vs. cloud deferred |
+| 8 | Video hosting | Explained in Technical Architecture; start cheap (Bunny.net/Cloudflare), upgrade later |
+| 9 | OBS dependency | Keep OBS; standard installer, low barrier; Qt app hides complexity |
+| 10 | Content exclusivity | No exclusivity — creators can coexist on Patreon and use YouTube/Instagram for discovery |
+| 11 | Music licensing | Platform handles centrally via royalty-free music licensing |
+| 12 | Quality control | Curated — vet for quality, hand-picked initially, application process later |
+| 13 | Geographic scope | Global from day one |
+| 14 | Certification timeline | Defer — focus on technical first; certification by referral initially |
+| 15 | Branding/positioning | Creator is the brand initially; develop platform brand later |
+| 16 | Patreon relationship | Clean replacement, not integration |
+| 17 | Partnership opportunities | Future phase — not for MVP |
+
+---
+
 ## Open Questions
 
-These are questions and decisions that need input before proceeding further:
+### Revenue Sharing: 70/30 vs 80/20
 
-### Business Model Questions
+This is the most significant open business model question. Here are the trade-offs:
 
-1. **Platform-first or content-first?** Should Phase 1 focus on building the platform tools (recording app, hosting, Q&A infrastructure) and selling them to other creators immediately? Or should it focus entirely on producing and distributing Knotty Yoga's own content, with the platform features being internal-only until they are proven?
-	- Mason- There should be a MVP phase focused on Knotty Yoga's content but I should also take one or two friend's business needs and support them as a beta for the product.
+**80/20 (creator gets 80%)**:
+- Headline differentiator: "creators keep 80%" — much better than YouTube (55%), Spotify (65-70%), Coursera (30-45%), or Udemy (37%).
+- Comparable to Patreon (88-95% after fees) — but creators get dramatically better tools, so the slightly lower percentage is justified by the value provided.
+- **Risk**: At early scale with few subscribers, the platform's 20% may not cover infrastructure costs (video hosting, LiveKit sessions, CDN, payment processing fees). Stripe alone takes ~3% + fixed fees, so the effective platform margin is closer to 17%.
+- Best if the platform can keep infrastructure costs low and grow through volume.
 
-2. **Pricing philosophy**: For studio licensing, is the goal to undercut Les Mills aggressively (making it accessible to small studios) or to price at a premium based on the specialized, niche content?
-	- Mason- I think that most acrobatics studios probably can't afford high prices. If we scaled to higher volume things like yoga studios and so forth, we can revisit this, but for now, I would like to keep it accessible.
+**70/30 (creator gets 70%)**:
+- Still very competitive — better than every major platform except Patreon and app stores.
+- More headroom for platform investment in marketing, features, and infrastructure.
+- 30% is the "standard" marketplace take rate (Apple/Google app stores, many SaaS marketplaces).
+- **Risk**: Creators comparing against Patreon's 5-12% fee may see 30% as steep, even though the platform provides far more value.
 
-3. **Revenue sharing split**: For the Phase 3 marketplace, what split feels right? 70/30 (creator/platform) is standard for app stores, but Spotify takes 30-35% and YouTube takes 45%. A 75/25 or 80/20 split would be a differentiator for attracting creators.
-	- Mason- I'm debating between 70/30 and 80/20. I do want to really appeal to content creators so I like the idea of getting as many as I can. Let's discuss this more.
+**Possible hybrid approach**: Start at 80/20 to attract the initial creator base, with a published plan to move to 75/25 or 70/30 as the platform scales and adds more value (studio licensing, marketplace reach, analytics, tools). Early creators could be grandfathered at the better rate. This rewards early adopters and creates urgency to join early.
 
-4. **Free tier**: Should there be free content on the platform for discovery (like YouTube) or should everything be behind a paywall from day one?
-	- Mason- I think a free tier will be important for marketing. 
+**Input needed**: What are the projected infrastructure costs per creator per month? This will determine whether 20% is viable or if 30% is necessary to sustain the platform.
 
-5. **Scope of Phase 1**: How much editing capability should the desktop app have? A full non-linear editor is an enormous engineering effort. An alternative is to focus on guided workflows (trim, reorder, add intro/outro) and leave complex editing to DaVinci Resolve, with the app handling import of the final edited file.
-	- Mason- I don't want to tackle a full non-linear editor but I want to support capturing multiple video / audio sources with timestamp information and being able to on the fly toggle between full screen for a given source, pip for a main source and a sub source, and split screen. For instance, I want to support multiple camera angles as well as audience questions video streams. For the livestream, the creator can toggle back and forth between these live but we should also save all the streams and allow a edit mode where the creator can go back after the fact and selectively choose when to switch between video sources for all of these modes. I also want to support adding voice over and even PIP commenting during editing.
+### Additional Questions for Future Discussion
 
-### Technical Questions
+1. **Beta creator selection**: Who are the 1-2 friends/colleagues you're considering for the beta? Understanding their specific content types and current workflows will help shape the MVP feature set.
 
-6. **Desktop app technology**: Electron (cross-platform, JavaScript/TypeScript, large ecosystem, heavier) vs. native (C++/Qt for performance, matches existing backend expertise, harder cross-platform) vs. Tauri (Rust-based, lighter than Electron, smaller ecosystem)?
-	- QT/C++ works pretty well for Windows and Mac which is what I care about. Even supporting Linux wouldn't be that hard.
+2. **MVP timeline and sequencing**: Should the MVP build recording/editing first and Q&A live sessions second? Or are both needed from day one? The recording workflow is technically simpler and delivers immediate value even without live streaming.
 
-7. **Self-hosted vs. cloud for LiveKit**: Self-hosting LiveKit reduces per-session costs but requires infrastructure management. LiveKit Cloud eliminates ops burden but costs ~$50-60 per Q&A session. At what scale does self-hosting become worthwhile?
-	- What is LiveKit and why do we need it?
+3. **Free tier boundaries**: What content belongs in the free tier? Options include:
+   - First lesson of every course free (the "preview" model)
+   - Select full courses permanently free (loss leaders)
+   - Creator-controlled: each creator decides what to make free
+   - Time-limited free trials (first 7 days of any course)
 
-8. **Video hosting choice**: Start with the cheapest option (Bunny.net) for validation, or invest in Mux from the start for better API, analytics, and player? The cost difference is significant at scale.
-	- Mason- Can you explain this to me?
+4. **Centralized music licensing scope**: Royalty-free music services (Epidemic Sound, Artlist) cover distribution on your own platform. But if studios play content in a commercial setting (in-class), the licensing requirements may differ from online distribution. This needs investigation — specifically whether Epidemic Sound / Artlist commercial licenses cover in-studio public performance, or if a separate blanket license is needed.
 
-9. **OBS dependency**: Is requiring instructors to install and configure OBS (even if controlled via a custom UI) an acceptable user experience? Or should the MVP support browser-based recording (single camera) as the default with OBS as an advanced option?
-	- Mason- I think that we will want the power of OBS. Is installing it a hard barrier of entry? Do they have a bundled installer?
+5. **Multi-platform content strategy**: If creators will use YouTube/Instagram for discovery, should the platform offer tools to generate short-form clips (Reels, Shorts, TikToks) from full-length content? This would be a compelling feature: upload a full class, and the platform auto-generates 30-60 second highlight clips with branding for social media distribution.
 
-### Content and Market Questions
-
-10. **Content exclusivity**: Should creators who place content in the Phase 3 marketplace be required to keep it exclusive (not also on Patreon/YouTube)? Or should the platform allow non-exclusive content to reduce the barrier to entry?
-	- Mason- No, I don't want to lock them in. At best, they will need to transition people from Patreon to my platform and probably coexist for a while if not indefinitely. YouTube / Instagram for discovery will remain highly important.
-
-11. **Music licensing**: Should the platform handle music licensing centrally (like Les Mills does) for studio-licensed content? This is a significant operational complexity but a major value-add for studios. Without it, studios need their own ASCAP/BMI licenses.
-	- Mason- Yes, we should deal with finding no royalty music.
-
-12. **Quality control**: How much curation should the marketplace have? Fully open (anyone can publish, like Udemy — large catalog but variable quality) vs. curated (invitation/application, like Alo Moves — smaller catalog but consistent quality)?
-	- Mason- We will vet for quality.
-
-13. **Geographic scope**: Is this a local/regional play (Pacific Northwest acrobatics community) initially, or does the niche nature of the content mean the audience is inherently global from day one?
-	- Mason- Global from day one. One of the people I would target initially for a content producer is in Canada.
-
-14. **Certification timeline**: How important is building the certification infrastructure early vs. focusing on content production and distribution first? Certification creates a moat but adds significant regulatory and operational complexity.
-	- Mason- Let's focus on the technical first. I will hand pick people at the start so certification will be entirely by referral.
-
-### Competitive Positioning Questions
-
-15. **Naming and positioning**: Should the platform be positioned as a "tool for creators" (like Teachable/Kajabi — the creator is the brand) or as a "destination for students" (like Alo Moves — the platform is the brand)? Or can it credibly be both at different phases?
-	- Mason- Start with the creator is the brand and then develop a brand once we have enough creators on the platform.
-
-16. **Relationship with Patreon**: Many target creators already have Patreon audiences. Should the platform offer Patreon integration (e.g., sync membership tiers) to ease migration, or position as a clean replacement?
-	- Mason- Clean replacement.
-
-17. **Partnership opportunities**: Are there existing organizations (AcroYoga International, aerial arts associations, Yoga Alliance) that would benefit from endorsing or partnering with the platform?
-	- Mason- Yes but at a much later point. Let's not worry about that for the first phase but I like the idea eventually.
+6. **Platform naming**: Does this platform have a working name, or should one be developed? The name will shape how creators and students perceive and remember it.
