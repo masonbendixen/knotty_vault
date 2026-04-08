@@ -410,13 +410,14 @@ The spa should have **separate products** (not variants) for different time-of-d
 - Fix variant chip CSS alignment in booking UI
 
 **Implementation plan:**
-- [ ] Create `product_booking_windows` table (schema, make_database_info, create_database registration)
-- [ ] Create table helper for product_booking_windows
-- [ ] Replace old spa products in seed data with 4 new products + booking windows
-- [ ] Update `RoomAvailabilityHelper` to intersect room hours with product booking windows; use 15-min alignment
-- [ ] Update slot payload: omit unnecessary fields for room-based slots
-- [ ] Fix booking page CSS: variant chip alignment
-- [ ] Tests for all layers
+- [x] Create `product_schedule_windows` table (schema, make_database_info, create_database registration in all 8 sections)
+- [x] Create table helper for product_schedule_windows (5 tests)
+- [x] Replace old spa products in seed data with 4 new products (Early Bird, Non-Peak, Peak, Late Night) + booking windows
+- [x] Update `RoomAvailabilityHelper` to intersect room hours with product schedule windows; use 15-min alignment (3 new tests)
+- [x] Fix booking page CSS: variant chip alignment (align-items: flex-start + line-height)
+- [x] Hide empty provider name card header for room-based products
+- [x] Fix week availability off-by-one (last day excluded)
+- [x] Performance: preload bookings in memory instead of per-slot DB queries
 
 ---
 
