@@ -631,6 +631,31 @@ The spa should have **separate products** (not variants) for different time-of-d
 
 ---
 
+### Phase 8: Automatic Comps, Vouchers, and Coupons
+*Auto-detect and offer applicable discounts at checkout — no manual code entry needed*
+
+#### 8.1 Backend: User-Compatible Discount Lookup
+- [ ] Create `GET /api/my_applicable_discounts?product_id=X` endpoint
+- [ ] Query active coupons applicable to the product (via `coupon_products` junction table or unrestricted coupons)
+- [ ] Query user's active vouchers with remaining balance compatible with the product
+- [ ] Query user's active comps (comp vouchers) compatible with the product
+- [ ] Return `{ coupons: [...], vouchers: [...] }` with code, description, discount summary
+
+#### 8.2 Frontend: Auto-Suggest Discounts
+- [ ] On payment page load, call `my_applicable_discounts` for the product being purchased
+- [ ] If any discounts found, auto-expand the "Coupons & Vouchers" panel
+- [ ] Show clickable discount suggestions above the manual code entry: "You have a 20% coupon — click to apply"
+- [ ] Clicking a suggestion auto-fills the code and triggers apply
+- [ ] Works for all payment flows: service booking, event booking, checkout
+
+#### 8.3 Shopping Cart Compatibility
+- [ ] When shopping cart is implemented (Phase 2), check discounts for each item in the cart
+- [ ] Aggregate applicable discounts across all cart items
+- [ ] Show per-item discount suggestions in the cart summary
+- [ ] Handle multi-product coupons that apply to multiple cart items
+
+---
+
 ## Documents to Update
 
 ### Payment Design Document
