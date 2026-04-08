@@ -366,7 +366,57 @@ New tables replacing `room_schedules`:
 - [x] Update seed data: create default "Standard Hours" template with 11am-9pm every day
 - [x] Update frontend ServerAccess: types, interface, proxy, network, mock, mock tests (12 mock tests)
 - [x] Update admin UI: template list, template editor with multi-day add, override editor (21 component tests)
-- [ ] Fix the service booking page to actually show spa slots
+- [x] Fix the service booking page to actually show spa slots (dateFrom==dateTo fix, performance optimization)
+
+#### 1.10 Spa Product Restructure
+
+The spa should have **separate products** (not variants) for different time-of-day tiers, each with their own availability windows. Multiple products share the same room and room capacity.
+
+**New spa products:**
+
+| Product | Days | Hours | Duration | Price | Visibility |
+|---|---|---|---|---|---|
+| Early Bird Spa | Mon-Wed | 11am-2pm | 3 hours | $40 | Public |
+| Non-Peak Spa | Mon-Wed 2pm-5pm, Thu-Fri 11am-5pm | 3 hours | $60 | Public |
+| Peak Spa | Mon-Fri 5pm-8pm, Sat-Sun all day (11am-9pm) | 2 hours | $60 | Public |
+| Late Night Spa | Mon/Wed/Thu | 8pm-9pm | 60 min | $10 | Gold members only |
+
+**Key design decisions:**
+- Each product has ONE variant (no multi-variant per product)
+- Products share room capacity — total bookings across all products must not exceed room `concurrent_capacity`
+- No 30-minute or 90-minute spa options
+- Room schedule templates define when the room is OPEN; product booking windows define when each product is AVAILABLE within those hours
+- The old "Spa Entry" product (with 5 variants) is removed
+
+**New table: `product_booking_windows`**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | BIGSERIAL | PK |
+| `product_id` | BIGINT | FK → products |
+| `day_of_week` | INTEGER | 0=Sun, 6=Sat |
+| `open_time_minutes` | INTEGER | Minutes from midnight |
+| `close_time_minutes` | INTEGER | Minutes from midnight |
+
+**Availability resolution:**
+1. Get room operating hours from template (or override)
+2. Get product booking windows for the requested product
+3. Intersect: available slots = room hours ∩ product hours
+4. Check capacity across ALL room-based products sharing that room
+
+**Other improvements:**
+- 15-minute slot alignment for room-based products (was 5-minute)
+- Reduced payload: omit provider fields (provider_person_id, provider_name, buffer_end_us) for room-based slots
+- Fix variant chip CSS alignment in booking UI
+
+**Implementation plan:**
+- [ ] Create `product_booking_windows` table (schema, make_database_info, create_database registration)
+- [ ] Create table helper for product_booking_windows
+- [ ] Replace old spa products in seed data with 4 new products + booking windows
+- [ ] Update `RoomAvailabilityHelper` to intersect room hours with product booking windows; use 15-min alignment
+- [ ] Update slot payload: omit unnecessary fields for room-based slots
+- [ ] Fix booking page CSS: variant chip alignment
+- [ ] Tests for all layers
 
 ---
 
