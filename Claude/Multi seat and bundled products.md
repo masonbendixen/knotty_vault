@@ -425,38 +425,31 @@ The spa should have **separate products** (not variants) for different time-of-d
 *Multi-item purchase capability — prerequisite for add-on bundles*
 
 #### 2.1 Cart Service (Frontend)
-- [ ] Create `CartService` — in-memory cart state management (array of cart items)
-- [ ] Each cart item: `{ productId, variantId?, quantity, scheduledStartTimeUs?, providerPersonId?, facilityId?, forPersonId? }`
-- [ ] Methods: `addItem()`, `removeItem()`, `clearCart()`, `getItems()`, `getItemCount()`
-- [ ] Observable `cartItems$` for reactive UI updates
-- [ ] Persist cart in localStorage for page refresh survival
-- [ ] Tests: service spec
+- [x] Create `CartService` — in-memory cart state management (array of cart items)
+- [x] Each cart item: `{ productId, variantId?, quantity, scheduledStartTimeUs?, providerPersonId?, facilityId?, productName, variantName?, priceCents, currency, durationMinutes? }`
+- [x] Methods: `addItem()`, `removeItem()`, `clearCart()`, `getItems()`, `getItemCount()`
+- [x] Observable `cartItems$`, `itemCount$`, `subtotalCents$` for reactive UI updates
+- [x] Persist cart in localStorage for page refresh survival
+- [x] Tests: 12 service spec tests (add, merge duplicates, scheduled items, remove, clear, persistence, observables)
 
 #### 2.2 Cart UI Component
-- [ ] Create `CartComponent` (standalone) — slide-out panel or dropdown from header
-- [ ] Shows cart items with product name, variant, price, scheduled time (if applicable)
-- [ ] Remove item button per row
-- [ ] Subtotal display
-- [ ] "Checkout" button → navigates to cart checkout page
-- [ ] Cart item count badge in header nav
-- [ ] Tests: component spec
+- [x] Cart page at `/shop/cart` with item list, remove buttons, subtotal, checkout
+- [x] Cart item count badge (red) in header nav — only shows when items in cart
+- [x] Shows scheduled service details (time, duration, provider)
+- [x] Empty state with "Browse Services" CTA
+- [x] Tests: 7 component spec tests
 
 #### 2.3 Cart Checkout Page
-- [ ] Create `CartCheckoutComponent` at `/shop/cart`
-- [ ] Shows all items with line totals
-- [ ] Detects add-on relationships and shows bundle discount applied
-- [ ] Coupon code input (applied to the whole purchase)
-- [ ] Voucher code input
+- [x] Single-item cart routes to existing checkout flow
+- [ ] Multi-item cart checkout with single purchase (Phase 3 when add-on bundles need it)
+- [ ] Coupon/voucher applied to whole purchase
 - [ ] Payment method
-- [ ] Creates a single multi-item purchase via `createPurchase()`
-- [ ] Tests: component spec
 
 #### 2.4 Add to Cart Buttons
-- [ ] Update service booking flow: after selecting a slot, "Add to Cart" button (in addition to "Book and Pay Now")
-- [ ] Update catalog/product browse: "Add to Cart" on products
-- [ ] Update event booking: "Add to Cart" option
-- [ ] If user adds a product that has add-ons, show a suggestion: "Save X% — add Spa Entry to your cart"
-- [ ] Tests: integration tests
+- [x] Service booking: "Add to Cart" alongside "Book and Pay" on confirm step
+- [x] Product detail: "Add to Cart" alongside "Purchase"
+- [x] Event booking: "Add to Cart" alongside "Book and Pay"
+- [ ] Add-on suggestions (Phase 3)
 
 ---
 
