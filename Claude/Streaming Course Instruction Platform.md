@@ -419,6 +419,8 @@ Based on extensive evaluation of available tools and services:
 
 Given the existing C++ expertise on this project, **Janus Gateway** is also a strong contender — it is written in C, highly performant, and offers more low-level control. The trade-off is more development work vs. LiveKit's more batteries-included approach.
 
+Mason- Wait... a single one hour session with 50 viewers would cost $50-$60? Per session? There really is no price model where I could make that effective. Could I live stream with YouTube, which is basically free, and then switch just the person featured for LiveQA to get a WebRTC stream for lower latency? Whoever is the current QA person would get a bidirectional WebRTC connection but everyone else would get YouTube streaming (with latency but not important if they aren't Q&A person).
+
 #### Video Hosting and Delivery (On-Demand)
 
 **What problem does this solve?** Once an instructional video or Q&A session has been edited and finalized, it needs to be stored, encoded into multiple quality levels (so it plays smoothly on both fast WiFi and slow mobile connections), and delivered to viewers worldwide through a CDN (Content Delivery Network — a global network of servers that serves video from a location near the viewer to minimize buffering).
@@ -442,6 +444,8 @@ You *could* do all of this yourself: store videos on a server, use FFmpeg to enc
 | Mux | $42 | $21 | ~$63 + encoding |
 
 Recommendation: **Start with Bunny.net or Cloudflare Stream** for the MVP to keep costs minimal. Migrate to Mux when the analytics, player, and API features justify the higher cost — likely when you have enough revenue that the cost difference is negligible relative to subscription income.
+
+Mason- Can I start with YouTube unlisted videos for the MVP to keep costs low and then migrate to something like Mux or C
 
 #### Payments and Subscriptions
 
