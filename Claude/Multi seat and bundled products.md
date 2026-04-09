@@ -540,6 +540,13 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [ ] Extend event booking with the same "Who is this for?" flow
 - [ ] Tests: event booking for another person
 
+#### 4.4 Payer Cancellation, Transfer, and Wrong-Email Recovery
+- [ ] **Payer can cancel bookings they paid for**: The person who paid (payer) should be able to cancel a booking even if the booking's `person_id` is someone else. Currently only the booking's `person_id` can cancel. Add `payer_person_id` check to the cancellation endpoint so the payer can also initiate cancellation. Refund goes to the payer's original payment method.
+- [ ] **Booking transfer on sharing acceptance**: When a gift permission is accepted, check if the grantor has any bookings that were intended for the grantee (tracked via a new `intended_for_email` column on `purchases`). Reassign those bookings' `person_id` from the payer to the grantee. Send confirmation email to both parties.
+- [ ] **Wrong email recovery**: Allow the payer to change the `intended_for_email` on an untransferred purchase. This resends the invitation to the new email and revokes any pending invitation/sharing request for the old email. Only allowed before the booking has been transferred.
+- [ ] **UI: "Booked for someone else" section in My Purchases**: Show purchases where the logged-in user is the payer but the booking is intended for someone else. Display transfer status (pending invitation, pending acceptance, transferred). Provide "Change recipient" and "Cancel" actions.
+- [ ] Tests: payer cancellation, transfer on acceptance, email change, UI states
+
 ---
 
 ### Phase 5: Drop-In Bookings
