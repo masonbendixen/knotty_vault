@@ -401,25 +401,42 @@ Based on extensive evaluation of available tools and services:
 - Server-side recording of all participant tracks as separate files — essential for the post-production re-editing workflow.
 - Server SDKs in Go, Node, Python, and C++. Client SDKs for JavaScript/React, Swift, Android, and Flutter.
 
+**Revised architecture: YouTube Live for broadcast + WebRTC only for the active Q&A participant.**
+
+The original proposal used LiveKit for all viewers, which costs ~$50-60 per session for 50 viewers — unsustainable. The hybrid approach is far cheaper and technically sound:
+
+- **All passive viewers** watch via **YouTube Live** (or another free live streaming platform). This is free, handles unlimited viewers, provides adaptive bitrate, and most of the audience already knows how to use YouTube. The latency is 3-15 seconds, but passive viewers don't need low latency — they are watching, not interacting.
+- **The host** streams to YouTube via OBS (RTMP) while simultaneously running a **WebRTC connection** for the active Q&A participant.
+- **The active Q&A participant** (the person currently asking a question) gets promoted to a **1-on-1 WebRTC connection** with the host. This gives sub-500ms latency for natural conversation. Only one person (or occasionally two) is on WebRTC at any time.
+- **The host's OBS scene** composites the WebRTC participant's video into the YouTube stream using the layout controls (full-screen, PIP, split-screen). All YouTube viewers see the interaction in near-real-time (with the usual YouTube latency).
+
+This means WebRTC only handles **2 participants at a time** (host + featured student), not 50+. The cost drops from $50-60/session to essentially zero for self-hosted or pennies for cloud-hosted.
+
 | Component | Recommendation | Rationale |
 |-----------|---------------|-----------|
-| Interactive sessions (WebRTC) | **LiveKit** (open source, self-hosted or cloud) | Handles the "raise hand" → promote audience member → host layout control workflow natively. |
-| Broadcast to viewers | **LiveKit Egress** → HLS via CDN | Sub-second latency for active participants; 2-6 second latency for passive viewers via HLS. |
-| Session recording | **LiveKit Recording** | Captures all participant tracks as separate files for post-production re-editing. |
+| Broadcast to audience | **YouTube Live** (via OBS RTMP) | Free, unlimited viewers, adaptive bitrate, well-known platform. Latency is 3-15s but acceptable for passive viewers. |
+| Active Q&A connection | **WebRTC (1-on-1)** | Sub-500ms latency for the host ↔ featured student conversation. Only 2 participants at a time. |
+| Host compositing | **OBS** (controlled by Qt app) | OBS receives the WebRTC participant's video as a source and composites it into the YouTube stream with the chosen layout (PIP, split, full-screen). |
+| Session recording | **OBS local recording** + **WebRTC track capture** | OBS records the host's full-quality video locally. The WebRTC participant's video is also captured separately. All sources saved for post-production re-editing. |
 
-**Deployment options**:
-- **Self-hosted** (free): Run LiveKit on your own server (a Linux VPS). No per-session cost beyond the server itself. Requires infrastructure management. A single $20-40/month VPS can handle small-to-medium sessions.
-- **LiveKit Cloud** (managed): $0.004/participant-minute for audio, $0.016 for video. A Q&A session with 1 host + 1 featured student + 50 viewers for 60 minutes costs approximately $50-60. Zero ops burden. Best for starting out — switch to self-hosted later if session volume makes it cost-effective.
+**WebRTC implementation for 1-on-1**:
+For a simple 1-on-1 WebRTC connection, a full media server like LiveKit is overkill. Options:
+- **Direct peer-to-peer WebRTC**: Browser-native, no server needed for the media stream itself. Only needs a lightweight signaling server (a few dozen lines of WebSocket code) to exchange connection details. Free. Works well for 1-on-1.
+- **Self-hosted TURN server** (e.g., coturn): Needed as a fallback when peer-to-peer fails due to NAT/firewall issues (~10-20% of connections). A $5-10/month VPS running coturn handles this. Or use a free TURN service like Metered.ca's free tier.
+- **LiveKit** (if we want it later): Still an option for future expansion if sessions evolve to need multiple simultaneous Q&A participants. A self-hosted LiveKit instance on a $20-40/month VPS would handle this affordably.
 
-**Alternatives considered:**
-- **Janus Gateway** (free, open source, C-based): Lower-level than LiveKit, more development work. Good if you want maximum control and have C expertise. Has been around longer, well-proven.
-- **MediaSoup** (free, open source): A library, not a server — you build all room management, recording, and signaling on top. Maximum flexibility but most development effort.
-- **Ant Media Server**: Enterprise features (clustering, SRT, hardware encoding) require paid license ($50-2,000/month).
-- **AWS IVS (Interactive Video Service)**: Managed service. $2.36/hour per live channel + delivery costs. Has a Web Broadcast SDK for browser-based streaming.
+**Cost per session with this architecture**: Essentially **$0** for the broadcast (YouTube is free) + negligible WebRTC bandwidth for the 1-on-1 connection + whatever the TURN server costs (shared across all sessions, ~$5-10/month total).
 
-Given the existing C++ expertise on this project, **Janus Gateway** is also a strong contender — it is written in C, highly performant, and offers more low-level control. The trade-off is more development work vs. LiveKit's more batteries-included approach.
+**Trade-offs of the YouTube Live approach**:
+- Viewers must have/use YouTube (not a problem in practice — universal platform).
+- The platform doesn't fully control the viewing experience (YouTube player, YouTube ads on free accounts, YouTube UI).
+- Viewer analytics come from YouTube's API rather than being fully platform-native.
+- Content is technically on YouTube (even if unlisted for the live stream) — but this is acceptable since the produced/edited videos are the real product, not the raw live stream.
 
-Mason- Wait... a single one hour session with 50 viewers would cost $50-$60? Per session? There really is no price model where I could make that effective. Could I live stream with YouTube, which is basically free, and then switch just the person featured for LiveQA to get a WebRTC stream for lower latency? Whoever is the current QA person would get a bidirectional WebRTC connection but everyone else would get YouTube streaming (with latency but not important if they aren't Q&A person).
+**Alternatives to YouTube Live for the broadcast layer**:
+- **Twitch**: Similar to YouTube Live, free, but less appropriate for the fitness audience.
+- **Self-hosted RTMP → HLS**: Use nginx-rtmp-module to receive the OBS RTMP stream and serve HLS. Requires a server but gives full control. Cost: $20-40/month VPS. More work to set up but no third-party dependency.
+- **Cloudflare Stream Live**: $1/1,000 minutes delivered. For 50 viewers watching 60 minutes = 3,000 viewer-minutes = ~$3/session. Cheap but not free.
 
 #### Video Hosting and Delivery (On-Demand)
 
@@ -445,7 +462,7 @@ You *could* do all of this yourself: store videos on a server, use FFmpeg to enc
 
 Recommendation: **Start with Bunny.net or Cloudflare Stream** for the MVP to keep costs minimal. Migrate to Mux when the analytics, player, and API features justify the higher cost — likely when you have enough revenue that the cost difference is negligible relative to subscription income.
 
-Mason- Can I start with YouTube unlisted videos for the MVP to keep costs low and then migrate to something like Mux or C
+Mason- Can I start with YouTube unlisted videos for the MVP to keep costs low and then migrate to something like Mux, Cloudflare, of MediaConvert/CloudFront later as I have revenue to justify the increased cost?
 
 #### Payments and Subscriptions
 
