@@ -491,16 +491,23 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Test: CancelBookingGroupCancelsAllMembers
 - [ ] Provider-cancel-base-only (keep addon with free cancel window) — deferred
 
-#### 3.7 Admin Add-On Configuration
-- [ ] Use existing nested admin table CRUD (`product_addons` registered as nested under products)
-- [ ] Verify admin can create/view/edit add-on relationships through the dashboard
-- [ ] Tests: can CRUD add-on relationships
+#### 3.7 Admin Bundle Management
+- [x] Created dedicated `/manage/bundles` page with full CRUD UI
+- [x] Dashboard card for "Bundles" in manage section
+- [x] Search bundles by product name (base or addon)
+- [x] Create: select base + addon products, discount type/value, stackable, extends duration
+- [x] Edit inline: update discount, stackable, extends duration
+- [x] Delete (deactivate) with confirmation
+- [x] Backend: GET/POST/POST update/POST delete endpoints with search support
+- [x] 4 endpoint tests + 9 component spec tests + 9 mock spec tests
 
 #### 3.8 Add-On Suggestions in Shopping Cart
-- [ ] When an item is added to cart, check if it has add-ons
-- [ ] Show suggestion card: "Add Spa Entry and save 20%! [Add to Cart]"
-- [ ] When add-on is in cart alongside its base, show the discounted price on the add-on line item with strikethrough on original price
-- [ ] Tests: component spec
+- [x] `GET /api/addon_suggestions?product_ids=1,2,3` endpoint returns available add-ons with pricing
+- [x] Cart page loads suggestions when items change
+- [x] Green "Bundle and Save" section shows suggestions with original/discounted price and strikethrough
+- [x] "Add" button adds suggestion to cart
+- [x] Doesn't suggest products already in cart
+- [x] 2 endpoint tests + 2 cart component spec tests + 1 mock spec test
 
 ---
 
