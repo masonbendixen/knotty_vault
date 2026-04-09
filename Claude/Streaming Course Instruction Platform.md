@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 4/7/2026
-Version: 0.3
+Last Updated: 4/9/2026
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -460,9 +460,28 @@ You *could* do all of this yourself: store videos on a server, use FFmpeg to enc
 | Cloudflare Stream | $30 | $150 | ~$180 |
 | Mux | $42 | $21 | ~$63 + encoding |
 
-Recommendation: **Start with Bunny.net or Cloudflare Stream** for the MVP to keep costs minimal. Migrate to Mux when the analytics, player, and API features justify the higher cost — likely when you have enough revenue that the cost difference is negligible relative to subscription income.
+**MVP approach: YouTube unlisted videos.**
 
-Mason- Can I start with YouTube unlisted videos for the MVP to keep costs low and then migrate to something like Mux, Cloudflare, of MediaConvert/CloudFront later as I have revenue to justify the increased cost?
+Yes — starting with YouTube unlisted videos is a viable MVP strategy and keeps hosting costs at exactly $0. Here is how it works and what the trade-offs are:
+
+**How it works**: Upload the final edited video to YouTube as "unlisted" (not public, not private — accessible only to people with the link). Embed the YouTube player on the platform's web page using YouTube's iframe embed API. The platform controls who sees the page (behind your login/paywall), and the YouTube link is not discoverable via search.
+
+**Advantages**:
+- $0 storage and delivery cost. YouTube handles encoding, adaptive bitrate, CDN, and player.
+- YouTube's player is excellent — adaptive quality, captions, speed control, mobile-optimized.
+- No infrastructure to manage.
+- Unlimited storage and bandwidth.
+
+**Trade-offs**:
+- **No content protection**: Anyone with the YouTube URL can watch the video, even without a platform subscription. Unlisted ≠ private. URLs can be shared or discovered by inspecting the page source. This is acceptable for an MVP but becomes a problem at scale if paying subscribers share links.
+- **YouTube branding**: The embed shows YouTube's logo, related video suggestions (can be mostly suppressed with embed parameters), and YouTube UI elements.
+- **Analytics**: You get YouTube Analytics (views, watch time, retention) but not integrated with your platform's user tracking. Cannot track which *specific subscriber* watched what.
+- **No signed URLs**: Cannot revoke access to a specific video for a specific user (e.g., if their subscription lapses). You'd need to rotate the unlisted URL, which affects all viewers.
+- **Terms of Service**: YouTube's ToS technically prohibits using unlisted videos as a paywall workaround at commercial scale. This is rarely enforced for small operations but is a risk to be aware of.
+
+**Migration path**: YouTube unlisted → Bunny.net or Cloudflare Stream → Mux or self-hosted. Each step adds cost but also adds control, analytics, and content protection. The migration is straightforward: re-upload videos to the new host, update the embed URLs in the platform database, done. No user-facing change except a better player.
+
+**Recommendation**: Use YouTube unlisted for the MVP. Plan the platform's video embed architecture so that swapping the hosting backend later requires only changing the video URL source — not rewriting the player or page structure. This keeps the door open for migration without upfront cost.
 
 #### Payments and Subscriptions
 
@@ -555,9 +574,11 @@ Content creators frequently do in-person workshops at studios. The platform coul
 |------|----------|------------|
 | Cold start: need creators and students simultaneously | High | Start with Knotty Yoga's own content. The platform solves a real internal need regardless of marketplace adoption. |
 | Creators already have established Patreon audiences and resist switching | Medium | Position as a clean replacement that is demonstrably better. Allow coexistence during transition — no exclusivity requirement. The quality improvement in produced content and the elimination of the Zoom/Patreon/YouTube patchwork is the pitch. |
-| Technical complexity of multi-source recording + live WebRTC | Medium | Use established tools (OBS + LiveKit) rather than building from scratch. Phase the build — recording and VOD first, live Q&A second. |
+| Technical complexity of multi-source recording + live WebRTC | Medium | Use established tools (OBS for recording, YouTube Live for broadcast, peer-to-peer WebRTC for Q&A). The 1-on-1 WebRTC scope is much simpler than a full media server deployment. |
 | Les Mills or a large player builds something similar | Low-Medium | Niche focus (acrobatics, partner work, aerial) is unlikely to attract enterprise competitors. The open marketplace model is fundamentally different from closed ecosystems. |
-| Video hosting costs scale unpredictably | Medium | Start with cost-effective hosting (Bunny.net or Cloudflare Stream). Move to Mux for premium features only when revenue justifies it. |
+| Video hosting costs scale unpredictably | Low (MVP) | YouTube unlisted has $0 cost. Migration to paid hosting is planned and straightforward when revenue justifies it. |
+| YouTube ToS risk for unlisted paywall workaround | Low | Rarely enforced at small scale. Migration plan to paid hosting is already in place. Not a long-term strategy — just an MVP cost optimization. |
+| YouTube unlisted URLs shared/leaked | Low-Medium | Acceptable for MVP. Paid hosting with signed URLs solves this when migrated. The real product value is the structured platform experience, not individual video URLs. |
 | Certification accreditation requirements change | Low | Stay current with Yoga Alliance and state licensing boards. The hybrid model (50% online / 50% in-person) is already conservative relative to what many bodies allow. |
 
 ---
@@ -568,70 +589,122 @@ Summary of decisions made (for reference):
 
 | # | Question | Decision |
 |---|----------|----------|
-| 1 | Platform-first or content-first? | MVP focused on Knotty Yoga + 1-2 beta creator partners |
+| 1 | Platform-first or content-first? | MVP focused on Knotty Yoga + Jenn Bruyer + PJ Perry as beta creators |
 | 2 | Studio licensing pricing | Accessible pricing for small acrobatics studios; revisit when scaling to yoga |
-| 3 | Revenue sharing split | Under discussion — between 70/30 and 80/20 (creator/platform) |
-| 4 | Free tier | Yes — free content for discovery and marketing |
+| 3 | Revenue sharing split | Under discussion — between 70/30 and 80/20 (see cost analysis in Open Questions) |
+| 4 | Free tier | Creator-controlled — teasers, trailers, interest-piquing content |
 | 5 | Editing scope | Multi-source layout switching (full/PIP/split) + voice-over + PIP commentary; not a full NLE |
 | 6 | Desktop app technology | Qt/C++ (Windows + Mac, Linux easy to add) |
-| 7 | LiveKit | Explained in Technical Architecture; decision on self-hosted vs. cloud deferred |
-| 8 | Video hosting | Explained in Technical Architecture; start cheap (Bunny.net/Cloudflare), upgrade later |
+| 7 | Live streaming architecture | YouTube Live for broadcast (free) + peer-to-peer WebRTC for active Q&A participant only |
+| 8 | Video hosting (on-demand) | YouTube unlisted for MVP; migrate to Bunny.net/Cloudflare/Mux when revenue justifies it |
 | 9 | OBS dependency | Keep OBS; standard installer, low barrier; Qt app hides complexity |
 | 10 | Content exclusivity | No exclusivity — creators can coexist on Patreon and use YouTube/Instagram for discovery |
-| 11 | Music licensing | Platform handles centrally via royalty-free music licensing |
+| 11 | Music licensing | Light-duty background/ambient only; AI-generated or royalty-free library, not commercial music |
 | 12 | Quality control | Curated — vet for quality, hand-picked initially, application process later |
 | 13 | Geographic scope | Global from day one |
 | 14 | Certification timeline | Defer — focus on technical first; certification by referral initially |
 | 15 | Branding/positioning | Creator is the brand initially; develop platform brand later |
 | 16 | Patreon relationship | Clean replacement, not integration |
 | 17 | Partnership opportunities | Future phase — not for MVP |
+| 18 | MVP sequencing | Both recording/editing AND live Q&A needed from day one |
+| 19 | Social media clip generation | Love it, but stretch goal — not MVP |
+| 20 | Platform naming | Needed but not blocking progress |
 
 ---
 
 ## Open Questions
 
-### Revenue Sharing: 70/30 vs 80/20
+### Revenue Sharing: 70/30 vs 80/20 — With Cost Analysis
 
-This is the most significant open business model question. Here are the trade-offs:
+With the YouTube-based MVP architecture, infrastructure costs per creator are dramatically lower than originally projected. Here is the math:
 
-**80/20 (creator gets 80%)**:
-- Headline differentiator: "creators keep 80%" — much better than YouTube (55%), Spotify (65-70%), Coursera (30-45%), or Udemy (37%).
-- Comparable to Patreon (88-95% after fees) — but creators get dramatically better tools, so the slightly lower percentage is justified by the value provided.
-- **Risk**: At early scale with few subscribers, the platform's 20% may not cover infrastructure costs (video hosting, LiveKit sessions, CDN, payment processing fees). Stripe alone takes ~3% + fixed fees, so the effective platform margin is closer to 17%.
-- Best if the platform can keep infrastructure costs low and grow through volume.
+**MVP infrastructure costs per creator per month (YouTube unlisted + YouTube Live + peer-to-peer WebRTC)**:
 
-**70/30 (creator gets 70%)**:
-- Still very competitive — better than every major platform except Patreon and app stores.
-- More headroom for platform investment in marketing, features, and infrastructure.
-- 30% is the "standard" marketplace take rate (Apple/Google app stores, many SaaS marketplaces).
-- **Risk**: Creators comparing against Patreon's 5-12% fee may see 30% as steep, even though the platform provides far more value.
+| Cost Item | Monthly Cost | Notes |
+|-----------|-------------|-------|
+| Video hosting (on-demand) | $0 | YouTube unlisted |
+| Live stream broadcast | $0 | YouTube Live |
+| WebRTC for Q&A (1-on-1) | $0 | Peer-to-peer, no media server |
+| TURN server (WebRTC fallback) | ~$2-3 (shared) | $10/month VPS shared across all creators |
+| Signaling server | ~$2-3 (shared) | Lightweight WebSocket, shared |
+| Stripe payment processing | ~3% of revenue | Per-transaction, unavoidable |
+| Domain/SSL/basic hosting | ~$5-10 (shared) | Platform web hosting, shared |
+| **Total marginal cost per creator** | **~$5-10/month shared overhead** | |
 
-**Possible hybrid approach**: Start at 80/20 to attract the initial creator base, with a published plan to move to 75/25 or 70/30 as the platform scales and adds more value (studio licensing, marketplace reach, analytics, tools). Early creators could be grandfathered at the better rate. This rewards early adopters and creates urgency to join early.
+At these costs, even a 20% platform take rate is viable from day one. Here is what the numbers look like for a single creator with 100 subscribers at $20/month:
 
-**Input needed**: What are the projected infrastructure costs per creator per month? This will determine whether 20% is viable or if 30% is necessary to sustain the platform.
+| | 80/20 Split | 70/30 Split |
+|---|---|---|
+| Monthly subscription revenue | $2,000 | $2,000 |
+| Creator gets | $1,600 | $1,400 |
+| Platform gets (gross) | $400 | $600 |
+| Stripe fees (~3.2%) | -$64 | -$64 |
+| Platform share of infra (~$5) | -$5 | -$5 |
+| **Platform net per creator** | **~$331/month** | **~$531/month** |
 
-Mason- This is where I'm not sure and could use helping calculate. I was thinking of starting with unlisted YouTube videos to avoid the storage / CDN fees. Payment processing is a given. I'm not sure about LiveKit. There are obvious disadvantages to YouTube unlisted but the cost is great. 
+With 3 creators (Knotty Yoga + Jenn + PJ), even at 80/20 the platform nets ~$1,000/month before development costs — enough to cover ongoing hosting and leave room for growth.
 
-### Additional Questions for Future Discussion
+**The trade-off is clearer now**: With near-zero infrastructure costs on the YouTube MVP, 80/20 is financially viable and gives you the strongest possible pitch to attract creators. You can always move to 75/25 later when you migrate off YouTube to paid hosting — that migration adds real costs that justify a higher platform take. Early creators could be grandfathered at 80/20.
 
-1. **Beta creator selection**: Who are the 1-2 friends/colleagues you're considering for the beta? Understanding their specific content types and current workflows will help shape the MVP feature set.
-	- Mason- One is Jenn Bruyer. She is an aerialist and all of her content is aerial. She publishes several videos a week that are recorded zoom meetings published on Patreon. PJ Perry is another. She does rope, straps conditioning, pilates, and handstands. He main appeal to most people is probably just rope though. She goes way deeper into rope and has a strong anatomy component.
+**Remaining question**: Does 80/20 feel right given this math? Or is there value in starting at 70/30 to build a larger war chest for development and marketing?
 
-2. **MVP timeline and sequencing**: Should the MVP build recording/editing first and Q&A live sessions second? Or are both needed from day one? The recording workflow is technically simpler and delivers immediate value even without live streaming.
-	- Mason- We really need to do both. Both people currently really lean on the live Q&A thing to do a virtual "class" format. That has pluses and minuses, in my opinion, and I think the split model of putting out content and then doing a Q&A session after people have looked at it would be better but it is a different model and I know that they will want to support the interactive format as well.
+### Beta Creator Profiles
 
-3. **Free tier boundaries**: What content belongs in the free tier? Options include:
-   - First lesson of every course free (the "preview" model)
-   - Select full courses permanently free (loss leaders)
-   - Creator-controlled: each creator decides what to make free
-   - Time-limited free trials (first 7 days of any course)
-	- Mason- Creator should decide. Might do teasers or trailers or content that is interesting but mainly piques interest.
+**Jenn Bruyer** — Aerialist
+- Content: All aerial (silks, trapeze, etc.)
+- Current workflow: Records Zoom sessions, publishes several videos/week on Patreon
+- Key need: Higher quality than Zoom recordings, structured video library instead of Patreon's chronological feed
+- Q&A format: Currently uses live Zoom "class" format — will want interactive live sessions from day one
 
-1. **Centralized music licensing scope**: Royalty-free music services (Epidemic Sound, Artlist) cover distribution on your own platform. But if studios play content in a commercial setting (in-class), the licensing requirements may differ from online distribution. This needs investigation — specifically whether Epidemic Sound / Artlist commercial licenses cover in-studio public performance, or if a separate blanket license is needed.
-	- Mason- Okay, let's dive into this. I more am thinking of light duty background sound and opening video title / trailer stuff than actual music during the class. Honestly, AI generated psuedo music / sound would be fine. We aren't going to need commercial music.
+**PJ Perry** — Rope, straps, conditioning, Pilates, handstands
+- Content: Primarily rope (deep expertise), plus straps conditioning, Pilates, handstands. Strong anatomy/theory component.
+- Likely appeal: Rope is the primary draw for most subscribers
+- Key need: Structured curriculum with anatomy content interspersed, not just recorded classes
 
-2. **Multi-platform content strategy**: If creators will use YouTube/Instagram for discovery, should the platform offer tools to generate short-form clips (Reels, Shorts, TikToks) from full-length content? This would be a compelling feature: upload a full class, and the platform auto-generates 30-60 second highlight clips with branding for social media distribution.
-	- Mason- that does sound like a nice thing to do but definitely not a MVP or must have or should have. More of a nice to have or stretch goal. In other words, I love the idea and would like to do it eventually.
+Both creators currently rely heavily on the live "class" format via Zoom. The platform must support both:
+1. The **new model** (produced instructional video → scheduled Q&A session) — which is better for content quality and student preparation
+2. The **current model** (live interactive class with immediate Q&A) — which creators and students are accustomed to and will expect
 
-3. **Platform naming**: Does this platform have a working name, or should one be developed? The name will shape how creators and students perceive and remember it.
-	- Mason- Yes, we need to think of a name but I don't want to block the progress on that.
+The platform should support both workflows from the start, with the produced-content-first model positioned as the premium experience while still allowing traditional live classes.
+
+### MVP Scope and Sequencing
+
+**Decision: both recording/editing AND live Q&A are needed for MVP.** The beta creators lean heavily on live sessions and will not adopt a platform that drops that capability.
+
+The MVP must deliver:
+1. **Multi-source recording** with OBS (controlled by the Qt app)
+2. **Layout editing** (full-screen/PIP/split-screen switching in post-production)
+3. **Voice-over and PIP commentary** in edit mode
+4. **Video publishing** to YouTube unlisted with platform embed
+5. **Live Q&A sessions** via YouTube Live + WebRTC for the featured participant
+6. **Session recording** for post-production re-editing
+7. **Web platform** with creator pages, subscription/payment, and video library
+
+This is a significant MVP. A possible phased approach within the MVP:
+- **Alpha**: Recording + editing + YouTube upload (manual). Proves the content production workflow.
+- **Beta**: Add live Q&A (YouTube Live + WebRTC). Proves the interactive workflow.
+- **MVP launch**: Add web platform with payments, subscriptions, and creator pages. Full product.
+
+### Music and Audio Licensing
+
+**Decision: light-duty background sound only.** The need is ambient background music for intros/outros and light background during instruction — not commercial music for energetic class playlists. This dramatically simplifies licensing.
+
+Options for this use case:
+- **AI-generated music**: Services like Suno, Udio, or AIVA can generate ambient/background music. Quality is now very good for atmospheric content. Licensing varies — check terms for commercial use. Some services grant full commercial rights on paid plans.
+- **Royalty-free ambient libraries**: Epidemic Sound and Artlist both have large ambient/background categories. Commercial licenses cover platform distribution and (on commercial plans) in-studio playback.
+- **Creative Commons / public domain**: Free ambient music exists on platforms like Free Music Archive and Freesound.org. Requires careful license checking per track.
+- **Self-produced**: Simple ambient loops can be created in GarageBand, Audacity, or similar tools with minimal effort.
+
+**For in-studio playback** (Phase 2, when studios play content on a screen): Since the music is background ambient — not the primary audio — the licensing risk is minimal. Royalty-free libraries with commercial licenses explicitly cover this use case. This is not the same as needing ASCAP/BMI blanket licenses for playing commercial music during a spin class.
+
+**Recommendation**: Start with AI-generated ambient music or a royalty-free library subscription. This is a solved problem at this scope — no complex licensing needed.
+
+### Future Ideas (Deferred)
+
+- **Social media clip generation** (Reels/Shorts/TikToks from full-length content): Great idea, not MVP. Defer to post-launch.
+- **Platform naming**: Needs a working name but not blocking progress. Can be developed in parallel with technical work.
+- **Partnership opportunities** (AcroYoga International, aerial arts associations, Yoga Alliance): Future phase.
+
+### Free Tier
+
+**Decision: creator-controlled.** Each creator decides what content is free. Expected use: teasers, trailers, and interest-piquing content designed to drive conversion to paid subscriptions. The platform provides the mechanism (mark a video as free/paid), and creators decide the strategy.
