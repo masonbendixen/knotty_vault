@@ -457,17 +457,17 @@ The spa should have **separate products** (not variants) for different time-of-d
 *Product relationships with automatic discounts*
 
 #### 3.1 `product_addons` Table
-- [ ] Create `db_schema/product_addons.h/cpp`
-- [ ] Register in `make_database_info.cpp`, `create_database.cpp` (all admin metadata, nested under products)
-- [ ] Add to `CMakeLists.txt`
-- [ ] Create table helper: `AddProductAddon`, `GetAddonsForProduct`, `GetBaseProductsForAddon`
-- [ ] Tests: table helper CRUD
+- [x] Create `db_schema/product_addons.h/cpp` — base_product_id, addon_product_id, discount_type, discount_value, is_stackable, extends_duration_by_base, sort_order, is_active
+- [x] Register in all 8 admin metadata sections
+- [x] Table helper: AddProductAddon, GetAddonsForProduct, GetBaseProductsForAddon, DeactivateAddon, DeleteAddon
+- [x] Tests: 6 table helper tests
 
 #### 3.2 `booking_groups` and `booking_group_members` Tables
-- [ ] Create `db_schema/booking_groups.h/cpp` and `booking_group_members.h/cpp`
-- [ ] Register in `make_database_info.cpp`, `create_database.cpp`
-- [ ] Create table helpers
-- [ ] Tests: table helper CRUD
+- [x] Create `db_schema/booking_groups.h/cpp` — purchase_id FK
+- [x] Create `db_schema/booking_group_members.h/cpp` — booking_group_id FK, booking_id FK, role (base/addon)
+- [x] Register in all 8 admin metadata sections
+- [x] Table helpers: BookingGroups (CreateGroup, GetGroupById, DeleteGroup), BookingGroupMembers (AddMember, GetMembersForGroup, GetGroupForBooking, DeleteMember)
+- [x] Tests: 5 table helper tests
 
 #### 3.3 Add-On Discount Logic
 - [ ] Create `business_logic/payment/addon_helper.h/cpp`
