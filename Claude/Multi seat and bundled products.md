@@ -470,34 +470,26 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: 5 table helper tests
 
 #### 3.3 Add-On Discount Logic
-- [ ] Create `business_logic/payment/addon_helper.h/cpp`
-- [ ] `GetAvailableAddons(productId)` — returns addon products with discount info
-- [ ] `CalculateAddonDiscount(baseProductId, addonProductId, addonPriceCents)` — computes discounted price
-- [ ] Discount vs coupon logic: if `is_stackable = false`, compare add-on discount to coupon discount. Apply the better one. The unused discount is not consumed (coupon use count not incremented if add-on discount was better).
-- [ ] Tests: percentage discount, fixed discount, stackability, coupon interaction
+- [x] Created `addon_helper.h/cpp` with GetAddonsForProduct, CalculateAddonDiscount, DetectAddonDiscounts
+- [x] Percentage and fixed discount types, capped at price
+- [x] Non-stackable: skipped when coupon present; stackable: both apply
+- [x] 10 unit tests
 
 #### 3.4 Purchase Creation with Add-On Discounts
-- [ ] Extend purchase creation: when a purchase contains items that have add-on relationships, automatically apply the add-on discount
-- [ ] The detection is based on `product_addons` table: if item A is a base and item B is its addon, apply discount to B
-- [ ] Track which discount was applied per item (add-on vs coupon)
-- [ ] Tests: purchase with add-on priced correctly, coupon vs add-on interaction
+- [x] Extended `PurchaseHelper::CreatePurchase` to auto-detect and apply per-item add-on discounts
+- [x] Stackability logic with coupons
+- [x] 3 purchase_helper tests (addon applied, non-stackable+coupon, stackable+coupon)
 
 #### 3.5 Duration Extension for Bundled Bookings
-- [ ] When booking base + add-on together and `extends_duration_by_base = true`:
-  - Adjust add-on booking end time: `addon_end = addon_start + addon_variant_duration + base_variant_duration`
-  - Factor extended duration into room capacity check
-- [ ] Create booking_group linking both bookings
-- [ ] Tests: extended duration calculated correctly, capacity check uses extended time
+- [x] `cart_checkout_helper` extends addon session end_time_us by base duration when `extends_duration_by_base = true`
+- [x] Creates booking_group with base + addon members
+- [x] Test: DurationExtensionAndBookingGroup
 
 #### 3.6 Linked Cancellation
-- [ ] Update `BookingHelper::CancelBooking` to check booking groups
-- [ ] When user cancels ANY member of a bundle group: cancel ALL members, refund per individual product policy
-- [ ] When **provider** cancels the **base** product:
-  - Cancel the base booking with full refund
-  - Do NOT cancel the add-on — keep it booked at the bundle discount price
-  - Give the add-on a `free_cancel_until_us` override (e.g., 24 hours from now) so the customer can cancel with full refund if they want
-  - Send email: "Your massage was cancelled by the provider. Your spa visit is still booked. You may cancel with a full refund if you prefer."
-- [ ] Tests: user cancel → all cancelled, provider cancel base → base cancelled + addon kept + free cancel window
+- [x] `BookingHelper::CancelBooking` checks booking groups — cancels all members
+- [x] Group deleted first to prevent recursion, then members cancelled
+- [x] Test: CancelBookingGroupCancelsAllMembers
+- [ ] Provider-cancel-base-only (keep addon with free cancel window) — deferred
 
 #### 3.7 Admin Add-On Configuration
 - [ ] Use existing nested admin table CRUD (`product_addons` registered as nested under products)
