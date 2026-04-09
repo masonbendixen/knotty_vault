@@ -515,14 +515,15 @@ The spa should have **separate products** (not variants) for different time-of-d
 *Extends purchase sharing to bookable services with invite flow*
 
 #### 4.1 Service Booking for Another Person
-- [ ] Extend service booking UI: "Who is this booking for?" selector
-  - Default: "Myself"
-  - Option: search from existing purchase sharing contacts (gift permission grantees)
-  - Option: enter email address of someone else
-- [ ] If person has purchase sharing enabled → book directly for them
-- [ ] The booking shows up in the recipient's "My Bookings"
-- [ ] The purchase is under the payer's account
-- [ ] Tests: book for self, book for sharing contact, purchase attributed to payer
+- [x] Cart checkout accepts `for_person_id` to book for someone else
+- [x] Server validates accepted gift permission (grantor→grantee) before allowing
+- [x] Booking `person_id` = recipient, purchase `payer_person_id` = logged-in user
+- [x] Booking for self (own ID or omitted) works without gift permission
+- [x] Cart UI: "Who is this booking for?" expansion panel with radio (Myself/Someone else)
+- [x] Loads accepted grantees from `searchGiftableUsers`
+- [x] Selected person shown as badge in panel header
+- [x] 3 backend tests (with permission, without permission, self)
+- [x] 4 frontend tests (default self, panel visible, select user, clear on switch back)
 
 #### 4.2 Invite Non-Member via Email
 - [ ] If user enters an email address of someone who isn't a member:
