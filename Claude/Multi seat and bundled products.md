@@ -526,15 +526,15 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] 4 frontend tests (default self, panel visible, select user, clear on switch back)
 
 #### 4.2 Invite Non-Member via Email
-- [ ] If user enters an email address of someone who isn't a member:
+- [x] If user enters an email address of someone who isn't a member:
   - System sends an invitation email: "X has booked a Massage for you at Knotty Yoga! Create your account to view your booking."
   - The invitation includes a link to register
   - After registration, the person is prompted to accept purchase sharing from the gifter
   - Once accepted, the booking becomes visible in their "My Bookings"
-- [ ] If the email belongs to an existing member but purchase sharing isn't set up:
+- [x] If the email belongs to an existing member but purchase sharing isn't set up:
   - Send a purchase sharing request
   - Once accepted, the booking becomes visible
-- [ ] Tests: invite flow for non-member, request flow for existing member
+- [x] Tests: invite flow for non-member, request flow for existing member
 
 #### 4.3 Same Patterns for Event Booking
 - [ ] Extend event booking with the same "Who is this for?" flow
