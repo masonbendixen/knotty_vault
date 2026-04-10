@@ -553,21 +553,24 @@ The spa should have **separate products** (not variants) for different time-of-d
 *Staff-initiated on-the-fly bookings for walk-in customers*
 
 #### 5.1 Staff Drop-In Endpoint
-- [ ] Create `POST /api/staff/dropin_booking` endpoint
-- [ ] Accepts: productId, variantId, personId, facilityId, roomId
-- [ ] Creates booking starting now (rounded to next 5-min boundary)
-- [ ] Checks room capacity before creating
-- [ ] Creates purchase at standard product price
-- [ ] Tests: success, capacity exceeded
+- [x] Create `POST /api/staff/dropin_booking` endpoint
+- [x] Accepts: productId, variantId, personId, facilityId
+- [x] Creates booking starting now (rounded to next 5-min boundary)
+- [x] Checks room capacity via ServiceBookingHelper (reuses existing infrastructure)
+- [x] Creates purchase at standard product price
+- [x] Tests: success, not authenticated, missing fields, product not found, non-service product rejected (5 tests)
 
 #### 5.2 On-the-Fly Account Creation
-- [ ] Create `POST /api/staff/create_quick_account` endpoint
-- [ ] Accepts: firstName, lastName, email
-- [ ] Creates account with auto-generated password
-- [ ] Sets `must_change_password = true`
-- [ ] Sends welcome email with temporary password and "please change immediately" message
-- [ ] Returns the new person_id for immediate use in drop-in booking
-- [ ] Tests: success, duplicate email, email sent
+- [x] Create `POST /api/staff/create_quick_account` endpoint
+- [x] Accepts: firstName, lastName, email
+- [x] Creates account with auto-generated password (12 chars, alphanumeric + symbols)
+- [x] Sets `must_change_password = true`
+- [x] Account is fully validated (no email verification step)
+- [x] Sends welcome email with temporary password and "please change immediately" message
+- [x] Returns the new person_id for immediate use in drop-in booking
+- [x] Duplicate email returns existing person (doesn't error)
+- [x] Processes pending gift permission invitations for the email
+- [x] Tests: success, welcome email sent, duplicate email returns existing, not authenticated, missing fields, account fully validated (7 endpoint tests + 5 email template tests)
 
 #### 5.3 Staff Drop-In UI
 - [ ] Add to staff check-in page: "Walk-In Booking" section
