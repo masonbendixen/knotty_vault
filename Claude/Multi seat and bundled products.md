@@ -574,13 +574,15 @@ The spa should have **separate products** (not variants) for different time-of-d
 
 #### 5.3 Staff Drop-In UI
 - [x] Add to staff check-in page: "Walk-In Booking" expansion panel
-- [x] Search for existing person from current bookings list, or "New Customer" form
+- [x] Search for existing person via server autocomplete, or "New Customer" form
 - [x] New Customer: collect first name, last name, email → create quick account → auto-select
-- [x] Select bookable service product and variant from dropdown
-- [x] Create Walk-In Booking button (disabled until person + product selected)
-- [x] ServerAccess: staffDropinBooking and staffCreateQuickAccount added to all 4 layers
+- [x] ServerAccess: staffDropinBooking, staffCreateQuickAccount, staffSearchPeople added to all 4 layers
 - [x] Server: facility_id defaults to first active facility when not specified
-- [x] Tests: 8 component spec tests, 4 mock spec tests
+- [x] Server: admin bypass for for_person_id gift permission check (cart_checkout + book_event)
+- [x] **Inline slot selection**: Product/variant dropdowns → date picker + hour pickers → "Show Available" button → clickable slot buttons with provider/time
+- [x] **Inline payment**: PaymentMethodComponent shown after slot selection with price and "Book and Pay" button
+- [x] **Book and pay**: `cartCheckout` (services) or `bookEvent` (events) with `for_person_id` + `purchasePayCard`. Admin bypass for gift permission.
+- [x] Tests: component spec (10 tests), server admin bypass (2 tests)
 
 ---
 
