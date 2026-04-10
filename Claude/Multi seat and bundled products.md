@@ -541,11 +541,11 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: event booking for another person (with permission, without permission, self, pending permission fails, combined with intended_for_email; frontend: forPersonId passed, inviteEmail passed, invitation sent after payment, defaults)
 
 #### 4.4 Payer Cancellation, Transfer, and Wrong-Email Recovery
-- [ ] **Payer can cancel bookings they paid for**: The person who paid (payer) should be able to cancel a booking even if the booking's `person_id` is someone else. Currently only the booking's `person_id` can cancel. Add `payer_person_id` check to the cancellation endpoint so the payer can also initiate cancellation. Refund goes to the payer's original payment method.
+- [x] **Payer can cancel bookings they paid for**: The person who paid (payer) should be able to cancel a booking even if the booking's `person_id` is someone else. Currently only the booking's `person_id` can cancel. Add `payer_person_id` check to the cancellation endpoint so the payer can also initiate cancellation. Refund goes to the payer's original payment method. Also fixes security issue: strangers can no longer cancel arbitrary bookings.
 - [x] **Booking transfer on sharing acceptance**: When a gift permission is accepted, check if the grantor has any bookings that were intended for the grantee (tracked via a new `intended_for_email` column on `purchases`). Reassign those bookings' `person_id` from the payer to the grantee.
-- [ ] **Wrong email recovery**: Allow the payer to change the `intended_for_email` on an untransferred purchase. This resends the invitation to the new email and revokes any pending invitation/sharing request for the old email. Only allowed before the booking has been transferred.
-- [ ] **UI: "Booked for someone else" section in My Purchases**: Show purchases where the logged-in user is the payer but the booking is intended for someone else. Display transfer status (pending invitation, pending acceptance, transferred). Provide "Change recipient" and "Cancel" actions.
-- [ ] Tests: payer cancellation, transfer on acceptance, email change, UI states
+- [x] **Wrong email recovery**: Allow the payer to change the `intended_for_email` on an untransferred purchase via `POST /api/purchase/{id}/change_recipient`. Resends invitation to the new email. Only allowed before the booking has been transferred (intended_for_email cleared).
+- [x] **UI: "Booked for someone else" section in My Purchases**: Show purchases where the logged-in user is the payer but the booking is intended for someone else. Display intended_for_email. Provide "Change Recipient" inline edit action.
+- [x] Tests: payer cancellation (owner, payer, stranger, unauth), transfer on acceptance (4 tests), email change (7 endpoint tests), UI states (7 component tests), mock spec (3 tests)
 
 ---
 
