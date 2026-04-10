@@ -537,8 +537,8 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: invite flow for non-member, request flow for existing member
 
 #### 4.3 Same Patterns for Event Booking
-- [ ] Extend event booking with the same "Who is this for?" flow
-- [ ] Tests: event booking for another person
+- [x] Extend event booking with the same "Who is this for?" flow (for_person_id with gift permission validation, intended_for_email, invitation after payment)
+- [x] Tests: event booking for another person (with permission, without permission, self, pending permission fails, combined with intended_for_email; frontend: forPersonId passed, inviteEmail passed, invitation sent after payment, defaults)
 
 #### 4.4 Payer Cancellation, Transfer, and Wrong-Email Recovery
 - [ ] **Payer can cancel bookings they paid for**: The person who paid (payer) should be able to cancel a booking even if the booking's `person_id` is someone else. Currently only the booking's `person_id` can cancel. Add `payer_person_id` check to the cancellation endpoint so the payer can also initiate cancellation. Refund goes to the payer's original payment method.
