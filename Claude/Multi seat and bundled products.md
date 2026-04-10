@@ -573,12 +573,14 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: success, welcome email sent, duplicate email returns existing, not authenticated, missing fields, account fully validated (7 endpoint tests + 5 email template tests)
 
 #### 5.3 Staff Drop-In UI
-- [ ] Add to staff check-in page: "Walk-In Booking" section
-- [ ] Search for existing person or "New Customer" button
-- [ ] New Customer: collect first name, last name, email → create account → proceed to booking
-- [ ] Select product/variant, show current room capacity
-- [ ] Create booking button
-- [ ] Tests: component spec
+- [x] Add to staff check-in page: "Walk-In Booking" expansion panel
+- [x] Search for existing person from current bookings list, or "New Customer" form
+- [x] New Customer: collect first name, last name, email → create quick account → auto-select
+- [x] Select bookable service product and variant from dropdown
+- [x] Create Walk-In Booking button (disabled until person + product selected)
+- [x] ServerAccess: staffDropinBooking and staffCreateQuickAccount added to all 4 layers
+- [x] Server: facility_id defaults to first active facility when not specified
+- [x] Tests: 8 component spec tests, 4 mock spec tests
 
 ---
 
