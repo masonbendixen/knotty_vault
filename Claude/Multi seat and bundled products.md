@@ -635,8 +635,10 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Mock spec tests: 2 tests (getPurchase success, getPurchase 404)
 
 #### 7.2 Checkout Success Enhancement
-- [ ] Show entitlements and seat assignment after payment
-- [ ] Link to purchase detail page
+- [x] Service booking, event booking, and cart success screens now capture `PayCardResponse.entitlements`
+- [x] Multi-seat entitlements show inline `SeatAssignmentComponent` on the success screen
+- [x] All three flows link to purchase detail page (done in 7.1)
+- [x] Cart success links to specific purchase detail instead of generic purchase list
 
 #### 7.3 My Bookings Enhancement for Bundles
 - [ ] Show linked bookings grouped together
