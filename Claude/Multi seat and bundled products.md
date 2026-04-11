@@ -597,17 +597,20 @@ The spa should have **separate products** (not variants) for different time-of-d
 ### Phase 6: iCal and Email Enhancements
 
 #### 6.1 iCal Generation Utility
-- [ ] Create `util/ical/ical_generator.h/cpp`
-- [ ] Generate `.ics` file content from: title, start time, end time, location, description
-- [ ] Timezone-aware using facility timezone
-- [ ] Tests: generated ICS is valid format
+- [x] Create `util/ical_generator.h/cpp` — RFC 5545 compliant .ics generation
+- [x] Generate `.ics` file content from: title, start time (UTC microseconds), end time (UTC microseconds), location, description
+- [x] Times stored as UTC with Z suffix (no VTIMEZONE needed)
+- [x] Proper escaping of commas, semicolons, newlines, backslashes
+- [x] CRLF line endings per RFC 5545
+- [x] Tests: 13 tests covering structure, timestamps, escaping, optional fields, CRLF
 
 #### 6.2 Attach iCal to Booking Confirmation Emails
-- [ ] Update `ServiceBookingConfirmationMail` to attach .ics
-- [ ] Update `WaitlistConfirmationBody` / event booking email to attach .ics
-- [ ] Update any spa booking confirmation to attach .ics
-- [ ] The mail helper needs to support attachments — check if mailio supports this, extend if needed
-- [ ] Tests: email body includes attachment
+- [x] Added `MailAttachment` struct and `AddAttachment`/`GetAttachments` to `MailMessage`
+- [x] Updated `MailHelperImpl::SendMail` to use mailio's `msg.attach()` for MIME attachments
+- [x] Updated `cart_checkout.cpp` to generate and attach iCal for all bookable service items with a time slot
+- [x] iCal end time resolved from `bookable_service_sessions.end_time_us` (falls back to 1 hour default)
+- [x] iCal title includes variant name when present (e.g. "Peak Spa - 60 Min Session")
+- [x] Tests: FullCartWithAllProductTypes verifies iCal on spa/massage/workshop emails, ServiceBookingEmailHasICalWithCorrectTimes verifies content, NoICalAttachmentForItemWithoutTimeslot
 
 #### 6.3 Confirmation Email for Bundles
 - [ ] When a bundle is booked (base + add-on), send a single confirmation showing both components
