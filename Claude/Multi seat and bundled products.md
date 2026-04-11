@@ -584,6 +584,13 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] **Book and pay**: `cartCheckout` (services) or `bookEvent` (events) with `for_person_id` + `purchasePayCard`. Admin bypass for gift permission.
 - [x] Tests: component spec (10 tests), server admin bypass (2 tests)
 
+#### 5.4 Walk-In Payment for Customer Account
+- [ ] **Server: staff card lookup for customer** — New endpoint `GET /api/staff/customer_cards/{personId}` that returns saved cards for a specific person (staff-only, requires admin role). This avoids showing the staff member's own cards.
+- [ ] **PaymentMethodComponent: accept personId input** — When `personId` is provided, load that person's saved cards instead of the logged-in user's. When no personId, behave as before (logged-in user's cards).
+- [ ] **Coupon/voucher validation against customer** — When booking for a walk-in customer, coupons must be validated against the customer's account (or be general-use). Vouchers must belong to the customer or be unassigned.
+- [ ] **Walk-in UI integration** — Pass `walkinPersonId` to PaymentMethodComponent. Show customer's saved card as first option. Allow new card entry. Add coupon/voucher fields.
+- [ ] Tests: server endpoint for customer cards, PaymentMethodComponent with personId, coupon/voucher validation
+
 ---
 
 ### Phase 6: iCal and Email Enhancements
