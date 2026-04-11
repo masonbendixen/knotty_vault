@@ -613,10 +613,11 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: FullCartWithAllProductTypes verifies iCal on spa/massage/workshop emails, ServiceBookingEmailHasICalWithCorrectTimes verifies content, NoICalAttachmentForItemWithoutTimeslot
 
 #### 6.3 Confirmation Email for Bundles
-- [ ] When a bundle is booked (base + add-on), send a single confirmation showing both components
-- [ ] Include note about linked cancellation policy
-- [ ] Include iCal with multiple events (or two separate .ics files)
-- [ ] Tests: email content
+- [x] Created `bundle_booking_confirmation_mail.h/cpp` — consolidated email template showing all bundle components with pricing, discount, and cancellation policy note
+- [x] Updated `cart_checkout.cpp` — detects bundle groups (base + addon) and sends a single combined email instead of separate emails per item; standalone items still get individual emails
+- [x] Bundle email includes linked cancellation policy: "If you cancel one, the bundle discount will be removed and the remaining booking will be charged at full price"
+- [x] Two separate `.ics` file attachments (one per booking) on the bundle email
+- [x] Tests: `BundleBookingConfirmationMailTest` (6 tests: both items, discount, no-discount, cancellation policy, provider omission, HTML structure), `BundleDiscountAppearsInEmail` updated (verifies consolidated email with both products, discount, policy, 2 iCal attachments)
 
 ---
 
