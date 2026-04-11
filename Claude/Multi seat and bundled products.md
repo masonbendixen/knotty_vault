@@ -666,11 +666,14 @@ The spa should have **separate products** (not variants) for different time-of-d
 *Auto-detect and offer applicable discounts at checkout — no manual code entry needed*
 
 #### 8.1 Backend: User-Compatible Discount Lookup
-- [ ] Create `GET /api/my_applicable_discounts?product_id=X` endpoint
-- [ ] Query active coupons applicable to the product (via `coupon_products` junction table or unrestricted coupons)
-- [ ] Query user's active vouchers with remaining balance compatible with the product
-- [ ] Query user's active comps (comp vouchers) compatible with the product
-- [ ] Return `{ coupons: [...], vouchers: [...] }` with code, description, discount summary
+- [x] Created `GET /api/my_applicable_discounts?product_id=X` endpoint
+- [x] Queries active coupons: within validity window, not maxed out, either unrestricted or restricted to the product via `coupon_products`
+- [x] Queries user's vouchers: active, with balance, not expired, either unrestricted or restricted to the product
+- [x] Comps are just vouchers — included automatically
+- [x] Returns `{ coupons: [{code, discount_type, discount_value, description}], vouchers: [{code, remaining_value_cents, currency, description}] }`
+- [x] Added `getMyApplicableDiscounts(productId)` to all 4 ServerAccess layers
+- [x] Added TypeScript types: `ApplicableDiscountsResponse`, `ApplicableCoupon`, `ApplicableVoucher`
+- [x] 12 server tests: empty, unrestricted coupon, product-specific coupon, wrong product coupon excluded, expired coupon excluded, user voucher, other user's voucher excluded, wrong product voucher excluded, matching product voucher, zero balance excluded, both coupons and vouchers, auth required
 
 #### 8.2 Frontend: Auto-Suggest Discounts
 - [ ] On payment page load, call `my_applicable_discounts` for the product being purchased
