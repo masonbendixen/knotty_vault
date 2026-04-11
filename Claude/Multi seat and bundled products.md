@@ -641,9 +641,11 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Cart success links to specific purchase detail instead of generic purchase list
 
 #### 7.3 My Bookings Enhancement for Bundles
-- [ ] Show linked bookings grouped together
-- [ ] "Bundled with: Spa Entry" label
-- [ ] Cancellation warning: "Canceling will also cancel your Spa Entry booking"
+- [x] Server: `my_bookings` endpoint detects addon discount relationships between bookings sharing a purchase, populates `bundled_with_product_name` on each bundled booking
+- [x] Client: "Bundled with: [product name]" label shown on both upcoming and past booking cards
+- [x] Cancellation warning when cancelling a bundled booking: "Cancelling will remove the bundle discount from your [other product] booking, which will be charged at full price"
+- [x] Server test: `GetMyBookingsBundleInfo` — verifies both bookings in a bundle have correct `bundled_with_product_name`
+- [x] Client tests: 3 tests (bundle label shown, cancellation warning, no label for non-bundled)
 
 #### 7.4 Catalog Multi-Seat Badge
 - [ ] Add `seats_default` to catalog response
