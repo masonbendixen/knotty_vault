@@ -685,10 +685,12 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: 4 service-booking spec tests (loads suggestions, no suggestions, coupon click fills code, voucher click fills code)
 
 #### 8.3 Shopping Cart Compatibility
-- [ ] When shopping cart is implemented (Phase 2), check discounts for each item in the cart
-- [ ] Aggregate applicable discounts across all cart items
-- [ ] Show per-item discount suggestions in the cart summary
-- [ ] Handle multi-product coupons that apply to multiple cart items
+- [x] Cart calls `getMyApplicableDiscounts` for each unique product in the cart
+- [x] Aggregates results using Map to deduplicate coupons/vouchers that apply to multiple products
+- [x] Shows clickable discount suggestion buttons above manual code entry (same UI as other flows)
+- [x] Panel auto-expands with "Discounts available" badge when suggestions found
+- [x] Suggestions hidden after coupon/voucher applied
+- [x] Tests: 5 cart spec tests (empty cart, coupon click, voucher click, badge shown, deduplication)
 
 ---
 
