@@ -589,7 +589,8 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [ ] **PaymentMethodComponent: accept personId input** — When `personId` is provided, load that person's saved cards instead of the logged-in user's. When no personId, behave as before (logged-in user's cards).
 - [ ] **Coupon/voucher validation against customer** — When booking for a walk-in customer, coupons must be validated against the customer's account (or be general-use). Vouchers must belong to the customer or be unassigned.
 - [ ] **Walk-in UI integration** — Pass `walkinPersonId` to PaymentMethodComponent. Show customer's saved card as first option. Allow new card entry. Add coupon/voucher fields.
-- [ ] Tests: server endpoint for customer cards, PaymentMethodComponent with personId, coupon/voucher validation
+- [ ] **Save card for new customers** — When a new customer pays with a card during walk-in, offer a "Save card for future visits" checkbox. If checked, show a card name field (e.g., "Visa ending 4242"), tokenize and save the card to the customer's account (not the staff member's). This uses the existing card-saving infrastructure but targets the customer's person_id.
+- [ ] Tests: server endpoint for customer cards, PaymentMethodComponent with personId, coupon/voucher validation, save card for new customer
 
 ---
 
