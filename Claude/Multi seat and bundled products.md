@@ -624,10 +624,15 @@ The spa should have **separate products** (not variants) for different time-of-d
 ### Phase 7: Polish
 
 #### 7.1 Purchase Detail Page
-- [ ] Create `GET /api/purchases/{id}` endpoint with entitlements + assignments
-- [ ] Create `PurchaseDetailComponent` at `/my/purchases/:id`
-- [ ] Integrate `SeatAssignmentComponent` for multi-seat entitlements
-- [ ] Link from purchase history and checkout success
+- [x] Created `GET /api/purchases/{id}` endpoint — returns purchase with items, entitlements (with assignments), payments, booking_ids. Auth: owner or admin.
+- [x] Created `PurchaseDetailComponent` at `/my/purchases/:id` — full page view with items, entitlements, payments, summary
+- [x] Integrated `SeatAssignmentComponent` for multi-seat entitlements — renders inline for entitlements with seats_total > 1
+- [x] Added `getPurchase(id)` to all 4 ServerAccess layers (interface, proxy, network, mock)
+- [x] Linked from purchase history ("View full details" link in each accordion panel)
+- [x] Linked from service booking and event booking success pages ("Purchase Details" button)
+- [x] Server tests: 5 tests (success with entitlements/payments, not authenticated, not found, not authorized, admin access)
+- [x] Client tests: 10 tests (component creation, load/display, invalid id, 404, server error, items/entitlements/payments display, status labels, multi-seat detection)
+- [x] Mock spec tests: 2 tests (getPurchase success, getPurchase 404)
 
 #### 7.2 Checkout Success Enhancement
 - [ ] Show entitlements and seat assignment after payment
