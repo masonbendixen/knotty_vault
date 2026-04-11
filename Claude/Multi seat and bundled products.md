@@ -585,12 +585,12 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Tests: component spec (10 tests), server admin bypass (2 tests)
 
 #### 5.4 Walk-In Payment for Customer Account
-- [ ] **Server: staff card lookup for customer** — New endpoint `GET /api/staff/customer_cards/{personId}` that returns saved cards for a specific person (staff-only, requires admin role). This avoids showing the staff member's own cards.
-- [ ] **PaymentMethodComponent: accept personId input** — When `personId` is provided, load that person's saved cards instead of the logged-in user's. When no personId, behave as before (logged-in user's cards).
-- [ ] **Coupon/voucher validation against customer** — When booking for a walk-in customer, coupons must be validated against the customer's account (or be general-use). Vouchers must belong to the customer or be unassigned.
-- [ ] **Walk-in UI integration** — Pass `walkinPersonId` to PaymentMethodComponent. Show customer's saved card as first option. Allow new card entry. Add coupon/voucher fields.
-- [ ] **Save card for new customers** — When a new customer pays with a card during walk-in, offer a "Save card for future visits" checkbox. If checked, show a card name field (e.g., "Visa ending 4242"), tokenize and save the card to the customer's account (not the staff member's). This uses the existing card-saving infrastructure but targets the customer's person_id.
-- [ ] Tests: server endpoint for customer cards, PaymentMethodComponent with personId, coupon/voucher validation, save card for new customer
+- [x] **Reuse existing admin card endpoints** — `GET/POST /api/admin/person/{personId}/cards` already exist. Added `staffGetCustomerCards` and `staffCreateCustomerCard` to all 4 ServerAccess layers.
+- [x] **PaymentMethodComponent: forPersonId input** — Loads customer's saved cards via `staffGetCustomerCards`. Card-on-file enabled for staff mode. "Manage cards" link hidden.
+- [x] **Save card for customers** — `allowSaveCard` input shows checkbox + card name field. Saves to customer's account via `staffCreateCustomerCard`.
+- [x] **Walk-in UI integration** — `[forPersonId]="walkinPersonId" [allowSaveCard]="true"` on the PaymentMethodComponent.
+- [ ] **Coupon/voucher validation against customer** — Deferred (coupons are product-specific, voucher person-scoping is separate).
+- [x] Tests: PaymentMethodComponent spec (11 tests), mock spec (3 staff card tests)
 
 ---
 
