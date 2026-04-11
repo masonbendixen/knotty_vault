@@ -648,9 +648,12 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Client tests: 3 tests (bundle label shown, cancellation warning, no label for non-bundled)
 
 #### 7.4 Catalog Multi-Seat Badge
-- [ ] Add `seats_default` to catalog response
-- [ ] Show "For N people" badge on multi-seat products
-- [ ] Show seat info in checkout
+- [x] Server: catalog endpoint looks up `seats_default` from `product_entitlement_rules` for each product, includes in response when > 1
+- [x] Client: added `seats_default` to `CatalogProduct` interface and `ServerAccessNetwork` mapping
+- [x] Catalog UI: "For N people" badge with group icon on multi-seat product cards
+- [x] Checkout UI: "For N people — assign seats after purchase" note on multi-seat products
+- [x] Server test: `GetCatalogProductsIncludesSeatsDefault` — verifies multi-seat product has `seats_default: 4`, single-seat product omits it
+- [x] Client tests: 2 tests (badge shown for multi-seat, not shown for single-seat)
 
 #### 7.5 Update Design Documents
 - [ ] Update Payment Design Document with new scenarios and tables
