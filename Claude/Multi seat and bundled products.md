@@ -676,11 +676,13 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] 12 server tests: empty, unrestricted coupon, product-specific coupon, wrong product coupon excluded, expired coupon excluded, user voucher, other user's voucher excluded, wrong product voucher excluded, matching product voucher, zero balance excluded, both coupons and vouchers, auth required
 
 #### 8.2 Frontend: Auto-Suggest Discounts
-- [ ] On payment page load, call `my_applicable_discounts` for the product being purchased
-- [ ] If any discounts found, auto-expand the "Coupons & Vouchers" panel
-- [ ] Show clickable discount suggestions above the manual code entry: "You have a 20% coupon — click to apply"
-- [ ] Clicking a suggestion auto-fills the code and triggers apply
-- [ ] Works for all payment flows: service booking, event booking, checkout
+- [x] On payment page load, calls `getMyApplicableDiscounts(productId)` for all three single-product flows
+- [x] Panel auto-expands when discounts found, shows "Discounts available" badge in header
+- [x] Clickable suggestion buttons above manual code entry with coupon/voucher icons and descriptions
+- [x] Clicking a suggestion auto-fills the code and triggers the apply action
+- [x] Implemented in: service booking, event booking, checkout (cart skipped — multi-product, handled in 8.3)
+- [x] Suggestions hidden after a coupon or voucher is applied
+- [x] Tests: 4 service-booking spec tests (loads suggestions, no suggestions, coupon click fills code, voucher click fills code)
 
 #### 8.3 Shopping Cart Compatibility
 - [ ] When shopping cart is implemented (Phase 2), check discounts for each item in the cart
