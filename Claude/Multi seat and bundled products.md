@@ -671,6 +671,33 @@ The spa should have **separate products** (not variants) for different time-of-d
 
 ---
 
+### Phase 9: Save Card Option on All Payment Flows
+*Offer "Save card for future visits" on every payment page that accepts credit cards (except subscriptions, which already save cards automatically)*
+
+#### 9.1 Identify All Payment Flows
+- [ ] Service booking (`service-booking.component`) — user books a service and pays
+- [ ] Event booking (`event-booking.component`) — user books an event and pays
+- [ ] Cart / checkout (`cart.component`, `checkout.component`) — user checks out a cart and pays
+- [ ] All of the above currently use `PaymentMethodComponent` without `allowSaveCard`
+
+#### 9.2 Enable Save Card on Self-Service Payment
+- [ ] Add `[allowSaveCard]="true"` to `PaymentMethodComponent` in each payment flow listed above
+- [ ] The component already supports this — when `allowSaveCard` is true and mode is credit-card, it shows a "Save card for future visits" checkbox and card name field
+- [ ] On save, uses the logged-in user's own person ID (not `forPersonId`) — need to add this path to `getPaymentSource()` which currently only saves for `forPersonId` (staff walk-in). Extend to also call the user's own `createCard` endpoint when `forPersonId` is null
+- [ ] After saving, use `saved_card_id` for payment (same nonce-reuse pattern as walk-in flow)
+
+#### 9.3 Server: Self-Service Card Save Endpoint
+- [ ] Verify existing `POST /api/cards` endpoint supports saving a card from a nonce (it may already — check `createCard` in `ServerAccess`)
+- [ ] If not, add or update to accept `source_id` (nonce) + `friendly_name` and create a saved card for the logged-in user
+- [ ] Tests for the endpoint
+
+#### 9.4 Tests
+- [ ] Component spec tests for each payment flow verifying `allowSaveCard` is wired
+- [ ] Integration test: user saves card during payment, card appears in saved cards list
+- [ ] Verify subscriptions are NOT affected (they handle card saving separately)
+
+---
+
 ## Documents to Update
 
 ### Payment Design Document
