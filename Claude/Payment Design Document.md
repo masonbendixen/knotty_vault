@@ -719,8 +719,8 @@ This section documents the user scenarios the payment system must support, valid
 [[Payment Should Have- Multi Seat and Bundled Pricing]]
 
 - [x] 5. User purchases a one time item for someone else like a massage or intro workshop
-- [ ] 6. User purchases a one time item for themself and one or more other people like a couple's massage
-- [ ] 7. User purchases a bundled product (e.g., massage + spa entry as a single product)
+- [x] 6. User purchases a one time item for themself and one or more other people like a couple's massage (Multi-seat entitlements with SeatAssignmentComponent; seats_default on product_entitlement_rules; catalog badge "For N people")
+- [x] 7. User purchases a bundled product (e.g., massage + spa entry as a single product) (Product addons with percentage/fixed discounts; bundle confirmation emails; bundle labels on My Bookings with cancellation warning)
 - [x] 8. User who has purchased a monthly membership receives a discount for other services (permission-based pricing)
 - [x] 9. User reassigns seat to a different person (e.g., user buys party package and different guests show up)
 
@@ -761,10 +761,10 @@ This section documents the user scenarios the payment system must support, valid
 - [x] 31. User upgrades to a higher tier membership (prorated)
 - [x] 32. User downgrades to a lower tier membership (effective next cycle)
 - [x] 33. User reactivates after cancelling membership (history preserved)
-- [ ] 34. User is gifted something but passes it on to someone else
-- [ ] 35. Admin grants extension of a membership as reward
+- [x] 34. User is gifted something but passes it on to someone else (Gift permissions system with change_purchase_recipient endpoint; payer can reassign even after transfer)
+- [x] 35. Admin grants extension of a membership as reward (Admin subscription management with entitlement date overrides)
 - [ ] 36. Credit card chargeback - invalidate payment, outstanding balance
-- [ ] 37. Guest passes - member gifts discounted/free guest pass to another person
+- [x] 37. Guest passes - member gifts discounted/free guest pass to another person (Gift permissions + book-for-someone-else via for_person_id; comp vouchers restricted to product)
 - [ ] 38. Product discontinued - existing entitlements remain valid, no new purchases
 - [ ] 39. Entitlement expires while user is mid-session
 

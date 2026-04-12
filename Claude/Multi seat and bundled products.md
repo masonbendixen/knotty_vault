@@ -656,9 +656,9 @@ The spa should have **separate products** (not variants) for different time-of-d
 - [x] Client tests: 2 tests (badge shown for multi-seat, not shown for single-seat)
 
 #### 7.5 Update Design Documents
-- [ ] Update Payment Design Document with new scenarios and tables
-- [ ] Update Support for scheduled purchases with new scenarios
-- [ ] Mark completed checkboxes
+- [x] Updated Payment Design Document — marked scenarios 6 (multi-seat), 7 (bundled product), 34 (gift pass), 35 (admin extends), 37 (guest passes) as complete with implementation notes
+- [x] Updated Support for scheduled purchases — marked scenarios 37 (staff check-in), 38 (identity verification), 39 (book for non-member), 43 (admin cancel booking) as complete; updated priority bucket tables to match
+- [x] Updated status date to April 2026
 
 ---
 
