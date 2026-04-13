@@ -389,13 +389,15 @@ Should there be a configurable "no booking" period at the very start and end of 
 
 ### 2. Short Breaks vs. Lunch
 The 10min buffer between clients provides a micro-break. But for very long shifts (10+ hours), should there be mandatory short breaks in addition to lunch? Some jurisdictions require a paid 10-15 min break for every 4 hours worked. This could be implemented as a second tier of the lunch system — a shorter break that doesn't need the balanced-split algorithm.
-- Mason- I don't plan on having people work shifts longer than 8 hours. I feel like massage is hard and it just isn
+- Mason- I don't plan on having people work shifts longer than 8 hours. I feel like massage is hard and it just isn't something that people can sustainably do for those lengths. However, if there is an emergency and someone needs to cover for someone in a pinch and work a really long day, we can schedule this as a separate shift with an appropriate buffer after the 8 hours to make this sustainable / legal.
 
 ### 3. Lunch Visibility to Customers
 The lunch break should appear as unavailable time in the slot search results. Currently, the system generates free windows by subtracting bookings from availability. The lunch break should be subtracted too, effectively splitting a long availability block into two shorter ones.
+- Mason- The customer just sees availability blocks. As discussed before, the lunch break will just be blocked out and essentially create two separate availability windows so the client won't necessarily be aware that there is a lunch break. They will just see that there is no availability at that time. For all they know, the previous person did a 30min longer massage. Is there a reason you think that the person would need to know this information?
 
 ### 4. Provider Preference Defaults from Facility
 The provider preferences (buffer, lunch length, time hole) should cascade: system default → facility override → provider preference. This gives facility managers control while allowing provider customization within bounds.
+- I feel like it should be the opposite (minus facility maximum / minimum values). The facility sets a default (like a buffer window of 10min) but the provider can override that if they choose. However, they are only paid for the facility default values. So if they increase their buffer to 20min, that's fine, but they aren't going to be paid for the extra ten minutes because that was their choice.
 
 ### 5. Impact on Walk-In Staff Bookings
 The staff check-in walk-in flow currently uses `skipAvailabilityCheck` for drop-in bookings. These bookings should still respect lunch breaks (you can't book a client during the provider's lunch), but buffer validation is already skipped. The lunch break should be a hard constraint even for walk-ins.
