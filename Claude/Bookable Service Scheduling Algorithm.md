@@ -67,7 +67,7 @@ There should also be a provider override for lunch length that has to be at leas
 	- 2 60min shifts with 10min buffer is 2:10 / 3:50 (50/50)
 	- 3 60min shifts with 10min buffer is 3:20 / 2:40 (40/20) - 40 is the lowest max delta
 	- 4 60min shifts with 10min buffer is 4:30 / 1:30 (90/90)
-Extend the shift by the unpaid lunch break. Also, please rewrite the document with 10min as the default buffer and all the examples. Feel free to create open questions of bring up any concerns or suggestions. Anything else I should factor into this scheduling algorithm while we are redoing it? We also need to add something to the staff portal for a user to change 
+Extend the shift by the unpaid lunch break. Also, please rewrite the document with 10min as the default buffer and all the examples. Feel free to create open questions of bring up any concerns or suggestions. Anything else I should factor into this scheduling algorithm while we are redoing it? We also need to add something to the staff portal for a user to change their preferred lunch break length, preferred buffer, and time hole setting. 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
