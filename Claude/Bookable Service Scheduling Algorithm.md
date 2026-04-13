@@ -405,14 +405,17 @@ The staff check-in walk-in flow currently uses `skipAvailabilityCheck` for drop-
 
 ### 6. Historical Consistency
 When a provider changes their buffer or lunch preference, existing future bookings should NOT be retroactively recalculated. The buffer assigned at booking time is stored on the session and remains fixed. Only new bookings use the updated preferences.
-- Mason- Yeah, past bookings should use the old settings. I feel like it would be useful to trac
+- Mason- Yeah, past bookings should use the old settings. I think how we should handle this is have the notion of a shift in the system that has a snapshot of all of these settings and when the lunch is. The lunch break should be visible to the provider and in the provider portal. As soon as any session is booked within a given shift, a shift entry should be generated into the database and the combination of facility / provider settings should be generated and snapshotted into this shift entry. This would mean that any shift for which there is a booking will use the old settings while shifts that have no bookings will be influenced by facility / provider setting changes up until the first booking in a shift. I think this is the best way to handle this possibility.
 
 ### 7. Minimum Buffer Enforcement
 The document specifies minimum buffer of 10min. But what if a legacy provider has a 5min override? We should either:
 - Enforce the 10min minimum at the API level (reject overrides below 10min)
 - Or display a warning but allow it for backwards compatibility
 
-I'd recommend enforcing the minimum — it's a business policy decision that the buffer serves as a break.
+- Mason - We have never deployed. There are no existing bookings. We are about to deploy next month but this isn't an issue for now.
+
+
+Mason- I think a separate sce
 
 # Implementation Plan
 
