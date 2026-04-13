@@ -52,6 +52,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Scheduling Algorithm
 
+Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide breaks and lunches for therapists. We need the following configurable settings per facility that are populated from configurable defaults that are secrets / configuration settings:
+- Shift interval that requires a paid break for each interval (excluding lunches)
+- Shift interval that requires an unpad 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
