@@ -55,18 +55,19 @@ Please create a plan with phases of implementation. Within each phase, please re
 Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide breaks and lunches for therapists. We can simplify this a lot by making the minimum buffer 10minutes which also provides a break between clients. We need the following configurable settings per facility that are populated from configurable defaults that are secrets / configuration settings:
 - Shift interval that requires an unpaid lunch break (default to six hours)
 - Lunch length (default to 30min / minimum 30min)
-There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). A break or lunch subsumes buffer so we don't need buffer before or after a break. The lunch must be between the 2nd and 5th hours of a shift. Calculate 60min slots with buffer between and then figure out which option for splitting the shift what the delta is between the first half of the shift and the midpoint of the shift and the delta between the after lunch component of the shift and the mid point and figure out which delta is scheduling 60min slots is closest to the middle of the shift and choose that spot to place the lunch. Take these examples:
+There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). A break or lunch subsumes buffer so we don't need buffer before or after a break. The lunch must be between the 2nd and 5th hours of a shift. Calculate 60min slots with buffer between and then figure out which option for splitting the shift what the delta is between the first half of the shift and the midpoint of the shift and the delta between the after lunch component of the shift and the mid point and figure out which delta is the largest. Go with the placement choice that creates the smallest, maximum delta. Take these examples:
 - 8hr shift
 	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
-	- 4 60min shifts with 10min buffer is 4:30 / 3:30 (30/30)
+	- 4 60min shifts with 10min buffer is 4:30 / 3:30 (30/30) - 30 is lowest max delta
 - 7hr shift
 	- 2 60min shifts with 10min buffer is 2:10 / 4:50 (80/80)
 	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (10/70)
-	- 4 60min shifts with 10min buffer is 4:30 / 2:30 (60/60)
+	- 4 60min shifts with 10min buffer is 4:30 / 2:30 (60/60) - 60 is the lowest max delta
 - 6hr shift
 	- 2 60min shifts with 10min buffer is 2:10 / 3:50 (50/50)
-	- 3 60min shifts with 10min buffer is 3:20 / 2:40 (40/20)
+	- 3 60min shifts with 10min buffer is 3:20 / 2:40 (40/20) - 40 is the lowest max delta
 	- 4 60min shifts with 10min buffer is 4:30 / 1:30 (90/90)
+Extend the shift by the unpaid lunch break. Also, please rewrite the document with 10min as the default buffer and all the examples. Feel free to create open questions of bring up any concerns or suggestions. Anything else I should factor into this scheduling algorithm while we are redoing it? We also need to add something to the staff portal for a user to change 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
