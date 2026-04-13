@@ -55,7 +55,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide breaks and lunches for therapists. We can simplify this a lot by making the minimum buffer 10minutes which also provides a break between clients. We need the following configurable settings per facility that are populated from configurable defaults that are secrets / configuration settings:
 - Shift interval that requires an unpaid lunch break (default to six hours)
 - Lunch length (default to 30min / minimum 30min)
-There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). A break or lunch subsumes buffer so we don't need buffer before or after a break. The lunch must be between the 2nd and 5th hours of a shift. Calculate 60min slots with buffer between and then figure out which option for scheduling 60min slots is closest to the middle of the shift and choose that spot to place the lunch. For instance, three 60min shifts with 10min buffer between would result in 3:20min which is 40min away from four hours. Four 60min shifts with 10min between them would be 4:30 which is 30min away from four hours so go with the four 60min shift option. H
+There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). A break or lunch subsumes buffer so we don't need buffer before or after a break. The lunch must be between the 2nd and 5th hours of a shift. Calculate 60min slots with buffer between and then figure out which option for scheduling 60min slots is closest to the middle of the shift and choose that spot to place the lunch. Take these examples:
+- 8hr shift
+	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
+	- 4 60min shifts with 10min buffer is 4:30 / 3:30 (30/30)
+- 7hr shift
+	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
