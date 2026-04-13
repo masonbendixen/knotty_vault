@@ -397,10 +397,11 @@ The lunch break should appear as unavailable time in the slot search results. Cu
 
 ### 4. Provider Preference Defaults from Facility
 The provider preferences (buffer, lunch length, time hole) should cascade: system default → facility override → provider preference. This gives facility managers control while allowing provider customization within bounds.
-- I feel like it should be the opposite (minus facility maximum / minimum values). The facility sets a default (like a buffer window of 10min) but the provider can override that if they choose. However, they are only paid for the facility default values. So if they increase their buffer to 20min, that's fine, but they aren't going to be paid for the extra ten minutes because that was their choice.
+- Mason- I feel like it should be the opposite (minus facility maximum / minimum values). The facility sets a default (like a buffer window of 10min) but the provider can override that if they choose. However, they are only paid for the facility default values. So if they increase their buffer to 20min, that's fine, but they aren't going to be paid for the extra ten minutes because that was their choice.
 
 ### 5. Impact on Walk-In Staff Bookings
 The staff check-in walk-in flow currently uses `skipAvailabilityCheck` for drop-in bookings. These bookings should still respect lunch breaks (you can't book a client during the provider's lunch), but buffer validation is already skipped. The lunch break should be a hard constraint even for walk-ins.
+- Mason- It does? Um... that's news to me and was not intended. A walk-in should not disrupt the availability system and we should only show windows that are available. Also, we need two settings for providers for walk in. One is if they allow walk in customers, and, if so, what kind of buffer window to allow for booking. For the website, we have a minimum window for which booking is allowed. If a therapist sees they have no client in their first slot, they might not come in until their second slot. A therapist might see a gap in their schedule and decide to take a call, go run an errand, take a class at the studio, use the spa. We can't have someone walk in three min before a slot, have it booked, and expect a therapist to be ready. I think
 
 ### 6. Historical Consistency
 When a provider changes their buffer or lunch preference, existing future bookings should NOT be retroactively recalculated. The buffer assigned at booking time is stored on the session and remains fixed. Only new bookings use the updated preferences.
