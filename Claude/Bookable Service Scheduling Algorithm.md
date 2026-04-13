@@ -60,7 +60,13 @@ There should also be a provider override for lunch length that has to be at leas
 	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
 	- 4 60min shifts with 10min buffer is 4:30 / 3:30 (30/30)
 - 7hr shift
-	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
+	- 2 60min shifts with 10min buffer is 2:10 / 4:50 (80/80)
+	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (10/70)
+	- 4 60min shifts with 10min buffer is 4:30 / 2:30 (60/60)
+- 6hr shift
+	- 2 60min shifts with 10min buffer is 2:10 / 3:50 (50/50)
+	- 3 60min shifts with 10min buffer is 3:20 / 2:40 (40/20)
+	- 4 60min shifts with 10min buffer is 4:30 / 1:30 (90/90)
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
