@@ -368,13 +368,16 @@ Total: 7 × 60min clients in an 8-hour shift.
 	- Mason- I will go with your recommendation.
 
 4. **Lunch and existing bookings**: When a shift has existing bookings AND meets the lunch threshold, the lunch placement should be calculated from the original shift availability (not from free windows between existing bookings). The lunch position is determined once at schedule generation time and treated like an unavailable block. If a provider has bookings that span across where the lunch would go, the lunch cannot be placed there — should the algorithm shift the lunch to the next valid gap, or should it flag a scheduling conflict?
-	- Mason- The lunch is part of the booking process and is c
+	- Mason- The lunch is part of the booking process and is calculated before bookings are allowed. The lunch spot is generated and placed. The before and after lunch are separate windows (other than the first window ending on a nice alignment boundary) that are basically independent.
 
 5. **Lunch for split shifts**: If a provider has two availability blocks (e.g., 8-12 and 1-5), should lunch be calculated per-block or for the combined working time? If the gap between blocks already serves as a lunch, no additional lunch is needed.
+	- Mason- They are two separate shifts at that point with no lunch. 
 
 6. **Minimum buffer change impact on existing data**: The current system uses 5min default buffer. Changing to 10min default means existing provider configurations may need updating. Should we migrate existing 5min buffers to 10min, or grandfather them in? Provider overrides that were explicitly set to a specific value should be respected.
+	- Mason- we have not deployed yet and are still in development so there is nothing to migrate.
 
 7. **Provider preferences visibility**: The staff portal additions (preferred lunch length, preferred buffer, time hole setting) — should these be visible to admins in the manage portal as well? Can admins override provider preferences?
+	- It would be nice to know the staff preferences to the admins. 
 
 # Discussion & Suggestions
 
