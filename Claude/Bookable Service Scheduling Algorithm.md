@@ -30,7 +30,10 @@ The Bookable Service Foundation.md file currently has the scheduling algorithm d
 	- This will cause concurrent pairs of 90min massages to occupy three hours with three buffers
 		- If one of the pair members is cancelled, it can only be replaced with another 90min massage, a 60min massage is not allowed since that would cause a 30min gap
 		- If both are cancelled, they can be replaced with either three 60min massages OR a 120min and 60min massage (in either order)
-	- The complicated case is i
+	- The complicated case is if we have three 90min massages A, B, C booked in a row
+		- This would look like A, double buffer, B, single buffer, C, double buffer
+		- If B is cancelled, it can only be replaced with either a 90min massage
+		- If B is cancelled and either A or B as well, either block can b
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
