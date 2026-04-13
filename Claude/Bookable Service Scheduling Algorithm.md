@@ -57,7 +57,7 @@ Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide
 - Shift interval that requires an unpaid lunch break (default to six hours)
 - Break length (default to 10min)
 - Lunch length (default to 30min)
-There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). For the break scheduling, they should be not less than 90min into an inter but not more than three hours 
+There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). For the break scheduling, they should be not less than 90min into an interval but not more than three hours into an interval. For lunch, it should be scheduled not less than three hours into a shift and not more than five hours into a shift. A break or lunch subsumes buffer so we don't need buffer before or after a break. Double buffer after a 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
