@@ -255,10 +255,13 @@ Result: The 195min window can hold three 60min, or 120min+60min, or 60min+120min
 # Open Questions
 
 1. **Provider buffer overrides**: The current system allows per-provider buffer overrides (e.g., a provider may require 10min instead of 5min). Should the new 90min alternating double/single buffer logic also scale with provider overrides? (i.e., if override is 10min, single buffer = 10min and double buffer = 20min?) **Assumed yes — the effective buffer is already used as the base.**
+	- Mason- Yes, 5min is just a default. Buffer is the concept and whatever is configured is used. It is the buffer that is relevant, not the five minutes.
 
 2. **Room-based products**: The room availability algorithm (`room_availability_helper.cpp`) uses a completely different slot generation model (fixed 15-minute intervals, no buffers, capacity-based). The new buffer rules only apply to provider-based products. **Assumed room-based products are unchanged.**
+	- Mason- Yes, this does not apply to room based products.
 
 3. **Existing bookings**: When checking the context of preceding bookings, we need to know what buffer was assigned to each existing 90min session. Should this be stored on the `bookable_service_sessions` table (e.g., a `buffer_type` column), or derived from the sequence at query time? **Storing on the session is safer and more performant — the buffer was determined at booking time and shouldn't change.**
+	- Mason- I will go with your recommendation.
 
 # Implementation Plan
 
