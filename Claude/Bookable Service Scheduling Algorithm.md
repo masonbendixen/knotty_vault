@@ -128,9 +128,41 @@ For each provider, determine free windows by subtracting existing bookings from 
 This context is needed to determine the buffer requirement for a 90min booking placed at the start of the free window.
 
 ### Step 3: Generate Valid Start Times
-Same as current: start times are generated at `window_start`, `window_start + minSlot`, `window_start + 2*minSlot`, etc., where `minSlot = baseDuration + baseBuffer` (65 minutes for 60min + 5min buffer), all rounded to 5-minute boundaries.
 
-**Bidirectional hole prevention** remains unchanged: a start time is only valid if the gap before it (from window start or previous slot's buffer end) is either 0 or >= minSlot.
+Start times are generated at `window_start`, `window_start + minSlot`, `window_start + 2*minSlot`, etc., where `minSlot = baseDuration + baseBuffer` (65 minutes for 60min + 5min buffer), all rounded to 5-minute boundaries.
+
+#### Bidirectional Hole Prevention
+
+The hole check applies in **both directions** — a slot is only valid if it does not create an unusable gap either before or after it. An unusable gap is a gap that is greater than zero but smaller than `minSlot` (the smallest bookable unit including its buffer).
+
+**Before the slot (leading gap):**
+- The gap between the window start (or previous booking's buffer end) and this slot's start time must be either **exactly 0** or **>= minSlot**
+- Valid start times from window start: `window_start`, `window_start + minSlot`, `window_start + 2*minSlot`, etc.
+
+**After the slot (trailing gap):**
+- The remaining time between this slot's buffer end and the window end (or next booking's start) must be either **exactly 0** or **>= minSlot**
+- If the remaining time is > 0 but < minSlot, the slot is **rejected** because it would create an unusable hole
+
+**Example**: Free window 8:00 AM – 10:00 AM (120 minutes), minSlot = 65 min:
+
+| Start Time | Leading Gap | Valid? | Reason |
+|-----------|-------------|--------|--------|
+| 8:00 AM   | 0 min       | ✓      | Window start, no gap before it |
+| 8:05 AM   | 5 min       | ✗      | Leaves 5-min gap before it (< 65min) |
+| 8:10 AM   | 10 min      | ✗      | 10-min gap before (< 65min) |
+| ...       | ...         | ✗      | All gaps < 65min |
+| 9:05 AM   | 65 min      | ✓      | Exactly minSlot from 8:00 — enough for one 60min+buffer before it |
+| 10:10 AM  | 130 min     | ✗      | Past window end (10:10 > 10:00) |
+
+So valid start times are **8:00 AM** and **9:05 AM** only.
+
+At 8:00 AM, for a 60min variant: end = 9:00, buffer end = 9:05. Trailing gap: 10:00 - 9:05 = 55 min. 55 < 65 → **rejected** (would leave unusable 55-min hole).
+
+At 8:00 AM, for a 120min variant: end = 10:00, buffer end = 10:10. But 10:10 > 10:00 → buffer extends past window. Service itself fits (10:00 = 10:00), gap after end = 0 → **accepted** with buffer clipped to window end.
+
+At 9:05 AM, for a 60min variant: end = 10:05. 10:05 > 10:00 → **rejected** (doesn't fit).
+
+Result: Only a 120min fits in the 120-minute window. This is correct — two 60min bookings would need 130min (60+5+60+5).
 
 ### Step 4: Generate Slots per Start Time
 For each valid start time, try each variant (longest first):
