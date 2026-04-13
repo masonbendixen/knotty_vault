@@ -377,7 +377,7 @@ Total: 7 × 60min clients in an 8-hour shift.
 	- Mason- we have not deployed yet and are still in development so there is nothing to migrate.
 
 7. **Provider preferences visibility**: The staff portal additions (preferred lunch length, preferred buffer, time hole setting) — should these be visible to admins in the manage portal as well? Can admins override provider preferences?
-	- It would be nice to know the staff preferences to the admins. 
+	- Mason- It would be nice to know the staff preferences to the admins. Knowing their buffer length preferences could help with planning shifts that end smoothly with the buffer preferences. I can imagine there will be a number of staff preferences that would be useful for admins to know so this could be the start for that class of data.
 
 # Discussion & Suggestions
 
