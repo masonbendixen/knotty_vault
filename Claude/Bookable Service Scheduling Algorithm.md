@@ -53,8 +53,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 # Scheduling Algorithm
 
 Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide breaks and lunches for therapists. We need the following configurable settings per facility that are populated from configurable defaults that are secrets / configuration settings:
-- Shift interval that requires a paid break for each interval (excluding lunches)
-- Shift interval that requires an unpad 
+- Shift interval that requires a paid break for each interval (excluding lunches) (default to four hours)
+- Shift interval that requires an unpaid lunch break (default to six hours)
+- Break length (default to 10min)
+- Lunch length (default to 30min)
+There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). For the break scheduling, they should be not less than 90min into an inter but not more than three hours 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
