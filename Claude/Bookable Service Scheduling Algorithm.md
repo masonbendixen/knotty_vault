@@ -33,7 +33,14 @@ The Bookable Service Foundation.md file currently has the scheduling algorithm d
 	- The complicated case is if we have three 90min massages A, B, C booked in a row
 		- This would look like A, double buffer, B, single buffer, C, double buffer
 		- If B is cancelled, it can only be replaced with either a 90min massage
-		- If B is cancelled and either A or B as well, either block can b
+		- If B is cancelled and either A or B as well, either block can be replaced with:
+			- Two 90min massages
+			- Three 60min massages
+			- A 60min and 120min massage in either order
+		- The key is that that alternating double buffers for 90min massages makes them compatible with 60min and 120min massages
+	- A 90min massage next to another 90min massage is compatible with 60min and 90min massage
+	- A 90min massage sandwiched between 60min or 120min massages is essentially and island and can only be replaced with another 90min massage if it is cancelled
+	- A 120min massage that is cancelled with no adjacent free slots can never be replaced by a 90min massage as that would create a 30min hole
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
