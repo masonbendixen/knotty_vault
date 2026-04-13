@@ -385,9 +385,11 @@ Total: 7 × 60min clients in an 8-hour shift.
 
 ### 1. Setup/Teardown Time at Shift Boundaries
 Should there be a configurable "no booking" period at the very start and end of a shift? For example, 5-10 minutes for a therapist to set up their room at the beginning and clean up at the end. This is different from buffer (which is between clients). Currently, the first booking starts right at the shift start.
+- Mason- I think we should add the capability but set both the start and end buffer to zero by default. My general feeling is that this is more of a shift scheduling thing and we should never schedule shifts with no buffer between them but it's generally assumed the therapist will be there a little early if they need to set up and stay a little late if they need to do cleanup. But it would be expensive to add later so let's do the support now even though I don't plan on enabling it currently.
 
 ### 2. Short Breaks vs. Lunch
 The 10min buffer between clients provides a micro-break. But for very long shifts (10+ hours), should there be mandatory short breaks in addition to lunch? Some jurisdictions require a paid 10-15 min break for every 4 hours worked. This could be implemented as a second tier of the lunch system — a shorter break that doesn't need the balanced-split algorithm.
+- Mason- I don't plan on having people work shifts longer than 8 hours. I feel like massage is hard and it just isn
 
 ### 3. Lunch Visibility to Customers
 The lunch break should appear as unavailable time in the slot search results. Currently, the system generates free windows by subtracting bookings from availability. The lunch break should be subtracted too, effectively splitting a long availability block into two shorter ones.
