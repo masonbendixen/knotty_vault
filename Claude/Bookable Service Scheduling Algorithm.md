@@ -39,7 +39,7 @@ The Bookable Service Foundation.md file currently has the scheduling algorithm d
 			- A 60min and 120min massage in either order
 		- The key is that that alternating double buffers for 90min massages makes them compatible with 60min and 120min massages
 	- A 90min massage next to another 90min massage is compatible with 60min and 90min massage
-	- A 90min massage sandwiched between 60min or 120min massages is essentially and island and can only be replaced with another 90min massage if it is cancelled
+	- A 90min massage sandwiched between 60min or 120min massages is essentially an island and can only be replaced with another 90min massage if it is cancelled
 	- A 120min massage that is cancelled with no adjacent free slots can never be replaced by a 90min massage as that would create a 30min hole
 	- A 90min massage can only be booked into an available window if there is either exactly 90min plus single or double buffer depending on previous massage state OR the window is at least 180min plus 3xbuffer long
 	- Please note that buffer requirements after a booking don't count if this is the last booking in an availability block (meaning that there isn't 60min left after the last booking in this block)
