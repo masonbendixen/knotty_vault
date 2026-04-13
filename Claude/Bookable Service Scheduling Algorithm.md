@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 4/13/2026
-Version: 0.1
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -52,40 +52,26 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Scheduling Algorithm
 
-Mason- Tweaks to scheduling algorithm for lunches and breaks. We need to provide breaks and lunches for therapists. We can simplify this a lot by making the minimum buffer 10minutes which also provides a break between clients. We need the following configurable settings per facility that are populated from configurable defaults that are secrets / configuration settings:
-- Shift interval that requires an unpaid lunch break (default to six hours)
-- Lunch length (default to 30min / minimum 30min)
-There should also be a provider override for lunch length that has to be at least the facility lunch length (ie. the law requires 30min but the therapist might want 60min but they can't choose less than 30min). A break or lunch subsumes buffer so we don't need buffer before or after a break. The lunch must be between the 2nd and 5th hours of a shift. Calculate 60min slots with buffer between and then figure out which option for splitting the shift what the delta is between the first half of the shift and the midpoint of the shift and the delta between the after lunch component of the shift and the mid point and figure out which delta is the largest. Go with the placement choice that creates the smallest, maximum delta. Take these examples:
-- 8hr shift
-	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (40/40)
-	- 4 60min shifts with 10min buffer is 4:30 / 3:30 (30/30) - 30 is lowest max delta
-- 7hr shift
-	- 2 60min shifts with 10min buffer is 2:10 / 4:50 (80/80)
-	- 3 60min shifts with 10min buffer is 3:20 / 4:40 (10/70)
-	- 4 60min shifts with 10min buffer is 4:30 / 2:30 (60/60) - 60 is the lowest max delta
-- 6hr shift
-	- 2 60min shifts with 10min buffer is 2:10 / 3:50 (50/50)
-	- 3 60min shifts with 10min buffer is 3:20 / 2:40 (40/20) - 40 is the lowest max delta
-	- 4 60min shifts with 10min buffer is 4:30 / 1:30 (90/90)
-Extend the shift by the unpaid lunch break. Also, please rewrite the document with 10min as the default buffer and all the examples. Feel free to create open questions of bring up any concerns or suggestions. Anything else I should factor into this scheduling algorithm while we are redoing it? We also need to add something to the staff portal for a user to change their preferred lunch break length, preferred buffer, and time hole setting. 
 ## Core Constants
 
 - **Slot alignment**: 5 minutes (all start times snap to 5-minute boundaries)
 - **Base unit**: 60 minutes
-- **Buffer**: 5 minutes (configurable per-variant, overridable per-provider)
+- **Buffer**: 10 minutes default (configurable per-provider, minimum 10 minutes)
 - **Variants**: 60min (1x), 90min (1.5x), 120min (2x)
 
 ## Buffer Rules
 
-The buffer model is designed to maximize rebookability — when a slot is cancelled, the freed time should be fillable with the maximum number of alternative configurations.
+The buffer model serves two purposes: (1) providing a break between clients for the provider, and (2) maximizing rebookability when a slot is cancelled. With a 10-minute minimum buffer, providers always get at least 10 minutes between clients.
 
 ### 60-Minute Bookings
-- Always require **1 buffer** (5min) after the booking
-- A cancelled 60min slot frees 65 minutes — enough for exactly one more 60min + buffer
+- Always require **1 buffer** (10min) after the booking
+- Total occupied: **70min**
+- A cancelled 60min slot frees 70 minutes — enough for exactly one more 60min + buffer
 
 ### 120-Minute Bookings
-- Always require **2 buffers** (10min) after the booking
-- A cancelled 120min slot frees 130 minutes — enough for exactly two 60min bookings (60+5+60+5 = 130min)
+- Always require **2 buffers** (20min) after the booking
+- Total occupied: **140min**
+- A cancelled 120min slot frees 140 minutes — enough for exactly two 60min bookings (60+10+60+10 = 140min)
 - This is the key **subdivisibility guarantee**: a 120min block is always perfectly replaceable by two 60min blocks
 
 ### 90-Minute Bookings (Context-Dependent Buffers)
@@ -93,24 +79,24 @@ The 90-minute variant requires context-dependent buffers because 90 is not an ex
 
 **Rule: Alternating double/single buffers for consecutive 90-minute bookings**
 
-1. **First 90min in a block, or previous was NOT 90min** → **double buffer** (10min) after this 90min
-2. **Previous was 90min with double buffer** → **single buffer** (5min) after this 90min
-3. **Previous was 90min with single buffer** → **double buffer** (10min) after this 90min
+1. **First 90min in a block, or previous was NOT 90min** → **double buffer** (20min) after this 90min
+2. **Previous was 90min with double buffer** → **single buffer** (10min) after this 90min
+3. **Previous was 90min with single buffer** → **double buffer** (20min) after this 90min
 
 This creates an alternating pattern for consecutive 90-min bookings:
 
 ```
-90min, 10min buffer, 90min, 5min buffer, 90min, 10min buffer, ...
+90min, 20min buffer, 90min, 10min buffer, 90min, 20min buffer, ...
   A      (double)      B     (single)      C      (double)
 ```
 
 **Why this works:**
-- A pair of 90min bookings (A + B) occupies: 90 + 10 + 90 + 5 = 195 minutes = 3 hours + 15 minutes (3 buffers)
-- If both A and B are cancelled, the 195 minutes can hold:
-  - Three 60min bookings: 60+5+60+5+60+5 = 195 ✓
-  - One 120min + one 60min: 120+10+60+5 = 195 ✓
-  - One 60min + one 120min: 60+5+120+10 = 195 ✓
-  - Two 90min bookings (same as before): 90+10+90+5 = 195 ✓
+- A pair of 90min bookings (A + B) occupies: 90 + 20 + 90 + 10 = 210 minutes (3 hours 30 minutes, 3 buffers)
+- If both A and B are cancelled, the 210 minutes can hold:
+  - Three 60min bookings: 60+10+60+10+60+10 = 210 ✓
+  - One 120min + one 60min: 120+20+60+10 = 210 ✓
+  - One 60min + one 120min: 60+10+120+20 = 210 ✓
+  - Two 90min bookings (same as before): 90+20+90+10 = 210 ✓
 - If only one of the pair is cancelled, only a 90min replacement fits (60min would leave a 30min hole)
 
 **Island 90-minute bookings:**
@@ -123,29 +109,92 @@ This creates an alternating pattern for consecutive 90-min bookings:
 
 ### Summary Table
 
-| Variant | Buffer Count | Buffer Duration (5min base) | Total Occupied | Condition |
-|---------|-------------|----------------------------|----------------|-----------|
-| 60min   | 1           | 5min                       | 65min          | Always |
-| 90min   | 2           | 10min                      | 100min         | First in block, or previous was non-90min, or previous 90min had single buffer |
-| 90min   | 1           | 5min                       | 95min          | Previous was 90min with double buffer |
-| 120min  | 2           | 10min                      | 130min         | Always |
+| Variant | Buffer Count | Buffer Duration (10min base) | Total Occupied | Condition |
+|---------|-------------|------------------------------|----------------|-----------|
+| 60min   | 1           | 10min                        | 70min          | Always |
+| 90min   | 2           | 20min                        | 110min         | First in block, or previous was non-90min, or previous 90min had single buffer |
+| 90min   | 1           | 10min                        | 100min         | Previous was 90min with double buffer |
+| 120min  | 2           | 20min                        | 140min         | Always |
+
+## Lunch Break System
+
+Providers working shifts at or above a configurable threshold require an unpaid lunch break. The shift clock time is extended by the lunch duration so the provider still works the full shift hours.
+
+### Configuration
+
+| Setting | Level | Default | Constraints |
+|---------|-------|---------|-------------|
+| Shift threshold requiring lunch | Facility (from secrets/config) | 6 hours | Must be > 0 |
+| Lunch length | Facility (from secrets/config) | 30 min | Minimum 30 min |
+| Provider lunch length override | Per-provider | (uses facility default) | Must be >= facility lunch length |
+
+### Lunch Placement Algorithm
+
+When a shift meets or exceeds the threshold, the algorithm determines optimal lunch placement:
+
+1. **Extend shift**: Add lunch duration to the total clock time. An 8hr shift with 30min lunch runs 8:00 AM – 4:30 PM on the clock, with the provider working 8 hours.
+
+2. **Constraint**: Lunch must begin **between the 2nd and 5th hours** of the shift (measured from shift start, in working time). This ensures neither the morning nor afternoon portion is unreasonably short or long.
+
+3. **Calculate split candidates**: Compute 60min slots with buffers from the start of the shift. Each buffer boundary between slots is a candidate lunch start point (within the 2nd–5th hour constraint).
+
+4. **Select optimal placement**: For each candidate, calculate the working time before lunch and working time after lunch. Compute the delta of each half from the midpoint of total working time. Pick the candidate with the **smallest maximum delta** — this creates the most balanced split.
+
+5. **Lunch subsumes buffer**: No additional buffer is required before or after the lunch break. The lunch IS the break.
+
+### Worked Examples (10min buffer, 30min lunch)
+
+#### 8-hour shift (480min working, 510min clock)
+Midpoint of working time: 240min (4:00)
+
+| Slots Before Lunch | Pre-Lunch Work | Post-Lunch Work | Delta A | Delta B | Max Delta |
+|--------------------:|---------------:|----------------:|--------:|--------:|----------:|
+| 3 | 3×60 + 2×10 = 200min (3:20) | 280min (4:40) | 40 | 40 | **40** |
+| 4 | 4×60 + 3×10 = 270min (4:30) | 210min (3:30) | 30 | 30 | **30** ← Winner |
+
+**Result**: Lunch after the 4th client. Schedule: 4 slots (8:00–12:30), lunch (12:30–1:00), remaining slots (1:00–4:30).
+
+#### 7-hour shift (420min working, 450min clock)
+Midpoint: 210min (3:30)
+
+| Slots Before Lunch | Pre-Lunch Work | Post-Lunch Work | Delta A | Delta B | Max Delta |
+|--------------------:|---------------:|----------------:|--------:|--------:|----------:|
+| 2 | 2×60 + 1×10 = 130min (2:10) | 290min (4:50) | 80 | 80 | **80** |
+| 3 | 3×60 + 2×10 = 200min (3:20) | 220min (3:40) | 10 | 10 | **10** ← Winner |
+| 4 | 4×60 + 3×10 = 270min (4:30) | 150min (2:30) | 60 | 60 | **60** |
+
+**Result**: Lunch after the 3rd client.
+
+#### 6-hour shift (360min working, 390min clock)
+Midpoint: 180min (3:00)
+
+| Slots Before Lunch | Pre-Lunch Work | Post-Lunch Work | Delta A | Delta B | Max Delta |
+|--------------------:|---------------:|----------------:|--------:|--------:|----------:|
+| 2 | 2×60 + 1×10 = 130min (2:10) | 230min (3:50) | 50 | 50 | **50** |
+| 3 | 3×60 + 2×10 = 200min (3:20) | 160min (2:40) | 20 | 20 | **20** ← Winner |
+| 4 | 4×60 + 3×10 = 270min (4:30) | 90min (1:30) | 90 | 90 | **90** |
+
+**Result**: Lunch after the 3rd client.
+
+#### 5-hour shift (300min working) — no lunch required
+Below the 6-hour threshold. No lunch break inserted.
 
 ## Slot Generation Algorithm
 
 ### Step 1: Build Free Windows
-For each provider, determine free windows by subtracting existing bookings from availability blocks (unchanged from current implementation).
+For each provider, determine free windows by subtracting existing bookings from availability blocks. **NEW**: Also subtract the computed lunch break from the availability, creating two separate working windows (pre-lunch and post-lunch) for shifts that require lunch.
 
 ### Step 2: Determine Context for Each Free Window
-**NEW**: Before generating slots for a free window, determine the **preceding booking context**:
+Before generating slots for a free window, determine the **preceding booking context**:
 - What type of booking (if any) immediately precedes this free window?
 - If it was a 90min booking, was its buffer a single or double buffer?
-- If the free window starts at the beginning of an availability block, there is no preceding context.
+- If the free window starts at the beginning of an availability block (or after a lunch break), there is no preceding context.
 
 This context is needed to determine the buffer requirement for a 90min booking placed at the start of the free window.
 
 ### Step 3: Generate Valid Start Times
 
-Start times are generated at `window_start`, `window_start + minSlot`, `window_start + 2*minSlot`, etc., where `minSlot = baseDuration + baseBuffer` (65 minutes for 60min + 5min buffer), all rounded to 5-minute boundaries.
+Start times are generated at `window_start`, `window_start + minSlot`, `window_start + 2*minSlot`, etc., where `minSlot = baseDuration + baseBuffer` (70 minutes for 60min + 10min buffer), all rounded to 5-minute boundaries.
 
 #### Bidirectional Hole Prevention
 
@@ -159,221 +208,294 @@ The hole check applies in **both directions** — a slot is only valid if it doe
 - The remaining time between this slot's buffer end and the window end (or next booking's start) must be either **exactly 0** or **>= minSlot**
 - If the remaining time is > 0 but < minSlot, the slot is **rejected** because it would create an unusable hole
 
-**Example**: Free window 8:00 AM – 10:00 AM (120 minutes), minSlot = 65 min:
+**Example**: Free window 8:00 AM – 10:20 AM (140 minutes), minSlot = 70 min:
 
 | Start Time | Leading Gap | Valid? | Reason |
 |-----------|-------------|--------|--------|
 | 8:00 AM   | 0 min       | ✓      | Window start, no gap before it |
-| 8:05 AM   | 5 min       | ✗      | Leaves 5-min gap before it (< 65min) |
-| 8:10 AM   | 10 min      | ✗      | 10-min gap before (< 65min) |
-| ...       | ...         | ✗      | All gaps < 65min |
-| 9:05 AM   | 65 min      | ✓      | Exactly minSlot from 8:00 — enough for one 60min+buffer before it |
-| 10:10 AM  | 130 min     | ✗      | Past window end (10:10 > 10:00) |
+| 8:05 AM   | 5 min       | ✗      | Leaves 5-min gap before it (< 70min) |
+| ...       | ...         | ✗      | All gaps < 70min |
+| 9:10 AM   | 70 min      | ✓      | Exactly minSlot from 8:00 — enough for one 60min+buffer before it |
+| 10:20 AM  | 140 min     | ✗      | Past window end |
 
-So valid start times are **8:00 AM** and **9:05 AM** only.
+So valid start times are **8:00 AM** and **9:10 AM** only.
 
-At 8:00 AM, for a 60min variant: end = 9:00, buffer end = 9:05. Trailing gap: 10:00 - 9:05 = 55 min. 55 < 65 → **rejected** (would leave unusable 55-min hole).
+At 8:00 AM, for a 60min variant: end = 9:00, buffer end = 9:10. Trailing gap: 10:20 - 9:10 = 70 min. 70 ≥ 70 (minSlot) → ✓
 
-At 8:00 AM, for a 120min variant: end = 10:00, buffer end = 10:10. But 10:10 > 10:00 → buffer extends past window. Service itself fits (10:00 = 10:00), gap after end = 0 → **accepted** with buffer clipped to window end.
+At 8:00 AM, for a 120min variant: end = 10:00, buffer end = 10:20. Remaining = 0 → ✓ (perfect fit)
 
-At 9:05 AM, for a 60min variant: end = 10:05. 10:05 > 10:00 → **rejected** (doesn't fit).
+At 9:10 AM, for a 60min variant: end = 10:10, buffer end = 10:20. Remaining = 0 → ✓
 
-Result: Only a 120min fits in the 120-minute window. This is correct — two 60min bookings would need 130min (60+5+60+5).
+Result: The 140-minute window offers either one 120min OR two 60min — the subdivisibility guarantee holds.
 
 ### Step 4: Generate Slots per Start Time
 For each valid start time, try each variant (longest first):
 
 1. **Calculate the buffer** for this variant at this position:
-   - 60min: always 1 buffer
-   - 120min: always 2 buffers
+   - 60min: always 1 buffer (10min)
+   - 120min: always 2 buffers (20min)
    - 90min: depends on what precedes this slot (see buffer rules above)
 
 2. **Check fit**: `startTime + duration + buffer <= windowEnd` (or if last slot, buffer waived if less than 60min remains after the booking)
 
 3. **Check trailing hole**: remaining time after buffer must be 0 or >= minSlot (same as current, but using the context-dependent buffer)
 
-### Step 5: End-of-Window Best-Fit Rule (MODIFIED)
+### Step 5: End-of-Window Best-Fit Rule
 
-**Current behavior**: At the last valid start time, offer only the longest fitting variant (best-fit).
-
-**New behavior**: At the last valid start time in a window:
-- If remaining time is **>= 120min + double buffer**: offer all fitting variants normally
-- If remaining time is **>= 90min + applicable buffer** but **< 120min + double buffer**: offer **both 90min AND 60min** (not just 90min)
+At the last valid start time in a window:
+- If remaining time is **>= 120min + double buffer (140min)**: offer all fitting variants normally
+- If remaining time is **>= 90min + applicable buffer** but **< 140min**: offer **both 90min AND 60min** (not just the longest)
 - If remaining time is **>= 60min** but **< 90min + applicable buffer**: offer only 60min
 - The rationale: 60min is the most popular variant and pairs best for availability. Restricting to only 90min at the end of a window unnecessarily limits options.
 
 ### Step 6: 90-Minute Availability Constraints
 A 90min booking can only be offered at a start time if ONE of these holds:
 1. The free window from that start time has **exactly** 90min + applicable buffer (single or double), making it a perfect fit
-2. The free window from that start time has **at least** 180min + 3×buffer (enough for a pair of 90min bookings in the alternating pattern)
+2. The free window from that start time has **at least** 210min (enough for a pair of 90min bookings in the alternating pattern: 90+20+90+10 = 210)
 3. The start time is at the **end of window** and the remaining time fits a 90min booking (with or without buffer per end-of-window rules)
 
-This prevents booking a 90min into a slot where the remaining time is awkward (e.g., 155 minutes — not enough for two 90s, and a lone 90 would leave a 60-minute gap that can only hold a 60min, wasting the potential for a 120min or two 60s).
+This prevents booking a 90min into a slot where the remaining time is awkward (e.g., 155 minutes — not enough for two 90s, and a lone 90 would leave a gap that can only hold a 60min, wasting the potential for a 120min or two 60s).
 
 ## Worked Examples
 
-### Example 1: 5 hours 20 minutes window (8:00 AM – 1:20 PM)
+### Example 1: 7-hour 20 minute window (8:00 AM – 3:20 PM, no lunch)
 
-**60min bookings**: 8:00, 9:05, 10:10, 11:15, 12:20 = 5 slots
-- Last booking ends 1:20 PM, window ends 1:20 PM — perfect fit
+**60min bookings**: 8:00, 9:10, 10:20, 11:30, 12:40, 13:50 = 6 slots
+- Last booking: 13:50+60=14:50. Buffer ends 15:00. Remaining: 15:20-15:00 = 20min < 60min → 6 slots is the max
+- Wait, 15:00+20min remaining. Let's verify: 6×70=420min=7:00. Window=7:20=440min. 440-420=20min leftover. So slot 6 at 13:50 ends at 14:50, buffer 15:00. Remaining 20min → no more. ✓
 
-**120min bookings**: 8:00, 10:10, 12:20 — but 12:20+120=2:20 PM > 1:20 PM, so only 2 slots at 8:00 and 10:10
-- After 10:10+120+10 = 12:20, remaining = 60min → fits one 60min
+**120min bookings**: 8:00 (ends 10:00, buffer 10:20), 10:20 (ends 12:20, buffer 12:40), 12:40 (ends 14:40, buffer 15:00). Remaining 20min. 3 slots.
+- Or mix: 120min at 8:00, then 60min at 10:20, 11:30, 12:40, 13:50. = 1×120 + 4×60.
 
-**90min at 8:00**: Check constraint — window is 320min. 90+10=100 at start, remaining 220min. 220 >= 180+15=195? Yes → allowed
-- 90min at 8:00 (double buffer, first in block) → buffer ends 9:40
-- Next start: 9:45 (rounded to 5-min boundary after 9:40)
-- At 9:45: 90min (previous was 90min with double buffer) → single buffer → buffer ends 11:20
-- Next start: 11:20
-- At 11:20: 90min (previous was 90min with single buffer) → double buffer → buffer ends 1:00
-- Remaining: 1:00 to 1:20 = 20min < 60min → no more slots
-- Total: 3 × 90min slots
+**90min**: Check at 8:00 — window is 440min. 90+20=110 at start, remaining 330. 330 ≥ 210? Yes → allowed.
+- 90min at 8:00 (double buffer) → ends 9:30, buffer ends 9:50
+- Next start: 9:50. 90min (previous 90 with double buffer) → single buffer → ends 11:20, buffer ends 11:30
+- Next start: 11:30. 90min (previous 90 with single buffer) → double buffer → ends 13:00, buffer ends 13:20
+- Next start: 13:20. 90min (previous 90 with double buffer) → single buffer → ends 14:50, buffer ends 15:00
+- Remaining: 20min < 60min → done. 4 × 90min slots.
 
-### Example 2: Cancelled 120min in a full day (8:00 AM – 4:00 PM)
+### Example 2: Cancelled 120min in a full day
 
 Original schedule:
 ```
-60min(8:00-9:00) buf(9:00-9:05) 120min(9:05-11:05) buf(11:05-11:15) 60min(11:15-12:15) ...
+60min(8:00-9:00) buf(9:00-9:10) 120min(9:10-11:10) buf(11:10-11:30) 60min(11:30-12:30) ...
 ```
 
-120min at 9:05 gets cancelled. Free window: 9:05 – 11:15 (130 min).
+120min at 9:10 gets cancelled. Free window: 9:10 – 11:30 (140 min).
 
-Available at 9:05:
-- 60min: 9:05–10:05, buffer ends 10:10. Remaining 11:15–10:10 = 65min ≥ 65min (minSlot) ✓
-- 120min: 9:05–11:05, buffer ends 11:15. Remaining = 0 ✓ (perfect fit)
-- 90min: Check constraint — window is 130min. 90+10=100, remaining 30min < 65min. Not enough for a second slot. Is it exactly 90+buffer? 90+10=100 ≠ 130. Not allowed.
+At 9:10:
+- 60min: 9:10–10:10, buffer ends 10:20. Remaining: 11:30–10:20 = 70min ≥ 70min (minSlot) ✓
+- 120min: 9:10–11:10, buffer ends 11:30. Remaining = 0 ✓ (perfect fit)
+- 90min: Window is 140min. 90+20=110, remaining 30min. Not enough for second slot. 90+buffer=110 ≠ 140. Not allowed.
 
-Next start: 10:10 (9:05 + 65min):
-- 60min: 10:10–11:10, buffer ends 11:15. Remaining = 0 ✓
-- 90min: 10:10+90=11:40 > 11:15. Doesn't fit.
-- 120min: 10:10+120=12:10 > 11:15. Doesn't fit.
+At 10:20:
+- 60min: 10:20–11:20, buffer ends 11:30. Remaining = 0 ✓
 
-Result: The 130min window offers either one 120min OR two 60min — exactly the subdivisibility guarantee.
+Result: Either one 120min OR two 60min. Subdivisibility guarantee holds.
 
 ### Example 3: End-of-window with 110 minutes remaining
 
-Availability window ends at 6:00 PM. Last valid start time at 4:10 PM. Remaining: 110 minutes.
+Last valid start time at 3:10 PM. Window ends at 5:00 PM. Remaining: 110 minutes.
 
-**Current algorithm**: Only offers 90min (best fit, longest that fits).
+- 120min: 3:10+120=5:10 > 5:00. Doesn't fit.
+- 90min: 3:10+90=4:40. Double buffer (20min): buffer ends 5:00. Remaining after: 0 ✓. But also check end-of-window rule: 110 >= 90+20=110 and 110 < 140. → Offer **both 90min and 60min**.
+- 60min: 3:10+60=4:10. Buffer: 10min. Buffer ends 4:20. Remaining: 40min < 60min → last slot. ✓
 
-**New algorithm**: 
-- 120min: 4:10+120=6:10 > 6:00. Doesn't fit.
-- 90min: 4:10+90=5:40. Buffer: double (10min, assuming first/non-90 preceding). 5:50 PM. Remaining after buffer: 10min < 60min → buffer waived at end of window. Fits ✓
-- 60min: 4:10+60=5:10. Buffer: 5min. 5:15 PM. Remaining after: 45min < 60min → this is the last slot. Fits ✓
+**Both 60min and 90min offered.** User can choose the popular 60min.
 
-**Both 60min and 90min are offered** at 4:10 PM. This is the key change — the user can choose the popular 60min option.
-
-### Example 4: Three consecutive 90min bookings then middle cancelled
+### Example 4: Three consecutive 90min, middle cancelled
 
 ```
-90min(8:00-9:30) double-buf(9:30-9:40) 90min(9:40-11:10) single-buf(11:10-11:15) 90min(11:15-12:45) double-buf(12:45-12:55)
+90min(8:00-9:30) double-buf(9:30-9:50) 90min(9:50-11:20) single-buf(11:20-11:30) 90min(11:30-13:00) double-buf(13:00-13:20)
 ```
 
-Middle booking (9:40-11:10) cancelled. Free window: 9:40 – 11:15 (95 min).
+Middle (9:50-11:20) cancelled. Free window: 9:50 – 11:30 (100 min).
 
-Preceding context: Previous booking was 90min with double buffer.
+Preceding context: Previous was 90min with double buffer.
 
-At 9:40:
-- 90min: 9:40+90=11:10. Buffer: single (5min, because previous was 90min with double buffer). Buffer ends 11:15. Remaining = 0. Perfect fit ✓
-- 60min: 9:40+60=10:40. Buffer: 5min. Buffer ends 10:45. Remaining: 11:15-10:45 = 30min. That's a gap > 0 but < 65min. NOT valid (creates unusable hole).
-- 120min: 9:40+120=11:40 > 11:15. Doesn't fit.
+At 9:50:
+- 90min: 9:50+90=11:20. Single buffer (10min, prev 90 had double). Buffer ends 11:30. Remaining = 0. Perfect fit ✓
+- 60min: 9:50+60=10:50. Buffer: 10min. Buffer ends 11:00. Remaining: 11:30-11:00 = 30min. Gap > 0 but < 70min → NOT valid.
+- 120min: 9:50+120=11:50 > 11:30. Doesn't fit.
 
-Result: Only 90min can fill the gap — correct, as a 60min would create a 30min hole.
+Result: Only 90min fits. Correct — 60min would leave a 30min hole.
 
-### Example 5: Two adjacent 90min cancelled (A and B from Example 4)
+### Example 5: Two adjacent 90min cancelled
 
-Both 8:00-9:30 and 9:40-11:10 cancelled. Free window: 8:00 – 11:15 (195 min).
+Both 8:00-9:30 and 9:50-11:20 cancelled. Free window: 8:00 – 11:30 (210 min).
 
-No preceding context (start of availability block).
+No preceding context (start of block).
 
 At 8:00:
-- 120min: 8:00+120=10:00. Buffer: double (10min). Buffer ends 10:10. Remaining: 11:15-10:10 = 65min ≥ 65min ✓
-- 90min: Check — window is 195min. 90+10=100, remaining 95min. 95 < 195 (3×90+3×5). But is it exactly 90+buffer? 195-100=95, which is exactly 90+5. So the second 90min would get single buffer, occupying 95min. Total: 100+95=195. Fits ✓
-- 60min: 8:00+60=9:00. Buffer: 5min. Buffer ends 9:05. Remaining: 11:15-9:05 = 130min ≥ 65min ✓
+- 120min: ends 10:00, buffer ends 10:20. Remaining: 11:30-10:20 = 70min ≥ 70 ✓
+- 90min: Window=210min. 90+20=110, remaining=100. Is 100 exactly 90+10? Yes (second 90 gets single buffer). Total 110+100=210 ✓
+- 60min: ends 9:00, buffer ends 9:10. Remaining: 11:30-9:10 = 140min ≥ 70 ✓
 
-At 9:05 (second start time, if 60min booked at 8:00):
-- 60min: 9:05+60=10:05. Buffer: 5min. Buffer ends 10:10. Remaining: 65min ≥ 65min ✓
-- 120min: 9:05+120=11:05. Buffer: 10min. Buffer ends 11:15. Remaining: 0 ✓
+At 9:10:
+- 60min: ends 10:10, buffer ends 10:20. Remaining: 70min ≥ 70 ✓
+- 120min: ends 11:10, buffer ends 11:30. Remaining = 0 ✓
 
-At 10:10 (third start time):
-- 60min: 10:10+60=11:10. Buffer: 5min. Buffer ends 11:15. Remaining: 0 ✓
+At 10:20:
+- 60min: ends 11:20, buffer ends 11:30. Remaining = 0 ✓
 
-Result: The 195min window can hold three 60min, or 120min+60min, or 60min+120min, or two 90min — all the expected configurations.
+Result: Three 60min, or 120+60, or 60+120, or two 90min — all fit in 210min. ✓
+
+### Example 6: 8-hour shift with lunch (10min buffer, 30min lunch)
+
+Shift: 8:00 AM – 4:30 PM (8hr working, 30min lunch).
+Lunch placement: after 4th client (see lunch algorithm above).
+
+Pre-lunch window: 8:00 AM – 12:30 PM (270min = 4.5hr working time)
+- Slots: 8:00, 9:10, 10:20, 11:30 → 4 × 60min
+
+Lunch: 12:30 PM – 1:00 PM (no buffer before/after)
+
+Post-lunch window: 1:00 PM – 4:30 PM (210min = 3.5hr working time)
+- Slots: 1:00, 2:10, 3:20 → 3 × 60min
+- Remaining after 3:20+60+10 = 4:30. Remaining = 0. ✓
+
+Total: 7 × 60min clients in an 8-hour shift.
 
 # Open Questions
 
-1. **Provider buffer overrides**: The current system allows per-provider buffer overrides (e.g., a provider may require 10min instead of 5min). Should the new 90min alternating double/single buffer logic also scale with provider overrides? (i.e., if override is 10min, single buffer = 10min and double buffer = 20min?) **Assumed yes — the effective buffer is already used as the base.**
-	- Mason- Yes, 5min is just a default. Buffer is the concept and whatever is configured is used. It is the buffer that is relevant, not the five minutes.
+1. **Provider buffer overrides**: The current system allows per-provider buffer overrides (e.g., a provider may require 15min instead of 10min). The 90min alternating double/single buffer logic scales with the provider's effective buffer. (i.e., if override is 15min, single buffer = 15min and double buffer = 30min.)
+	- Mason- Yes, 10min is just a default. Buffer is the concept and whatever is configured is used. It is the buffer that is relevant, not the ten minutes.
 
-2. **Room-based products**: The room availability algorithm (`room_availability_helper.cpp`) uses a completely different slot generation model (fixed 15-minute intervals, no buffers, capacity-based). The new buffer rules only apply to provider-based products. **Assumed room-based products are unchanged.**
+2. **Room-based products**: The room availability algorithm (`room_availability_helper.cpp`) uses a completely different slot generation model (fixed 15-minute intervals, no buffers, capacity-based). The new buffer rules only apply to provider-based products.
 	- Mason- Yes, this does not apply to room based products.
 
-3. **Existing bookings**: When checking the context of preceding bookings, we need to know what buffer was assigned to each existing 90min session. Should this be stored on the `bookable_service_sessions` table (e.g., a `buffer_type` column), or derived from the sequence at query time? **Storing on the session is safer and more performant — the buffer was determined at booking time and shouldn't change.**
+3. **Existing bookings**: When checking the context of preceding bookings, we need to know what buffer was assigned to each existing 90min session. This is stored on the `bookable_service_sessions` table via `buffer_end_us`. The difference between `buffer_end_us` and `end_time_us` reveals the buffer duration assigned at booking time.
 	- Mason- I will go with your recommendation.
+
+4. **Lunch and existing bookings**: When a shift has existing bookings AND meets the lunch threshold, the lunch placement should be calculated from the original shift availability (not from free windows between existing bookings). The lunch position is determined once at schedule generation time and treated like an unavailable block. If a provider has bookings that span across where the lunch would go, the lunch cannot be placed there — should the algorithm shift the lunch to the next valid gap, or should it flag a scheduling conflict?
+	- Mason- The lunch is part of the booking process and is c
+
+5. **Lunch for split shifts**: If a provider has two availability blocks (e.g., 8-12 and 1-5), should lunch be calculated per-block or for the combined working time? If the gap between blocks already serves as a lunch, no additional lunch is needed.
+
+6. **Minimum buffer change impact on existing data**: The current system uses 5min default buffer. Changing to 10min default means existing provider configurations may need updating. Should we migrate existing 5min buffers to 10min, or grandfather them in? Provider overrides that were explicitly set to a specific value should be respected.
+
+7. **Provider preferences visibility**: The staff portal additions (preferred lunch length, preferred buffer, time hole setting) — should these be visible to admins in the manage portal as well? Can admins override provider preferences?
+
+# Discussion & Suggestions
+
+## Additional Considerations for the Algorithm
+
+### 1. Setup/Teardown Time at Shift Boundaries
+Should there be a configurable "no booking" period at the very start and end of a shift? For example, 5-10 minutes for a therapist to set up their room at the beginning and clean up at the end. This is different from buffer (which is between clients). Currently, the first booking starts right at the shift start.
+
+### 2. Short Breaks vs. Lunch
+The 10min buffer between clients provides a micro-break. But for very long shifts (10+ hours), should there be mandatory short breaks in addition to lunch? Some jurisdictions require a paid 10-15 min break for every 4 hours worked. This could be implemented as a second tier of the lunch system — a shorter break that doesn't need the balanced-split algorithm.
+
+### 3. Lunch Visibility to Customers
+The lunch break should appear as unavailable time in the slot search results. Currently, the system generates free windows by subtracting bookings from availability. The lunch break should be subtracted too, effectively splitting a long availability block into two shorter ones.
+
+### 4. Provider Preference Defaults from Facility
+The provider preferences (buffer, lunch length, time hole) should cascade: system default → facility override → provider preference. This gives facility managers control while allowing provider customization within bounds.
+
+### 5. Impact on Walk-In Staff Bookings
+The staff check-in walk-in flow currently uses `skipAvailabilityCheck` for drop-in bookings. These bookings should still respect lunch breaks (you can't book a client during the provider's lunch), but buffer validation is already skipped. The lunch break should be a hard constraint even for walk-ins.
+
+### 6. Historical Consistency
+When a provider changes their buffer or lunch preference, existing future bookings should NOT be retroactively recalculated. The buffer assigned at booking time is stored on the session and remains fixed. Only new bookings use the updated preferences.
+
+### 7. Minimum Buffer Enforcement
+The document specifies minimum buffer of 10min. But what if a legacy provider has a 5min override? We should either:
+- Enforce the 10min minimum at the API level (reject overrides below 10min)
+- Or display a warning but allow it for backwards compatibility
+
+I'd recommend enforcing the minimum — it's a business policy decision that the buffer serves as a break.
 
 # Implementation Plan
 
-## Phase 1: Data Model — Store Buffer on Sessions
-*Add a column to track the buffer type assigned at booking time*
+## Phase 1: Configuration — Lunch and Buffer Settings
+*Add facility-level lunch settings and update buffer defaults*
 
-### 1. Database schema update
-- [ ] Add `buffer_end_us` column to `bookable_service_sessions` table (already exists per schema). Verify this is populated correctly at booking time. The difference between `buffer_end_us` and `end_time_us` tells us the buffer duration.
+### 1. Database: Add lunch configuration to secrets/config
+- [ ] Add secrets: `scheduling_lunch_threshold_minutes` (default 360), `scheduling_lunch_length_minutes` (default 30), `scheduling_min_buffer_minutes` (default 10)
+- [ ] Tests for secrets lookup with defaults
 
-### 2. Verify booking flow populates buffer correctly
-- [ ] Check `ServiceBookingHelper::BookService` and `CartCheckoutHelper::Checkout` — they create `bookable_service_sessions` rows. Verify `buffer_end_us` is set to `end_time_us + total_buffer`.
-- [ ] If not already correct, fix to use the new context-dependent buffer for 90min bookings.
+### 2. Database: Add provider lunch preference
+- [ ] Add `preferred_lunch_minutes` column to `provider_type_assignments` table (nullable — null means use facility default)
+- [ ] Add table helper method for getting/setting the value
+- [ ] Validation: must be >= facility lunch length when set
+- [ ] Tests
 
-## Phase 2: Algorithm — Context-Dependent Buffer Calculation
-*Modify `CalculateTotalBufferMinutes` and `ComputeSlotsForFreeWindow` to implement the new rules*
+### 3. Update default buffer from 5min to 10min
+- [ ] Update `product_variants` default buffer values in database helper / seed data
+- [ ] Ensure existing provider buffer overrides below 10min are handled (enforce minimum)
+- [ ] Tests
+
+## Phase 2: Algorithm — Lunch Placement
+*Implement the lunch break calculation and shift splitting*
+
+### 1. Lunch placement calculator (pure function)
+- [ ] Create `CalculateLunchPlacement(shiftDurationMinutes, bufferMinutes, lunchMinutes, lunchThresholdMinutes, lunchWindowStartHour, lunchWindowEndHour)` → returns minute offset into shift where lunch starts, or nullopt if no lunch needed
+- [ ] Implements the balanced-split algorithm from this document
+- [ ] Tests for 6hr, 7hr, 8hr, 5hr (no lunch), edge cases
+
+### 2. Integration with availability computation
+- [ ] In `ComputeAvailableSlots`, after loading provider availability, detect shifts meeting the lunch threshold
+- [ ] Calculate lunch placement for each qualifying shift
+- [ ] Split the availability window into pre-lunch and post-lunch windows
+- [ ] Lunch window treated as unavailable (no slots generated in it)
+- [ ] Tests
+
+## Phase 3: Algorithm — Context-Dependent Buffer Calculation
+*Modify buffer calculation and slot generation for the new rules*
 
 ### 1. New buffer calculation function
-- [ ] Create `CalculateBufferForVariant(variantDurationMinutes, baseDurationMinutes, effectiveBufferMinutes, precedingBookingDurationMinutes, precedingBookingBufferMinutes)` that implements the context-dependent buffer rules:
-  - 60min → always 1× buffer
-  - 120min → always 2× buffer
-  - 90min → double buffer (2×) if preceding is non-90min or preceding 90min had single buffer; single buffer (1×) if preceding 90min had double buffer
-  - Non-standard durations → current proportional rule (exact multiples get proportional, others get 1×)
-- [ ] Tests for all buffer calculation cases
+- [ ] Create `CalculateBufferForVariant(variantDurationMinutes, baseDurationMinutes, effectiveBufferMinutes, precedingBookingDurationMinutes, precedingBookingBufferMinutes)` implementing context-dependent rules
+- [ ] Tests for all buffer cases
 
-### 2. Update ComputeSlotsForFreeWindow signature
-- [ ] Add `precedingBookingContext` parameter (duration and buffer of the booking that ends at the start of this free window, or nullopt if window starts at availability block start)
-- [ ] Thread this context through to the buffer calculation for the first slot in each window
+### 2. Update ComputeSlotsForFreeWindow
+- [ ] Add `precedingBookingContext` parameter
+- [ ] Thread context through start time generation and slot generation
+- [ ] Implement slot-to-slot context propagation within a window
+- [ ] Tests
 
-### 3. Update slot-to-slot context propagation
-- [ ] When generating multiple start times within a window, track what the "previous" booking at each start time would be (the slot generated at the prior start time)
-- [ ] For each variant at each start time, calculate its buffer based on what would precede it
+### 3. 90-minute availability constraints
+- [ ] Implement the three conditions under which 90min can be offered
+- [ ] Tests
 
-### 4. Implement 90-minute availability constraints
-- [ ] 90min is only offered if: (a) exactly 90min+buffer fits perfectly, OR (b) window has >= 180min+3×buffer from this start time, OR (c) it's the last slot in the window (end-of-window rule)
-- [ ] Tests for all constraint cases
+### 4. Modified end-of-window rule
+- [ ] Offer both 60min and 90min at end of window when either fits
+- [ ] Tests
 
-### 5. Implement modified end-of-window rule
-- [ ] At the last valid start time, if remaining time >= 90min+buffer but < 120min+double_buffer, offer BOTH 60min and 90min (not just the longest)
-- [ ] Tests for end-of-window scenarios
+### 5. Port and extend all existing algorithm tests
+- [ ] Update all existing `ComputeSlotsForFreeWindow` tests for new signature and 10min buffer
+- [ ] Add tests for all new scenarios from worked examples
 
-### 6. Extensive algorithm tests
-- [ ] Port all existing `ComputeSlotsForFreeWindow` tests to the new signature
-- [ ] Add tests for: alternating 90min buffers, cancelled middle 90min, cancelled pair of 90min, 90min island, end-of-window 60+90 both offered, 90min constraint rejection
+## Phase 4: Integration — Booking Creation and Context
+*Update booking flow to store correct buffers and pass context*
 
-## Phase 3: Integration — Update Free Window Context in ComputeAvailableSlots
-*Pass preceding booking context from the main function to the slot generator*
+### 1. Update booking creation
+- [ ] `ServiceBookingHelper` and `CartCheckoutHelper` calculate context-dependent buffer when creating sessions
+- [ ] Store correct `buffer_end_us` on `bookable_service_sessions`
+- [ ] Tests
 
-### 1. Update ComputeAvailableSlots
-- [ ] When iterating through free windows between existing bookings, extract the preceding booking's duration and buffer from the booked interval data
-- [ ] Pass this context to `ComputeSlotsForFreeWindow`
+### 2. Pass preceding context in ComputeAvailableSlots
+- [ ] Extract preceding booking duration and buffer when building free windows
+- [ ] Pass to `ComputeSlotsForFreeWindow`
+- [ ] Integration tests
 
-### 2. Update booking creation
-- [ ] Ensure `ServiceBookingHelper` and `CartCheckoutHelper` calculate and store the context-dependent buffer when creating new sessions
-- [ ] Tests for booking creation with correct buffers
+## Phase 5: Staff Portal — Provider Preferences UI
+*Add UI for providers to manage their scheduling preferences*
 
-### 3. Integration tests
-- [ ] Test: existing 90min booking → free window → new 90min gets correct buffer
-- [ ] Test: existing 60min booking → free window → new 90min gets double buffer
-- [ ] Test: full day with mix of bookings and cancellations
+### 1. API endpoints
+- [ ] `GET /api/provider/preferences` — returns current buffer, lunch, time hole settings
+- [ ] `PUT /api/provider/preferences` — updates preferences with validation
+- [ ] Tests
 
-## Phase 4: Documentation Update
+### 2. Provider portal UI
+- [ ] Add "Scheduling Preferences" section to provider portal
+- [ ] Fields: preferred buffer (min 10min), preferred lunch length (min = facility min), max time hole
+- [ ] Validation and save
+- [ ] Component tests
+
+## Phase 6: Documentation Update
 *Move algorithm documentation from BSF doc to this document*
 
 ### 1. Update Bookable Service Foundation.md
-- [ ] Remove the scheduling algorithm section (lines 140-199 approximately)
+- [ ] Remove the scheduling algorithm section
 - [ ] Replace with a reference to this document: "See [[Bookable Service Scheduling Algorithm]] for the complete scheduling algorithm description."
-- [ ] Verify no other references in BSF doc that need updating
+- [ ] Verify no other references need updating
