@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 4/13/2026
-Version: 0.3
+Last Updated: 4/15/2026
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -213,9 +213,10 @@ Walk-in bookings are staff-initiated bookings for customers who arrive without a
 
 ### Walk-In Constraints
 1. **Respect availability**: Walk-ins must go through the normal availability system. No `skipAvailabilityCheck`. Available slots are shown to the staff member.
-2. **No booking immediately after in-session provider**: If a provider is currently with a client, the open slot immediately following that client **cannot** be booked as a walk-in. Rationale: therapists commonly extend sessions when no one is booked after them. If the therapist finishes on time, the front desk can ask them if they want to take the walk-in and use the admin override (see below).
+2. **No booking immediately after in-session provider**: If a provider is currently with a client, the open slot immediately following that client **cannot** be booked as a walk-in. "In session" is defined as the current time falling within `start_time_us` to `end_time_us + buffer_minutes` (the buffer extension serves as a grace period for wrap-up). Rationale: therapists commonly extend sessions when no one is booked after them. If the therapist finishes on time, the front desk can ask them if they want to take the walk-in and use the admin override (see below).
 3. **Minimum booking window**: The slot must start at least `walk_in_min_buffer_minutes` from now.
 4. **Admin override**: Admin/staff can override the "already started" constraint to book a slot that has technically started (within the buffer period). This handles the case where a therapist finishes on time and is ready for the next client.
+5. **Client cannot cancel walk-ins**: Walk-in bookings can only be cancelled by staff, not by the client.
 
 ## Mid-Session Extension (Upgrades)
 
@@ -227,11 +228,12 @@ It's common for a therapist to extend a session if no client is booked after the
 - 90min → 120min
 
 ### Rules
-1. **Staff/admin only**: Upgrades are initiated by staff, not customers.
-2. **Don't cancel the original booking**: Cancelling would affect bundled pricing. Instead, add an upgrade line item to the purchase.
-3. **Charge the delta**: The upgrade line item charges only the price difference between the original and new duration.
+1. **Staff/admin only**: Upgrades are initiated by staff via an in-session view in the provider portal. Therapists see "Upgrade to 90min" / "Upgrade to 120min" buttons during an active session.
+2. **Don't cancel the original booking**: Cancelling would affect bundled pricing. Instead, create a separate staff-only upgrade product purchase item.
+3. **Charge the delta based on list value**: The upgrade charges the difference between the target variant's list price and the original variant's **list value** (not what was actually paid). This avoids complications with bundles, comps, and coupons.
 4. **Override availability checks**: Upgrades may violate "no schedule hole" rules, which is acceptable because the alternative is dead time for the therapist.
-5. **Update the session**: Modify `bookable_service_sessions.end_time_us` and `buffer_end_us` to reflect the new duration.
+5. **Update the session**: Modify `bookable_service_sessions.end_time_us` and `buffer_end_us` to reflect the new duration. Update the existing entitlement's end time to match.
+6. **Future vision**: In-room kiosks where therapists can view their schedule, receive walk-in notifications, and extend sessions.
 
 ## Slot Generation Algorithm
 
@@ -415,55 +417,35 @@ These were open questions that have been answered:
 
 14. **Mid-session extensions don't cancel original**: Add upgrade line item, charge delta, update session times. Can override availability checks.
 
-# Open Questions
+15. **Walk-in "in-session" detection**: Use `start_time_us` / `end_time_us` range on booked sessions to determine if a provider is currently in session. No check-in status needed.
 
-1. **Walk-in "in-session" detection**: To prevent booking the slot immediately after a provider currently in session, we need to reliably determine if a provider is in session right now. The simplest approach: check if the current time falls within a booked session's `start_time_us` to `end_time_us` range. Is this sufficient, or do we need check-in status as a more reliable indicator?
-	- Mason- let's just do start_time_us / end_time_us
+16. **Upgrade product variant linking**: Don't cancel the original booking (too complicated with bundles, comps, coupons). The upgrade charges the delta based on the **list value** of the original variant, not what was actually paid. Approach: create a separate upgrade product type that is staff-only. This avoids the complexity of tying a new 90min booking to the old 60min booking while keeping the purchase history clean.
 
-2. **Upgrade product variant linking**: When extending 60→90min, we need the 90min variant's pricing. Should the upgrade create a new purchase item referencing the 90min variant with a negative adjustment for the already-paid 60min? Or should it create a special "upgrade" item type with just the delta price?
-	- Mason- I'm on the fence about this one. I don't want to cancel the existing one since that gets complicated with bundles, comps, coupons, etc. I feel like whatever we do, it should be the value of the previous thing that is essentially removed from the cost of the longer item, not what was actually paid. Is creating a 90min booking and somehow tying it to the old booking without cancelling it going to cause an issue? If so, I think we should just do a separate, upgrade product that can only be booked by staff.
+17. **Upgrade and existing entitlements**: Since massage entitlements end with the session (unlike memberships), simply modify the existing entitlement's end time to match the upgraded duration. No supplemental entitlement needed.
 
-3. **Upgrade and existing entitlements**: A 60min booking creates an entitlement. When upgraded to 90min, should the original entitlement be modified, or should a new supplemental entitlement be created?
-	- Mason- What do you recommend? Honestly, the entitlement really isn't that big to me for this one since an entitlement for massage ends with the session. It's not as complicated as a membership that grants a lot of features / benefits / seats.
+18. **Walk-in provider opt-in default**: Default to **true** — walk-ins are a standard part of the business. Providers who don't want walk-ins opt out.
 
-4. **Walk-in provider opt-in default**: Should "accepts walk-ins" default to true or false? If true, providers who don't want walk-ins need to opt out. If false, walk-ins are an opt-in feature. Recommendation: default true — walk-ins are a standard part of the business.
-	- Mason- I'll go with your recommendation.
+19. **Shift materialization trigger**: Create the shift record at the moment of the first booking. If all bookings in a shift are cancelled, delete the shift record and return to virtual/pristine state so current settings apply again.
 
-5. **Shift materialization trigger**: Should the shift record be created at the moment of the first booking, or at the start of the shift's clock time? Creating at booking time means the settings snapshot happens earlier, which is safer. But if a booking is cancelled and the shift has no bookings again, should the shift record be deleted (returning to virtual state)?
-	- Mason- At time of first booking. Yes, if a booking is cancelled, clear the shift record and go back to the pristine state.
+20. **Lunch visibility in provider portal**: Display lunch as a distinct labeled "Lunch" block on the provider's schedule view, not just as unavailable time.
 
-6. **Lunch visibility in provider portal**: The lunch break should be visible to providers in their schedule view. Should it appear as a distinct "Lunch" block, or just as unavailable time? Distinct block seems more user-friendly and provides a clear visual indicator.
-	- Mason- By all means, let's explicitly list it on their schedule.
+21. **Walk-in cancellation policy**: Clients cannot cancel walk-in bookings. Only staff can cancel a walk-in.
 
-# Discussion & Suggestions
+22. **Extension UI**: The upgrade flow lives in the staff/provider portal as an in-session view. The therapist sees "Upgrade to 90min" / "Upgrade to 120min" buttons during an active session. Long-term vision: kiosks in each room where therapists can view their schedule, receive walk-in notifications, and extend sessions.
 
-## 1. Rest Break Compliance
-Some states require paid 10-minute rest breaks for every 4 hours worked. With 10min buffers between clients, providers get regular micro-breaks. For a 7-slot day (7 hours of client time with 6 buffers), the provider gets 60 minutes of buffer time spread throughout the day plus a 30-minute lunch. This likely satisfies most rest break requirements, but you may want to verify with a labor attorney for your specific jurisdiction.
-- Mason- Sounds good.
+23. **Provider shift properties UI**: Providers can click on a day in their schedule to see shift properties. The shift-properties UI only appears when the materialized shift settings **differ** from the provider's current configured settings — no clutter when everything matches.
 
-## 2. Overtime Tracking
-The lunch extension means an 8-hour shift runs 8.5 hours on the clock. This should NOT count as overtime. The system should track working time (excluding lunch) separately from clock time. This distinction matters for payroll compliance.
-- Mason- noted :)
+24. **Walk-in queue**: Not needed. Staff manually handles walk-in availability. If a cancellation opens a slot, staff can find the guest in the spa and offer the walk-in directly. No automated queue system.
 
-## 3. Cancellation Window for Walk-Ins
-Walk-ins have a 15-minute minimum booking window. But should there also be a cancellation policy? If a walk-in is booked and the customer changes their mind 5 minutes later, the therapist may have already started preparing. Consider: walk-in bookings could have a shorter or different cancellation policy than pre-booked appointments.
-- Mason- Let's make it so the client can't cancel a walk-in. Only staff.
+25. **In-session grace period for walk-ins**: The in-session block extends for `buffer_minutes` **after** the session's `end_time_us`, not just during the session itself. This prevents booking the immediately-following slot while the provider may still be wrapping up.
 
-## 4. Extension Notification
-When a therapist extends a session, the front desk system should be aware so they don't try to book walk-ins into the now-occupied slot. The extension should immediately update the session times in the database and recalculate availability. Should the front desk get a real-time notification (e.g., via websocket or polling)?
-- Mason- Let's create UI in the staff portal for the therapist for an in session view where the therapist can click Upgrade to 90min / Upgrade to 120min. Eventually, I'd like to have kiosks in each room so the therapist can see their schedule, be notified of a walkin, and extend a session.
+# Notes
 
-## 5. Provider Schedule Transparency
-With the shift model, providers should see their materialized shift settings in their portal. If a provider changes their buffer from 10 to 15 minutes, they should understand that existing shifts keep the old setting while future un-booked shifts will use the new setting. A clear visual distinction (e.g., "Settings locked for this shift — first booking was made on April 10") would help avoid confusion.
-- Mason- It would be nice to click on a day in their schedule and be able to see shift properties. It would be nice to only show UI if the shift settings for a given shift differ from what is configured in their setting.
+## Rest Break Compliance
+With 10min buffers between clients, providers get regular micro-breaks. A 7-slot day yields 60 minutes of buffer time spread throughout the day plus a 30-minute lunch. This likely satisfies most state rest break requirements but should be verified with a labor attorney for the specific jurisdiction.
 
-## 6. Walk-In Queue
-For busy periods, there may be multiple walk-in customers waiting. Should the system support a simple queue or waitlist for walk-ins? This is different from the event waitlist — it's more of a "next available" queue. Not necessarily for this implementation, but worth considering for the data model.
-- Mason- I don't think that we need to do this. If someone walks in, they will get scheduled for an available slot which should be visible to the staff marking them down. Unless there is a cancellation, there really won't be random slots appearing to feed a queue. But I don't think people are just going to sit around waiting for a cancellation. I feel like if someone checks into the spa and asks about walk in massage and none is available, if there is a cancellation, the staff can just find the person in the spa and ask if they would like to do a walk-in which seems like a better model than a queue.
-
-## 7. Grace Period for "In-Session" Walk-In Block
-The rule that walk-ins can't book the slot after an in-session provider should have a time window. If a provider's session ended 2 minutes ago and they haven't checked in the next client, they're technically not "in session" but may still be wrapping up. Consider: the in-session block should extend for buffer-minutes after the session's end_time_us, not just during the session itself.
-- Mason- I like your suggestion. Let's go with that.
+## Overtime Tracking
+The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The system should track working time (excluding lunch) separately from clock time — lunch time is NOT overtime. This distinction matters for payroll compliance.
 
 # Implementation Plan
 
@@ -536,6 +518,7 @@ The rule that walk-ins can't book the slot after an in-session provider should h
 - [ ] When creating a booking, check if a shift record exists for this provider/availability block
 - [ ] If not, create one with snapshotted settings
 - [ ] If yes, use the shift's snapshotted settings for buffer calculation
+- [ ] On booking cancellation: if shift has no remaining bookings, delete the shift record (return to virtual state)
 - [ ] Tests
 
 ### 2. Update booking creation with context-dependent buffers
@@ -554,7 +537,8 @@ The rule that walk-ins can't book the slot after an in-session provider should h
 ### 1. Remove skipAvailabilityCheck from walk-in flow
 - [ ] Update `staff_dropin_booking.cpp` to use normal availability checking
 - [ ] Add walk-in minimum booking window check
-- [ ] Add in-session provider blocking (no booking slot after currently in-session provider)
+- [ ] Add in-session provider blocking: no booking slot after currently in-session provider. In-session detection uses `start_time_us` to `end_time_us` range, extended by `buffer_minutes` after `end_time_us` (grace period for wrap-up)
+- [ ] Walk-in bookings are not cancellable by clients — only staff can cancel
 - [ ] Tests
 
 ### 2. Provider walk-in settings
@@ -569,19 +553,26 @@ The rule that walk-ins can't book the slot after an in-session provider should h
 ## Phase 6: Mid-Session Extension (Upgrades)
 *Allow staff to extend a session duration mid-appointment*
 
-### 1. Upgrade endpoint
+### 1. Upgrade product type
+- [ ] Create a staff-only "upgrade" product type with variants for each upgrade path (60→90, 60→120, 90→120)
+- [ ] Price delta based on **list value** of original variant, not what was actually paid (handles bundles/comps/coupons cleanly)
+- [ ] Tests
+
+### 2. Upgrade endpoint
 - [ ] Create `POST /api/staff/upgrade_session/{sessionId}` with target variant
-- [ ] Calculate price delta from original variant to target variant
-- [ ] Create upgrade purchase item (staff/admin only visible)
-- [ ] Update session `end_time_us` and `buffer_end_us`
+- [ ] Calculate price delta (target variant list price − original variant list price)
+- [ ] Create upgrade purchase item linked to original session (staff/admin only)
+- [ ] Update session `end_time_us` and `buffer_end_us` for new duration
+- [ ] Update existing entitlement's end time to match upgraded duration
 - [ ] Override availability checks
 - [ ] Tests
 
-### 2. Upgrade UI
-- [ ] Add "Extend Session" option on staff check-in / provider portal active session view
-- [ ] Show available upgrade paths (60→90, 60→120, 90→120)
-- [ ] Confirm with price delta
-- [ ] Tests
+### 3. Upgrade UI — In-Session Provider View
+- [ ] Create in-session view in staff/provider portal showing active session details
+- [ ] "Upgrade to 90min" / "Upgrade to 120min" buttons (based on current duration)
+- [ ] Confirm with price delta display
+- [ ] Session times update immediately in database on confirmation
+- [ ] Component tests
 
 ## Phase 7: Staff Portal — Provider Preferences UI
 *Add UI for providers to manage scheduling preferences*
@@ -594,7 +585,9 @@ The rule that walk-ins can't book the slot after an in-session provider should h
 ### 2. Provider portal UI
 - [ ] Add "Scheduling Preferences" section to provider portal
 - [ ] Fields: preferred buffer (min = facility min), preferred lunch length (min = facility min), max time hole, accepts walk-ins
-- [ ] Show lunch break in schedule view as distinct block
+- [ ] Show lunch break in schedule view as a distinct labeled "Lunch" block
+- [ ] Click-on-day to show shift properties panel
+- [ ] Only show shift properties UI when materialized shift settings differ from provider's current configured settings
 - [ ] Validation and save
 - [ ] Component tests
 
