@@ -421,13 +421,16 @@ These were open questions that have been answered:
 	- Mason- let's just do start_time_us / end_time_us
 
 2. **Upgrade product variant linking**: When extending 60→90min, we need the 90min variant's pricing. Should the upgrade create a new purchase item referencing the 90min variant with a negative adjustment for the already-paid 60min? Or should it create a special "upgrade" item type with just the delta price?
-	- Mason- I'm on the fence about this one. I don't want to cancel the existing one since that g
+	- Mason- I'm on the fence about this one. I don't want to cancel the existing one since that gets complicated with bundles, comps, coupons, etc. I feel like whatever we do, it should be the value of the previous thing that is essentially removed from the cost of the longer item, not what was actually paid. Is creating a 90min booking and somehow tying it to the old booking without cancelling it going to cause an issue? If so, I think we should just do a separate, upgrade product that can only be booked by staff.
 
 3. **Upgrade and existing entitlements**: A 60min booking creates an entitlement. When upgraded to 90min, should the original entitlement be modified, or should a new supplemental entitlement be created?
+	- Mason- What do you recommend? Honestly, the entitlement really isn't that big to me for this one since an entitlement for massage ends with the session. It's not as complicated as a membership that grants a lot of features / benefits / seats.
 
 4. **Walk-in provider opt-in default**: Should "accepts walk-ins" default to true or false? If true, providers who don't want walk-ins need to opt out. If false, walk-ins are an opt-in feature. Recommendation: default true — walk-ins are a standard part of the business.
+	- Mason- I'll go with your recommendation.
 
 5. **Shift materialization trigger**: Should the shift record be created at the moment of the first booking, or at the start of the shift's clock time? Creating at booking time means the settings snapshot happens earlier, which is safer. But if a booking is cancelled and the shift has no bookings again, should the shift record be deleted (returning to virtual state)?
+	- Mason- At time of first booking. Yes, if a booking is cancelled, clear the shift record and go back to the pristine state.
 
 6. **Lunch visibility in provider portal**: The lunch break should be visible to providers in their schedule view. Should it appear as a distinct "Lunch" block, or just as unavailable time? Distinct block seems more user-friendly and provides a clear visual indicator.
 
