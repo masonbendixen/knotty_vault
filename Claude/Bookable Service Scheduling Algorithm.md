@@ -418,8 +418,10 @@ These were open questions that have been answered:
 # Open Questions
 
 1. **Walk-in "in-session" detection**: To prevent booking the slot immediately after a provider currently in session, we need to reliably determine if a provider is in session right now. The simplest approach: check if the current time falls within a booked session's `start_time_us` to `end_time_us` range. Is this sufficient, or do we need check-in status as a more reliable indicator?
+	- Mason- let's just do start_time_us / end_time_us
 
 2. **Upgrade product variant linking**: When extending 60→90min, we need the 90min variant's pricing. Should the upgrade create a new purchase item referencing the 90min variant with a negative adjustment for the already-paid 60min? Or should it create a special "upgrade" item type with just the delta price?
+	- Mason- I'm on the fence about this one. I don't want to cancel the existing one since that g
 
 3. **Upgrade and existing entitlements**: A 60min booking creates an entitlement. When upgraded to 90min, should the original entitlement be modified, or should a new supplemental entitlement be created?
 
