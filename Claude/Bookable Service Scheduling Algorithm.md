@@ -459,10 +459,11 @@ With the shift model, providers should see their materialized shift settings in 
 
 ## 6. Walk-In Queue
 For busy periods, there may be multiple walk-in customers waiting. Should the system support a simple queue or waitlist for walk-ins? This is different from the event waitlist — it's more of a "next available" queue. Not necessarily for this implementation, but worth considering for the data model.
-- Mason- I don't think that we need to do this. If someone walks in, they will get scheduled for an available slot which should be visible to the staff marking them down. Unless there is a cancellation, there really won't be random slots appearing to feed a queue. But I don't think people are just going to sit around waiting for a cancella
+- Mason- I don't think that we need to do this. If someone walks in, they will get scheduled for an available slot which should be visible to the staff marking them down. Unless there is a cancellation, there really won't be random slots appearing to feed a queue. But I don't think people are just going to sit around waiting for a cancellation. I feel like if someone checks into the spa and asks about walk in massage and none is available, if there is a cancellation, the staff can just find the person in the spa and ask if they would like to do a walk-in which seems like a better model than a queue.
 
 ## 7. Grace Period for "In-Session" Walk-In Block
 The rule that walk-ins can't book the slot after an in-session provider should have a time window. If a provider's session ended 2 minutes ago and they haven't checked in the next client, they're technically not "in session" but may still be wrapping up. Consider: the in-session block should extend for buffer-minutes after the session's end_time_us, not just during the session itself.
+- Mason- I like your suggestion. Let's go with that.
 
 # Implementation Plan
 
