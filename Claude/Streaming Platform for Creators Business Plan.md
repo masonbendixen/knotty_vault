@@ -547,9 +547,8 @@ Content creators frequently do in-person workshops at studios. The platform coul
 
 | Source | Pricing | Revenue To Platform |
 |--------|---------|---------------------|
-| Creator subscriptions to use platform tools | $29-99/month | 100% |
-| Student subscriptions to creator content | Creator sets price (typically $10-50/month) | 10-20% transaction fee |
-| Pay-per-view for individual courses | Creator sets price | 10-20% transaction fee |
+| Student subscriptions to creator content | Creator sets price (typically $10-50/month) | 25% transaction fee |
+| Pay-per-view for individual courses | Creator sets price | 25% transaction fee |
 
 ### Phase 2 Revenue (B2B Studio Licensing)
 
@@ -649,6 +648,39 @@ With 3 creators (Knotty Yoga + Jenn + PJ), even at 80/20 the platform nets ~$1,0
 **Remaining question**: Does 80/20 feel right given this math? Or is there value in starting at 70/30 to build a larger war chest for development and marketing?
 
 Mason- I don't really like the idea of charging creators a monthly fee. I would rather take a bigger cut from the per student fees. What do you think?
+
+Claude- I think this is a strong call. Dropping the creator monthly fee makes the onboarding pitch frictionless: "Join for free, we only earn when you earn." That's a much easier conversation with Jenn and PJ than "pay $29-99/month to try our unproven platform." It also aligns incentives — the platform is motivated to help each creator grow because that's the only way the platform makes money.
+
+To compensate for dropping the creator fee, the per-student transaction cut would need to increase. Here's a revised model:
+
+| Revenue Model | Old (with creator fee) | Revised (no creator fee) |
+|---|---|---|
+| Creator monthly fee | $29-99/month | **$0** |
+| Platform cut of student subscriptions | 10-20% | **25-30%** |
+| Platform cut of pay-per-view | 10-20% | **25-30%** |
+
+At 25-30%, you're still significantly better than the major platforms (YouTube 45%, Udemy 63%, Coursera 55-70%) and competitive with Spotify (30-35%). The pitch becomes: "You keep 70-75% of every dollar your students pay, and you never pay us a dime out of pocket."
+
+Running the numbers with the existing example (1 creator, 100 subscribers at $20/month = $2,000/month revenue):
+
+| | 75/25 Split (no creator fee) | 70/30 Split (no creator fee) |
+|---|---|---|
+| Monthly subscription revenue | $2,000 | $2,000 |
+| Creator gets | $1,500 | $1,400 |
+| Platform gets (gross) | $500 | $600 |
+| Stripe fees (~3.2%) | -$64 | -$64 |
+| Platform share of infra (~$5) | -$5 | -$5 |
+| **Platform net per creator** | **~$431/month** | **~$531/month** |
+
+Compare to the old model with the creator fee: a creator paying $49/month + 15% transaction fee would generate $49 + $300 = $349/month for the platform — actually *less* than the 25% no-fee model. So the no-fee model can actually produce more platform revenue while being a better deal for the creator. The creator fee was adding friction without adding much revenue.
+
+**Recommendation**: Drop the creator fee entirely. Set the platform cut at **25%** (creator keeps 75%). This is:
+- Better for creators than every major competitor except Patreon's raw percentage (but Patreon offers far less)
+- More platform revenue than the old fee + low-percentage model
+- Zero barrier to entry for new creators
+- A clean, simple pitch: "You keep 75 cents of every dollar"
+
+The Phase 1 Revenue table in the Revenue Model Summary section should be updated to reflect this if you agree. The 70/30 vs 80/20 question from the marketplace (Phase 3) is a separate decision — that's about the platform-wide subscription pool, not individual creator subscriptions. It would be reasonable to have a different split for Phase 3 marketplace revenue than for Phase 1 direct subscriptions.
 
 ### Beta Creator Profiles
 
