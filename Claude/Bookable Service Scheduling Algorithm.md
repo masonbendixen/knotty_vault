@@ -451,13 +451,15 @@ Walk-ins have a 15-minute minimum booking window. But should there also be a can
 
 ## 4. Extension Notification
 When a therapist extends a session, the front desk system should be aware so they don't try to book walk-ins into the now-occupied slot. The extension should immediately update the session times in the database and recalculate availability. Should the front desk get a real-time notification (e.g., via websocket or polling)?
-- Mason- Let's create UI in the staff portal for the therapist for an in session view where the therapist can click Upgrade to 90min / Upgrad
+- Mason- Let's create UI in the staff portal for the therapist for an in session view where the therapist can click Upgrade to 90min / Upgrade to 120min. Eventually, I'd like to have kiosks in each room so the therapist can see their schedule, be notified of a walkin, and extend a session.
 
 ## 5. Provider Schedule Transparency
 With the shift model, providers should see their materialized shift settings in their portal. If a provider changes their buffer from 10 to 15 minutes, they should understand that existing shifts keep the old setting while future un-booked shifts will use the new setting. A clear visual distinction (e.g., "Settings locked for this shift — first booking was made on April 10") would help avoid confusion.
+- Mason- It would be nice to click on a day in their schedule and be able to see shift properties. It would be nice to only show UI if the shift settings for a given shift differ from what is configured in their setting.
 
 ## 6. Walk-In Queue
 For busy periods, there may be multiple walk-in customers waiting. Should the system support a simple queue or waitlist for walk-ins? This is different from the event waitlist — it's more of a "next available" queue. Not necessarily for this implementation, but worth considering for the data model.
+- Mason- I don't think that we need to do this. If someone walks in, they will get scheduled for an available slot which should be visible to the staff marking them down. Unless there is a cancellation, there really won't be random slots appearing to feed a queue. But I don't think people are just going to sit around waiting for a cancella
 
 ## 7. Grace Period for "In-Session" Walk-In Block
 The rule that walk-ins can't book the slot after an in-session provider should have a time window. If a provider's session ended 2 minutes ago and they haven't checked in the next client, they're technically not "in session" but may still be wrapping up. Consider: the in-session block should extend for buffer-minutes after the session's end_time_us, not just during the session itself.
