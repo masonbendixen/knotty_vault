@@ -475,16 +475,21 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Implement the lunch break calculation and shift splitting*
 
 ### 1. Lunch placement calculator (pure function)
-- [ ] Create `CalculateLunchPlacement(shiftDurationMinutes, bufferMinutes, lunchMinutes, lunchThresholdMinutes)` → returns minute offset into shift where lunch starts, or nullopt if no lunch needed
-- [ ] Balanced-split algorithm: try each slot boundary, compute max delta, pick smallest
-- [ ] Constraint: lunch must start between hour 2 and hour 5
-- [ ] Tests for 5hr (no lunch), 6hr, 7hr, 8hr shifts, edge cases
+- [x] Create `CalculateLunchPlacement(workingDurationMinutes, bufferMinutes, lunchMinutes, lunchThresholdMinutes)` → returns minute offset into shift where lunch starts, or nullopt if no lunch needed
+- [x] Balanced-split algorithm: try each slot boundary, compute max delta, pick smallest
+- [x] Constraint: lunch must start between hour 2 and hour 5
+- [x] Tests for 5hr (no lunch), 6hr, 7hr, 8hr shifts, edge cases (14 tests)
 
 ### 2. Integration with availability computation
-- [ ] In `ComputeAvailableSlots`, detect shifts meeting lunch threshold
-- [ ] Calculate lunch placement, split availability into pre-lunch and post-lunch windows
-- [ ] Apply setup/teardown buffers to window boundaries
-- [ ] Tests
+- [x] In `ComputeAvailableSlots`, load facility scheduling config from secrets
+- [x] Load provider preferences and cascade (provider overrides upward from facility defaults)
+- [x] `ApplyShiftAdjustments` static method: applies setup/teardown buffers and lunch splitting
+- [x] Lunch triggered when clock duration >= threshold + lunch minutes
+- [x] Calculate lunch placement, split availability into pre-lunch and post-lunch windows
+- [x] Apply setup/teardown buffers to window boundaries
+- [x] Updated `ServiceAvailabilityHelper` constructor to accept `SecretsHelperPtr`
+- [x] Updated all callers: `ServiceBookingHelper`, `CartCheckoutHelper`, endpoints, test helper
+- [x] Tests for shift adjustments (11 tests): no adjustments, setup/teardown, lunch at 6/7/8hr, combined, edge cases
 
 ## Phase 3: Algorithm — Context-Dependent Buffer Calculation
 *Modify buffer calculation and slot generation for the new rules*
