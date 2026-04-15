@@ -495,26 +495,30 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Modify buffer calculation and slot generation for the new rules*
 
 ### 1. New buffer calculation function
-- [ ] Create `CalculateBufferForVariant(variantDurationMinutes, baseDurationMinutes, effectiveBufferMinutes, precedingDurationMinutes, precedingBufferMinutes)` implementing context-dependent rules
-- [ ] Tests for all buffer cases
+- [x] Create `CalculateBufferForVariant(variantDurationMinutes, baseDurationMinutes, effectiveBufferMinutes, PrecedingBookingContext)` implementing context-dependent rules
+- [x] Tests for all buffer cases (7 tests: 60 always single, 120 always double, 90 double by default, 90 double after non-90, 90 single after 90-with-double, 90 double after 90-with-single, 180 triple)
 
 ### 2. Update ComputeSlotsForFreeWindow
-- [ ] Add `precedingBookingContext` parameter
-- [ ] Thread context through start time generation and slot generation
-- [ ] Implement slot-to-slot context propagation within a window
-- [ ] Tests
+- [x] Add `PrecedingBookingContext` parameter (defaulted to empty)
+- [x] Thread context through slot generation — buffer calculation uses context at each start time
+- [x] Tests for context-dependent behavior (single buffer with preceding 90-double)
 
 ### 3. 90-minute availability constraints
-- [ ] Implement the three conditions under which 90min can be offered
-- [ ] Tests
+- [x] Implement the three conditions: exact fit (90+applicable buffer), pair space (≥210min), or end-of-window
+- [x] Tests: rejected when insufficient room, allowed with pair space, allowed exact fit double, allowed exact fit single with context
 
 ### 4. Modified end-of-window rule
-- [ ] Offer both 60min and 90min at end of window when either fits
-- [ ] Tests
+- [x] ≥140min (fullSizeThreshold): offer all fitting variants normally
+- [x] ≥90+buffer but <140: offer BOTH 90min AND 60min
+- [x] ≥60min but <90+buffer: offer only 60min
+- [x] Tests: 110min offers both, 100min only 60, 60min only 60
 
 ### 5. Port and extend all existing algorithm tests
-- [ ] Update all existing tests for new signature and 10min buffer
-- [ ] Add tests for all worked examples
+- [x] Updated `MakeStandardVariants` default from 5min to 10min buffer
+- [x] Updated all pure algorithm tests for 10min buffer and new 90min rules
+- [x] Added worked example tests (examples 2-5 from design doc)
+- [x] Updated critical business scenarios for 10min buffer
+- [x] Updated edge case tests (TwoVariantsOnly, FullDayAllVariantsCoverage)
 
 ## Phase 4: Integration — Booking Creation, Shifts, and Context
 *Update booking flow for shift materialization and context-dependent buffers*
