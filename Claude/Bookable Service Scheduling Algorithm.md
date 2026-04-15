@@ -453,23 +453,23 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Add the shift entity, facility config, and provider preferences*
 
 ### 1. Database: Shift table
-- [ ] Create `provider_shifts` table: id, provider_person_id, facility_id, shift_start_us, shift_end_us, lunch_start_us (nullable), lunch_end_us (nullable), effective_buffer_minutes, setup_buffer_minutes, teardown_buffer_minutes, max_time_hole_minutes, created_us
-- [ ] Schema in `db_schema/`, table helper in `sql_util/table_helpers/`
-- [ ] Tests for CRUD operations
+- [x] Create `provider_shifts` table: id, provider_person_id, facility_id, shift_start_us, shift_end_us, lunch_start_us (nullable), lunch_end_us (nullable), effective_buffer_minutes, setup_buffer_minutes, teardown_buffer_minutes, max_time_hole_minutes, created_us
+- [x] Schema in `db_schema/`, table helper in `sql_util/table_helpers/`
+- [x] Tests for CRUD operations
 
 ### 2. Database: Facility scheduling config in secrets
-- [ ] Add secrets: `scheduling_lunch_threshold_minutes` (default 360), `scheduling_lunch_length_minutes` (default 30), `scheduling_min_buffer_minutes` (default 10), `scheduling_setup_buffer_minutes` (default 0), `scheduling_teardown_buffer_minutes` (default 0), `scheduling_walkin_min_buffer_minutes` (default 15)
-- [ ] Tests for secrets lookup with defaults
+- [x] Add secrets: `scheduling_lunch_threshold_minutes` (default 360), `scheduling_lunch_length_minutes` (default 30), `scheduling_min_buffer_minutes` (default 10), `scheduling_setup_buffer_minutes` (default 0), `scheduling_teardown_buffer_minutes` (default 0), `scheduling_walkin_min_buffer_minutes` (default 15)
+- [x] Tests for secrets lookup with defaults
 
 ### 3. Database: Provider preferences
-- [ ] Add columns to `provider_type_assignments`: `preferred_buffer_minutes` (nullable), `preferred_lunch_minutes` (nullable), `accepts_walkins` (boolean, default true), `preferred_setup_minutes` (nullable), `preferred_teardown_minutes` (nullable)
-- [ ] Table helper methods for get/set
-- [ ] Validation: preferred values must be >= facility minimums
-- [ ] Tests
+- [x] Add columns to `provider_type_assignments`: `preferred_buffer_minutes` (nullable), `preferred_lunch_minutes` (nullable), `accepts_walkins` (boolean, default true), `preferred_setup_minutes` (nullable), `preferred_teardown_minutes` (nullable)
+- [x] Table helper methods for get/set
+- [ ] Validation: preferred values must be >= facility minimums (deferred to Phase 7 API layer)
+- [x] Tests
 
 ### 4. Update default buffer from 5min to 10min
-- [ ] Update `product_variants` default buffer values in database helper / seed data
-- [ ] Tests
+- [x] Update `product_variants` default buffer values in database helper / seed data from 5 to 10
+- [x] Tests (existing tests use their own explicit buffer values, not seed data)
 
 ## Phase 2: Algorithm — Lunch Placement
 *Implement the lunch break calculation and shift splitting*
