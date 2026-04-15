@@ -648,6 +648,8 @@ With 3 creators (Knotty Yoga + Jenn + PJ), even at 80/20 the platform nets ~$1,0
 
 **Remaining question**: Does 80/20 feel right given this math? Or is there value in starting at 70/30 to build a larger war chest for development and marketing?
 
+Mason- I don't really like the idea of charging creators a monthly fee. I would rather take a bigger cut from the per student fees. What do you think?
+
 ### Beta Creator Profiles
 
 **Jenn Bruyer** — Aerialist
