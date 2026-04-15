@@ -433,20 +433,25 @@ These were open questions that have been answered:
 	- Mason- At time of first booking. Yes, if a booking is cancelled, clear the shift record and go back to the pristine state.
 
 6. **Lunch visibility in provider portal**: The lunch break should be visible to providers in their schedule view. Should it appear as a distinct "Lunch" block, or just as unavailable time? Distinct block seems more user-friendly and provides a clear visual indicator.
+	- Mason- By all means, let's explicitly list it on their schedule.
 
 # Discussion & Suggestions
 
 ## 1. Rest Break Compliance
 Some states require paid 10-minute rest breaks for every 4 hours worked. With 10min buffers between clients, providers get regular micro-breaks. For a 7-slot day (7 hours of client time with 6 buffers), the provider gets 60 minutes of buffer time spread throughout the day plus a 30-minute lunch. This likely satisfies most rest break requirements, but you may want to verify with a labor attorney for your specific jurisdiction.
+- Mason- Sounds good.
 
 ## 2. Overtime Tracking
 The lunch extension means an 8-hour shift runs 8.5 hours on the clock. This should NOT count as overtime. The system should track working time (excluding lunch) separately from clock time. This distinction matters for payroll compliance.
+- Mason- noted :)
 
 ## 3. Cancellation Window for Walk-Ins
 Walk-ins have a 15-minute minimum booking window. But should there also be a cancellation policy? If a walk-in is booked and the customer changes their mind 5 minutes later, the therapist may have already started preparing. Consider: walk-in bookings could have a shorter or different cancellation policy than pre-booked appointments.
+- Mason- Let's make it so the client can't cancel a walk-in. Only staff.
 
 ## 4. Extension Notification
 When a therapist extends a session, the front desk system should be aware so they don't try to book walk-ins into the now-occupied slot. The extension should immediately update the session times in the database and recalculate availability. Should the front desk get a real-time notification (e.g., via websocket or polling)?
+- Mason- Let's create UI in the staff portal for the therapist for an in session view where the therapist can click Upgrade to 90min / Upgrad
 
 ## 5. Provider Schedule Transparency
 With the shift model, providers should see their materialized shift settings in their portal. If a provider changes their buffer from 10 to 15 minutes, they should understand that existing shifts keep the old setting while future un-booked shifts will use the new setting. A clear visual distinction (e.g., "Settings locked for this shift — first booking was made on April 10") would help avoid confusion.
