@@ -554,8 +554,8 @@ Content creators frequently do in-person workshops at studios. The platform coul
 
 | Source | Pricing | Revenue To Platform |
 |--------|---------|---------------------|
-| Studio subscriptions | $50-500/month depending on tier | 20-30% (remainder to creator) |
-| Instructor certification fees | $200-500/module | 20-30% (remainder to creator) |
+| Studio subscriptions | $50-500/month depending on tier | 30% (remainder to creator) |
+| Instructor certification fees | $200-500/module | 30% (remainder to creator) |
 | Workshop booking commissions | % of ticket price | 10-15% |
 
 ### Phase 3 Revenue (Platform Marketplace)
