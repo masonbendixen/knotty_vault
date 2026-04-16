@@ -524,39 +524,42 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Update booking flow for shift materialization and context-dependent buffers*
 
 ### 1. Shift materialization on first booking
-- [ ] When creating a booking, check if a shift record exists for this provider/availability block
-- [ ] If not, create one with snapshotted settings
-- [ ] If yes, use the shift's snapshotted settings for buffer calculation
-- [ ] On booking cancellation: if shift has no remaining bookings, delete the shift record (return to virtual state)
+- [x] When creating a booking, check if a shift record exists for this provider/availability block
+- [x] If not, create one with snapshotted settings (buffer, setup, teardown from secrets + provider overrides)
+- [x] If yes, skip (shift already materialized)
+- [x] On booking cancellation: if shift has no remaining non-cancelled sessions, delete the shift record (return to virtual state)
 - [ ] Tests
 
 ### 2. Update booking creation with context-dependent buffers
-- [ ] `ServiceBookingHelper` and `CartCheckoutHelper` calculate and store correct `buffer_end_us`
-- [ ] Pass preceding context from existing bookings in the shift
+- [x] `ServiceBookingHelper` uses `CalculateBufferForVariant` with preceding context from existing sessions
+- [x] `CartCheckoutHelper` uses `CalculateBufferForVariant` with preceding context
+- [x] Both query preceding session to determine 90min single/double buffer
 - [ ] Tests
 
 ### 3. Pass preceding context in ComputeAvailableSlots
-- [ ] Extract preceding booking duration and buffer when building free windows
-- [ ] Pass to `ComputeSlotsForFreeWindow`
+- [x] Expanded `BookedInterval` to carry `endTimeUs` and `durationMinutes`
+- [x] Extract preceding booking's duration and buffer count when building free windows
+- [x] Pass `PrecedingBookingContext` to each `ComputeSlotsForFreeWindow` call
 - [ ] Integration tests
 
 ## Phase 5: Walk-In Booking Constraints
 *Fix walk-in flow to respect availability and add new constraints*
 
 ### 1. Remove skipAvailabilityCheck from walk-in flow
-- [ ] Update `staff_dropin_booking.cpp` to use normal availability checking
-- [ ] Add walk-in minimum booking window check
-- [ ] Add in-session provider blocking: no booking slot after currently in-session provider. In-session detection uses `start_time_us` to `end_time_us` range, extended by `buffer_minutes` after `end_time_us` (grace period for wrap-up)
-- [ ] Walk-in bookings are not cancellable by clients — only staff can cancel
+- [x] Removed `skipAvailabilityCheck = true` from `staff_dropin_booking.cpp` — walk-ins now go through normal availability
+- [x] Walk-in minimum booking window: slot start pushed forward to `now + walkin_min_buffer_minutes` (from secrets, default 15)
+- [x] In-session provider blocking: checks `start_time_us <= now AND buffer_end_us > now` for provider's current sessions. Blocks the immediately-following slot unless `admin_override` is set.
+- [x] Walk-in bookings marked with `is_walkin = true` on the booking record
+- [x] Client cannot cancel walk-in bookings — only staff with `manage_products` permission
 - [ ] Tests
 
 ### 2. Provider walk-in settings
-- [ ] Filter available providers by `accepts_walkins` for walk-in requests
+- [x] Filter by `accepts_walkins` in `staff_dropin_booking.cpp` — rejects providers who opted out
 - [ ] API endpoint to toggle walk-in acceptance
 - [ ] Tests
 
 ### 3. Admin override for "already started" slots
-- [ ] Allow admin to book a slot where start_time_us is in the past (within buffer period)
+- [x] `admin_override` boolean in the drop-in request body bypasses the in-session blocking constraint
 - [ ] Tests
 
 ## Phase 6: Mid-Session Extension (Upgrades)
