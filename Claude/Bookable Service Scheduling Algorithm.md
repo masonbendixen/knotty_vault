@@ -564,18 +564,18 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Allow staff to extend a session duration mid-appointment*
 
 ### 1. Upgrade product type
-- [ ] Create a staff-only "upgrade" product type with variants for each upgrade path (60→90, 60→120, 90→120)
-- [ ] Price delta based on **list value** of original variant, not what was actually paid (handles bundles/comps/coupons cleanly)
-- [ ] Tests
+- [x] Create a staff-only "upgrade" product type with variants for each upgrade path (60→90, 60→120, 90→120)
+- [x] Price delta based on **list value** of original variant, not what was actually paid (handles bundles/comps/coupons cleanly)
+- [x] Tests
 
 ### 2. Upgrade endpoint
-- [ ] Create `POST /api/staff/upgrade_session/{sessionId}` with target variant
-- [ ] Calculate price delta (target variant list price − original variant list price)
-- [ ] Create upgrade purchase item linked to original session (staff/admin only)
-- [ ] Update session `end_time_us` and `buffer_end_us` for new duration
-- [ ] Update existing entitlement's end time to match upgraded duration
-- [ ] Override availability checks
-- [ ] Tests
+- [x] Create `POST /api/staff/upgrade_session/{sessionId}` with target variant
+- [x] Calculate price delta (target variant list price − original variant list price)
+- [x] Create upgrade purchase item linked to original session (staff/admin only)
+- [x] Update session `end_time_us` and `buffer_end_us` for new duration
+- [x] Update existing entitlement's end time to match upgraded duration
+- [x] Override availability checks
+- [x] Tests
 
 ### 3. Upgrade UI — In-Session Provider View
 - [ ] Create in-session view in staff/provider portal showing active session details
@@ -588,9 +588,9 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Add UI for providers to manage scheduling preferences*
 
 ### 1. API endpoints
-- [ ] `GET /api/provider/preferences` — returns current buffer, lunch, time hole, walk-in settings
-- [ ] `PUT /api/provider/preferences` — updates preferences with validation
-- [ ] Tests
+- [x] `GET /api/provider/preferences` — returns current buffer, lunch, time hole, walk-in settings
+- [x] `PUT /api/provider/preferences` — updates preferences with validation
+- [x] Tests
 
 ### 2. Provider portal UI
 - [ ] Add "Scheduling Preferences" section to provider portal
