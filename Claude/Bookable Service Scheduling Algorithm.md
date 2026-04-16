@@ -578,11 +578,11 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 - [x] Tests
 
 ### 3. Upgrade UI — In-Session Provider View
-- [ ] Create in-session view in staff/provider portal showing active session details
-- [ ] "Upgrade to 90min" / "Upgrade to 120min" buttons (based on current duration)
-- [ ] Confirm with price delta display
-- [ ] Session times update immediately in database on confirmation
-- [ ] Component tests
+- [x] Create in-session view in staff/provider portal showing active session details
+- [x] "Upgrade to 90min" / "Upgrade to 120min" buttons (based on current duration)
+- [x] Confirm with price delta display
+- [x] Session times update immediately in database on confirmation
+- [x] Component tests
 
 ## Phase 7: Staff Portal — Provider Preferences UI
 *Add UI for providers to manage scheduling preferences*
@@ -593,18 +593,18 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 - [x] Tests
 
 ### 2. Provider portal UI
-- [ ] Add "Scheduling Preferences" section to provider portal
-- [ ] Fields: preferred buffer (min = facility min), preferred lunch length (min = facility min), max time hole, accepts walk-ins
+- [x] Add "Scheduling Preferences" section to provider portal
+- [x] Fields: preferred buffer (min = facility min), preferred lunch length (min = facility min), max time hole, accepts walk-ins
 - [ ] Show lunch break in schedule view as a distinct labeled "Lunch" block
 - [ ] Click-on-day to show shift properties panel
 - [ ] Only show shift properties UI when materialized shift settings differ from provider's current configured settings
-- [ ] Validation and save
-- [ ] Component tests
+- [x] Validation and save
+- [x] Component tests
 
 ### 3. Admin visibility
-- [ ] Show provider preferences in manage portal staff view
-- [ ] Read-only view for admins (providers set their own preferences)
-- [ ] Tests
+- [x] Show provider preferences in manage portal staff view
+- [x] Read-only view for admins (providers set their own preferences)
+- [x] Tests
 
 ## Phase 8: Documentation Update
 *Move algorithm documentation from BSF doc to this document*
