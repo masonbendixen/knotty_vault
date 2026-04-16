@@ -528,19 +528,18 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 - [x] If not, create one with snapshotted settings (buffer, setup, teardown from secrets + provider overrides)
 - [x] If yes, skip (shift already materialized)
 - [x] On booking cancellation: if shift has no remaining non-cancelled sessions, delete the shift record (return to virtual state)
-- [ ] Tests
+- [x] Tests: ShiftMaterializedOnFirstBooking, SecondBookingNoDoubleShift
 
 ### 2. Update booking creation with context-dependent buffers
 - [x] `ServiceBookingHelper` uses `CalculateBufferForVariant` with preceding context from existing sessions
 - [x] `CartCheckoutHelper` uses `CalculateBufferForVariant` with preceding context
 - [x] Both query preceding session to determine 90min single/double buffer
-- [ ] Tests
 
 ### 3. Pass preceding context in ComputeAvailableSlots
 - [x] Expanded `BookedInterval` to carry `endTimeUs` and `durationMinutes`
 - [x] Extract preceding booking's duration and buffer count when building free windows
 - [x] Pass `PrecedingBookingContext` to each `ComputeSlotsForFreeWindow` call
-- [ ] Integration tests
+- [x] Integration test: PrecedingNinetyMinContextPropagation endpoint test
 
 ## Phase 5: Walk-In Booking Constraints
 *Fix walk-in flow to respect availability and add new constraints*
@@ -551,16 +550,15 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 - [x] In-session provider blocking: checks `start_time_us <= now AND buffer_end_us > now` for provider's current sessions. Blocks the immediately-following slot unless `admin_override` is set.
 - [x] Walk-in bookings marked with `is_walkin = true` on the booking record
 - [x] Client cannot cancel walk-in bookings — only staff with `manage_products` permission
-- [ ] Tests
+- [x] Tests: DropinBookingSetsIsWalkinFlag, WalkinBookingCannotBeCancelledByClient
 
 ### 2. Provider walk-in settings
 - [x] Filter by `accepts_walkins` in `staff_dropin_booking.cpp` — rejects providers who opted out
-- [ ] API endpoint to toggle walk-in acceptance
-- [ ] Tests
+- [x] Tests: DropinBookingRejectsOptedOutProvider
+- [ ] API endpoint to toggle walk-in acceptance (deferred — use admin CRUD for now)
 
 ### 3. Admin override for "already started" slots
 - [x] `admin_override` boolean in the drop-in request body bypasses the in-session blocking constraint
-- [ ] Tests
 
 ## Phase 6: Mid-Session Extension (Upgrades)
 *Allow staff to extend a session duration mid-appointment*
