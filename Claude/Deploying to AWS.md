@@ -49,7 +49,7 @@ Why Lightsail instead of EC2 + ALB + RDS for v1: it bundles bandwidth, has predi
 | AWS App Runner + RDS | Minimal ops, auto-scale | Fargate pricing on tiny workloads is expensive; some quirks with long-lived connections | Not a great fit |
 | Elastic Beanstalk | Quick start | Legacy-feeling, opaque when things break | Skip |
 | **EC2 + self-hosted Postgres** | Cheapest possible | You own backups/upgrades/replication | Only if budget is tight AND you accept operational risk |
-
+Mason- Does it need to be ARM that I build for? It can't be x86? Can you give a cost breakdown of EC2 especially compared to lightsail. What is lightsail for?
 ## Critical Code Gaps That Block Deploy (Summary)
 
 These come first — they're the Phase 1 work. Each is detailed in its phase section below.
