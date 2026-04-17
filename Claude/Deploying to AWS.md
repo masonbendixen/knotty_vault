@@ -278,6 +278,7 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] From the VPS: `psql` a test connection over the private VPC endpoint.
 
 **Alternative**: RDS `db.t4g.micro` (same price ballpark, more flexible but more config). Pick Lightsail for simplicity; migrate to RDS later via logical replication if needed.
+Mason- what is the cost difference between lightsail and RDS in cost? RDS does backups too, right?
 
 ## 4.5 DNS + TLS
 
