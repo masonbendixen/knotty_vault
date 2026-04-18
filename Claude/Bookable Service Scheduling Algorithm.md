@@ -610,6 +610,6 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 *Move algorithm documentation from BSF doc to this document*
 
 ### 1. Update Bookable Service Foundation.md
-- [ ] Remove the scheduling algorithm section
-- [ ] Replace with reference: "See [[Bookable Service Scheduling Algorithm]] for the complete scheduling algorithm description."
-- [ ] Verify no other references need updating
+- [x] Remove the scheduling algorithm section
+- [x] Replace with reference: "See [[Bookable Service Scheduling Algorithm]] for the complete scheduling algorithm description."
+- [x] Verify no other references need updating

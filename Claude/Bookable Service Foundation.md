@@ -135,126 +135,18 @@ Backend work listed before frontend in each phase. The critical algorithm is **S
 
 ## Phase 2: Availability Computation Algorithm (Scenarios 66, 30)
 
-**Goal**: Build the core algorithm that computes available time slots for a bookable service. This is the most complex piece. The slot computation model is **sequential, not interval-based** — slots are generated from free windows between existing bookings, and only offered if they don't create unusable gaps.
+**Goal**: Build the core algorithm that computes available time slots for a bookable service.
 
 ### Slot Computation Model (Scenario 66)
 
-The algorithm does NOT scan at fixed intervals. Instead, it works with **free windows** derived from provider availability minus existing bookings. For each free window, it generates the valid start times for each variant, ensuring no booking would create an orphaned gap.
-
-**Example**: Provider available 8am-2pm. Variants: 60min, 90min, 120min. Buffer: 5min.
-- Booking at 8:00-9:00 (60min massage, buffer ends 9:05)
-- Next available start: **9:05am** (buffer_end rounded up to 5-min boundary)
-- From 9:05am, the system lists slots for each variant that fits:
-  - 60min: 9:05-10:05 (buffer ends 10:10)
-  - 90min: 9:05-10:35 (buffer ends 10:40)
-  - 120min: 9:05-11:05 (buffer ends **11:15** — double buffer, see below)
-- If someone books 10:40am, then the 9:05-10:35 window only fits:
-  - 60min: 9:05-10:05 ✓ (leaves 30min gap → too small for any variant → **rejected**)
-  - 90min: 9:05-10:35 ✓ (no gap, fills exactly → **offered**)
-  - So only the 90min variant is offered at 9:05am
-
-**Multi-buffer rule for long variants**: A variant whose duration is a multiple of the base variant's duration gets proportional buffers. Specifically:
-
-`num_buffers = (duration % base_duration == 0) ? (duration / base_duration) : 1`
-`total_buffer = num_buffers * buffer_minutes`
-
-Only exact multiples of the base duration get proportional buffers. This ensures subdivisibility: a 120min slot with 2 buffers can be replaced by two 60min slots with 1 buffer each. Non-multiples (like 90min) are single blocks that can't be subdivided, so they get 1 buffer.
-
-For the example above (base = 60min, buffer = 5min):
-- 60min → 60/60 = 1, exact → 1 buffer → buffer_end = end + 5min
-- 90min → 90/60 = 1.5, not exact → 1 buffer → buffer_end = end + 5min
-- 120min → 120/60 = 2, exact → 2 buffers → buffer_end = end + 10min
-- 180min → 180/60 = 3, exact → 3 buffers → buffer_end = end + 15min
-
-**Why this matters**: A 120-minute slot with double buffer can always be equivalently replaced by two 60-minute slots with a buffer between them. If a 120-minute booking at 9:05 only had a single 5-minute buffer (ending at 11:10), then cancelling it and rebooking as two 60-minute massages would require: 9:05-10:05 (buffer to 10:10) + 10:10-11:10 (buffer to 11:15). The second massage's buffer extends to 11:15, which is past the original 11:10 buffer_end — creating a conflict with whatever was booked after. Double buffer ensures the time block is always subdivisible into smaller variants without overlap.
-
-**Bidirectional hole prevention**: The hole check applies in BOTH directions — a slot can't create an unusable gap *after* it (before the next booking or window end) OR *before* it (after the previous booking's buffer_end or window start).
-
-**Example**: Provider available 8:00am-4:00pm. Buffer: 5min. Smallest variant: 60min.
-- The valid start times from the window start are: **8:00am** and **9:05am** (and onward in 65-min steps from 8:00).
-- **8:00am is valid** — it's the window start, no gap before it.
-- **8:05am is NOT valid** — it leaves a 5-min gap before it (8:00-8:05) which is too small for any 60-min variant.
-- **8:10am, 8:15am, ... 9:00am are all NOT valid** — each leaves a gap at the start smaller than 60 minutes.
-- **9:05am IS valid** — it leaves exactly 65 minutes from 8:00 (enough for a 60min + 5min buffer). So either 8:00 is booked (and 9:05 follows naturally), or the 8:00-9:05 slot can fit a 60-min variant.
-- The same logic applies throughout: each candidate start time is checked to ensure the gap between the previous booking's buffer_end (or window start) and this slot's start can fit at least one variant + buffer, OR is exactly zero (the slot starts right at the boundary).
-
-In general, for a free window, valid start times are: `window_start`, `window_start + (smallest_duration + buffer)`, `window_start + 2*(smallest_duration + buffer)`, etc. — all rounded to 5-minute boundaries. Each of these is then checked per-variant to see which durations fit without creating a hole after it.
-
-**End-of-window best-fit rule**: The last slot before the end of an availability window (or before the next booking) is a special case. A trailing gap is unavoidable if the remaining time doesn't divide evenly. In this case, the system offers only the **longest variant that fits** — not shorter ones that would leave a larger unused gap. Example: 110 minutes remaining, variants are 60/90/120min:
-- 120min → doesn't fit → **rejected**
-- 90min → fits, leaves 20min gap → **offered** (best fit)
-- 60min → fits, but leaves 50min gap → **rejected** (90min is a better fit and should be preferred)
-
-The logic: at the last valid start time before a window end, compute the remaining time. For each variant (sorted longest first), check if it fits. Offer the **first (longest) variant that fits**. Skip shorter variants because they'd waste more time. If no variant fits, don't offer this start time at all.
-
-Note: this only applies to the *last* slot in a window. Interior slots use the standard bidirectional hole check (which naturally handles this via the trailing gap rule).
-
-**Key rules:**
-- Start times are on **5-minute boundaries** (configurable constant `kSlotAlignmentMinutes = 5`)
-- Duration and buffer values must be multiples of 5 (validated on input)
-- A slot is only offered if booking it would NOT create a gap before OR after it that is smaller than the smallest active variant's duration (+ buffer) for the product. A zero-length gap (slot flush against boundary or adjacent booking) is always fine.
-- **Exception**: The last slot in a window may leave a trailing gap. In this case, only the longest fitting variant is offered (best-fit rule).
-- Long variants get proportional buffers: `num_buffers = ceil(duration / base_duration)`, where base_duration is the smallest active variant's duration for the product
-- The freed time after cancellation of a long variant can be split into smaller variant slots (the proportional buffers ensure this always works without overlap)
-- The algorithm generates slots per-variant (the frontend shows which durations are available at each start time)
+> **Note:** The scheduling algorithm description has been moved to its own document. See [[Bookable Service Scheduling Algorithm]] for the complete specification including buffer rules, 90-minute context-dependent buffers, lunch placement, shift materialization, walk-in constraints, mid-session extensions, and provider preferences.
 
 ### 2.1 Backend — Business Logic Layer
 
-- [x] **`ServiceAvailabilityHelper` class** created in `business_logic/scheduling/`
-  - `service_availability_helper.h/cpp`
-  - Dependencies: `DatabaseHelper`
+*Algorithm description moved to [[Bookable Service Scheduling Algorithm]].*
 
-  - **`ComputeAvailableSlots(Transaction&, request)` → `std::vector<AvailableSlot>`**
-    - Request: `{ productId, providerPersonId (optional), facilityId, dateFromUs, dateToUs, personId (for permission-based booking window) }`
-    - Note: returns slots for ALL active variants, not a single variant. The frontend groups by start time and shows which durations are available.
-    - Steps:
-      1. Load the product to get `provider_type_id`, `required_room_type_id`, `advance_booking_days`, `booking_cutoff_hours`
-      2. Load all active product variants for this product → get duration_minutes and buffer_minutes for each. Determine `base_duration` = smallest variant's duration_minutes. Determine `min_slot` = base_duration + buffer (the smallest bookable unit of time).
-      3. Determine the user's booking window based on their permissions (see Phase 2 booking window design below)
-      4. If no specific provider requested: find all providers assigned to the product's provider type who are accepting bookings
-      5. For each provider:
-         a. Load provider availability blocks for the date range (exclude `is_blocked = true`)
-         b. Load existing bookable_service_sessions for the provider in the date range (ordered by start_time_us)
-         c. Load provider buffer overrides for each variant
-         d. Compute **free windows**: subtract booked sessions (using `buffer_end_us`) from availability windows
-         e. For each free window, generate **valid start times**:
-            - First start = window_start (rounded up to 5-min boundary)
-            - Subsequent starts = previous_start + min_slot, rounded up to 5-min boundary
-            - This ensures no gap before any start time is smaller than min_slot (bidirectional hole prevention)
-         f. For each valid start time, determine if this is the **last start time** in the window (no room for another min_slot after it). Then for each variant (sorted **longest first**):
-            - Calculate proportional buffer: `num_buffers = ceil(variant.duration / base_duration)`, `total_buffer = num_buffers * effective_buffer` where effective_buffer = `MAX(variant.buffer_minutes, provider_override.buffer_minutes)`
-            - Check if `start + duration + total_buffer <= window_end` (or `start + duration <= window_end` if this is the very end of the window and no trailing buffer is needed)
-            - If this is NOT the last start time: **trailing hole check** — if `slot.buffer_end` to `window_end` leaves a gap smaller than `min_slot` and greater than zero → reject this variant
-            - If this IS the last start time: **best-fit rule** — offer only the **longest variant that fits**. Skip shorter variants (they'd waste more time). This is the one case where a trailing gap is acceptable.
-            - If valid, add to results
-      6. Check room availability: for the product's `required_room_type_id`, find rooms at the facility. For each slot, verify at least one room has capacity (check `concurrent_capacity` against overlapping sessions)
-      7. Apply booking window filter (based on user's permissions)
-      8. Filter out slots in the past
-      9. Return results grouped by provider
-
-  - **`AvailableSlot` struct**:
-    ```cpp
-    struct AvailableSlot {
-        int64_t providerPersonId = 0;
-        std::string providerName;
-        int64_t facilityId = 0;
-        std::string facilityName;
-        int64_t startTimeUs = 0;
-        int64_t endTimeUs = 0;       // start + duration (no buffer)
-        int64_t bufferEndUs = 0;     // end + buffer
-        int64_t productVariantId = 0;
-        std::string variantName;
-        int64_t durationMinutes = 0;
-    };
-    ```
-
-  - **`FreeWindow` helper struct** (internal):
-    ```cpp
-    struct FreeWindow {
-        int64_t startUs;  // Start of free time
-        int64_t endUs;    // End of free time (next booking start or availability end)
-    };
-    ```
+- [x] **`ServiceAvailabilityHelper` class** — `ComputeAvailableSlots()`, `ComputeSlotsForFreeWindow()`, `CalculateBufferForVariant()`, `ApplyShiftAdjustments()`, `ComputeLunchBlocks()`
+- [x] **Tests** — Pure algorithm tests + database integration tests
 
 ### Permission-Based Booking Windows (from Open Question #5)
 
