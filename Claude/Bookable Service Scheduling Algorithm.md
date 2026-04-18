@@ -595,9 +595,9 @@ The lunch extension means an 8-hour shift runs 8.5 hours on the clock. The syste
 ### 2. Provider portal UI
 - [x] Add "Scheduling Preferences" section to provider portal
 - [x] Fields: preferred buffer (min = facility min), preferred lunch length (min = facility min), max time hole, accepts walk-ins
-- [ ] Show lunch break in schedule view as a distinct labeled "Lunch" block
-- [ ] Click-on-day to show shift properties panel
-- [ ] Only show shift properties UI when materialized shift settings differ from provider's current configured settings
+- [x] Show lunch break in schedule view as a distinct labeled "Lunch" block
+- [x] Click-on-day to show shift properties panel
+- [x] Only show shift properties UI when materialized shift settings differ from provider's current configured settings
 - [x] Validation and save
 - [x] Component tests
 
