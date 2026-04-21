@@ -360,15 +360,30 @@ Goal: provision the accounts/services we'll actually deploy to.
   - `sg-knottyyoga-web`: allows 22 (SSH from your home IP only), 80, 443 from 0.0.0.0/0.
   - `sg-knottyyoga-db`: allows 5432 from `sg-knottyyoga-web` only.
 
-## 4.3 Compute: Lightsail VPS
+## 4.3 Compute: Lightsail VPS (legacy path — skip if going with EC2 + CloudFront)
 
-- [ ] Create Lightsail instance: Ubuntu 22.04 LTS, ARM 2 vCPU / 2 GB plan ($12/mo).
+- [ ] Create Lightsail instance: Ubuntu 22.04 LTS, 2 vCPU / 2 GB plan ($12/mo).
 - [ ] Attach a static IP (free while attached to an instance).
 - [ ] Upload your SSH public key during creation (do not use Lightsail's default key).
 - [ ] After first boot: `apt update && apt upgrade`, install `nginx`, `postgresql-client`, `certbot python3-certbot-nginx`.
 - [ ] Create `knottyyoga` system user (`useradd -r -s /bin/false knottyyoga`).
 - [ ] Create `/opt/knottyyoga/{bin,ui,migrations}` owned by that user, `/etc/knottyyoga/server.env` (chmod 600, root:knottyyoga).
 - [ ] Enable `ufw` with rules: deny incoming default, allow 22/80/443.
+
+## 4.3-alt Compute: EC2 (recommended path)
+
+- [ ] Create key pair in EC2 console (or import your existing public key).
+- [ ] Launch `t3.small` (x86) instance, Ubuntu 22.04 LTS AMI, 20 GB gp3 root volume, in default VPC public subnet.
+- [ ] Security group `sg-knottyyoga-web`:
+  - Inbound 22 from your home IP only.
+  - Inbound 80 from CloudFront prefix list (`com.amazonaws.global.cloudfront.origin-facing`) — or if that's too fiddly, from `0.0.0.0/0` + require the `X-Origin-Secret` custom header check in nginx (see 4.x below).
+  - No 443 (CloudFront handles TLS).
+- [ ] Allocate Elastic IP, attach to the instance. Free while attached. Needed so the DNS target doesn't change on stop/start.
+- [ ] First boot: `apt update && apt upgrade`; install `nginx`, `postgresql-client` (NO certbot — ACM handles certs).
+- [ ] Create `knottyyoga` system user; `/opt/knottyyoga/{bin,migrations}`; `/etc/knottyyoga/server.env` (chmod 600).
+- [ ] Enable `ufw` with rules: deny incoming default, allow 22 + 80.
+- [ ] Install CloudWatch Agent if you want metrics beyond the basic EC2 ones. Optional for v1.
+- [ ] Consider the free-tier 1-yr reserved instance once you're confident the instance type is right (locks in ~40% savings).
 
 ## 4.4 Database: Lightsail managed PostgreSQL
 
@@ -378,16 +393,77 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] Create the application database and a non-superuser role for the app (`CREATE ROLE knottyyoga LOGIN PASSWORD '...'; GRANT ALL ON DATABASE knottyyoga TO knottyyoga;`).
 - [ ] From the VPS: `psql` a test connection over the private VPC endpoint.
 
-**Alternative**: RDS `db.t4g.micro` (same price ballpark, more flexible but more config). Pick Lightsail for simplicity; migrate to RDS later via logical replication if needed.
-Mason- what is the cost difference between lightsail and RDS in cost? RDS does backups too, right?
+**Lightsail managed PG vs RDS — cost and backup comparison** (answering Mason's question):
 
-## 4.5 DNS + TLS
+| Aspect | Lightsail managed PG (smallest) | RDS db.t3.micro (x86) | RDS db.t4g.micro (ARM) |
+|---|---|---|---|
+| Compute + 40 GB storage | $15.00/mo flat | $13.14/mo + $2.30/mo (20 GB) = **$15.44/mo** | $11.68/mo + $2.30/mo = **$13.98/mo** |
+| 1-yr reserved (no upfront) | not available | ~$9/mo + storage | ~$8/mo + storage |
+| Automated daily backups | yes, 7-day retention | yes, 7-day retention (free ≤ DB size) | same |
+| Point-in-time recovery (PITR) | **no** — snapshots only | **yes, to any second in retention window** | same |
+| Snapshots on demand | yes, $0.05/GB/mo | yes, $0.095/GB/mo (free up to DB size) | same |
+| Multi-AZ failover | no | optional (~2× the cost) | same |
+| Read replicas | no | yes | yes |
+| Parameter tuning / extensions | limited | full | full |
+| VPC peering with EC2 in standard AWS | painful | native | native |
+
+**Short answer**: costs are within ~$1–2/mo of each other at this scale. **RDS wins** on backups because of point-in-time recovery (you can restore to 13:47:03 on Tuesday, not just "yesterday's snapshot"). For a payments app you genuinely want PITR. Pick RDS.
+
+If going with the **EC2 + RDS + S3 + CloudFront** recommendation above, this whole section's "Lightsail managed PG" is replaced by RDS. See Phase 4.4-alt below.
+
+## 4.4-alt Database: RDS Postgres (recommended path)
+
+- [ ] Create RDS subnet group spanning at least two AZs in your default VPC (needed even for single-AZ instances).
+- [ ] Provision `db.t3.micro` (or `db.t4g.micro` if going ARM), engine Postgres 15, single-AZ, 20 GB gp3 storage, auto-minor-version upgrades on.
+- [ ] Enable automated backups with 7-day retention (default). Turn on "deletion protection" so a rogue script can't `aws rds delete-db-instance` you into the ground.
+- [ ] Security group `sg-knottyyoga-db`: inbound 5432 from `sg-knottyyoga-web` only.
+- [ ] Record the RDS endpoint; note it's a DNS name (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`), not a static IP — put in `/etc/knottyyoga/server.env` as `KNOTTYYOGA_DB_HOST`.
+- [ ] Create the application database and non-superuser role (same SQL as the Lightsail path).
+- [ ] Download the AWS RDS CA bundle to `/etc/knottyyoga/rds-ca.pem`; set `KNOTTYYOGA_DB_SSLMODE=verify-full` and add a `KNOTTYYOGA_DB_SSLROOTCERT` env var that the connection-string builder can pick up. (Phase 1.1 already plans for sslmode.)
+- [ ] Verify PITR by running a toy restore (Phase 5.1 smoke test).
+
+## 4.5 DNS + TLS (Lightsail path)
 
 - [ ] Buy (or transfer) the domain. **Recommendation**: use Route 53 as registrar too — consolidates billing and DNS control.
 - [ ] Create a Route 53 hosted zone. $0.50/mo flat.
 - [ ] Create an `A` record pointing the apex (or `www`) to the Lightsail static IP.
 - [ ] After DNS propagates, run `sudo certbot --nginx -d knottyyoga.example -d www.knottyyoga.example` to get an LE cert. Certbot sets up auto-renewal via a systemd timer.
 - [ ] Confirm HTTPS reachable, HTTP auto-redirects, certificate chain is valid (`ssl-labs` test — aim for A).
+
+## 4.5-alt DNS + TLS (CloudFront path, recommended)
+
+- [ ] Buy domain via Route 53; hosted zone $0.50/mo.
+- [ ] In ACM (in `us-east-1` — CloudFront *requires* certs from us-east-1, even if your origin is elsewhere!), request a public cert for `knottyyoga.example` and `www.knottyyoga.example` with DNS validation. Route 53 can auto-create the validation CNAMEs — one click.
+- [ ] Do **not** create `A` records for the domain yet — they'll point at the CloudFront distribution once it's created (Phase 4.x).
+- [ ] When the CloudFront distribution is live, create Route 53 `A` alias records (apex + `www`) pointing to the CloudFront distribution. Alias records are free (no per-query cost).
+
+## 4.x S3 + CloudFront (recommended path)
+
+### S3 bucket for the frontend
+
+- [ ] Create bucket `knottyyoga-ui-prod` in the same region as EC2. Block all public access (CloudFront will reach it via Origin Access Control — more secure than "make bucket public").
+- [ ] Enable versioning (cheap insurance if a bad deploy overwrites files).
+- [ ] Disable static website hosting on the bucket itself — we don't need it; CloudFront will serve the content.
+- [ ] Create IAM user `ci-deploy` with policy allowing `s3:PutObject` + `s3:DeleteObject` + `s3:ListBucket` on this bucket only + `cloudfront:CreateInvalidation` on the distribution. Store its access key in GitLab CI variables.
+
+### CloudFront distribution
+
+- [ ] Create a CloudFront distribution with two behaviors:
+  - **Default behavior** (`*`): origin = S3 bucket via **Origin Access Control** (OAC, the modern replacement for OAI). Viewer protocol policy = redirect HTTP→HTTPS. Cache policy = `Managed-CachingOptimized`. Response headers policy = `Managed-SecurityHeadersPolicy`. Compress objects automatically = yes.
+  - **API behavior** (`api/*`): origin = EC2 Elastic IP (HTTP, port 80). Viewer protocol = redirect HTTP→HTTPS. Cache policy = `Managed-CachingDisabled`. Origin request policy = `Managed-AllViewerExceptHostHeader` (forwards all cookies, headers, query strings to origin).
+- [ ] Alternate domain names (CNAMEs): `knottyyoga.example`, `www.knottyyoga.example`.
+- [ ] SSL certificate = the ACM cert created above (must be in us-east-1).
+- [ ] Custom error responses: map HTTP 403 and 404 from the S3 origin to `/index.html` with response code 200 — this is what makes Angular's deep-linked routes work on refresh.
+- [ ] **Origin protection**: either restrict EC2's SG to the CloudFront IP prefix list `com.amazonaws.global.cloudfront.origin-facing`, OR generate a long random string, add a CloudFront custom origin header `X-Origin-Secret: <value>`, and configure nginx on the EC2 to reject requests without it. I recommend the header approach — CloudFront's IP list changes and requires periodic updates to your SG.
+- [ ] After deploy, invalidate `/index.html` (Angular's hashed asset filenames auto-bust cache; only `index.html` needs manual invalidation).
+
+### Frontend deploy script (for GitLab CI and for operators)
+
+- [ ] Script `deploy/deploy-ui.sh`:
+  1. `aws s3 sync ui/dist/ui/ s3://knottyyoga-ui-prod/ --delete --cache-control 'public, max-age=31536000, immutable'` for hashed assets.
+  2. Override `--cache-control 'public, max-age=0, must-revalidate'` for `index.html` (so the browser always checks for a new one).
+  3. `aws cloudfront create-invalidation --distribution-id <ID> --paths /index.html`.
+- [ ] Document in `RUNBOOK.md` that frontend-only deploys can happen independently of backend.
 
 ## 4.6 Email via SES
 
@@ -522,21 +598,45 @@ Not required to ship; listed so we don't forget.
 
 # Monthly Cost Estimate (soft launch)
 
-| Line item | Approx. $/mo |
+## Option A — recommended: EC2 + RDS + S3 + CloudFront
+
+| Line item | On-demand $/mo | 1-yr reserved $/mo |
+|---|---:|---:|
+| EC2 t3.small (x86, 2 vCPU / 2 GB) | $15.18 | $9.50 |
+| EBS gp3 20 GB root | $1.60 | $1.60 |
+| EC2 data out (tiny, most traffic via CloudFront) | ~$0.50 | ~$0.50 |
+| RDS db.t3.micro + 20 GB gp3 | $15.44 | $11.30 |
+| RDS snapshots (up to DB size free; beyond that $0.095/GB) | ~$0 | ~$0 |
+| S3 storage (Angular bundle ≈ 5 MB) | ~$0 | ~$0 |
+| S3 requests + data out to CloudFront (AWS-internal) | ~$0 | ~$0 |
+| CloudFront (first 1 TB out free 12 months, then $0.085/GB) | ~$0 | ~$0 |
+| CloudFront requests (free tier 10M/mo for 12 months) | ~$0 | ~$0 |
+| ACM certificate | free | free |
+| Route 53 hosted zone | $0.50 | $0.50 |
+| Route 53 queries (light) | ~$0.50 | ~$0.50 |
+| SES (first 62k emails/mo free from AWS egress) | ~$0 | ~$0 |
+| CloudWatch Logs (< 5 GB free tier) | ~$0 | ~$0 |
+| Domain registration (amortized) | ~$1.00 | ~$1.00 |
+| **Total** | **~$35/mo** | **~$25/mo** |
+
+After the first 12 months of AWS "new customer" free tier, add ~$5–10/mo for CloudFront data+requests at the soft-launch scale. Still sub-$50/mo.
+
+## Option B — alternative: Lightsail VPS + Lightsail managed PG
+
+| Line item | $/mo |
 |---|---:|
-| Lightsail VPS (2 vCPU / 2 GB ARM) | $12 |
-| Lightsail managed PostgreSQL (smallest) | $15 |
-| Route 53 hosted zone | $0.50 |
-| Route 53 queries (light) | ~$0.50 |
-| SES (first 62k emails/mo free from EC2/Lightsail; otherwise $0.10/1000) | ~$0 |
-| CloudWatch Logs (< 5 GB free tier) | ~$0 |
-| Lightsail snapshots (~$0.05/GB) | ~$1 |
+| Lightsail VPS (2 vCPU / 2 GB) | $12.00 |
+| Lightsail managed PostgreSQL (smallest) | $15.00 |
+| Lightsail snapshots | ~$1 |
+| Route 53 hosted zone + queries | ~$1 |
+| SES | ~$0 |
+| CloudWatch Logs | ~$0 |
 | Domain registration (amortized) | ~$1 |
 | **Total** | **~$30/mo** |
 
-Costs scale up with traffic mainly on Lightsail bandwidth overage ($0.09/GB after the included 2–3 TB) and RDS/Lightsail DB plan size. For the first dozen users, you'll be nowhere near the ceilings.
+Option A costs ~$5/mo more on-demand (cheaper if reserved) and gives you a real CDN, native AWS integrations, point-in-time DB recovery, and room to scale without migration. **Pick A** unless setup time is the hard constraint.
 
-Pricing caveat: AWS adjusts prices occasionally; verify current rates before committing.
+Pricing caveat: AWS adjusts prices occasionally; verify current rates in the AWS Pricing Calculator before committing.
 
 ---
 
@@ -546,12 +646,15 @@ These are things I want your answer on before or during implementation. Adding h
 
 1. **Domain**: do you already own a domain for Knotty Yoga, or will you buy one during this project? Does it need to live under a subdomain (e.g., `app.knottyyoga.com`)?
 2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.)
-3. **Lightsail vs. EC2+RDS**: my recommendation is Lightsail for v1. Any reason to jump straight to EC2/RDS (e.g., you already have AWS SSO/IAM strategy, you expect rapid scale, you want Infrastructure-as-Code via Terraform from day one)?
+3. **Architecture — Option A (EC2 + RDS + S3 + CloudFront) vs Option B (Lightsail)**: my updated recommendation is Option A for the reasons above — better perf, proper backups, room to scale, only ~$5/mo more. Any objection? The tradeoff is ~2–3 extra hours of one-time setup for CloudFront + S3 + IAM.
 4. **Staging environment**: do you want a separate staging VPS+DB from the start (~$27/mo extra), or will the soft-launch environment *be* the staging environment for a while?
 5. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
 6. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
 7. **Backup/restore testing**: how often do you want to exercise restore from snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
-8. **TLS**: are you comfortable with Let's Encrypt via certbot (free, auto-renews, industry standard) or do you want AWS ACM? ACM only matters if we add an ALB/CloudFront.
+8. **TLS**: with the CloudFront architecture recommendation, TLS is free via ACM and handled by CloudFront. No certbot needed. Agreed?
+13. **ARM vs x86 build target**: I'm suggesting x86-64 for the first deploy (simpler CI, same Windows dev box, ~$2/mo more). Any reason to go ARM from day one?
+14. **CloudFront origin protection method**: I'm recommending a custom header (`X-Origin-Secret`) checked by nginx on the EC2 origin, rather than trying to restrict to the CloudFront IP prefix list (which changes and requires periodic SG updates). Agreed, or do you prefer the IP-prefix approach?
+15. **Reserved instance commitment**: 1-yr reserved (no upfront) saves ~40% on EC2/RDS. I'd commit after ~2 weeks of running on-demand to confirm the instance type is right. Agreed?
 9. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
 10. **Admin access**: who besides you needs SSH access to the VPS? Any second operator's public key we need to include from day one?
 11. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies? There's a scenario where it helps — e.g., generating a schema diff report between two versions — but a script that diffs across git tags solves that too.
