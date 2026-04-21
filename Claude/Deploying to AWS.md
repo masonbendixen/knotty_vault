@@ -43,13 +43,114 @@ Why Lightsail instead of EC2 + ALB + RDS for v1: it bundles bandwidth, has predi
 
 | Option | Pros | Cons | Good for |
 |---|---|---|---|
-| **Lightsail VPS + Lightsail PG** (recommended) | Cheapest, flat pricing, includes bandwidth, simple mental model | Less flexible than full EC2, smaller instance sizes | Small-scale soft launch |
-| EC2 + RDS + ALB + Route 53 | Full AWS power, horizontal scaling, managed cert via ACM | More pieces, more billing surface, more config | Long-term production |
-| ECS Fargate + RDS | No EC2 hosts to patch, easy rolling deploys | More complex IaC, cold starts less of an issue here but still | Team with containerization discipline |
-| AWS App Runner + RDS | Minimal ops, auto-scale | Fargate pricing on tiny workloads is expensive; some quirks with long-lived connections | Not a great fit |
+| Lightsail VPS + Lightsail PG | Cheapest flat pricing, bundled bandwidth, simple mental model | Doesn't compose with S3/CloudFront/ACM/IAM cleanly | Tiny soft launch, DigitalOcean-style |
+| **EC2 + RDS + S3 + CloudFront** (recommended, see below) | Proper separation of static vs API; CDN for free-tier frontend; grows with traffic | More pieces to configure once; slightly higher billing surface | Real-world production — what I'd deploy |
+| EC2 + RDS + ALB | Full AWS power + managed LB for blue/green | ALB is $16–22/mo you don't need yet | When you need multi-instance HA |
+| ECS Fargate + RDS | No hosts to patch | More complex IaC, higher $/hr | Team with container discipline |
+| AWS App Runner + RDS | Minimal ops, auto-scale | Pricey on tiny workloads; quirky with long-lived conns | Not a great fit |
 | Elastic Beanstalk | Quick start | Legacy-feeling, opaque when things break | Skip |
-| **EC2 + self-hosted Postgres** | Cheapest possible | You own backups/upgrades/replication | Only if budget is tight AND you accept operational risk |
-Mason- Does it need to be ARM that I build for? It can't be x86? Can you give a cost breakdown of EC2 especially compared to lightsail. What is lightsail for?
+| EC2 + self-hosted Postgres | Cheapest possible | You own backups/upgrades/replication | Skip for a payments app |
+
+## Answers to inline questions
+
+### Does it need to be ARM? Can I build for x86?
+
+**x86 is totally fine** — no reason you must build for ARM. Crow, libpqxx, Boost, Conan 2, and the rest of the stack all support both. ARM (Graviton) is ~10–20% cheaper for the same performance, but it adds friction:
+
+- Your Windows dev box is x86-64. Building an x86-64 Linux binary from CI (GitLab shared runners are x86) is trivial. Building an ARM64 Linux binary either requires ARM runners (self-hosted) or cross-compilation, which is annoying.
+- If you containerize later, Docker BuildKit can cross-build, but Conan's dep cache and some sharp C++ libs don't always play nice.
+- **Recommendation**: ship x86-64 for the soft launch. Revisit ARM when you're optimizing cost at scale. The ~$2/mo saved isn't worth the build-system churn right now.
+
+### What is Lightsail for?
+
+Lightsail is AWS's "simplified VPS" — think DigitalOcean or Linode, but inside the AWS account. One monthly price (no line items) gets you a VM, bundled bandwidth, optional managed DB, optional load balancer, and a DNS/domain. It's designed for MVPs and people intimidated by full AWS. The catch: **it doesn't compose cleanly with the rest of AWS**. You can't use S3+CloudFront as a front door to a Lightsail instance in any first-class way — Lightsail lives in its own VPC with restricted peering, and integrations with RDS/IAM/ACM are weak. The moment you want the full AWS toolbox, Lightsail is the wrong home.
+
+### EC2 vs Lightsail cost breakdown (similar spec, us-west-2, April 2026 rates)
+
+| Item | Lightsail 2GB ARM | Lightsail 2GB x86 | EC2 t4g.small (ARM) | EC2 t3.small (x86) |
+|---|---:|---:|---:|---:|
+| Compute (on-demand) | $12.00/mo | $12.00/mo | $12.26/mo | $15.18/mo |
+| Compute (1-yr reserved, no upfront) | — | — | ~$7.50/mo | ~$9.50/mo |
+| Storage (60 GB SSD included vs 20 GB EBS gp3) | included | included | $1.60/mo | $1.60/mo |
+| Bandwidth out | 3 TB included | 3 TB included | $0.09/GB (no free tier on Lightsail migration) | $0.09/GB |
+| Static IP | free | free | $3.60/mo if not attached to running instance | same |
+
+**Takeaway**: Lightsail's headline price beats EC2 *only because of the bundled 3 TB of outbound data*. A small API at light traffic moves maybe 20–100 GB/mo → $1.80–$9/mo on EC2, so actual delta is ~$5–10/mo. When you front the server with CloudFront (see the next section), almost all outbound goes through CloudFront instead — and CloudFront's data-out price is cheaper than EC2's, plus its first 1 TB is free for the first 12 months. So with CloudFront in front, EC2 effectively ties or beats Lightsail on cost and gives you everything AWS offers.
+
+### Is S3 + CloudFront + RDS + EC2/ECS a viable architecture?
+
+**Yes — and it's what I'd actually recommend for Knotty Yoga.** The stateless C++ server is a near-perfect fit for the split.
+
+Architecture sketch:
+
+```
+              ┌──────────────────┐
+ users ───►   │   CloudFront     │  (TLS via free ACM cert)
+              │   distribution   │
+              └──────┬───────┬───┘
+                     │       │
+        /* (default)│       │ /api/*  (no caching, forward cookies + auth)
+                     ▼       ▼
+              ┌──────────┐  ┌──────────────────────┐
+              │    S3    │  │  EC2 t3.small (x86)  │
+              │ Angular  │  │  Crow server :8080   │
+              │  bundle  │  │  systemd, no TLS     │
+              └──────────┘  └──────────┬───────────┘
+                                       │ TLS (RDS cert)
+                                       ▼
+                                ┌──────────────┐
+                                │ RDS db.t4g.  │
+                                │    micro     │
+                                │  Postgres 15 │
+                                └──────────────┘
+```
+
+**Why this is better than Lightsail for a real app**:
+
+1. **Faster frontend**: the Angular bundle is served from S3 via CloudFront edge POPs — your users in Seattle hit a POP in Seattle, not Oregon. Dramatic perceived-speed win over a single VPS.
+2. **API isn't competing with static serving**: CloudFront eats all the "give me a .js file" requests. Your EC2 only handles `/api/*` — genuine work.
+3. **Free TLS via ACM**: provisioned and renewed automatically, attached to the CloudFront distribution. No certbot to babysit.
+4. **Native composability**: RDS ↔ EC2 via VPC security groups, S3 ↔ CloudFront via OAC, IAM for deploy creds, CloudWatch for all logs. Everything integrates.
+5. **Deploy the frontend independently**: `aws s3 sync ui/dist/ui/ s3://…` + CloudFront invalidation is simpler than SCP'ing a tarball for a frontend-only change. Backend deploys stay on the EC2.
+
+**Gotchas to be aware of**:
+
+1. **SPA routing**: CloudFront needs a "Custom Error Response" rule that rewrites 403/404 to `/index.html` with HTTP 200 — otherwise deep-linked Angular routes break on refresh. ~5 lines of config but you *must* remember it.
+2. **Cookies through CloudFront**: for the `/api/*` behavior you must set Cache Policy to `CachingDisabled` AND Origin Request Policy to `AllViewer` (forwards all cookies, query strings, headers). Miss this and either caching breaks auth (old session leaks) or cookies don't reach the origin.
+3. **Invalidation on deploy**: CloudFront caches static assets by content hash (Angular's hashed filenames) so the bundle auto-busts. But `index.html` is NOT hashed — you need to invalidate `/index.html` on every frontend deploy. Trivial (`aws cloudfront create-invalidation --paths /index.html`) but easy to forget.
+4. **Origin protection**: with CloudFront in front, attackers could still hit the EC2 IP directly and bypass the CDN. Mitigate with one of: (a) restrict EC2's security group to CloudFront IP ranges only (AWS publishes them — but they change, needs periodic update), (b) require a custom header in CloudFront → origin and have nginx/Crow reject requests without it, (c) put the EC2 in a private subnet behind an internal ALB that CloudFront talks to (more $). (b) is the pragmatic answer.
+5. **WebSockets / SSE**: CloudFront supports them with extra config, but we don't use either today.
+6. **Slightly longer first-time setup**: you'll spend a couple of hours wiring CloudFront's behaviors, cache policies, origin access, ACM cert. After that it's static config.
+
+**What about ECS vs EC2?** ECS Fargate removes the "patch the VM" chore but costs more (~$15/mo for an always-on 0.25 vCPU / 0.5 GB task plus $0.04/GB-hr ephemeral storage; realistically $20–25/mo for a 1 GB task) and the deployment story is more container-centric. If you already have a containerized build, Fargate is tidy. Given we don't yet have a production Dockerfile, **EC2 is simpler for v1**. We can graduate later.
+
+## Updated recommendation (TL;DR v2)
+
+Build for the real-AWS architecture from the start:
+
+- **Compute**: EC2 `t3.small` (x86, ~$15/mo on-demand, ~$9.50/mo reserved) running nginx + `knottyyoga_the_server` + `knottyyoga_helper` under systemd. No TLS on nginx itself — CloudFront terminates.
+- **Database**: RDS `db.t3.micro` Postgres (x86, ~$13/mo + $2.30/mo storage), single-AZ, automated backups on (RDS does daily snapshots + 7-day point-in-time recovery *out of the box, free*).
+- **Frontend**: S3 bucket + CloudFront distribution. Angular bundle deployed via `aws s3 sync`.
+- **CDN/TLS/Reverse proxy**: single CloudFront distribution with two behaviors — default → S3, `/api/*` → EC2 origin. Free ACM cert.
+- **DNS**: Route 53 hosted zone + apex alias to CloudFront.
+- **Email**: SES (same as before).
+- **Monthly total**: ~$32–40/mo on-demand, ~$27–35/mo with 1-yr reserved instance.
+
+This reads more expensive than Lightsail on paper (~$5–10/mo more) but gives you: edge caching, free TLS, proper backups, real AWS IAM, clean scaling runway. For a payments-processing app, worth it.
+
+**What to drop from the old Lightsail plan**:
+
+- Certbot on the VPS (ACM handles TLS at CloudFront).
+- nginx as TLS terminator (still useful as HTTP reverse proxy + health endpoint + static-fallback).
+- Lightsail managed DB (RDS replaces).
+- Static files on the VPS (S3 replaces).
+
+**What carries over unchanged**:
+
+- Phases 1 (code prereqs) and 3 (DB migrations) don't care which compute we pick.
+- Phase 6 (GitLab CI) mostly unchanged; deploy step now invokes `aws s3 sync` + CloudFront invalidation + SSH-to-EC2.
+- Phase 7 (versioning + rollback) unchanged.
+
 ## Critical Code Gaps That Block Deploy (Summary)
 
 These come first — they're the Phase 1 work. Each is detailed in its phase section below.
