@@ -23,21 +23,21 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ## TL;DR — Recommended Shape of the First Deploy
 
-For a "let a few people try it out" soft launch with Square sandbox, I recommend the **simplest viable AWS footprint** and then evolving it later:
+> **Note**: this TL;DR has been superseded by "Updated recommendation (TL;DR v2)" further down. Leaving the original for history — see v2 for the current recommendation (EC2 + RDS + S3 + CloudFront, no nginx).
 
-- **Compute**: One AWS Lightsail VPS (Ubuntu 22.04 LTS, ARM, 2 vCPU / 2 GB, ~$12/mo) running:
+For a "let a few people try it out" soft launch with Square sandbox, the simplest viable footprint is a single Lightsail VPS. After walking through the tradeoffs (and Mason's follow-up questions), we've shifted to the real-AWS architecture instead, which is documented below. This section is retained only so the Lightsail fallback stays legible as an alternative.
+
+- **Compute**: One AWS Lightsail VPS (Ubuntu 22.04 LTS, 2 vCPU / 2 GB, ~$12/mo) running:
   - nginx as TLS terminator + static file server + reverse proxy to C++ server
   - `knottyyoga_the_server` (C++ Crow) on `127.0.0.1:18080`, managed by systemd
   - `knottyyoga_helper` (scheduled jobs + watchdog, from `Scheduled Jobs.md`), managed by systemd — once it lands
   - `knottyyoga_test_helper` run on-demand via SSH (not a persistent service)
-- **Database**: Lightsail managed PostgreSQL (~$15/mo for the smallest plan) OR self-host PostgreSQL on the same VPS for the first few weeks and migrate to managed later. Recommendation: **managed from day one** — backups + PITR are cheap insurance for real customer data.
-- **DNS + TLS**: Route 53 for the domain, Let's Encrypt via certbot on the VPS (or AWS Certificate Manager if we later move to ALB).
-- **Frontend**: Built Angular bundle served by nginx from the same VPS (same-origin with `/api/*` — no CORS needed, cookies simpler). *Alternative*: S3 + CloudFront, but that's more moving parts for v1.
-- **Email**: Amazon SES (starts in sandbox mode — need to request production access). Square confirmation emails are already wired via `MailHelper`.
+- **Database**: Lightsail managed PostgreSQL (~$15/mo for the smallest plan).
+- **DNS + TLS**: Route 53 for the domain, Let's Encrypt via certbot on the VPS.
+- **Frontend**: Built Angular bundle served by nginx from the same VPS (same-origin with `/api/*`).
+- **Email**: Amazon SES.
 - **Square**: Sandbox for the initial rollout; flip `kSquareEnvironment` secret to `production` later.
-- **Estimated total monthly**: **~$30–$50/mo** for the small-scale initial deploy.
-
-Why Lightsail instead of EC2 + ALB + RDS for v1: it bundles bandwidth, has predictable flat pricing, and avoids the "death by a thousand line items" bill. We can graduate to full EC2/ECS/RDS when traffic or requirements demand it. The application architecture is so portable (stateless server, Postgres-only persistence) that moving later is straightforward.
+- **Estimated total monthly**: **~$30/mo** flat.
 
 ## Hosting Option Comparison
 
@@ -126,22 +126,41 @@ Architecture sketch:
 
 ## Updated recommendation (TL;DR v2)
 
-Build for the real-AWS architecture from the start:
+Build for the real-AWS architecture from the start, and **skip nginx entirely**. You're right that nginx is just a middleman once CloudFront is doing TLS + reverse-proxy + static serving — every one of its classic roles is already covered. We'll have Crow listen on port 80 directly, with a tiny middleware that enforces the CloudFront-origin secret.
 
-- **Compute**: EC2 `t3.small` (x86, ~$15/mo on-demand, ~$9.50/mo reserved) running nginx + `knottyyoga_the_server` + `knottyyoga_helper` under systemd. No TLS on nginx itself — CloudFront terminates.
+- **Compute**: EC2 `t3.small` (x86, ~$15/mo on-demand, ~$9.50/mo reserved) running `knottyyoga_the_server` + `knottyyoga_helper` under systemd. Crow binds 0.0.0.0:80. No TLS, no nginx.
 - **Database**: RDS `db.t3.micro` Postgres (x86, ~$13/mo + $2.30/mo storage), single-AZ, automated backups on (RDS does daily snapshots + 7-day point-in-time recovery *out of the box, free*).
 - **Frontend**: S3 bucket + CloudFront distribution. Angular bundle deployed via `aws s3 sync`.
 - **CDN/TLS/Reverse proxy**: single CloudFront distribution with two behaviors — default → S3, `/api/*` → EC2 origin. Free ACM cert.
+- **Origin protection**: CloudFront adds a custom header `X-Origin-Secret: <random>` on every forwarded request. Crow middleware drops any request missing that header. Attackers hitting the EC2 IP directly get a 403. Simpler and more robust than SG-by-CloudFront-IP-prefix, and less code than standing up nginx.
 - **DNS**: Route 53 hosted zone + apex alias to CloudFront.
 - **Email**: SES (same as before).
 - **Monthly total**: ~$32–40/mo on-demand, ~$27–35/mo with 1-yr reserved instance.
 
-This reads more expensive than Lightsail on paper (~$5–10/mo more) but gives you: edge caching, free TLS, proper backups, real AWS IAM, clean scaling runway. For a payments-processing app, worth it.
+This reads more expensive than Lightsail on paper (~$5/mo more) but gives you: edge caching, free TLS, proper backups, real AWS IAM, clean scaling runway. For a payments-processing app, worth it.
+
+### Why nginx adds no value here (justification)
+
+The classic reasons to put nginx in front of an app server — and what replaces them in this architecture:
+
+| nginx role | Replaced by |
+|---|---|
+| TLS termination | CloudFront + ACM (free, auto-renewed) |
+| HTTP → HTTPS redirect | CloudFront "Redirect HTTP to HTTPS" viewer protocol policy |
+| Static file serving | S3 via CloudFront OAC |
+| Reverse proxy to app server | CloudFront origin behavior `/api/*` → EC2 |
+| gzip / compression | CloudFront auto-compression + Crow's `compress` middleware |
+| Request logging | CloudFront access logs to S3 + CloudWatch |
+| Rate limiting (basic) | CloudFront request-limit behaviors; AWS WAF for anything serious |
+| Graceful reload on deploy | systemd restart + CloudFront never-down |
+| Origin-secret check | Crow middleware (see Phase 1.7) |
+
+The one genuine miss: if you needed to serve something non-HTTP directly from the EC2 (WebSockets, SSE, a second process on a different port) you'd want nginx to multiplex. The C++ server exposes only `/api/*` over HTTP → no multiplexing needed.
 
 **What to drop from the old Lightsail plan**:
 
 - Certbot on the VPS (ACM handles TLS at CloudFront).
-- nginx as TLS terminator (still useful as HTTP reverse proxy + health endpoint + static-fallback).
+- nginx entirely (everything it did is covered by CloudFront or Crow middleware).
 - Lightsail managed DB (RDS replaces).
 - Static files on the VPS (S3 replaces).
 
@@ -212,21 +231,36 @@ Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future 
 - [ ] Populate `ui/src/environments/environment.prod.ts` with Square **sandbox** Application ID and Location ID for the initial rollout (pulled from the existing `Square credentials and Sandbox setup.md`). These are client-side public identifiers — they're supposed to be in the bundle.
 - [ ] Decide: do we want a separate `environment.prod-square-live.ts` configuration for when we flip to Square production? **Recommendation**: yes — create the config but leave commented until we're ready, so the "soft launch" build isn't accidentally using live Square credentials.
 - [ ] Add a production build configuration in `ui/angular.json` if one doesn't already exist that maps to `environment.prod.ts`.
-- [ ] Ensure the frontend uses relative URLs (`/api/...`) so it works same-origin behind nginx. Scan `ServerAccessNetwork.ts` for any hardcoded absolute URLs — if present, make them use a `baseUrl` from environment config.
+- [ ] Ensure the frontend uses relative URLs (`/api/...`) so it works same-origin behind CloudFront. Scan `ServerAccessNetwork.ts` for any hardcoded absolute URLs — if present, make them use a `baseUrl` from environment config.
 
-## 1.5 Cookies + CORS sanity pass for same-origin deploy
+## 1.5 Cookies + CORS sanity pass for CloudFront same-origin deploy
 
-Currently `ServerConfig::Initialize` reads `kWebsiteAddress` from DB secrets and configures CORS when `prodMode_` is on. If the frontend and backend ship from the same origin via nginx (recommended), CORS isn't actually exercised — but the config still needs to be correct for the health of cookies.
+Currently `ServerConfig::Initialize` reads `kWebsiteAddress` from DB secrets and configures CORS when `prodMode_` is on. With CloudFront serving both the Angular bundle (from S3) and `/api/*` (from EC2) under one distribution domain, the browser sees a single origin → CORS preflight never triggers → cookies flow with plain `SameSite=Lax`.
 
-- [ ] Verify: with nginx terminating TLS and proxying `/api/*` to the C++ server, the browser sees `Origin: https://knottyyoga.example` for both static assets and API. Same-origin → CORS preflight not triggered → cookies flow without `SameSite=None; Secure` gymnastics.
+- [ ] Verify: with CloudFront fronting both behaviors, the browser sees `Origin: https://knottyyoga.example` for both static assets and API. Same-origin → CORS preflight not triggered → cookies flow without `SameSite=None; Secure` gymnastics.
 - [ ] Document in `Deploying to AWS.md` (this doc) the secret values that must be set before first boot: `kWebsiteAddress`, `kServerProductionMode=true`, `kSquareAccessToken`, `kSquareEnvironment=sandbox`, plus any email/SES secrets.
-- [ ] If any auth code currently assumes the frontend lives at a *different* origin, add a test fixture exercising the same-origin case and reverse-proxy header handling (`X-Forwarded-Proto`, `X-Forwarded-For`).
+- [ ] If any auth code currently assumes the frontend lives at a *different* origin, add a test fixture exercising the same-origin case and the CloudFront-forwarded header handling (`X-Forwarded-Proto`, `X-Forwarded-For`, `CloudFront-Viewer-Address`).
 
 ## 1.6 Reverse-proxy awareness in the C++ server
 
-- [ ] Confirm the server trusts `X-Forwarded-Proto: https` when setting the `Secure` flag on cookies. If today it infers scheme from the request itself (which will be `http` behind nginx), cookies set as `Secure` will be dropped by the browser.
+CloudFront forwards the viewer's scheme in `X-Forwarded-Proto: https`, but the TCP connection to Crow is plain HTTP on port 80. Without trusting the forwarded scheme, the `Secure` cookie flag won't be emitted and sessions will silently break on HTTPS.
+
+- [ ] Confirm the server trusts `X-Forwarded-Proto: https` when setting the `Secure` flag on cookies. If today it infers scheme from the request itself (which will be `http` behind CloudFront), cookies set as `Secure` will be dropped by the browser.
 - [ ] Add a `KNOTTYYOGA_TRUST_PROXY` flag that, when true, tells the cookie/session code to treat the forwarded scheme as authoritative.
 - [ ] Tests for both the trust-proxy-on and trust-proxy-off paths in `cookie_manager_test.cpp` or a new `proxy_trust_test.cpp`.
+
+## 1.7 Origin-secret middleware (replaces nginx)
+
+Since we're dropping nginx, Crow needs to enforce the CloudFront-origin secret itself. This is what stops attackers from hitting the EC2 Elastic IP directly and bypassing the CDN/WAF/cache.
+
+- [ ] Add a `CloudFrontOriginGuard` middleware to `endpoints/middleware/` (or the existing middleware folder if Crow's `App` type params it). On each incoming request:
+  1. If the path starts with `/api/health` (or whatever unauthenticated path we pick), pass through — so AWS target groups can probe.
+  2. Otherwise require header `X-Origin-Secret: <expected>` where `<expected>` is read from env var `KNOTTYYOGA_ORIGIN_SECRET` at startup.
+  3. Missing or mismatched → respond 403 with body `{"error":"direct_origin_access_forbidden"}` and log once per minute (to avoid log-flood on scanners).
+- [ ] Log at startup whether the guard is active (`KNOTTYYOGA_ORIGIN_SECRET` set) or disabled (not set — for local dev).
+- [ ] Tests:
+  - `origin_guard_test.cpp` — verify request with correct header passes, missing header 403s, wrong header 403s, health-check passes regardless, empty env var disables the guard.
+- [ ] Wire the secret into `/etc/knottyyoga/server.env` on the EC2 and into CloudFront's "Origin custom headers" config. Document rotation procedure in `RUNBOOK.md` (generate new random, update CloudFront first, update env file + restart systemd unit — short overlap where both values work would require two headers, skip for v1, accept a ~30s outage during rotation).
 
 ---
 
@@ -254,7 +288,7 @@ The trade-off is slightly less reproducibility across build machines; GitLab CI 
   - `bin/knottyyoga_helper` (once it exists from the Scheduled Jobs plan)
   - Any runtime `.so` dependencies not in base OS (via `ldd` + copy)
   - Certificates / static resources used at runtime, if any
-- [ ] Produce a single tarball `knottyyoga-<version>.tar.gz` with a flat layout: `bin/`, `lib/`, `systemd/` (units), `nginx/` (conf snippet), `migrations/` (see Phase 3).
+- [ ] Produce a single tarball `knottyyoga-<version>.tar.gz` with a flat layout: `bin/`, `lib/`, `systemd/` (units), `migrations/` (see Phase 3). No `nginx/` — CloudFront replaces it on the recommended path. (Add an `nginx/` folder only if you pick the Lightsail fallback.)
 - [ ] Decide on the target OS/arch. **Recommendation**: Ubuntu 22.04 LTS on ARM64 (Lightsail/EC2 Graviton is ~20% cheaper and plenty fast for Crow). Pin this in the build image.
 
 ## 2.2 systemd units
@@ -264,7 +298,9 @@ The trade-off is slightly less reproducibility across build machines; GitLab CI 
 - [ ] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH.
 - [ ] Log lines validating env var wiring (matches 1.1 / 1.3).
 
-## 2.3 nginx reverse-proxy configuration
+## 2.3 nginx reverse-proxy configuration (Lightsail fallback only — skip on recommended path)
+
+Only needed if you're going with Option B (Lightsail). On the recommended path (Option A), CloudFront handles TLS, HTTP→HTTPS redirect, and static serving — nothing for nginx to do.
 
 - [ ] `nginx/knottyyoga.conf` snippet:
   - `server_name knottyyoga.example;`
@@ -370,20 +406,21 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] Create `/opt/knottyyoga/{bin,ui,migrations}` owned by that user, `/etc/knottyyoga/server.env` (chmod 600, root:knottyyoga).
 - [ ] Enable `ufw` with rules: deny incoming default, allow 22/80/443.
 
-## 4.3-alt Compute: EC2 (recommended path)
+## 4.3-alt Compute: EC2 (recommended path — no nginx)
 
 - [ ] Create key pair in EC2 console (or import your existing public key).
 - [ ] Launch `t3.small` (x86) instance, Ubuntu 22.04 LTS AMI, 20 GB gp3 root volume, in default VPC public subnet.
 - [ ] Security group `sg-knottyyoga-web`:
   - Inbound 22 from your home IP only.
-  - Inbound 80 from CloudFront prefix list (`com.amazonaws.global.cloudfront.origin-facing`) — or if that's too fiddly, from `0.0.0.0/0` + require the `X-Origin-Secret` custom header check in nginx (see 4.x below).
-  - No 443 (CloudFront handles TLS).
-- [ ] Allocate Elastic IP, attach to the instance. Free while attached. Needed so the DNS target doesn't change on stop/start.
-- [ ] First boot: `apt update && apt upgrade`; install `nginx`, `postgresql-client` (NO certbot — ACM handles certs).
-- [ ] Create `knottyyoga` system user; `/opt/knottyyoga/{bin,migrations}`; `/etc/knottyyoga/server.env` (chmod 600).
+  - Inbound 80 from `0.0.0.0/0`. Origin protection is enforced in the Crow middleware (`X-Origin-Secret` check — see Phase 1.7), not at the SG level. This avoids the ongoing chore of keeping up with CloudFront's IP prefix list.
+  - No 443 (CloudFront handles TLS; Crow listens HTTP on 80).
+- [ ] Allocate an Elastic IP, attach it to the instance. Free while attached. Needed so the DNS / CloudFront origin target doesn't change on stop/start.
+- [ ] First boot: `apt update && apt upgrade`; install `postgresql-client` only. No nginx, no certbot.
+- [ ] Allow `knottyyoga_the_server` to bind port 80 as non-root: `sudo setcap 'cap_net_bind_service=+ep' /opt/knottyyoga/bin/knottyyoga_the_server` after each deploy (the install script handles this). Cleaner than running as root.
+- [ ] Create `knottyyoga` system user; `/opt/knottyyoga/{bin,migrations}`; `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, and the `KNOTTYYOGA_DB_*` vars.
 - [ ] Enable `ufw` with rules: deny incoming default, allow 22 + 80.
-- [ ] Install CloudWatch Agent if you want metrics beyond the basic EC2 ones. Optional for v1.
-- [ ] Consider the free-tier 1-yr reserved instance once you're confident the instance type is right (locks in ~40% savings).
+- [ ] Install CloudWatch Agent if you want metrics beyond basic EC2 ones. Optional for v1 — systemd journal tailed to CloudWatch Logs is enough.
+- [ ] Consider 1-yr reserved instance once you're confident the instance type is right (locks in ~40% savings).
 
 ## 4.4 Database: Lightsail managed PostgreSQL
 
@@ -454,7 +491,7 @@ If going with the **EC2 + RDS + S3 + CloudFront** recommendation above, this who
 - [ ] Alternate domain names (CNAMEs): `knottyyoga.example`, `www.knottyyoga.example`.
 - [ ] SSL certificate = the ACM cert created above (must be in us-east-1).
 - [ ] Custom error responses: map HTTP 403 and 404 from the S3 origin to `/index.html` with response code 200 — this is what makes Angular's deep-linked routes work on refresh.
-- [ ] **Origin protection**: either restrict EC2's SG to the CloudFront IP prefix list `com.amazonaws.global.cloudfront.origin-facing`, OR generate a long random string, add a CloudFront custom origin header `X-Origin-Secret: <value>`, and configure nginx on the EC2 to reject requests without it. I recommend the header approach — CloudFront's IP list changes and requires periodic updates to your SG.
+- [ ] **Origin protection**: generate a long random string, add a CloudFront "Origin custom header" `X-Origin-Secret: <value>` on the `/api/*` behavior's origin. The Crow middleware from Phase 1.7 rejects anything missing the header with 403. This is the "pragmatic answer" — no nginx needed, no SG-by-IP-prefix churn.
 - [ ] After deploy, invalidate `/index.html` (Angular's hashed asset filenames auto-bust cache; only `index.html` needs manual invalidation).
 
 ### Frontend deploy script (for GitLab CI and for operators)
@@ -496,9 +533,10 @@ Purposely manual — gets you comfortable with the pieces before automating.
 - [ ] SCP tarballs to VPS: `scp knottyyoga-v1.0.0.tar.gz ubuntu@<ip>:/tmp/`.
 - [ ] Extract to `/opt/knottyyoga/` via a small shell script (`deploy/install.sh`) that also:
   - Installs systemd units.
-  - Installs nginx snippet, reloads nginx.
+  - Grants the server the `cap_net_bind_service` capability so it can bind port 80 as the `knottyyoga` user.
   - Runs `knottyyoga_database_helper --migrate`.
   - `systemctl daemon-reload && systemctl enable --now knottyyoga-server`.
+  - (Lightsail fallback only: installs nginx snippet and reloads nginx.)
 - [ ] Smoke test: `curl https://knottyyoga.example/api/health`.
 - [ ] Log in via the frontend, register a user, process a sandbox Square payment end-to-end.
 
@@ -511,7 +549,7 @@ Purposely manual — gets you comfortable with the pieces before automating.
 
 ## 5.3 Observability (low-cost baseline)
 
-- [ ] Set up CloudWatch Logs agent on the VPS (free tier: 5 GB/mo), tailing `/var/log/nginx/access.log`, the journal for `knottyyoga-server.service`, and `knottyyoga-helper.service`.
+- [ ] Set up CloudWatch Logs agent on the EC2 (free tier: 5 GB/mo), tailing the systemd journals for `knottyyoga-server.service` and `knottyyoga-helper.service`. CloudFront's own access logs go directly to a separate S3 bucket (configured on the distribution) if you want HTTP-level visibility — optional, ~$0 at low traffic.
 - [ ] Set up an uptime check — CloudWatch Synthetics, or something free like UptimeRobot — pointed at `/api/health`. Alert via email.
 - [ ] Configure `journalctl` retention to a sensible cap (e.g., 500 MB) so disk doesn't fill.
 
@@ -588,7 +626,7 @@ Not required to ship; listed so we don't forget.
 
 - [ ] CloudFront in front of the Angular bundle for static-asset caching (meaningful only when we see real users).
 - [ ] RDS multi-AZ (if we move off Lightsail).
-- [ ] AWS WAF rules on nginx for basic abuse protection.
+- [ ] AWS WAF rules attached to the CloudFront distribution for basic abuse protection (rate limits, common-attack managed rule set, geo-blocking if desired). $5/mo base + $1 per rule + $0.60 per million requests.
 - [ ] Separate staging environment (second tiny Lightsail VPS + DB, used for final pre-prod validation).
 - [ ] Move Angular bundle to S3 + CloudFront, leaving the VPS to do API only. Reduces VPS load; enables edge caching.
 - [ ] Structured JSON logging — easier to grep CloudWatch.
@@ -653,7 +691,7 @@ These are things I want your answer on before or during implementation. Adding h
 7. **Backup/restore testing**: how often do you want to exercise restore from snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
 8. **TLS**: with the CloudFront architecture recommendation, TLS is free via ACM and handled by CloudFront. No certbot needed. Agreed?
 13. **ARM vs x86 build target**: I'm suggesting x86-64 for the first deploy (simpler CI, same Windows dev box, ~$2/mo more). Any reason to go ARM from day one?
-14. **CloudFront origin protection method**: I'm recommending a custom header (`X-Origin-Secret`) checked by nginx on the EC2 origin, rather than trying to restrict to the CloudFront IP prefix list (which changes and requires periodic SG updates). Agreed, or do you prefer the IP-prefix approach?
+14. **CloudFront origin protection method**: the check lives in the C++ server as a Crow middleware (Phase 1.7), not in nginx. CloudFront injects `X-Origin-Secret`; Crow rejects any request missing/mismatched. No nginx involved. Agreed?
 15. **Reserved instance commitment**: 1-yr reserved (no upfront) saves ~40% on EC2/RDS. I'd commit after ~2 weeks of running on-demand to confirm the instance type is right. Agreed?
 9. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
 10. **Admin access**: who besides you needs SSH access to the VPS? Any second operator's public key we need to include from day one?
