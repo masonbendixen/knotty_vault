@@ -636,6 +636,80 @@ Not required to ship; listed so we don't forget.
 
 # Monthly Cost Estimate (soft launch)
 
+## Per-service cost detail (Option A breakdown)
+
+Prices in us-west-2 (Oregon), April 2026. These are the AWS public list prices — verify against the AWS Pricing Calculator before committing.
+
+### EC2
+
+| Component | Rate | Monthly (soft launch) |
+|---|---|---:|
+| `t3.small` on-demand | $0.0208/hr | $15.18 (730 hr) |
+| `t3.small` 1-yr reserved, no upfront | — | ~$9.50 |
+| `t3.small` 3-yr reserved, no upfront | — | ~$6.50 |
+| EBS gp3 root, 20 GB | $0.08/GB-mo | $1.60 |
+| EBS snapshots (1 weekly) | $0.05/GB-mo | ~$1 |
+| Data out to internet (non-CloudFront) | $0.09/GB (first 100 GB free) | ~$0 |
+| Data out to CloudFront (same region) | **free** | $0 |
+| Elastic IP (attached to running instance) | free | $0 |
+| **EC2 subtotal (on-demand)** | | **~$18/mo** |
+| **EC2 subtotal (1-yr reserved)** | | **~$12/mo** |
+
+*Bandwidth note*: because `/api/*` traffic flows EC2 → CloudFront → user, AWS bills the EC2 → CloudFront hop at zero. Your EC2 data-out costs are effectively free at soft-launch volume.
+
+### RDS
+
+| Component | Rate | Monthly (soft launch) |
+|---|---|---:|
+| `db.t3.micro` (1 vCPU / 1 GB) on-demand, single-AZ | $0.018/hr | $13.14 |
+| `db.t3.micro` 1-yr reserved, no upfront | — | ~$9.00 |
+| `db.t4g.micro` (ARM) on-demand | $0.016/hr | $11.68 |
+| Storage, gp3 20 GB | $0.115/GB-mo | $2.30 |
+| Automated backups | **free up to DB size** | $0 |
+| PITR (point-in-time recovery) | included | $0 |
+| Extra manual snapshots | $0.095/GB-mo above DB size | ~$0–$1 |
+| Data transfer in | free | $0 |
+| Data transfer out (to EC2 in same AZ) | free | $0 |
+| Multi-AZ (optional, doubles compute) | — | skip for v1 |
+| **RDS subtotal (on-demand, x86)** | | **~$16/mo** |
+| **RDS subtotal (1-yr reserved, x86)** | | **~$11/mo** |
+
+### CloudFront
+
+The free tier (first 12 months) is generous enough that CloudFront is effectively free at soft-launch scale.
+
+| Component | Rate (North America) | Monthly (soft launch) |
+|---|---|---:|
+| Data out to internet | $0.085/GB (first 1 TB/mo free for 12 months) | $0 free-tier, then ~$1–5 |
+| HTTPS requests | $0.01 per 10,000 (first 10M/mo free for 12 months) | $0 free-tier, then ~$0.50 |
+| Invalidation requests | first 1,000 paths/mo free | $0 |
+| Origin Shield (optional caching layer) | $0.0075/10k requests | skip for v1 |
+| **CloudFront subtotal (first 12 months)** | | **~$0/mo** |
+| **CloudFront subtotal (after free tier)** | | **~$1–5/mo** |
+
+Assumption: soft launch traffic ≈ 5–20 GB/mo and 100k–1M requests/mo. Even scaled to 100 GB and 10M requests you're under $15/mo.
+
+### S3
+
+| Component | Rate | Monthly (soft launch) |
+|---|---|---:|
+| Storage (Standard class), Angular bundle ≈ 5–10 MB | $0.023/GB-mo | ~$0 |
+| PUT/COPY/POST (deploys only) | $0.005 per 1,000 | ~$0 |
+| GET (CloudFront reads from S3, mostly cached) | $0.0004 per 1,000 | ~$0 |
+| Data out to CloudFront | free | $0 |
+| **S3 subtotal** | | **~$0/mo** (literally under $0.10) |
+
+### Total
+
+| Mode | EC2 | RDS | CF | S3 | Other* | **Total** |
+|---|---:|---:|---:|---:|---:|---:|
+| On-demand, first 12 months | $18 | $16 | $0 | $0 | $2 | **~$36/mo** |
+| On-demand, after free tier | $18 | $16 | $3 | $0 | $2 | **~$39/mo** |
+| 1-yr reserved, first 12 months | $12 | $11 | $0 | $0 | $2 | **~$25/mo** |
+| 1-yr reserved, after free tier | $12 | $11 | $3 | $0 | $2 | **~$28/mo** |
+
+*"Other" = Route 53 hosted zone + queries (~$1), SES (~$0 on AWS egress), CloudWatch Logs (~$0 in free tier), domain registration amortized (~$1).*
+
 ## Option A — recommended: EC2 + RDS + S3 + CloudFront
 
 | Line item | On-demand $/mo | 1-yr reserved $/mo |
