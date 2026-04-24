@@ -214,8 +214,8 @@ The trade-off is slightly less reproducibility across build machines; GitLab CI 
   - `bin/knottyyoga_helper` (once it exists from the Scheduled Jobs plan)
   - Any runtime `.so` dependencies not in base OS (via `ldd` + copy)
   - Certificates / static resources used at runtime, if any
-- [ ] Produce a single tarball `knottyyoga-<version>.tar.gz` with a flat layout: `bin/`, `lib/`, `systemd/` (units), `migrations/` (see Phase 3). No `nginx/` — CloudFront replaces it on the recommended path. (Add an `nginx/` folder only if you pick the Lightsail fallback.)
-- [ ] Decide on the target OS/arch. **Recommendation**: Ubuntu 22.04 LTS on ARM64 (Lightsail/EC2 Graviton is ~20% cheaper and plenty fast for Crow). Pin this in the build image.
+- [ ] Produce a single tarball `knottyyoga-<version>.tar.gz` with a flat layout: `bin/`, `lib/`, `systemd/` (units), `migrations/` (see Phase 3). No `nginx/` — CloudFront replaces it.
+- [ ] Target OS/arch: **Ubuntu 22.04 LTS on x86-64** for the initial deploy. Pin this in the build image. Migrate to ARM64 (Graviton, ~20% cheaper) post-launch when the CI builder has an ARM runner or cross-build set up.
 
 ## 2.2 systemd units
 
@@ -285,7 +285,7 @@ You asked about saving copies of `db_schema/`. My take: **don't copy the directo
 
 - [ ] Rolling back a code-only release: redeploy previous tarball, restart systemd unit. Near-zero downtime.
 - [ ] Rolling back a code + schema release: redeploy previous binaries but **do not** roll back the migration. Old code must be forward-compatible with the new schema (which is why Expand/Migrate/Contract matters).
-- [ ] Disaster recovery: restore RDS/Lightsail PG snapshot. Write this procedure down in a `RUNBOOK.md` in this repo once Phase 4 is complete.
+- [ ] Disaster recovery: restore from an RDS snapshot or point-in-time. Write this procedure down in a `RUNBOOK.md` in this repo once Phase 4 is complete.
 
 ---
 
@@ -404,7 +404,6 @@ Purposely manual — gets you comfortable with the pieces before automating.
   - Grants the server the `cap_net_bind_service` capability so it can bind port 80 as the `knottyyoga` user.
   - Runs `knottyyoga_database_helper --migrate`.
   - `systemctl daemon-reload && systemctl enable --now knottyyoga-server`.
-  - (Lightsail fallback only: installs nginx snippet and reloads nginx.)
 - [ ] Smoke test: `curl https://knottyyoga.example/api/health`.
 - [ ] Log in via the frontend, register a user, process a sandbox Square payment end-to-end.
 
@@ -413,7 +412,7 @@ Purposely manual — gets you comfortable with the pieces before automating.
 - [ ] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`).
 - [ ] Use key-based auth only; record public keys of any authorized operator in `~/.ssh/authorized_keys` for both `ubuntu` and `knottyyoga` (knottyyoga for emergency access if needed).
 - [ ] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't.
-- [ ] Optional: enable AWS Systems Manager Session Manager as a backup access path so you don't depend on your home IP / SSH key forever. Only meaningful if we move off Lightsail.
+- [ ] Optional: enable AWS Systems Manager Session Manager as a backup access path so you don't depend on your home IP / SSH key forever. Useful if your IP changes or your key is lost.
 
 ## 5.3 Observability (low-cost baseline)
 
@@ -492,13 +491,14 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 
 Not required to ship; listed so we don't forget.
 
-- [ ] CloudFront in front of the Angular bundle for static-asset caching (meaningful only when we see real users).
-- [ ] RDS multi-AZ (if we move off Lightsail).
+- [ ] Migrate EC2 to `t4g.small` (ARM Graviton) for ~20% compute savings. Needs an ARM-capable CI builder or cross-build.
+- [ ] RDS multi-AZ (doubles RDS cost; buy when a real outage hurts).
 - [ ] AWS WAF rules attached to the CloudFront distribution for basic abuse protection (rate limits, common-attack managed rule set, geo-blocking if desired). $5/mo base + $1 per rule + $0.60 per million requests.
-- [ ] Separate staging environment (second tiny Lightsail VPS + DB, used for final pre-prod validation).
-- [ ] Move Angular bundle to S3 + CloudFront, leaving the VPS to do API only. Reduces VPS load; enables edge caching.
+- [ ] Separate staging environment (second tiny EC2 + RDS, used for final pre-prod validation).
 - [ ] Structured JSON logging — easier to grep CloudWatch.
 - [ ] Encrypted secrets-at-rest in the `config_secrets` table (column-level encryption with a key from env var) instead of plaintext. Plaintext is ok for a tiny soft launch but you'll want this before real revenue flows.
+- [ ] CloudFront access logs → S3 for HTTP-level visibility (free aside from S3 storage of the log files).
+- [ ] Buy the 1-yr Compute Savings Plan once the instance type is confirmed.
 
 ---
 
@@ -584,33 +584,35 @@ Pricing caveat: AWS adjusts prices occasionally; verify current rates in the AWS
 
 # Open Questions
 
-These are things I want your answer on before or during implementation. Adding here instead of prompting at the terminal.
+Resolved (recorded here for history):
+- ✅ Architecture — **EC2 + RDS + S3 + CloudFront**, no nginx.
+- ✅ Build target — **x86-64**; migrate to ARM later.
+- ✅ TLS — **ACM + CloudFront**, no certbot.
+- ✅ Origin-protection — Crow middleware checks `X-Origin-Secret`.
+
+Still open:
 
 1. **Domain**: do you already own a domain for Knotty Yoga, or will you buy one during this project? Does it need to live under a subdomain (e.g., `app.knottyyoga.com`)?
-2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.)
-3. **Architecture — Option A (EC2 + RDS + S3 + CloudFront) vs Option B (Lightsail)**: my updated recommendation is Option A for the reasons above — better perf, proper backups, room to scale, only ~$5/mo more. Any objection? The tradeoff is ~2–3 extra hours of one-time setup for CloudFront + S3 + IAM.
-4. **Staging environment**: do you want a separate staging VPS+DB from the start (~$27/mo extra), or will the soft-launch environment *be* the staging environment for a while?
-5. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
-6. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
-7. **Backup/restore testing**: how often do you want to exercise restore from snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
-8. **TLS**: with the CloudFront architecture recommendation, TLS is free via ACM and handled by CloudFront. No certbot needed. Agreed?
-13. **ARM vs x86 build target**: I'm suggesting x86-64 for the first deploy (simpler CI, same Windows dev box, ~$2/mo more). Any reason to go ARM from day one?
-14. **CloudFront origin protection method**: the check lives in the C++ server as a Crow middleware (Phase 1.7), not in nginx. CloudFront injects `X-Origin-Secret`; Crow rejects any request missing/mismatched. No nginx involved. Agreed?
-15. **Reserved instance commitment**: 1-yr reserved (no upfront) saves ~40% on EC2/RDS. I'd commit after ~2 weeks of running on-demand to confirm the instance type is right. Agreed?
-9. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
-10. **Admin access**: who besides you needs SSH access to the VPS? Any second operator's public key we need to include from day one?
-11. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies? There's a scenario where it helps — e.g., generating a schema diff report between two versions — but a script that diffs across git tags solves that too.
-12. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
+2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.) Regardless of app region, the ACM cert for CloudFront must be issued in `us-east-1`.
+3. **Staging environment**: do you want a separate staging EC2 + RDS from the start (~$30/mo extra), or will the soft-launch environment *be* the staging environment for a while?
+4. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
+5. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
+6. **Backup/restore testing**: how often do you want to exercise restore from RDS snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
+7. **Savings Plan commitment timing**: I propose running on-demand for the first 2–4 weeks to confirm `t3.small` is right-sized, then buying a 1-yr Compute Savings Plan at the observed burn rate. Agreed?
+8. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
+9. **Admin access**: who besides you needs SSH access to the EC2? Any second operator's public key we need to include from day one?
+10. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies?
+11. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
 
 ---
 
 # Phase 0 — Decisions checklist (fill before Phase 1 starts)
 
+- [x] Architecture committed — EC2 + RDS + S3 + CloudFront, x86-64, no nginx
 - [ ] Domain chosen
-- [ ] AWS region chosen
-- [ ] Lightsail vs. EC2+RDS decision
+- [ ] AWS region chosen (app region; ACM cert for CloudFront always in us-east-1)
 - [ ] Square sandbox values confirmed
 - [ ] SES sender identity agreed
 - [ ] Staging env: yes / no / later
 - [ ] `knottyyoga_helper` in-scope for soft launch: yes / no
-- [ ] Open Questions 1–12 answered
+- [ ] Open Questions 1–11 answered
