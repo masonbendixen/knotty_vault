@@ -150,7 +150,7 @@ Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future 
 - [ ] Confirm that on Linux the server flushes stdout on each line (systemd journal and CloudWatch Logs agent tail line-by-line).
 - [ ] Add tests where practical (e.g., helper that resolves destination from env var).
 
-**Advice**: systemd captures stdout/stderr automatically into the journal — no need for a custom log file path in the container/VPS deploy. Simpler is better.
+**Advice**: systemd captures stdout/stderr automatically into the journal — no need for a custom log file path in the container/EC2 deploy. Simpler is better.
 
 ## 1.4 Frontend environment configuration
 
@@ -398,7 +398,7 @@ Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull f
 Purposely manual — gets you comfortable with the pieces before automating.
 
 - [ ] Build artifacts locally (or via temporary GitLab CI one-shot).
-- [ ] SCP tarballs to VPS: `scp knottyyoga-v1.0.0.tar.gz ubuntu@<ip>:/tmp/`.
+- [ ] SCP tarballs to EC2: `scp knottyyoga-v1.0.0.tar.gz ubuntu@<ip>:/tmp/`.
 - [ ] Extract to `/opt/knottyyoga/` via a small shell script (`deploy/install.sh`) that also:
   - Installs systemd units.
   - Grants the server the `cap_net_bind_service` capability so it can bind port 80 as the `knottyyoga` user.
@@ -450,7 +450,7 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 ## 6.5 Deploy job
 
 - [ ] Job `deploy-manual` is a manual-trigger job (click Play in GitLab UI) that:
-  - SSHs to the VPS using a deploy key stored in GitLab CI variables.
+  - SSHs to the EC2 using a deploy key stored in GitLab CI variables.
   - Runs `/opt/knottyyoga/deploy/install.sh <artifact-url>`.
 - [ ] Start with **manual** deploys; go auto once you're confident. Auto-deploys on push-to-main for a payments-processing app are risky until CI coverage is strong.
 
@@ -476,8 +476,8 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 ## 7.4 Update procedure
 
 - [ ] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab.
-- [ ] Operator clicks `deploy-manual` in GitLab → artifact deploys to VPS.
-- [ ] VPS `install.sh`:
+- [ ] Operator clicks `deploy-manual` in GitLab → artifact deploys to EC2.
+- [ ] EC2 `install.sh`:
   1. Downloads artifact.
   2. Extracts to versioned dir (`/opt/knottyyoga/releases/vX.Y.Z/`).
   3. Runs migrations.
@@ -611,7 +611,9 @@ Still open:
 9. **Admin access**: who besides you needs SSH access to the EC2? Any second operator's public key we need to include from day one?
 	- Mason- realistically, probably me for now but I'd like to be able to grant other people access. I have a friend who is retired and occasionally helps out with stuff.
 10. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies?
+	- Mason- I'll go with your recommendation.
 11. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
+	- Mason- Sure.
 
 ---
 
