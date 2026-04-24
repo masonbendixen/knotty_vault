@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 4/16/2026
-Version: 0.1
+Last Updated: 4/24/2026
+Version: 0.2
 tags: 
 ---
 # Overview
