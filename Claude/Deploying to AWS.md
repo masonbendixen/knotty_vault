@@ -609,6 +609,7 @@ Still open:
 8. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
 	- Mason- I'll go with your recommendation
 9. **Admin access**: who besides you needs SSH access to the EC2? Any second operator's public key we need to include from day one?
+	- Mason- realistically, probably me for now but I'd like to be able to grant other people access. I have a friend who is retired and occasionally helps out with stuff.
 10. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies?
 11. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
 
