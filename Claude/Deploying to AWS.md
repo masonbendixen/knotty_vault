@@ -595,11 +595,13 @@ Still open:
 1. **Domain**: do you already own a domain for Knotty Yoga, or will you buy one during this project? Does it need to live under a subdomain (e.g., `app.knottyyoga.com`)?
 	- Mason- I own the domain for KnottyYoga.com. It's registered with another DNS provider. I might migrate it to AWS at some point.
 2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.) Regardless of app region, the ACM cert for CloudFront must be issued in `us-east-1`.
-	- us-west-2 for sure
+	- Mason- us-west-2 for sure
 3. **Staging environment**: do you want a separate staging EC2 + RDS from the start (~$30/mo extra), or will the soft-launch environment *be* the staging environment for a while?
-	- 
+	- Mason- Hrm... I hadn't thought of having a separate staging environment. I was going to stage to Amazon, not do DNS, use the Square sandbox for a bit and have friends try it. Then convert it over to production. Should I have a separate staging environment?
 4. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
+	- Mason- I'm going to implement that next. I do need to think about my heart beat functionality. Is that something I should bother with or can AWS do that for me?
 5. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
+	- 
 6. **Backup/restore testing**: how often do you want to exercise restore from RDS snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
 7. **Savings Plan commitment timing**: I propose running on-demand for the first 2–4 weeks to confirm `t3.small` is right-sized, then buying a 1-yr Compute Savings Plan at the observed burn rate. Agreed?
 8. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
