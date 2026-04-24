@@ -593,7 +593,7 @@ Resolved (recorded here for history):
 Still open:
 
 1. **Domain**: do you already own a domain for Knotty Yoga, or will you buy one during this project? Does it need to live under a subdomain (e.g., `app.knottyyoga.com`)?
-	- Mason- I own the domain for KnottyYoga.com. It's registered with another D
+	- Mason- I own the domain for KnottyYoga.com. It's registered with another DNS provider. I might migrate it to AWS at some point.
 2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.) Regardless of app region, the ACM cert for CloudFront must be issued in `us-east-1`.
 3. **Staging environment**: do you want a separate staging EC2 + RDS from the start (~$30/mo extra), or will the soft-launch environment *be* the staging environment for a while?
 4. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
