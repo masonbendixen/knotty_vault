@@ -601,10 +601,13 @@ Still open:
 4. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
 	- Mason- I'm going to implement that next. I do need to think about my heart beat functionality. Is that something I should bother with or can AWS do that for me?
 5. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
-	- 
+	- Mason- Probably? Look at the values in the secrets file in the database. There are ifdefs for production and debug.
 6. **Backup/restore testing**: how often do you want to exercise restore from RDS snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
+	- Mason- I'll take your suggestion.
 7. **Savings Plan commitment timing**: I propose running on-demand for the first 2–4 weeks to confirm `t3.small` is right-sized, then buying a 1-yr Compute Savings Plan at the observed burn rate. Agreed?
+	- Mason- Is it hard to switch?
 8. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
+	- Mason- I'll go with your recommendation
 9. **Admin access**: who besides you needs SSH access to the EC2? Any second operator's public key we need to include from day one?
 10. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies?
 11. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
