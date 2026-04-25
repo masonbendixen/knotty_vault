@@ -299,7 +299,8 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] Enable MFA on root. Never log in as root after bootstrap.
 - [ ] Create an IAM admin user for yourself; create `AWSCLI` access keys stored in a password manager.
 - [ ] Set a **billing alarm** at $75/mo (sanity) so a misconfigured anything doesn't quietly run up a bill.
-- [ ] Pick a region. **Recommendation**: `us-west-2` (Oregon) — cheap, reliable; or `us-east-1` if you prefer proximity. Stick with one.
+- [ ] Region: `us-west-2` (Oregon) for everything except the ACM cert. The ACM cert lives in `us-east-1` (CloudFront-global limitation) — you'll create that explicitly in Phase 4.5.
+- [ ] In the AWS console region picker, default to `us-west-2`. When you switch over to ACM in Phase 4.5, remember to flip the region picker to `us-east-1` for that step only.
 
 ## 4.2 Networking
 
@@ -337,10 +338,15 @@ Goal: provision the accounts/services we'll actually deploy to.
 
 ## 4.5 DNS + TLS
 
-- [ ] Buy domain via Route 53; hosted zone $0.50/mo.
-- [ ] In ACM **in `us-east-1`** (CloudFront *only* reads certs from us-east-1 regardless of where your app runs), request a public cert for `knottyyoga.example` and `www.knottyyoga.example` with DNS validation. Route 53 can auto-create the validation CNAMEs — one click.
-- [ ] Do not create `A` records yet — they'll point at the CloudFront distribution once Phase 4.6 stands it up.
-- [ ] After the CloudFront distribution is live, create Route 53 `A` alias records (apex + `www`) pointing to the distribution. Alias records are free.
+`knottyyoga.com` is registered at a non-AWS provider. We're keeping the registrar there but moving DNS hosting to Route 53 so CloudFront alias records work cleanly. The registrar just needs its NS records updated.
+
+- [ ] Create a Route 53 hosted zone for `knottyyoga.com` ($0.50/mo). Note the four NS records Route 53 assigns.
+- [ ] At your current DNS provider, change the nameservers for `knottyyoga.com` to those four Route 53 NS values. **Do not** delete the registration there; you only swap the NS pointers. Propagation is typically <1 hour but can take up to 48 hours.
+- [ ] (Optional, later) Migrate the registrar itself to Route 53. Costs roughly the same as your current registrar, consolidates billing. Can be done at any time without disturbing anything.
+- [ ] In ACM **in `us-east-1`** (CloudFront *only* reads certs from `us-east-1` regardless of where your app runs), request a public cert for `knottyyoga.com` and `www.knottyyoga.com` with DNS validation. Route 53 can auto-create the validation CNAMEs — one click in the ACM console.
+- [ ] **Do not** create `A` records for the domain yet — keep CloudFront accessible only via its `dXXXXXX.cloudfront.net` URL during the soft-launch / friends-and-family phase. That's how we avoid running production DNS while still letting testers reach the site (paste them the CloudFront URL directly).
+- [ ] When you're ready to flip live: in the Route 53 hosted zone, create two `A`-type *alias* records (apex `knottyyoga.com` and `www.knottyyoga.com`) pointing at the CloudFront distribution. Alias records are free of per-query charges.
+- [ ] At go-live, also flip the `kSquareEnvironment` secret from `sandbox` to `production` (Phase 4.8 secret bootstrap covers this).
 
 ## 4.6 S3 + CloudFront
 
@@ -409,16 +415,63 @@ Purposely manual — gets you comfortable with the pieces before automating.
 
 ## 5.2 SSH access hardening
 
+Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manager Session Manager for additional operators (no key juggling, IAM-controlled, full audit trail).
+
+### Your own SSH (primary)
+
 - [ ] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`).
-- [ ] Use key-based auth only; record public keys of any authorized operator in `~/.ssh/authorized_keys` for both `ubuntu` and `knottyyoga` (knottyyoga for emergency access if needed).
+- [ ] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP.
 - [ ] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't.
-- [ ] Optional: enable AWS Systems Manager Session Manager as a backup access path so you don't depend on your home IP / SSH key forever. Useful if your IP changes or your key is lost.
 
-## 5.3 Observability (low-cost baseline)
+### Session Manager (for additional operators, e.g., your retired friend)
 
-- [ ] Set up CloudWatch Logs agent on the EC2 (free tier: 5 GB/mo), tailing the systemd journals for `knottyyoga-server.service` and `knottyyoga-helper.service`. CloudFront's own access logs go directly to a separate S3 bucket (configured on the distribution) if you want HTTP-level visibility — optional, ~$0 at low traffic.
-- [ ] Set up an uptime check — CloudWatch Synthetics, or something free like UptimeRobot — pointed at `/api/health`. Alert via email.
-- [ ] Configure `journalctl` retention to a sensible cap (e.g., 500 MB) so disk doesn't fill.
+- [ ] Attach the AWS-managed `AmazonSSMManagedInstanceCore` IAM policy to the EC2's instance profile. Install the `amazon-ssm-agent` package (already preinstalled on Ubuntu 22.04 AMIs, just needs to be `enabled` and `started`).
+- [ ] Verify by running `aws ssm start-session --target i-xxxxxxxx` from your own machine — you should land in a shell on the EC2 without any SSH key involved.
+- [ ] Create an IAM user for each additional operator (e.g., `friend-of-mason`). Attach a policy that grants `ssm:StartSession` on this specific instance ARN, plus `ssm:TerminateSession` and `ssm:DescribeSessions` for their own sessions. They generate their own access keys and `aws ssm start-session --target i-xxxxxxxx`.
+- [ ] Document the onboarding/offboarding procedure in `RUNBOOK.md`: granting a new operator is "create IAM user + attach policy", revoking is "delete the IAM user". No rebooting, no editing files on the EC2.
+- [ ] Audit trail: SSM session activity is logged in CloudTrail automatically. Optionally, enable session logging to S3 or CloudWatch Logs to capture every keystroke (worth it for prod with multiple operators).
+
+### Why no shared SSH keys
+
+Adding more public keys to `authorized_keys` works but has bad ergonomics: rotating one user's key means editing files on every EC2 you ever build, no audit trail, you have to remember who has what. Session Manager + per-user IAM scales without that mess.
+
+## 5.3 Observability + watchdog replacement
+
+This is the section that replaces the custom watchdog-of-watchdogs from `Scheduled Jobs.md`. AWS-native primitives cover the same job with less code.
+
+### Logs
+
+- [ ] Install the CloudWatch Logs agent on the EC2 (free tier covers 5 GB/mo of ingest). Configure it to tail the systemd journals for `knottyyoga-server.service` and `knottyyoga-helper.service`.
+- [ ] Set CloudWatch Logs retention to **30 days** for both log groups.
+- [ ] Cap journald to **500 MB** total disk via `/etc/systemd/journald.conf` (`SystemMaxUse=500M`) so a chatty service can't fill `/var/log`.
+- [ ] (Optional) Enable CloudFront access logs → a dedicated S3 bucket. Free aside from S3 storage; skip until you actually want HTTP-level visibility.
+
+### Health-check + alarming
+
+- [ ] Create an SNS topic `knottyyoga-alerts` and subscribe your email to it.
+- [ ] CloudWatch alarm on **EC2 instance status check** — alarms when AWS itself thinks the VM is unhealthy. Action: notify SNS topic.
+- [ ] CloudWatch alarm on **EC2 system status check** — alarms on underlying-host issues (rare). Action: notify SNS topic.
+- [ ] CloudWatch alarm on **disk-free percentage < 20%** (requires CloudWatch Agent reporting disk metrics). Action: notify SNS topic.
+- [ ] **CloudWatch Synthetics canary** hitting `https://<your CloudFront domain>/api/health` every 5 minutes. Alarms after 2 consecutive failures. ~$0.0012/run = ~$10/mo for 5-minute interval. (Or skip Synthetics and use UptimeRobot's free tier — 5-minute interval, free for up to 50 monitors. Same coverage.)
+
+### Process resiliency
+
+- [ ] systemd unit's `Restart=on-failure` covers process-level crashes (planned in Phase 2.2).
+- [ ] **No custom watchdog process needed**. The custom `knottyyoga_helper` watchdog mode from `Scheduled Jobs.md` is dropped from scope. `knottyyoga_helper` retains only the scheduled-jobs runner (subscription billing, reminders).
+
+### What this stack catches vs. misses
+
+| Failure | Detected by | Time to detect |
+|---|---|---|
+| Crow process crash | systemd `Restart=on-failure` | <5s |
+| Crow process hung but not crashed | Synthetics canary | <10 min |
+| EC2 VM hung / kernel panic | EC2 instance status check | <2 min |
+| EC2 host-hardware failure | EC2 system status check + auto-recovery | <2 min |
+| Disk full | CloudWatch alarm | <2 min |
+| RDS down | App's own DB exception → 503 → Synthetics fails | <10 min |
+| AZ outage | Synthetics fails; manual rebuild needed (single-AZ design) | minutes; resolution = hours |
+
+For a soft launch, that coverage is plenty. Multi-AZ EC2 / RDS is a Phase 8 upgrade if real users start depending on uptime.
 
 ---
 
@@ -582,48 +635,41 @@ Pricing caveat: AWS adjusts prices occasionally; verify current rates in the AWS
 
 ---
 
-# Open Questions
+# Resolved Questions (decisions log)
 
-Resolved (recorded here for history):
-- ✅ Architecture — **EC2 + RDS + S3 + CloudFront**, no nginx.
-- ✅ Build target — **x86-64**; migrate to ARM later.
-- ✅ TLS — **ACM + CloudFront**, no certbot.
-- ✅ Origin-protection — Crow middleware checks `X-Origin-Secret`.
+All previously open questions are answered. Decisions are recorded here so we can trace why the plan looks the way it does, and so future-Mason has the rationale.
 
-Still open:
-
-1. **Domain**: do you already own a domain for Knotty Yoga, or will you buy one during this project? Does it need to live under a subdomain (e.g., `app.knottyyoga.com`)?
-	- Mason- I own the domain for KnottyYoga.com. It's registered with another DNS provider. I might migrate it to AWS at some point.
-2. **Region**: any preference for `us-west-2` vs `us-east-1` vs something closer to your users? (User latency for a studio in WA/OR/CA strongly favors `us-west-2`.) Regardless of app region, the ACM cert for CloudFront must be issued in `us-east-1`.
-	- Mason- us-west-2 for sure
-3. **Staging environment**: do you want a separate staging EC2 + RDS from the start (~$30/mo extra), or will the soft-launch environment *be* the staging environment for a while?
-	- Mason- Hrm... I hadn't thought of having a separate staging environment. I was going to stage to Amazon, not do DNS, use the Square sandbox for a bit and have friends try it. Then convert it over to production. Should I have a separate staging environment?
-4. **`knottyyoga_helper` availability**: the Scheduled Jobs plan isn't implemented yet. Do we soft-launch without it (meaning: no automated subscription renewals, no scheduled reminders) and add it in a subsequent release? I think yes — minimizes initial scope.
-	- Mason- I'm going to implement that next. I do need to think about my heart beat functionality. Is that something I should bother with or can AWS do that for me?
-5. **Square Application ID / Location ID**: are the sandbox values in `Square credentials and Sandbox setup.md` current and correct? I'll pull from there for `environment.prod.ts` unless told otherwise.
-	- Mason- Probably? Look at the values in the secrets file in the database. There are ifdefs for production and debug.
-6. **Backup/restore testing**: how often do you want to exercise restore from RDS snapshot? My suggestion: once during the initial deploy (prove it works), then quarterly thereafter.
-	- Mason- I'll take your suggestion.
-7. **Savings Plan commitment timing**: I propose running on-demand for the first 2–4 weeks to confirm `t3.small` is right-sized, then buying a 1-yr Compute Savings Plan at the observed burn rate. Agreed?
-	- Mason- Is it hard to switch?
-8. **Log retention**: journald default is "until disk fills". Want me to set a fixed cap (e.g., 500 MB) and a CloudWatch retention of 30 days? That's my default recommendation.
-	- Mason- I'll go with your recommendation
-9. **Admin access**: who besides you needs SSH access to the EC2? Any second operator's public key we need to include from day one?
-	- Mason- realistically, probably me for now but I'd like to be able to grant other people access. I have a friend who is retired and occasionally helps out with stuff.
-10. **"Save snapshot copies of `db_schema/` per version"**: I argued against this above (git tags suffice). Are you persuaded, or do you have a specific reason you want directory copies?
-	- Mason- I'll go with your recommendation.
-11. **Destructive migration safety**: I'm proposing that `--recreate_database` becomes unavailable in prod by default (needs an explicit env var to re-enable). Agreed?
-	- Mason- Sure.
+- ✅ **Architecture** — EC2 + RDS + S3 + CloudFront, no nginx.
+- ✅ **Build target** — x86-64 for v1; migrate to ARM (Graviton) post-launch.
+- ✅ **TLS** — ACM + CloudFront, no certbot.
+- ✅ **Origin protection** — Crow `CloudFrontOriginGuard` middleware checks `X-Origin-Secret`.
+- ✅ **Domain** — `KnottyYoga.com`, currently registered at another DNS provider. Plan: keep the registrar, but stand up a Route 53 hosted zone for DNS so we get apex-alias records to CloudFront. Update the registrar's NS records to point at Route 53. Migrating the registrar to AWS later is optional and trivial. (Phase 4.5 details.)
+- ✅ **Region** — `us-west-2` (Oregon) for EC2/RDS/S3. ACM cert for CloudFront is in `us-east-1` regardless (CloudFront-global limitation).
+- ✅ **Staging environment** — **No separate staging.** The recommendation: launch in `us-west-2` directly into what will become production, run on the Square *sandbox* with no DNS pointing at it (use the CloudFront distribution's auto-generated `dXXXXXX.cloudfront.net` URL, share that with friend-testers). When you're ready, point `knottyyoga.com` at it via Route 53 and flip `kSquareEnvironment` to `production`. Reasons: doubling the cost and config surface for a one-person project rarely pays back; a friends-and-family sandbox period is its own staging.
+  - The day you'd actually want a separate staging environment: when (a) you have paying customers and need to test schema migrations against prod-like data without risk, or (b) more than one developer is shipping in parallel. Neither is true today.
+- ✅ **Watchdog / heartbeat — let AWS do most of it.** The custom watchdog-of-watchdogs from `Scheduled Jobs.md` was designed for self-hosted environments. On AWS, simpler primitives cover most of it:
+  1. systemd `Restart=on-failure` restarts a crashed process within seconds. (Phase 2.2.)
+  2. CloudWatch alarm on the EC2 instance-status check + SNS email tells you if the VM itself is wedged.
+  3. CloudWatch Synthetics canary (or a free external uptime probe like UptimeRobot) hits `/api/health` every ~5 min and pages on failure.
+  4. Auto-scaling-group-of-one with an instance-replacement policy is overkill for a soft launch but worth knowing exists.
+  → **Decision**: in `knottyyoga_helper`, keep only the **scheduled-jobs runner** (subscription renewals, reminders, etc.). Drop the watchdog/watchdog-of-watchdog pieces. Phase 5.3 will add the CloudWatch alarms + Synthetics canary. Update `Scheduled Jobs.md` to reflect this when you implement that helper.
+- ✅ **Square credentials** — values come from `secret_values.cpp` (the `production`/`debug` ifdef'd block). Phase 1.4 will pull the sandbox values for `environment.prod.ts` and the production values when you flip live.
+- ✅ **Backup testing** — exercise RDS restore once during initial deploy, then quarterly. (Tracked in Phase 5.1 + Phase 8.)
+- ✅ **Savings Plan timing** — run on-demand for 2–4 weeks, then buy a **1-yr Compute Savings Plan**. Switching is easy: Compute Savings Plans commit to a $/hr spend, not a specific instance, so changing instance type/family/size/region (e.g., later migrating to ARM `t4g.small`) keeps the discount as long as you stay within the committed hourly burn. The lock-in cost is "you owe AWS this $/hr for 12 months even if you scale down." For RDS the equivalent is a Reserved Instance, which *is* tied to instance family — so RDS RI commitment should wait until you're confident on `db.t3.micro`, OR be skipped (the RDS RI savings on a single small instance are only ~$50/yr; not worth the inflexibility).
+- ✅ **Log retention** — journald capped at 500 MB on the EC2; CloudWatch Logs retention 30 days. (Phase 5.3.)
+- ✅ **Admin access** — Mason only on day one, but design for granting access to others. **Use AWS Systems Manager Session Manager**, not raw SSH key juggling, for the secondary operator. SSM gives you: no public key on the EC2, AWS-IAM-controlled access (grant/revoke instantly via IAM policy), full audit trail in CloudTrail, no inbound port 22 needed. The retired-friend gets an IAM user + Session Manager permission, runs `aws ssm start-session --target <instance-id>` from their machine, and they're in. Phase 5.2 details.
+- ✅ **`db_schema/` snapshots** — git tags only; no directory copies.
+- ✅ **Destructive migration safety** — `--recreate_database` blocked in prod unless `KNOTTYYOGA_ALLOW_DESTRUCTIVE=1` env var is set. (Phase 3.3.)
 
 ---
 
 # Phase 0 — Decisions checklist (fill before Phase 1 starts)
 
 - [x] Architecture committed — EC2 + RDS + S3 + CloudFront, x86-64, no nginx
-- [ ] Domain chosen
-- [ ] AWS region chosen (app region; ACM cert for CloudFront always in us-east-1)
-- [ ] Square sandbox values confirmed
-- [ ] SES sender identity agreed
-- [ ] Staging env: yes / no / later
-- [ ] `knottyyoga_helper` in-scope for soft launch: yes / no
-- [ ] Open Questions 1–11 answered
+- [x] Domain chosen — `KnottyYoga.com` (keep at current registrar; Route 53 hosted zone for DNS only)
+- [x] AWS region chosen — `us-west-2` (app); `us-east-1` (ACM cert for CloudFront)
+- [x] Square sandbox values confirmed — pull from `secret_values.cpp` ifdef'd `production`/`debug` block
+- [ ] SES sender identity agreed (likely `noreply@knottyyoga.com`; needs your call on the local-part)
+- [x] Staging env — **no**, soft-launch environment doubles as staging (no DNS, sandbox Square, friends-only)
+- [x] `knottyyoga_helper` in-scope for soft launch — scheduled-jobs runner only; AWS Synthetics + CloudWatch alarms replace the custom watchdog
+- [x] Resolved Questions log filled in
