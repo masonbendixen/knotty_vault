@@ -194,11 +194,20 @@ The full list of secrets and their defaults lives in `src/util/secrets/secret_va
 
 ## 1.6 Reverse-proxy awareness in the C++ server
 
-CloudFront forwards the viewer's scheme in `X-Forwarded-Proto: https`, but the TCP connection to Crow is plain HTTP on port 80. Without trusting the forwarded scheme, the `Secure` cookie flag won't be emitted and sessions will silently break on HTTPS.
+CloudFront forwards the viewer's scheme in `X-Forwarded-Proto: https`, but the TCP connection to Crow is plain HTTP on port 80. Code that infers scheme from the request itself would see `http` behind CloudFront — so any future caller that needs to know the *viewer*'s scheme/IP must consult the forwarded headers.
 
-- [ ] Confirm the server trusts `X-Forwarded-Proto: https` when setting the `Secure` flag on cookies. If today it infers scheme from the request itself (which will be `http` behind CloudFront), cookies set as `Secure` will be dropped by the browser.
-- [ ] Add a `KNOTTYYOGA_TRUST_PROXY` flag that, when true, tells the cookie/session code to treat the forwarded scheme as authoritative.
-- [ ] Tests for both the trust-proxy-on and trust-proxy-off paths in `cookie_manager_test.cpp` or a new `proxy_trust_test.cpp`.
+- [x] **Audit confirmed the cookie path is scheme-agnostic.** `session.cpp:213-237` (the only place that sets `Secure` on a cookie) keys off `ServerConfig::IsProdMode()`, not the request scheme. So `Secure=true` is emitted whenever the operator has set `production_mode_on=true`, regardless of whether Crow saw the request as HTTP. The viewer receives the response over HTTPS via CloudFront and accepts the `Secure` cookie correctly. **No cookie code change needed for the CloudFront deploy.**
+- [x] Searched the codebase for any `req.is_secure()`, `req.scheme()`, `is_https`, etc. — none exist. No code path currently makes a wrong decision based on the EC2-leg's HTTP scheme.
+- [x] Added `business_logic/auth/proxy_trust.{h,cpp}`:
+  - `Auth::ProxyTrustEnabled()` — reads `KNOTTYYOGA_TRUST_PROXY` env var. True for `"1"` / `"true"` (case-insensitive); false for unset / empty / `"0"` / `"false"` / garbage.
+  - `Auth::ResolveViewerScheme(req)` — when the proxy is trusted, returns the trimmed `X-Forwarded-Proto` value (e.g., `"https"`); otherwise empty string.
+  - `Auth::ResolveViewerIp(req)` — when the proxy is trusted, returns the first IP from `X-Forwarded-For` (the original viewer; the rest of the comma-separated list is the proxy chain and is dropped); otherwise empty string.
+  - The header itself documents *why* these helpers exist with no immediate consumer (cookie code already does the right thing) — they're available for future request-logging, abuse-detection by IP, HSTS preload checks, etc., and shipping the primitive now means the header-parsing logic + opt-in env var are tested before we need them.
+- [x] **Defense-in-depth**: helpers default to "not trusted" so an operator who forgets to set `KNOTTYYOGA_TRUST_PROXY=1` on the EC2 just gets empty strings, not spoofed viewer IPs. Phase 1.7's `CloudFrontOriginGuard` middleware will additionally 403 any direct-EC2 request that bypasses CloudFront, so even when the env var IS set, attackers can't spoof headers because they can't reach the origin.
+- [x] Tests in `proxy_trust_test.cpp` (16 cases, no fixtures, RAII `ProxyTrustEnvScope` to scrub env between tests):
+  - `ProxyTrustEnabled` — unset / empty / `"1"` / `"true"` (lowercase) / `"True"` (mixed) / `"0"` / `"false"` / garbage.
+  - `ResolveViewerScheme` — not-trusted-but-header-present returns empty / trusted-with-`https` / trusted-with-`http` / trusted-but-header-missing returns empty / whitespace trimming.
+  - `ResolveViewerIp` — not-trusted returns empty / trusted single IP / trusted comma list returns first IP only / whitespace trimming / header missing / header empty.
 
 ## 1.7 Origin-secret middleware (replaces nginx)
 
