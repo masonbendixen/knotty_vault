@@ -118,18 +118,20 @@ Goal: make the application configurable per environment and observable enough to
 
 Touches the lowest layer (database access). Everything above depends on the DB, so this is first.
 
-- [ ] Update `server/knottyyoga_server/src/sql_util/database_access/database_helper_init.cpp` to read from env vars with sensible fallbacks to current dev defaults:
+- [x] Update `server/knottyyoga_server/src/sql_util/database_access/database_helper_init.cpp` to read from env vars with sensible fallbacks to current dev defaults:
   - `KNOTTYYOGA_DB_HOST` (fallback: current platform-dependent value)
   - `KNOTTYYOGA_DB_PORT` (fallback: `5432`)
   - `KNOTTYYOGA_DB_USER` (fallback: `docker`)
   - `KNOTTYYOGA_DB_PASSWORD` (fallback: `docker`)
   - `KNOTTYYOGA_DB_NAME` (fallback: `kDatabaseName`)
   - `KNOTTYYOGA_DB_SSLMODE` (fallback: `prefer`; set to `require` in prod)
-- [ ] Update the connection string builder to include `sslmode=<mode>` when set.
-- [ ] Add a unit test `database_helper_init_test.cpp` that:
-  - Sets env vars via `setenv` / `_putenv_s` and asserts the connection string reflects them.
-  - Clears env vars and asserts the defaults.
-- [ ] Log (at `LogInfo`) the host/port/db name (NOT the password) at startup so misconfig is obvious in logs.
+  - `KNOTTYYOGA_DB_SSLROOTCERT` (fallback: empty; set to `/etc/knottyyoga/rds-ca.pem` for `verify-full` against RDS)
+- [x] Update the connection string builder to include `sslmode=<mode>` and `sslrootcert=<path>` when those fields are non-empty.
+- [x] Add a unit test `database_helper_init_test.cpp` that:
+  - Sets env vars via `setenv` / `_putenv_s` and asserts both the parsed fields and the connection string reflect them.
+  - Clears env vars and asserts the platform-specific defaults.
+  - Verifies sslmode/sslrootcert are appended only when set.
+- [x] Log (at `LogInfo`) the host/port/db name (NOT the password) at startup so misconfig is obvious in logs (`DatabaseHelperInit::LogStartupInfo()`, called from the no-arg `MakeProductionDatabaseHelper()`).
 
 **Note on RDS & `sslmode`**: RDS PostgreSQL requires either `require` or `verify-full` for production-grade TLS. `verify-full` needs the AWS RDS CA bundle installed in the image. Start with `require` (encrypt, don't verify CN). Good enough for v1.
 
