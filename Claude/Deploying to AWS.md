@@ -148,9 +148,10 @@ Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future 
 
 ## 1.3 Logging to stdout for systemd / CloudWatch
 
-- [ ] Inspect `util/logging.h`/`.cpp`. If logs currently go to a file path, make the destination controllable via `KNOTTYYOGA_LOG_DEST` (values: `stdout`, `stderr`, `<file path>`). Default stays as current for dev.
-- [ ] Confirm that on Linux the server flushes stdout on each line (systemd journal and CloudWatch Logs agent tail line-by-line).
-- [ ] Add tests where practical (e.g., helper that resolves destination from env var).
+- [x] Existing `util/logging.cpp` was hardcoded to `std::cout`. Replaced with a `KNOTTYYOGA_LOG_DEST`-driven config: `stdout` (default), `stderr`, or a file path. `LogXxx()` now returns a stream pointed at the resolved destination; the file-path branch falls back to stdout (with a warning on stderr) if the file can't be opened.
+- [x] Linux line-buffering confirmed: `InitializeLogging()` calls `setvbuf(file, _IOLBF, ...)` on the chosen stream, so each LogInfo() "...\n" lands in the systemd journal / CloudWatch Logs agent immediately rather than waiting for a 4 KB pipe buffer to flush. (Documented inline that MSVC treats `_IOLBF` as full-buffered, which is fine for Windows dev.)
+- [x] `InitializeLogging()` wired into `main.cpp` and `database_helper/main.cpp` as the first call in each.
+- [x] Added `logging_test.cpp` covering `ResolveLogDestination` for null / empty / "stdout" / "stderr" / absolute path / relative path / Windows-style path / case-sensitivity edge.
 
 **Advice**: systemd captures stdout/stderr automatically into the journal — no need for a custom log file path in the container/EC2 deploy. Simpler is better.
 
