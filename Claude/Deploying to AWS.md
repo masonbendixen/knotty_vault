@@ -169,9 +169,28 @@ Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future 
 
 Currently `ServerConfig::Initialize` reads `kWebsiteAddress` from DB secrets and configures CORS when `prodMode_` is on. With CloudFront serving both the Angular bundle (from S3) and `/api/*` (from EC2) under one distribution domain, the browser sees a single origin → CORS preflight never triggers → cookies flow with plain `SameSite=Lax`.
 
-- [ ] Verify: with CloudFront fronting both behaviors, the browser sees `Origin: https://knottyyoga.example` for both static assets and API. Same-origin → CORS preflight not triggered → cookies flow without `SameSite=None; Secure` gymnastics.
-- [ ] Document in `Deploying to AWS.md` (this doc) the secret values that must be set before first boot: `kWebsiteAddress`, `kServerProductionMode=true`, `kSquareAccessToken`, `kSquareEnvironment=sandbox`, plus any email/SES secrets.
-- [ ] If any auth code currently assumes the frontend lives at a *different* origin, add a test fixture exercising the same-origin case and the CloudFront-forwarded header handling (`X-Forwarded-Proto`, `X-Forwarded-For`, `CloudFront-Viewer-Address`).
+- [x] **Same-origin verified.** CloudFront fronts both `/*` (S3) and `/api/*` (EC2) under one host (`knottyyoga.com`). Browser sees same-origin → no CORS preflight → cookies flow with `SameSite=Lax`. The existing CORS middleware in `ServerConfig::Initialize` keys off `kWebsiteAddress`; in production it's effectively a no-op because preflights never fire from same-origin. (Direct hits to the EC2 IP would trigger CORS, but Phase 1.7's `CloudFrontOriginGuard` middleware will 403 those before they reach any handler.)
+- [x] **Auth code audit**: existing cookie code in `business_logic/auth/session.cpp:213-237` already does the right thing for same-origin — `SameSite=Lax`, `httpOnly=true`, and in prod mode adds `Secure=true` + `Domain=<kWebsiteAddress>`. No code currently assumes a cross-origin frontend; no `SameSite=None` or hardcoded scheme appears outside test fixtures.
+- [x] **Test added** — `SessionTest.InitializeFromLoginProdModeCookieHasSecureAndDomain` in `session_test.cpp` calls the full `ServerConfig::Initialize` path (via `EndpointTestHelper`'s WebApp) with `kServerProductionMode=true` + `kWebsiteAddress=knottyyoga.com`, then exercises `Session::InitializeFromLogin` and asserts the cookie carries `Secure`, `Domain=knottyyoga.com`, `SameSite=Lax`, `HttpOnly`. Locks the same-origin contract so a future cross-origin migration must be deliberate. (Phase 1.6 covers the proxy-trust side — making sure `X-Forwarded-Proto` is honored when running HTTP-only on EC2 behind CloudFront.)
+
+### First-boot secrets to set on the EC2 (Phase 4.8 procedure references this)
+
+These are the values that **must** be overridden before booting the server in production. Items marked "default OK" can ride the `secret_values.cpp` fallback. Items marked "must override" have wrong-for-prod defaults or empty defaults.
+
+| Secret key | Value for soft launch | Why override |
+|---|---|---|
+| `production_mode_on` | `true` | Defaults to `false`; needed to enable Secure cookies + CORS |
+| `website_address` | `knottyyoga.com` | Release default is `http://www.knottyyoga.com/`; we want the bare apex (cookies use this for the `Domain` attribute) |
+| `square_access_token` | sandbox token from Square Developer Console | Release default is empty |
+| `square_environment` | `sandbox` | Release default is `production`; we're on the sandbox during soft launch |
+| `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | Default is `smtp.gmail.com` |
+| `mail_server_port` | `587` (STARTTLS) | Default is `465` (SSL) — SES supports both, 587 is the AWS-recommended path |
+| `mail_server_method` | `login` | Default OK (already `login`) |
+| `mail_app_password` | SES SMTP password (created in IAM, NOT your console password) | Default is the Gmail app password |
+| `Knotty Yoga and Spa` (sender name) | (use default) | Default OK |
+| `knottyyogaandspa@gmail.com` (sender address) | `noreply@knottyyoga.com` (or whatever `kMailSenderAddress` is set to) | Defaults to the Gmail address; SES requires the From address match a verified domain identity |
+
+The full list of secrets and their defaults lives in `src/util/secrets/secret_values.cpp`. Phase 4.8 (Secret bootstrap ordering) describes the operator workflow: provision DB → run `database_helper --migrate` to populate the `config_secrets` table from defaults → run `database_helper --seed-secrets-from-file secrets.json` (or `knottyyoga_test_helper`) to override the values above → start the server.
 
 ## 1.6 Reverse-proxy awareness in the C++ server
 
