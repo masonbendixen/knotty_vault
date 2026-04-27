@@ -158,10 +158,12 @@ Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future 
 
 ## 1.4 Frontend environment configuration
 
-- [ ] Populate `ui/src/environments/environment.prod.ts` with Square **sandbox** Application ID and Location ID for the initial rollout (pulled from the existing `Square credentials and Sandbox setup.md`). These are client-side public identifiers — they're supposed to be in the bundle.
-- [ ] Decide: do we want a separate `environment.prod-square-live.ts` configuration for when we flip to Square production? **Recommendation**: yes — create the config but leave commented until we're ready, so the "soft launch" build isn't accidentally using live Square credentials.
-- [ ] Add a production build configuration in `ui/angular.json` if one doesn't already exist that maps to `environment.prod.ts`.
-- [ ] Ensure the frontend uses relative URLs (`/api/...`) so it works same-origin behind CloudFront. Scan `ServerAccessNetwork.ts` for any hardcoded absolute URLs — if present, make them use a `baseUrl` from environment config.
+- [x] `environment.prod.ts` populated with Square **sandbox** Application ID (`sandbox-sq0idb-B1PoAtwzV7eEmN3u8FHLyQ`) and Location ID (`NWLEQ37Z06H6JEC`) from `Square credentials and Sandbox setup.md`. `production: true`, sandbox script URL. This is the soft-launch build's environment.
+- [x] `environment.development.ts` updated — replaced the `LXXXX` Location ID placeholder with the real sandbox Location ID so `ng serve` actually tokenizes against Square sandbox.
+- [x] Created `environment.prod-square-live.ts` for the eventual live flip — placeholder Application ID / Location ID, production script URL, with a top-of-file comment listing the four-step procedure to flip live (fill IDs → update angular.json → flip backend `kSquareEnvironment`/`kSquareAccessToken` → smoke test). NOT wired into angular.json so an accidental production build can't ship live-card creds.
+- [x] `environment.ts` (the imported file) annotated with a comment explaining it's always file-replaced; placeholder values kept as a deliberately-broken fallback so an unconfigured `ng build` fails loud rather than ships placeholders.
+- [x] `angular.json` `production` build configuration now file-replaces `environment.ts` → `environment.prod.ts`. `ng build --configuration=production` (the default) produces the soft-launch bundle.
+- [x] `ServerAccessNetwork.ts` audited — every HTTP call uses a relative `/api/...` URL. Same-origin behind CloudFront works as-is; no `baseUrl` plumbing needed.
 
 ## 1.5 Cookies + CORS sanity pass for CloudFront same-origin deploy
 
