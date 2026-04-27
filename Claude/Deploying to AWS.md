@@ -139,12 +139,12 @@ Touches the lowest layer (database access). Everything above depends on the DB, 
 
 Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future load balancer, monitoring.
 
-- [ ] Add `endpoints/health.cpp` / `health.h` with a `GET /api/health` handler returning `{"status":"ok","db":"ok"|"fail","version":"<git-sha>"}`.
-  - Runs a trivial `SELECT 1` inside a transaction to validate DB connectivity.
-  - Returns 503 if the DB probe throws.
-- [ ] Compile-time constant `kBuildVersion` (or read from env var `KNOTTYYOGA_VERSION`) so ops can confirm which build is live.
-- [ ] Add `health_test.cpp` — green path and DB-failure path. Follow the `EndpointTestHelper` pattern used by other endpoint tests.
-- [ ] Wire into `endpoints/CMakeLists.txt` (both header and cpp).
+- [x] Add `endpoints/health.cpp` / `health.h` with a `GET /api/health` handler returning `{"status":"ok|fail","db":"ok|fail","version":"<git-sha>"}`.
+  - Runs a trivial `SELECT 1` inside a transaction (`ProbeDatabase`) to validate DB connectivity.
+  - Returns 503 if the DB probe throws or the provider is null; 200 otherwise.
+- [x] Build version comes from env var `KNOTTYYOGA_VERSION` at request time (`GetBuildVersion()`); falls back to `"unknown"` when unset/empty.
+- [x] Add `health_test.cpp` — green path, DB-failure path, env-var handling, JSON shape, full HTTP integration. Uses an in-test `ThrowingTransactionProvider` to drive the failure path without taking down a real DB.
+- [x] Wire into `endpoints/CMakeLists.txt` (both header and cpp + test) and into `web_app.cpp` (include + `g_Health` reference) so MSVC keeps the routing translation unit alive.
 
 ## 1.3 Logging to stdout for systemd / CloudWatch
 
