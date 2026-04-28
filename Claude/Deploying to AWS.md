@@ -213,14 +213,20 @@ CloudFront forwards the viewer's scheme in `X-Forwarded-Proto: https`, but the T
 
 Since we're dropping nginx, Crow needs to enforce the CloudFront-origin secret itself. This is what stops attackers from hitting the EC2 Elastic IP directly and bypassing the CDN/WAF/cache.
 
-- [ ] Add a `CloudFrontOriginGuard` middleware to `endpoints/middleware/` (or the existing middleware folder if Crow's `App` type params it). On each incoming request:
-  1. If the path starts with `/api/health` (or whatever unauthenticated path we pick), pass through — so AWS target groups can probe.
-  2. Otherwise require header `X-Origin-Secret: <expected>` where `<expected>` is read from env var `KNOTTYYOGA_ORIGIN_SECRET` at startup.
-  3. Missing or mismatched → respond 403 with body `{"error":"direct_origin_access_forbidden"}` and log once per minute (to avoid log-flood on scanners).
-- [ ] Log at startup whether the guard is active (`KNOTTYYOGA_ORIGIN_SECRET` set) or disabled (not set — for local dev).
-- [ ] Tests:
-  - `origin_guard_test.cpp` — verify request with correct header passes, missing header 403s, wrong header 403s, health-check passes regardless, empty env var disables the guard.
-- [ ] Wire the secret into `/etc/knottyyoga/server.env` on the EC2 and into CloudFront's "Origin custom headers" config. Document rotation procedure in `RUNBOOK.md` (generate new random, update CloudFront first, update env file + restart systemd unit — short overlap where both values work would require two headers, skip for v1, accept a ~30s outage during rotation).
+- [x] Added `endpoints/cloudfront_origin_guard.{h,cpp}`:
+  - `Endpoints::CloudFrontOriginGuard` is a Crow middleware (`struct context`, `before_handle`, `after_handle`). Reads `KNOTTYYOGA_ORIGIN_SECRET` once in its constructor and caches the expected value.
+  - `before_handle` flow: (1) guard disabled (env var unset/empty) → pass through; (2) URL starts with `/api/health` → pass through (allow-listed for Synthetics + watchdog probes); (3) `X-Origin-Secret` header matches expected → pass through; (4) otherwise: `res.code = 403` + `Content-Type: application/json` + body `{"error":"direct_origin_access_forbidden"}` + `res.end()` to short-circuit the handler.
+  - `after_handle` is intentionally a no-op.
+- [x] Wired into `endpoints/web_app.h` `AppType`: `crow::App<Endpoints::CloudFrontOriginGuard, crow::CookieParser, crow::CORSHandler>`. Existing endpoint tests work unchanged because the env var is unset in tests so the guard auto-disables.
+- [x] Startup logging: on construction the guard emits one `LogInfo()` line — either "CloudFrontOriginGuard active: requests must carry X-Origin-Secret (allow-listed: /api/health*)" or "CloudFrontOriginGuard disabled: KNOTTYYOGA_ORIGIN_SECRET not set." Operators see immediately on first boot whether the guard armed.
+- [x] Rejection logging is rate-limited to **once per minute per process** via a steady_clock-throttled `LogWarning()`, so a port scanner or misconfigured monitor can't drown the systemd journal in 403 messages. Throttled message identifies the missing-vs-mismatched case so operators have a useful first signal.
+- [x] Tests in `cloudfront_origin_guard_test.cpp` (14 cases, no fixtures, RAII `OriginSecretEnvScope` for env hygiene):
+  - Activation: unset / empty → inactive; non-empty → active.
+  - Disabled guard passes every request through.
+  - Active guard, secret-protected path: rejects no-header / wrong-header / empty-header (all → 403 with right body + `Content-Type: application/json` + `is_completed`); accepts correct-header (pass-through, `is_completed` false).
+  - Health allow-list: `/api/health` and `/api/health/db` pass through without header; `/api/login` and `/` are rejected; `/api/healthz` is documented as currently allowed (canary test that pins the simple-prefix-match decision so a future tightening is deliberate).
+  - `after_handle` is a no-op (preserves response body + code).
+- [ ] **Operator wiring** (Phase 4.6): set `KNOTTYYOGA_ORIGIN_SECRET=<random>` in `/etc/knottyyoga/server.env` and the matching `X-Origin-Secret` value as a CloudFront "Origin custom header" on the `/api/*` behavior. Document rotation in `RUNBOOK.md`: generate new random → update CloudFront first → update env file + `systemctl restart knottyyoga-server` → expect ~30s outage during the cut-over (overlap window with two valid headers skipped for v1).
 
 ---
 
