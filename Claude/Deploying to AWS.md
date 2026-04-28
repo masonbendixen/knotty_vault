@@ -247,15 +247,19 @@ The trade-off is slightly less reproducibility across build machines; GitLab CI 
 
 **If you'd rather containerize anyway** (reasonable if you want to later go ECS), write a single multi-stage Dockerfile that produces three thin runtime images from one `builder` stage: `knottyyoga-server`, `knottyyoga-db-helper`, `knottyyoga-helper`.
 
-- [ ] Write `server/knottyyoga_server/package/build_linux_release.sh` that runs `conan install`, `cmake -DCMAKE_BUILD_TYPE=Release`, `cmake --build`, and collects:
-  - `bin/knottyyoga_the_server`
-  - `bin/knottyyoga_database_helper`
-  - `bin/knottyyoga_test_helper`
-  - `bin/knottyyoga_helper` (once it exists from the Scheduled Jobs plan)
-  - Any runtime `.so` dependencies not in base OS (via `ldd` + copy)
-  - Certificates / static resources used at runtime, if any
-- [ ] Produce a single tarball `knottyyoga-<version>.tar.gz` with a flat layout: `bin/`, `lib/`, `systemd/` (units), `migrations/` (see Phase 3). No `nginx/` — CloudFront replaces it.
-- [ ] Target OS/arch: **Ubuntu 22.04 LTS on x86-64** for the initial deploy. Pin this in the build image. Migrate to ARM64 (Graviton, ~20% cheaper) post-launch when the CI builder has an ARM runner or cross-build set up.
+- [x] Wrote `server/knottyyoga_server/package/build_linux_release.sh`. Runs `conan install`, `cmake -DCMAKE_BUILD_TYPE=Release`, `cmake --build`, then assembles a staging tree:
+  - `bin/knottyyoga_the_server`, `bin/knottyyoga_database_helper`, `bin/knottyyoga_test_helper` (all required; build fails fast if missing).
+  - `bin/knottyyoga_helper` is detected via `find` anywhere under the build tree and bundled if present, skipped if not (won't exist until Scheduled Jobs lands).
+  - All bin files are stripped (`strip --strip-unneeded`) to keep the tarball small.
+  - `lib/` populated by walking each binary's `ldd` output, filtering OS-provided libs (anything under `/lib`, `/usr/lib`, `/lib64`, `/usr/lib64`), and copying every other shared object. `patchelf --set-rpath '$ORIGIN/../lib'` rewrites each binary's RPATH so the bundled libs resolve without `LD_LIBRARY_PATH`. Bundled libs themselves get `$ORIGIN` so inter-lib deps stay inside `lib/`.
+  - `certs/cacert.pem` copied from the source tree (libcurl trust store).
+- [x] Tarball: `dist/knottyyoga-<version>.tar.gz` with the layout `bin/`, `lib/`, `certs/`, `systemd/` (placeholder for Phase 2.2), `migrations/` (placeholder for Phase 3), plus `VERSION` and `MANIFEST.txt` files at the root. Tar uses a top-level `knottyyoga-<version>/` prefix so untar'ing produces a single directory.
+- [x] Version resolution: `KNOTTYYOGA_VERSION` env var if set; else git short-sha (with `-dirty` suffix when the worktree has uncommitted changes); else `dev-YYYYMMDDHHMMSS`. Same value goes into the tarball name and the `VERSION` file, and is what `KNOTTYYOGA_VERSION` should be set to on the EC2 so `/api/health` reports the matching build string.
+- [x] Tool checks at the top of the script (`require_tool conan|cmake|patchelf|ldd|tar|g++`) — fail fast with a hint to `apt install` / `pip install` if anything's missing.
+- [x] Configuration knobs via env vars: `BUILD_DIR`, `OUT_DIR`, `STAGE_DIR`, `JOBS` (defaults to `nproc`). Self-locating via `${BASH_SOURCE[0]}` so the script can be invoked from any cwd.
+- [x] Sidesteps the recipe's `vs_layout` quirk on Linux by passing `--output-folder` to conan and an explicit `-DCMAKE_TOOLCHAIN_FILE` to cmake.
+- [x] Companion `package/README.md` with quick-start instructions, env-var reference, troubleshooting tips, and a list of what's in the tarball.
+- [x] Target OS/arch: **Ubuntu 22.04 LTS on x86-64**. Migrate to ARM64 (Graviton, ~20% cheaper) post-launch when the CI builder has an ARM runner or cross-build set up.
 
 ## 2.2 systemd units
 
