@@ -232,21 +232,40 @@ Since we're dropping nginx, Crow needs to enforce the CloudFront-origin secret i
 
 # Phase 2 — Build & Packaging
 
-Goal: produce deployable artifacts repeatably. We have two real options; I'm recommending native binaries + systemd over Docker for v1.
+Goal: produce deployable artifacts repeatably via Docker containers, run under systemd on EC2.
 
-## 2.1 Decide: native binaries vs. Docker
+## 2.1 Decision: Docker containers (decided 2026-04-30)
 
-**My recommendation**: build static-ish native Linux binaries and ship them as `.tar.gz` artifacts, run under systemd. Reasons:
+**Decision**: containerize. A single multi-stage Dockerfile produces one image containing all binaries. Reasons for switching from the original native-binary recommendation:
 
-1. No existing prod Dockerfile — writing a good multi-stage one for a C++/Conan/libpqxx/Crow/mailio stack is real work.
-2. The app is stateless C++ — Docker's main selling points (isolation, fast process restart) matter less here.
-3. Simpler CI pipeline.
-4. Easy to SSH in, inspect, and run `knottyyoga_test_helper` ad hoc.
+1. **System library headaches disappear at deploy time.** The GSSAPI/krb5 link-ordering battle during the Linux build proved the point: the runtime image has the exact libraries the binaries were built against. No `apt install` on the target EC2, no RPATH patching, no missing `.so` surprises.
+2. **ECS migration later is near-zero work.** Push the image to ECR, create a task definition, done.
+3. **The build container already exists** (`server/docker_project/`). The multi-stage Dockerfile extends it with a slim runtime stage.
+4. **SSH + test_helper is barely harder.** `docker exec -it knottyyoga-server knottyyoga_test_helper` instead of running the binary directly.
 
-The trade-off is slightly less reproducibility across build machines; GitLab CI with a pinned builder image neutralizes that.
+### Container architecture
 
-**If you'd rather containerize anyway** (reasonable if you want to later go ECS), write a single multi-stage Dockerfile that produces three thin runtime images from one `builder` stage: `knottyyoga-server`, `knottyyoga-db-helper`, `knottyyoga-helper`.
+One image, multiple entrypoints. On the EC2, each process runs as a separate container from the same image:
 
+```
+knottyyoga:<version>
+├── /opt/knottyyoga/bin/knottyyoga_the_server      (default entrypoint)
+├── /opt/knottyyoga/bin/knottyyoga_database_helper
+├── /opt/knottyyoga/bin/knottyyoga_test_helper
+├── /opt/knottyyoga/bin/knottyyoga_helper           (when it exists)
+└── /opt/knottyyoga/certs/cacert.pem
+```
+
+- **Server container**: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`
+- **Helper container** (scheduled jobs): same image, different entrypoint: `--entrypoint knottyyoga_helper`
+- **DB migration** (one-shot at deploy): `docker run --rm --env-file ... knottyyoga:<version> knottyyoga_database_helper --migrate`
+- **Test helper** (ad-hoc via SSH): `docker exec -it knottyyoga-server knottyyoga_test_helper`
+
+- [x] Wrote `server/knottyyoga_server/package/Dockerfile` — multi-stage build:
+  - **Builder stage** (`gcc:14.2.0`): installs cmake, conan 2.x, patchelf, libkrb5-dev, then runs `build_linux_release.sh` to compile and stage all binaries.
+  - **Runtime stage** (`ubuntu:22.04`): copies only `bin/`, `lib/`, `certs/`, `VERSION` from the builder. Installs minimal runtime deps (`libgssapi-krb5-2`, `libstdc++6`, `ca-certificates`). Default entrypoint is `knottyyoga_the_server`; override with `--entrypoint` for other binaries.
+  - Build: `docker build -t knottyyoga:<ver> --build-arg KNOTTYYOGA_VERSION=<ver> -f package/Dockerfile .`
+  - Image size: ~100-150 MB (vs ~2 GB builder stage).
 - [x] Wrote `server/knottyyoga_server/package/build_linux_release.sh`. Runs `conan install`, `cmake -DCMAKE_BUILD_TYPE=Release`, `cmake --build`, then assembles a staging tree:
   - `bin/knottyyoga_the_server`, `bin/knottyyoga_database_helper`, `bin/knottyyoga_test_helper` (all required; build fails fast if missing).
   - `bin/knottyyoga_helper` is detected via `find` anywhere under the build tree and bundled if present, skipped if not (won't exist until Scheduled Jobs lands).
@@ -261,12 +280,12 @@ The trade-off is slightly less reproducibility across build machines; GitLab CI 
 - [x] Companion `package/README.md` with quick-start instructions, env-var reference, troubleshooting tips, and a list of what's in the tarball.
 - [x] Target OS/arch: **Ubuntu 22.04 LTS on x86-64**. Migrate to ARM64 (Graviton, ~20% cheaper) post-launch when the CI builder has an ARM runner or cross-build set up.
 
-## 2.2 systemd units
+## 2.2 systemd units (Docker-based)
 
-- [ ] `knottyyoga-server.service` — `ExecStart=/opt/knottyyoga/bin/knottyyoga_the_server`, `EnvironmentFile=/etc/knottyyoga/server.env`, `Restart=on-failure`, `User=knottyyoga`.
-- [ ] `knottyyoga-helper.service` — same pattern for the scheduled jobs/watchdog helper (when it exists).
-- [ ] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH.
-- [ ] Log lines validating env var wiring (matches 1.1 / 1.3).
+- [ ] `knottyyoga-server.service` — `ExecStart=/usr/bin/docker run --rm --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`, `ExecStop=/usr/bin/docker stop knottyyoga-server`, `Restart=on-failure`.
+- [ ] `knottyyoga-helper.service` — same image, `--entrypoint knottyyoga_helper` (when it exists).
+- [ ] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH: `docker exec -it knottyyoga-server knottyyoga_test_helper`.
+- [ ] Log lines validating env var wiring (matches 1.1 / 1.3). Docker captures stdout/stderr automatically; systemd journals it.
 
 ## 2.3 Frontend artifact
 
@@ -359,9 +378,9 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] Launch `t3.small` (x86) instance, Ubuntu 22.04 LTS AMI, 20 GB gp3 root volume, in default VPC public subnet.
 - [ ] Attach `sg-knottyyoga-web`.
 - [ ] Allocate an Elastic IP and attach it. Free while attached. Needed so the CloudFront origin target doesn't change on stop/start.
-- [ ] First boot: `apt update && apt upgrade`; install `postgresql-client` only.
-- [ ] Allow `knottyyoga_the_server` to bind port 80 as non-root: `sudo setcap 'cap_net_bind_service=+ep' /opt/knottyyoga/bin/knottyyoga_the_server` (the install script runs this after each deploy). Cleaner than running as root.
-- [ ] Create `knottyyoga` system user; `/opt/knottyyoga/{bin,migrations}`; `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, the `KNOTTYYOGA_DB_*` vars, and `KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`.
+- [ ] First boot: `apt update && apt upgrade`; install `docker.io` and `postgresql-client`.
+- [ ] Docker handles port binding — no `cap_net_bind_service` needed. The container runs as root internally (standard for single-process containers); the EC2 host user doesn't matter.
+- [ ] Create `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, the `KNOTTYYOGA_DB_*` vars, and `KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`.
 - [ ] Enable `ufw`: deny incoming default, allow 22 + 80.
 - [ ] Install CloudWatch Agent if you want metrics beyond basic EC2 ones. Optional for v1 — the systemd journal tailed to CloudWatch Logs is enough.
 
@@ -447,13 +466,11 @@ Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull f
 
 Purposely manual — gets you comfortable with the pieces before automating.
 
-- [ ] Build artifacts locally (or via temporary GitLab CI one-shot).
-- [ ] SCP tarballs to EC2: `scp knottyyoga-v1.0.0.tar.gz ubuntu@<ip>:/tmp/`.
-- [ ] Extract to `/opt/knottyyoga/` via a small shell script (`deploy/install.sh`) that also:
-  - Installs systemd units.
-  - Grants the server the `cap_net_bind_service` capability so it can bind port 80 as the `knottyyoga` user.
-  - Runs `knottyyoga_database_helper --migrate`.
-  - `systemctl daemon-reload && systemctl enable --now knottyyoga-server`.
+- [ ] Build the Docker image locally: `docker build -t knottyyoga:v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server`.
+- [ ] Push to ECR (or `docker save | scp | docker load` for the first deploy before ECR is set up).
+- [ ] On the EC2, run `deploy/install.sh` which:
+  - Runs `docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<version> knottyyoga_database_helper --migrate`.
+  - Updates the version tag in the systemd unit and restarts: `systemctl restart knottyyoga-server`.
 - [ ] Smoke test: `curl https://knottyyoga.example/api/health`.
 - [ ] Log in via the frontend, register a user, process a sandbox Square payment end-to-end.
 
@@ -575,12 +592,12 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 - [ ] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab.
 - [ ] Operator clicks `deploy-manual` in GitLab → artifact deploys to EC2.
 - [ ] EC2 `install.sh`:
-  1. Downloads artifact.
-  2. Extracts to versioned dir (`/opt/knottyyoga/releases/vX.Y.Z/`).
-  3. Runs migrations.
-  4. Atomically swaps `/opt/knottyyoga/current` symlink.
-  5. `systemctl restart knottyyoga-server`.
-  6. Health-check poll; abort + rollback symlink if health fails within 30s.
+  1. Pulls image: `docker pull <ecr-repo>/knottyyoga:vX.Y.Z`.
+  2. Runs migrations: `docker run --rm --env-file /etc/knottyyoga/server.env <image> knottyyoga_database_helper --migrate`.
+  3. Stops old container: `docker stop knottyyoga-server`.
+  4. Starts new container: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env <image>`.
+  5. Health-check poll; abort + rollback to previous image tag if health fails within 30s.
+  6. Prune old images: `docker image prune -f`.
 
 ---
 
