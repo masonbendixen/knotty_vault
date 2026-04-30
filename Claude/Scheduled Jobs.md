@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 3/13/2026
-Version: 0.1
+Last Updated: 4/30/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -23,15 +23,18 @@ Look at the document: Subscriptions- Recurring billing and card management.md an
 
 And the code base for other ideas for things that need to be called from the helper process. For the watchdog process, I feel like there should be some kind of ping endpoint that this watchdog process calls every so often. If that doesn't return a response within a configurable interval, it should kill the webserver process and restart it. The name of the executable for the web process should be a configurable setting. The watchdog process should also spawn a separate instance that pings the first instance using some mechanism. If that doesn't return a response within a configurable interval, it should kill the other process, take over the watchdog responsibility, and kick off a new watchdog process to watch the watchdog. This should ideally be portable code that runs on windows and linux. Ideally we use the standard library and boost (or come up with other libraries on conan) to do this process orchestration support.
 
-# Scheduled Jobs & Watchdog Helper — Design Plan
+# Scheduled Jobs Helper — Design Plan
 
 ## Executive Summary
 
-A single new executable (`knottyyoga_helper`) that serves two purposes:
-1. **Scheduled Job Runner** — Calls the web server's admin endpoints on configurable intervals to process billing, notifications, cleanup, and reminders
-2. **Server Watchdog** — Monitors the web server process health and restarts it on failure, with a self-healing watchdog-of-watchdog architecture
+A single new executable (`knottyyoga_helper`) that serves as a **Scheduled Job Runner** — calling the web server's admin endpoints on configurable intervals to process billing, notifications, cleanup, and reminders.
 
-The executable runs in two modes (via command-line flag): **primary mode** (scheduler + web server watcher) and **watchdog mode** (watches the primary process). The primary spawns a watchdog; the watchdog monitors the primary. If either dies, the survivor takes corrective action.
+**Watchdog responsibilities are handled by AWS infrastructure** (see `Deploying to AWS.md`):
+- **Process crashes**: systemd `Restart=on-failure` restarts the Docker container within seconds
+- **Application hangs**: CloudWatch Synthetics canary hits `/api/health` every 5 minutes, alerts via SNS on failure
+- **VM-level failures**: EC2 instance status checks + CloudWatch alarms
+
+The helper runs as a separate Docker container from the same image, with `--entrypoint knottyyoga_helper`. It does NOT manage the web server process — that's systemd's job.
 
 ---
 
@@ -77,95 +80,20 @@ These will become relevant as more features are built. Listed here for completen
 
 ---
 
-# 2. Watchdog Architecture
+# 2. Health & Monitoring (AWS-native — no custom watchdog)
 
-## 2.1 Web Server Health Check
+The original plan called for a custom watchdog-of-watchdog architecture. **This has been replaced by AWS-native primitives** (decided in `Deploying to AWS.md`, Phase 5.3):
 
-The web server needs a lightweight health check endpoint.
+| Failure | Handled by | Detection time |
+|---|---|---|
+| Crow process crash | systemd `Restart=on-failure` on the Docker container | <5s |
+| Crow process hung | CloudWatch Synthetics canary → `/api/health` | <10 min |
+| Helper process crash | systemd `Restart=on-failure` on its container | <5s |
+| EC2 VM failure | EC2 instance status check + CloudWatch alarm | <2 min |
 
-**New endpoint**: `GET /api/health`
-- **No authentication required** (the helper doesn't need to log in for health checks)
-- Returns `200 OK` with a minimal JSON body: `{"status": "ok", "uptime_seconds": 12345}`
-- Should be as simple as possible — no database calls, no business logic
-- Just confirms the Crow server is alive and accepting HTTP requests
+**Health endpoint** (`GET /api/health`): **Already implemented** in Phase 1.2 of the AWS deployment plan. Returns `{"status":"ok|fail","db":"ok|fail","version":"<git-sha>"}` with a `SELECT 1` DB probe. Used by CloudWatch Synthetics, not by the helper.
 
-The helper calls this endpoint on a configurable interval (default: every 30 seconds). If the endpoint doesn't respond within a configurable timeout (default: 10 seconds), the helper considers the server unhealthy. After a configurable number of consecutive failures (default: 3), the helper kills the web server process and restarts it.
-
-## 2.2 Self-Healing Process Pair
-
-The architecture uses two instances of the same executable running simultaneously:
-
-```
-┌─────────────────────────────────────────────────┐
-│  PRIMARY PROCESS (knottyyoga_helper)             │
-│                                                  │
-│  Responsibilities:                               │
-│  1. Run scheduled jobs on their intervals        │
-│  2. Ping web server health endpoint              │
-│  3. Kill/restart web server if unhealthy         │
-│  4. Listen on a TCP port for watchdog pings      │
-│  5. Respond to watchdog pings                    │
-│  6. Monitor watchdog child — respawn if it dies  │
-│                                                  │
-│  Spawns ──► WATCHDOG PROCESS                     │
-└─────────────────────────────────────────────────┘
-          ▲                           │
-          │ TCP ping                  │ TCP ping
-          │ (health check)            ▼
-┌─────────────────────────────────────────────────┐
-│  WATCHDOG PROCESS (knottyyoga_helper --watchdog) │
-│                                                  │
-│  Responsibilities:                               │
-│  1. Ping primary process on its TCP port         │
-│  2. If primary doesn't respond:                  │
-│     a. Kill primary process                      │
-│     b. Become the new primary (take over all     │
-│        primary responsibilities)                 │
-│     c. Spawn a new watchdog process              │
-│                                                  │
-│  Does NOT run scheduled jobs while in            │
-│  watchdog mode — only monitors.                  │
-└─────────────────────────────────────────────────┘
-```
-
-### Failure Scenarios
-
-**Web server crashes**:
-1. Primary detects health check failure (consecutive misses exceed threshold)
-2. Primary kills web server process (if still running)
-3. Primary restarts web server process
-4. Primary resumes health checks
-
-**Primary process crashes**:
-1. Watchdog detects ping failure on TCP port
-2. Watchdog kills primary process (if still running)
-3. Watchdog promotes itself to primary mode:
-   - Starts running scheduled jobs
-   - Starts monitoring web server
-   - Opens TCP listen port for watchdog pings
-4. Watchdog spawns a new watchdog child
-
-**Watchdog process crashes**:
-1. Primary detects its watchdog child process has exited
-2. Primary spawns a new watchdog child
-3. (Primary never stops running — this is just resilience)
-
-**Both crash simultaneously** (e.g., machine reboot):
-- An OS-level service manager (systemd on Linux, Windows Service, or Task Scheduler) should be configured to start the primary process on boot
-- The primary will then spawn its watchdog as usual
-
-## 2.3 Inter-Process Communication: TCP Ping
-
-The primary process runs a lightweight TCP listener on a configurable port (default: 18090). The protocol is minimal:
-
-1. Watchdog connects to `localhost:{port}`
-2. Watchdog sends: `PING\n`
-3. Primary responds: `PONG\n`
-4. Connection closed
-
-This uses **Boost.Asio** (already available — `boost::asio` is used by `ThreadPool`). Boost.Asio provides cross-platform async TCP, which works identically on Windows and Linux.
-
-If the primary doesn't respond within the timeout, the watchdog counts it as a failure. After consecutive failures exceed the threshold, the watchdog takes over.
+The helper does NOT monitor the web server. It only runs scheduled jobs.
 
 ---
 
@@ -178,35 +106,9 @@ Using `absl::flags` (same pattern as `knottyyoga_database_helper`):
 ```
 knottyyoga_helper [flags]
 
-Mode flags:
-  --watchdog                  Run in watchdog mode (monitor primary process)
-                              Default: false (run as primary)
-
-Web server watchdog flags:
-  --server_executable         Path to web server executable
-                              Default: "knottyyoga_the_server"
-  --server_url                Web server base URL for health checks and API calls
-                              Default: "http://localhost:18080"
-  --server_health_interval    Seconds between web server health checks
-                              Default: 30
-  --server_health_timeout     Seconds to wait for health check response
-                              Default: 10
-  --server_health_failures    Consecutive failures before restart
-                              Default: 3
-  --manage_server             Whether to manage (start/restart) the web server process
-                              Default: true
-
-Inter-process watchdog flags:
-  --watchdog_port             TCP port for primary/watchdog communication
-                              Default: 18090
-  --watchdog_interval         Seconds between watchdog pings
-                              Default: 15
-  --watchdog_timeout          Seconds to wait for ping response
-                              Default: 5
-  --watchdog_failures         Consecutive failures before takeover
-                              Default: 3
-
 Scheduler flags:
+  --server_url                Web server base URL for API calls
+                              Default: "http://localhost:80"
   --service_account_email     Email for authenticating to admin endpoints
                               Default: "scheduler@knottyyoga.local"
   --service_account_password  Password for the service account
@@ -221,7 +123,10 @@ Scheduling interval overrides (seconds, 0 = disabled):
   --token_cleanup_interval    Default: 86400 (daily)
   --idempotency_cleanup_interval  Default: 86400 (daily)
   --photo_cleanup_interval    Default: 86400 (daily)
+  --waitlist_refunds_interval Default: 3600 (hourly)
 ```
+
+No watchdog flags — process health is handled by systemd + CloudWatch (see Section 2).
 
 ## 3.2 Authentication Strategy
 
@@ -241,18 +146,11 @@ This approach:
 
 ## 3.3 Scheduler Loop
 
-The primary process runs a single main loop using **Boost.Asio** timers:
+The helper runs a single main loop using **Boost.Asio** timers:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  boost::asio::io_context                                      │
-│                                                               │
-│  Timer: server_health_check (every 30s)                       │
-│    → GET /api/health                                          │
-│    → On failure: increment counter, kill/restart if threshold  │
-│                                                               │
-│  Timer: watchdog_tcp_listener (always-on)                      │
-│    → Accept connections, respond to PING with PONG             │
 │                                                               │
 │  Timer: billing (every 24h, aligned to 1:00 AM)               │
 │    → POST /api/admin/run_billing                              │
@@ -266,8 +164,14 @@ The primary process runs a single main loop using **Boost.Asio** timers:
 │  Timer: expiring_cards (monthly, aligned to 1st, 3:00 AM)     │
 │    → POST /api/admin/check_expiring_cards                     │
 │                                                               │
+│  Timer: voucher_expiry (every 24h, aligned to 2:30 AM)        │
+│    → POST /api/admin/process_voucher_expiry                   │
+│                                                               │
 │  Timer: event_reminders (every 1h)                            │
 │    → POST /api/admin/send_event_reminders                     │
+│                                                               │
+│  Timer: waitlist_refunds (every 1h)                           │
+│    → POST /api/admin/process_waitlist_refunds                 │
 │                                                               │
 │  Timer: token_cleanup (every 24h)                             │
 │    → POST /api/admin/cleanup_expired_tokens                   │
@@ -278,41 +182,14 @@ The primary process runs a single main loop using **Boost.Asio** timers:
 │  Timer: photo_cleanup (every 24h)                             │
 │    → POST /api/admin/cleanup_scaled_photos                    │
 │                                                               │
-│  Child process monitor: watchdog process                       │
-│    → Check if child is alive, respawn if dead                  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 All timers are async. The `io_context::run()` drives the entire event loop. No raw threads needed — everything is single-threaded with async I/O, which avoids all the threading complexity that was the reason for not putting timers in the Crow server.
 
-## 3.4 Process Management
+No process management, no watchdog, no TCP listener. The helper's only job is to call admin endpoints on schedule. If the helper crashes, systemd restarts its container.
 
-**Library**: `Boost.Process` (part of Boost 1.86, already in `conanfile.py`)
-
-Boost.Process provides cross-platform process spawning, monitoring, and termination:
-
-```cpp
-#include <boost/process.hpp>
-namespace bp = boost::process;
-
-// Spawn web server
-bp::child server(server_executable_path, bp::std_out > stdout, bp::std_err > stderr);
-
-// Check if alive
-if (server.running()) { ... }
-
-// Kill
-server.terminate();
-
-// Wait for exit
-server.wait();
-```
-
-This works identically on Windows (uses `CreateProcess`/`TerminateProcess`) and Linux (uses `fork`/`exec`/`kill`).
-
-**Note**: Boost.Process v2 (in Boost 1.86) is the current version. It uses `boost::process::v2` namespace and integrates with Boost.Asio for async child monitoring. We should verify which API surface Boost 1.86 exposes and use v2 if available.
-
-## 3.5 HTTP Client for API Calls
+## 3.4 HTTP Client for API Calls
 
 The codebase already has `Http::HttpClient` (`util/http/http_client.h`) wrapping libcurl. The helper executable links against `knotty_yoga_core`, giving it access to this HTTP client.
 
@@ -337,18 +214,8 @@ server/knottyyoga_server/
 │   ├── scheduler/                          # New directory for helper executable
 │   │   ├── CMakeLists.txt                  # Library + executable targets
 │   │   ├── main.cpp                        # Entry point, flag parsing
-│   │   ├── scheduler.h                     # Primary mode: scheduler + web server watcher
+│   │   ├── scheduler.h                     # Main loop: timer-based job execution
 │   │   ├── scheduler.cpp
-│   │   ├── watchdog.h                      # Watchdog mode: monitor primary process
-│   │   ├── watchdog.cpp
-│   │   ├── health_checker.h                # HTTP health check logic
-│   │   ├── health_checker.cpp
-│   │   ├── process_manager.h               # Cross-platform process spawn/kill/monitor
-│   │   ├── process_manager.cpp
-│   │   ├── tcp_ping_server.h               # Boost.Asio TCP listener for PONG responses
-│   │   ├── tcp_ping_server.cpp
-│   │   ├── tcp_ping_client.h               # Boost.Asio TCP client for PING requests
-│   │   ├── tcp_ping_client.cpp
 │   │   ├── scheduled_job.h                 # Job definition: endpoint, interval, name
 │   │   ├── scheduled_job.cpp
 │   │   ├── job_scheduler.h                 # Timer-based job execution engine
@@ -402,7 +269,7 @@ target_link_libraries(knottyyoga_helper
 )
 ```
 
-The `knotty_yoga_scheduler` library contains all the helper-specific code (watchdog, ping server/client, process manager, job scheduler, API client). It links against `knotty_yoga_core` for access to `HttpClient` and other utilities.
+The `knotty_yoga_scheduler` library contains all the helper-specific code (job scheduler, API client). It links against `knotty_yoga_core` for access to `HttpClient` and other utilities.
 
 ## 4.3 Build Outputs
 
@@ -420,56 +287,23 @@ build/
 
 # 5. Implementation Phases
 
-## Phase 0: Health Check Endpoint on Web Server
-**Backend work first — gives the watchdog something to ping.**
+## Phase 0: Health Check Endpoint on Web Server ✅
+**Already implemented** in Phase 1.2 of `Deploying to AWS.md`.
 
-- [ ] Create `GET /api/health` endpoint in web server
-  - No authentication required
-  - Returns `{"status": "ok", "uptime_seconds": N}`
-  - Track server start time in `WebApp` or a global
-  - Register in `web_app.cpp` routing
-- [ ] Tests for health endpoint
+- [x] `GET /api/health` — returns `{"status":"ok|fail","db":"ok|fail","version":"<git-sha>"}`
+- [x] DB probe via `SELECT 1`, 503 on failure, 200 otherwise
+- [x] Tests: green path, DB-failure path, env-var handling, JSON shape, full HTTP integration
+- [x] Wired into `web_app.cpp`
 
-## Phase 1: Executable Skeleton & Process Manager
-**Get the basic executable building and able to spawn/monitor processes.**
+## Phase 1: Executable Skeleton
+**Get the basic executable building.**
 
 - [ ] Create `src/scheduler/` directory with `CMakeLists.txt`
 - [ ] Add `knotty_yoga_scheduler` library and `knottyyoga_helper` executable to top-level CMake
 - [ ] Implement `main.cpp` with `absl::flags` for all command-line options
-- [ ] Implement `ProcessManager` class using Boost.Process:
-  - `SpawnProcess(executable, args) → ProcessHandle`
-  - `IsRunning(ProcessHandle) → bool`
-  - `Terminate(ProcessHandle)`
-  - `WaitForExit(ProcessHandle) → exit_code`
-  - Cross-platform (Windows + Linux)
-- [ ] Tests for `ProcessManager` (spawn a trivial process, check alive, terminate)
+- [ ] Verify the executable builds, links against `knotty_yoga_core`, and runs with `--help`
 
-## Phase 2: TCP Ping Server & Client
-**Inter-process health check mechanism.**
-
-- [ ] Implement `TcpPingServer` using Boost.Asio:
-  - Listens on configurable port
-  - Accepts connections async
-  - Reads `PING\n`, responds `PONG\n`, closes
-  - Integrates with shared `io_context`
-- [ ] Implement `TcpPingClient` using Boost.Asio:
-  - Connects to `localhost:{port}` with configurable timeout
-  - Sends `PING\n`, waits for `PONG\n`
-  - Returns success/failure
-- [ ] Tests for both (connect server to client, verify round-trip)
-
-## Phase 3: Web Server Health Checker
-**HTTP-based health monitoring of the web server.**
-
-- [ ] Implement `HealthChecker` class:
-  - Uses `HttpClient` to call `GET /api/health`
-  - Tracks consecutive failures
-  - Fires callback when failure threshold exceeded
-  - Configurable interval, timeout, failure threshold
-- [ ] Integrate with `ProcessManager` for kill/restart on failure
-- [ ] Tests for `HealthChecker` (mock `HttpClient`, verify failure counting, verify restart trigger)
-
-## Phase 4: API Client with Authentication
+## Phase 2: API Client with Authentication
 **Authenticated HTTP client for calling admin endpoints.**
 
 - [ ] Implement `ApiClient` class:
@@ -480,7 +314,7 @@ build/
 - [ ] Verify `HttpClient` supports cookie handling; extend if needed
 - [ ] Tests for `ApiClient` (mock HTTP responses, verify auth flow, verify retry on 401)
 
-## Phase 5: Job Scheduler
+## Phase 3: Job Scheduler
 **Timer-based execution of scheduled jobs.**
 
 - [ ] Define `ScheduledJob` struct: name, endpoint path, HTTP method, interval, last-run timestamp, enabled flag
@@ -490,36 +324,19 @@ build/
   - Calls `ApiClient` for each job
   - Logs results (success/failure, response summary)
   - Handles alignment to wall-clock times (e.g., "run at 1:00 AM daily" not "run every 24h from startup")
-- [ ] Configure all 8 jobs from Section 1 (4 existing + 4 new endpoints)
+- [ ] Configure all jobs from Section 1 (existing + new endpoints)
 - [ ] Tests for `JobScheduler` (mock `ApiClient`, verify timer firing, verify job execution)
 
-## Phase 6: Primary Mode Assembly
-**Wire everything together for the primary process.**
+## Phase 4: Main Loop Assembly
+**Wire everything together.**
 
-- [ ] Implement `Scheduler` class (primary mode orchestrator):
+- [ ] Implement `Scheduler` class (main orchestrator):
   - Creates `boost::asio::io_context`
-  - Initializes `HealthChecker`, `ProcessManager`, `TcpPingServer`, `ApiClient`, `JobScheduler`
-  - Spawns web server process (if `--manage_server` is true)
-  - Spawns watchdog child process
-  - Monitors watchdog child — respawn if it exits
+  - Initializes `ApiClient`, `JobScheduler`
   - Runs `io_context.run()` as the main event loop
-- [ ] Wire up in `main.cpp`: if `--watchdog` is false → run `Scheduler`
-- [ ] Integration test: start primary, verify it spawns watchdog, verify health checks run
-
-## Phase 7: Watchdog Mode Assembly
-**The watchdog process that monitors the primary.**
-
-- [ ] Implement `Watchdog` class:
-  - Creates `boost::asio::io_context`
-  - Initializes `TcpPingClient` targeting primary's TCP port
-  - Periodically pings primary process
-  - On failure threshold:
-    - Kills primary process (via PID passed as command-line arg or discovered)
-    - Promotes self to primary mode (instantiates `Scheduler`)
-    - Spawns new watchdog child
-- [ ] Wire up in `main.cpp`: if `--watchdog` is true → run `Watchdog`
-- [ ] Handle PID passing: primary passes its own PID to watchdog child via `--primary_pid` flag
-- [ ] Tests for `Watchdog` (mock TCP client, verify failure detection, verify promotion)
+  - Handles SIGTERM/SIGINT for graceful shutdown
+- [ ] Wire up in `main.cpp`
+- [ ] Integration test: start helper, verify it calls endpoints on schedule
 
 ## Phase 8: New Admin Endpoints on Web Server
 **Implement the 4 new admin endpoints that the scheduler will call.**
@@ -568,17 +385,14 @@ build/
 - [ ] Document that the service account password should be set via environment variable, not hardcoded
 - [ ] Add a secret key for the service account password so it can be configured in the secrets table
 
-## Phase 10: Logging & Operational Concerns
+## Phase 8: Logging & Operational Concerns
 **Production-readiness.**
 
 - [ ] Structured logging for all operations:
   - Job execution: name, start time, duration, success/failure, response summary
-  - Health checks: status, consecutive failures
-  - Process events: spawn, terminate, restart, watchdog promotion
-- [ ] Log rotation / log file configuration (or use stdout and let the OS service manager handle it)
-- [ ] Graceful shutdown: handle SIGTERM/SIGINT (Linux) and service stop events (Windows)
-  - Stop timers, close TCP listener, terminate child processes cleanly
-- [ ] Consider writing a PID file for the primary process
+  - Authentication: login success/failure, re-auth events
+- [ ] Use stdout logging (same `InitializeLogging()` as the server, Phase 1.3 of AWS deploy). Docker/systemd captures stdout to the journal, CloudWatch Logs agent tails it.
+- [ ] Graceful shutdown: handle SIGTERM/SIGINT to stop timers cleanly (Docker sends SIGTERM on `docker stop`)
 
 ---
 
@@ -586,14 +400,12 @@ build/
 
 | Library | Already Available? | Used For |
 |---------|-------------------|----------|
-| Boost.Asio | Yes (via `boost/1.86.0` in conanfile) | Async timers, TCP server/client, io_context event loop |
-| Boost.Process | Yes (via `boost/1.86.0` in conanfile) | Cross-platform process spawn, monitor, terminate |
-| Boost.Filesystem | Yes (already `find_package(Boost COMPONENTS filesystem)`) | Path handling for executable locations |
+| Boost.Asio | Yes (via `boost/1.86.0` in conanfile) | Async timers, io_context event loop |
 | abseil (absl::flags) | Yes (via `abseil/20220623.1` in conanfile) | Command-line flag parsing |
 | libcurl (HttpClient) | Yes (via `libcurl/7.86.0` in conanfile) | HTTP calls to web server endpoints |
-| Standard library | Yes | `<chrono>`, `<string>`, `<functional>`, `<memory>` |
+| Standard library | Yes | `<chrono>`, `<string>`, `<functional>`, `<memory>`, `<csignal>` |
 
-No new Conan dependencies needed. Everything is available in the existing dependency set.
+No new Conan dependencies needed. Boost.Process and Boost.Filesystem are no longer required since the helper doesn't manage processes.
 
 ---
 
@@ -625,57 +437,49 @@ These already exist and are used by the admin endpoints. The helper doesn't read
 
 # 8. Deployment Considerations
 
-## 8.1 Linux (Production — Docker)
+## 8.1 Linux (Production — Docker on EC2)
 
-The helper runs as a systemd service (or supervisor process) alongside the Docker container:
+The helper runs as a **separate Docker container** from the same image as the web server, managed by its own systemd unit (see `Deploying to AWS.md` Phase 2.2):
 
-```ini
-[Unit]
-Description=Knotty Yoga Scheduler & Watchdog
-After=postgresql.service
-
-[Service]
-ExecStart=/opt/knottyyoga/knottyyoga_helper \
-    --server_executable=/opt/knottyyoga/knottyyoga_the_server \
-    --server_url=http://localhost:8080 \
+```bash
+# The helper container talks to the server container over the Docker network
+docker run -d --name knottyyoga-helper \
+    --network host \
+    --env-file /etc/knottyyoga/server.env \
+    --entrypoint knottyyoga_helper \
+    knottyyoga:<version> \
+    --server_url=http://localhost:80 \
     --service_account_email=scheduler@knottyyoga.local
-Environment=SCHEDULER_PASSWORD=<from-secrets-manager>
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
 ```
 
-If both the helper AND its watchdog somehow die, systemd's `Restart=always` brings the helper back, which then restarts the web server and spawns a new watchdog.
+systemd's `Restart=on-failure` handles helper crashes. No watchdog needed — the helper doesn't manage the web server process.
+
+The helper uses `--network host` so it can reach the server container on `localhost:80`. Both containers read their config from `/etc/knottyyoga/server.env`.
 
 ## 8.2 Windows (Development)
 
-Run from command line or as a Windows Service:
+Run from command line alongside the web server (started separately in Visual Studio):
 
 ```batch
 knottyyoga_helper.exe ^
-    --server_executable=knottyyoga_the_server.exe ^
     --server_url=http://localhost:18080 ^
     --service_account_email=scheduler@knottyyoga.local ^
     --service_account_password=%SCHEDULER_PASSWORD%
 ```
 
-For development, `--manage_server=false` can be used to disable web server management (just run scheduled jobs while you run the web server separately in Visual Studio).
-
 ---
 
 # 9. Open Questions
 
-| # | Question | Notes |
-|---|----------|-------|
-| 1 | **Boost.Process version**: Boost 1.86 ships both v1 (`boost::process`) and v2 (`boost::process::v2`). Which API surface should we target? v2 integrates more cleanly with Boost.Asio for async child monitoring. Need to verify what's available with our Conan package. | Recommend: try v2 first, fall back to v1 if build issues arise. |
-| 2 | **Event reminder tracking**: Should we add a `reminder_sent_us` column to the `bookings` table, or create a separate `booking_notifications` table? A column is simpler but only supports one reminder. A table supports multiple reminder types later. | Recommend: `reminder_sent_us` column for now (YAGNI). Add a table later if multiple reminder types are needed. |
-| 3 | **Scaled photo cleanup**: What table/mechanism stores scaled photos? Need to verify the actual storage mechanism before implementing the cleanup endpoint. | Need to examine `business_logic/images/` for how scaled photos are stored. |
-| 4 | **Wall-clock alignment**: Should daily jobs run at specific wall-clock times (e.g., 1:00 AM) or simply at fixed intervals from startup? Wall-clock alignment is more predictable but more complex to implement (need timezone awareness). | Recommend: wall-clock alignment using the studio's configured timezone (`kDefaultStudioTimezone`). |
-| 5 | **Should the helper manage the web server by default?** In some deployments (Docker, Kubernetes), an orchestrator already manages the web server process. The helper should be able to run in "scheduler-only" mode without process management. | Already addressed: `--manage_server=false` flag. |
-| 6 | **Service account creation**: Should this be automatic (part of `knottyyoga_database_helper`) or manual (admin creates via portal)? | Recommend: automatic creation in database helper with a well-known email. Password set via secret/environment variable. |
-| 7 | **HttpClient cookie support**: Does the existing `HttpClient` wrapper support storing and sending cookies across requests? If not, what's the best extension approach? | Need to examine `util/http/http_client.h/cpp` to determine current cookie handling capability. |
+| # | Question | Status | Notes |
+|---|----------|--------|-------|
+| 1 | ~~**Boost.Process version**~~ | ✅ Resolved | No longer needed — the helper doesn't manage processes. AWS infrastructure handles restarts. |
+| 2 | ~~**Event reminder tracking**~~ | ✅ Resolved | `reminder_sent_us` column added to `bookings` table. Endpoint implemented in Phase 8a. |
+| 3 | **Scaled photo cleanup**: What table/mechanism stores scaled photos? | Open | Need to examine `business_logic/images/` for how scaled photos are stored. |
+| 4 | **Wall-clock alignment**: Should daily jobs run at specific wall-clock times (e.g., 1:00 AM) or simply at fixed intervals from startup? | Open | Recommend: wall-clock alignment using the studio's configured timezone. |
+| 5 | ~~**Should the helper manage the web server?**~~ | ✅ Resolved | No. systemd manages the Docker container. Helper is scheduler-only. |
+| 6 | **Service account creation**: Should this be automatic (part of `knottyyoga_database_helper`) or manual? | Open | Recommend: automatic creation in database helper with a well-known email. Password set via secret/env var. |
+| 7 | **HttpClient cookie support**: Does the existing `HttpClient` wrapper support cookies across requests? | Open | Need to examine `util/http/http_client.h/cpp`. |
 
 ---
 
@@ -683,18 +487,16 @@ For development, `--manage_server=false` can be used to disable web server manag
 
 The phases above are ordered by dependency, but for practical development, the recommended sequence is:
 
-1. **Phase 0** — Health endpoint (quick win, immediately useful for any monitoring)
-2. **Phase 8b, 8c** — Cleanup endpoints (simple, low risk, independently valuable)
-3. **Phase 8a** — Event reminders (most user-facing value of the new endpoints)
-4. **Phase 8d** — Photo cleanup (needs investigation of photo storage)
-5. **Phase 1** — Executable skeleton + process manager
-6. **Phase 2** — TCP ping server/client
-7. **Phase 4** — API client with authentication
-8. **Phase 5** — Job scheduler
-9. **Phase 3** — Web server health checker
-10. **Phase 6** — Primary mode assembly
-11. **Phase 7** — Watchdog mode assembly
-12. **Phase 9** — Service account setup
-13. **Phase 10** — Logging and operational polish
+1. **Phase 0** — ✅ Health endpoint (done — Phase 1.2 of AWS deploy)
+2. **Phase 5b, 5c** — Cleanup endpoints (simple, low risk, independently valuable)
+3. **Phase 5a** — Event reminders (partially done — endpoint exists, needs integration)
+4. **Phase 5d** — Photo cleanup (needs investigation of photo storage)
+5. **Phase 1** — Executable skeleton (CMake, main.cpp, flag parsing)
+6. **Phase 2** — API client with authentication
+7. **Phase 3** — Job scheduler (timer-based execution engine)
+8. **Phase 4** — Main loop assembly (wire it all together)
+9. **Phase 6** — Service account setup
+10. **Phase 7** — Waitlist refund endpoint
+11. **Phase 8** — Logging and operational polish
 
-This order delivers independently useful server endpoints first (which can be tested manually or via curl), then builds the helper executable infrastructure, and finishes with the watchdog self-healing system.
+This is a much simpler plan than the original — no watchdog, no TCP ping, no process management. The helper is just a timer loop that calls HTTP endpoints. AWS infrastructure handles all the process health monitoring.
