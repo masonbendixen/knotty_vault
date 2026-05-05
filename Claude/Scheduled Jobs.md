@@ -324,19 +324,17 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] Created `POST /api/admin/cleanup_idempotency_keys` endpoint in `endpoints/admin_cleanup_idempotency_keys.{h,cpp}`. Auth: requires login + `manage_subscriptions`. Returns `{"idempotency_keys_deleted": N}`. Endpoint tests cover 401 unauthenticated, 403 missing permission, 200 nothing-to-clean, and 200 deletes-expired-leaves-fresh.
 - [x] Wired into `web_app.cpp` and `endpoints/CMakeLists.txt`.
 
-## Phase 3: Event Reminder Emails
-**Most-requested SHOULD HAVE feature; partially done.**
+## Phase 3: Event Reminder Emails ✅
+**Most-requested SHOULD HAVE feature.**
 
-- [ ] Create `EventReminderNotification` in `business_logic/scheduling/`:
-  - Query bookings for events starting within `event_reminder_hours` that haven't had a reminder sent
-  - Need a `reminder_sent_us` column on `bookings` table (or a separate `booking_notifications` table)
-  - Send reminder email with event details (name, date/time, location)
-  - Return count of reminders sent
-- [x] Create email template `event_reminder_mail.h/cpp` — Blue-themed reminder email with event details
-- [x] Create `POST /api/admin/send_event_reminders` endpoint — Finds confirmed bookings within reminder window, sends emails, marks `reminder_sent_us`
-- [x] Tests for notification logic (5 tests in `event_reminder_helper_test.cpp`) and email template (2 tests)
-- [x] Added `reminder_sent_us` column to `bookings` table
-- [x] Added `send_event_reminders` command (alias `ser`) to test helper executable
+- [x] Notification logic lives in `Scheduling::EventReminderHelper` (`business_logic/scheduling/event_reminder_helper.{h,cpp}`). Queries confirmed bookings whose `reminder_sent_us` is NULL and whose event start is within the per-product `reminder_hours` (or the `event_reminder_hours` secret default of 24h). Sends reminder emails and marks `reminder_sent_us`. Returns `ReminderResult { sent, skipped }`.
+- [x] Email template `event_reminder_mail.h/cpp` — Blue-themed reminder email with event details.
+- [x] `reminder_sent_us` column on `bookings` table.
+- [x] `POST /api/admin/send_event_reminders` endpoint.
+- [x] Helper tests (5 tests in `event_reminder_helper_test.cpp`) and email template tests (2 tests).
+- [x] **Security fix**: endpoint was missing the `manage_subscriptions` permission check. Any logged-in user could trigger reminder emails. Fixed in `admin_send_event_reminders.cpp`.
+- [x] **Endpoint tests added** (`admin_send_event_reminders_test.cpp`): 401 unauthenticated, 403 missing permission, 200 nothing-to-send, 200 sends-reminder-and-marks-booking. The success test also asserts via the test mail helper that exactly one email left the system.
+- [x] `send_event_reminders` command (alias `ser`) in the test helper executable.
 
 ## Phase 4: Scaled Photo Cache Cleanup
 **Cleanup endpoint — uses existing `kScaledPhotoMaxAgeUs` secret.**
