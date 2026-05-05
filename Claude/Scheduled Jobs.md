@@ -481,13 +481,23 @@ knottyyoga_helper.exe ^
 
 1. **Scaled photo cleanup table/mechanism.** Scaled photos are stored in the `scaled_photos` table (helpers at `sql_util/table_helpers/scaled_photos.{h,cpp}`, schema in `db_schema/photos.{h,cpp}`). Cleanup would mean deleting rows older than `kScaledPhotoMaxAgeUs`. Should the cleanup business logic live in `business_logic/images/scaled_photo_cleanup.{h,cpp}` and delegate row deletion to a new method on the existing `ScaledPhotosTable` helper, or should it issue the delete query directly via `DbCrud`? Any other state to clean up beyond the table rows (e.g., on-disk blobs)?
 
-   **Answer:** Mason- Let's 
+   **Answer:** Mason- Let's add it to ScaledPhotosTable helper and make sure to add tests.
 
 2. **Wall-clock alignment for daily jobs.** Should daily jobs run at specific wall-clock times (e.g., billing at 1:00 AM, grace at 1:30 AM, etc., as listed in Section 1.1) using the studio's configured timezone, or simply at fixed intervals from startup? If wall-clock, where does the timezone come from — a new secret, an existing one, or the host's local time?
 
-   **Answer:**
+   **Answer:** Mason- Let's go with host's local time zone.
 
 3. **Service account creation — automatic vs. manual.** Should the `scheduler@knottyyoga.local` service account be created automatically by `knottyyoga_database_helper` (with `manage_subscriptions` permission, marked verified, password sourced from a secret/env var), or created manually as a one-time provisioning step? If automatic, should the password default to a generated value on first run, or require operator-supplied input?
+
+   **Answer:** Mason- What do you suggest?
+
+   **Claude's recommendation:** Automatic creation in `knottyyoga_database_helper`, password sourced from a single environment variable (e.g., `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`) that is read by **both** processes:
+   - `knottyyoga_database_helper` reads the env var, hashes it, and stores the hash in the `people` row for `scheduler@knottyyoga.local` (creating the row + permission grant on first run; idempotent on subsequent runs).
+   - `knottyyoga_helper` reads the same env var at startup and uses it to call `POST /api/login`.
+
+   Both containers already share `/etc/knottyyoga/server.env` via `--env-file` (see Section 8.1), so there's exactly one place to set the password. If the env var is missing when `knottyyoga_database_helper` runs, fail loudly with an instruction to generate a strong password and add it to the env file — don't auto-generate, because then the operator wouldn't know the value to give the helper.
+
+   Follow-up question: should the service account be flagged in the `people` table somehow (e.g., a `is_service_account bool` column) so it's hidden from the admin user list and can't be logged into via the normal UI? Or is `scheduler@knottyyoga.local` distinguishable enough by its email domain?
 
    **Answer:**
 
@@ -497,6 +507,19 @@ knottyyoga_helper.exe ^
    - **(c)** Skip session cookies entirely — give admin endpoints an alternative auth mechanism (e.g., a static service token header) that the helper can use without login.
 
    Which option do you prefer?
+
+   **Answer:** What do you think? I'm leaning towards "a" since it seems to be the easiest to use but I could be convinced otherwise.
+
+   **Claude's recommendation:** I'd push back gently and recommend **(b) — cookie logic inside `ApiClient`**. Reasoning:
+
+   - **`HttpClient` is intentionally stateless today.** The interface is one virtual call: `Execute(HttpRequest) → HttpResponse`. Adding a cookie jar makes it stateful, which means: every test double has to model jar behavior, every consumer has to think about whether two calls share state, and the libcurl impl has to either keep a persistent `CURL*` or replay cookies on every call. That's a meaningful API change for one consumer.
+   - **The cookie logic is tiny.** All the helper needs is: parse `Set-Cookie` headers from the login response, store name/value pairs, attach a `Cookie:` header on subsequent requests. ~30 lines inside `ApiClient`. You don't need full RFC 6265 (domain matching, expiry, paths) because the helper only ever talks to one origin with a session cookie.
+   - **YAGNI.** The helper is the only client that needs cookies right now. If a second tool ever needs the same behavior, it can either share an `ApiClient` or pull the cookie logic out into a small `CookieJar` helper at that point — and we'll know more about real usage.
+   - **Tests stay simple.** The existing `TestHttpClient` doesn't need a cookie story. `ApiClient` tests can mock the underlying `HttpClient` and verify Cookie header behavior at one level up.
+
+   The "ease of use" win for (a) is real, but it's outweighed by giving up the simple stateless `HttpClient` contract. Option (c) I'd avoid — adding a parallel non-cookie auth path to admin endpoints expands the auth surface area for one caller's convenience.
+
+   Want me to go with (b), or did I miss something that tips it toward (a)?
 
    **Answer:**
 
