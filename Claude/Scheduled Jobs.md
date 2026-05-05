@@ -336,15 +336,15 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] **Endpoint tests added** (`admin_send_event_reminders_test.cpp`): 401 unauthenticated, 403 missing permission, 200 nothing-to-send, 200 sends-reminder-and-marks-booking. The success test also asserts via the test mail helper that exactly one email left the system.
 - [x] `send_event_reminders` command (alias `ser`) in the test helper executable.
 
-## Phase 4: Scaled Photo Cache Cleanup
+## Phase 4: Scaled Photo Cache Cleanup ✅
 **Cleanup endpoint — uses existing `kScaledPhotoMaxAgeUs` secret.**
 
-- [ ] Add a `DeleteOlderThan(int64_t cutoffUs)` method to `ScaledPhotosTable` (`sql_util/table_helpers/scaled_photos.{h,cpp}`):
-  - Deletes scaled photo rows whose age exceeds `kScaledPhotoMaxAgeUs`
-  - Returns count of deleted records
-  - Tests in `scaled_photos_test.cpp` (insert rows with varying ages, run cleanup, verify the right rows are deleted and counts returned)
-- [ ] Create `POST /api/admin/cleanup_scaled_photos` endpoint that reads `kScaledPhotoMaxAgeUs` from secrets and calls the table helper. Endpoint test for auth + happy path.
-- [ ] No on-disk blob cleanup needed — scaled photos are stored entirely in the `scaled_photos` table.
+- [x] Added `DeleteOlderThan(Transaction&, int64_t cutoffUs) → int64_t` to `TableHelpers::ScaledPhotos`. Single `DELETE ... WHERE last_used_at_us < $1 RETURNING photo_instance_id` plus a per-row cleanup loop on `photo_instances`, mirroring the cascading behavior of the existing `DeleteScaledPhoto` and `DeleteScaledPhotosBySourcePhotoId`. Returns count of `scaled_photos` rows deleted.
+- [x] **Important correction to plan note**: blobs are stored in `photo_instances`, not `scaled_photos`. A naive single-table DELETE would leak blob storage indefinitely. The cascade is necessary.
+- [x] Tests in `scaled_photos_test.cpp`: deletes-aged-rows-and-cascades-to-instances (verifies the underlying `photo_instances` rows are also deleted), no-aged-rows-returns-zero, boundary-not-inclusive (strict `<`).
+- [x] Created `POST /api/admin/cleanup_scaled_photos` endpoint in `endpoints/admin_cleanup_scaled_photos.{h,cpp}`. Auth: requires login + `manage_subscriptions`. Reads `kScaledPhotoMaxAgeUs` from the secrets helper, computes `cutoff = now_us() - maxAge`, calls the table helper. Returns `{"scaled_photos_deleted": N}`. Returns 500 if the secret is missing.
+- [x] Endpoint tests in `admin_cleanup_scaled_photos_test.cpp`: 401 unauthenticated, 403 missing permission, 200 nothing-to-clean (fresh-only photo), 200 deletes-aged-rows-and-cascades (verifies the `photo_instances` rows are also gone).
+- [x] Wired into `web_app.cpp` and `endpoints/CMakeLists.txt`.
 
 ## Phase 5: Executable Skeleton
 **Get the basic helper executable building.**
