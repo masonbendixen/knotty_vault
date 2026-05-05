@@ -299,6 +299,8 @@ build/
 
 # 5. Implementation Phases
 
+Phases are listed in recommended implementation order. Phases 1–4 are new admin endpoints on the existing web server — they can be developed, tested, and merged independently of the helper executable, since the test helper executable can invoke them directly. Phases 5–8 build the helper executable. Phase 9 unblocks end-to-end integration testing of the helper. Phases 10–11 are follow-ups (Phase 10 is blocked on the waitlist feature).
+
 ## Phase 0: Health Check Endpoint on Web Server ✅
 **Already implemented** in Phase 1.2 of `Deploying to AWS.md`.
 
@@ -307,53 +309,28 @@ build/
 - [x] Tests: green path, DB-failure path, env-var handling, JSON shape, full HTTP integration
 - [x] Wired into `web_app.cpp`
 
-## Phase 1: Executable Skeleton
-**Get the basic executable building.**
+## Phase 1: Expired Token Cleanup Endpoint
+**Cleanup endpoint — simple, low-risk, independently valuable.**
 
-- [ ] Create `src/scheduler/` directory with `CMakeLists.txt`
-- [ ] Add `knotty_yoga_scheduler` library and `knottyyoga_helper` executable to top-level CMake
-- [ ] Implement `main.cpp` with `absl::flags` for all command-line options
-- [ ] Verify the executable builds, links against `knotty_yoga_core`, and runs with `--help`
+- [ ] Create `TokenCleanup` in `business_logic/auth/`:
+  - Delete device tokens where `created_us + max_duration < now`
+  - Delete email verifications past expiration
+  - Return counts of deleted records
+- [ ] Create `POST /api/admin/cleanup_expired_tokens` endpoint
+- [ ] Tests for cleanup logic and endpoint
 
-## Phase 2: API Client with Authentication
-**Authenticated HTTP client for calling admin endpoints.**
+## Phase 2: Idempotency Key Cleanup Endpoint
+**Cleanup endpoint — simple, low-risk, independently valuable.**
 
-- [ ] Implement `ApiClient` class:
-  - `Login(email, password)` → calls `POST /api/login`, stores session cookie
-  - `CallEndpoint(method, path)` → makes authenticated HTTP call
-  - Auto-re-authenticates on `401` response
-  - Configurable base URL
-- [ ] Verify `HttpClient` supports cookie handling; extend if needed
-- [ ] Tests for `ApiClient` (mock HTTP responses, verify auth flow, verify retry on 401)
+- [ ] Create `IdempotencyCleanup` in `business_logic/payment/`:
+  - Delete idempotency keys where `expires_us < now`
+  - Return count of deleted records
+- [ ] Create `POST /api/admin/cleanup_idempotency_keys` endpoint
+- [ ] Tests for cleanup logic and endpoint
 
-## Phase 3: Job Scheduler
-**Timer-based execution of scheduled jobs.**
+## Phase 3: Event Reminder Emails
+**Most-requested SHOULD HAVE feature; partially done.**
 
-- [ ] Define `ScheduledJob` struct: name, endpoint path, HTTP method, interval, last-run timestamp, enabled flag
-- [ ] Implement `JobScheduler` class:
-  - Owns a set of `ScheduledJob` definitions
-  - Uses Boost.Asio timers to fire jobs on their intervals
-  - Calls `ApiClient` for each job
-  - Logs results (success/failure, response summary)
-  - Handles alignment to wall-clock times (e.g., "run at 1:00 AM daily" not "run every 24h from startup")
-- [ ] Configure all jobs from Section 1 (existing + new endpoints)
-- [ ] Tests for `JobScheduler` (mock `ApiClient`, verify timer firing, verify job execution)
-
-## Phase 4: Main Loop Assembly
-**Wire everything together.**
-
-- [ ] Implement `Scheduler` class (main orchestrator):
-  - Creates `boost::asio::io_context`
-  - Initializes `ApiClient`, `JobScheduler`
-  - Runs `io_context.run()` as the main event loop
-  - Handles SIGTERM/SIGINT for graceful shutdown
-- [ ] Wire up in `main.cpp`
-- [ ] Integration test: start helper, verify it calls endpoints on schedule
-
-## Phase 8: New Admin Endpoints on Web Server
-**Implement the 4 new admin endpoints that the scheduler will call.**
-
-### 8a: Event Reminder Emails
 - [ ] Create `EventReminderNotification` in `business_logic/scheduling/`:
   - Query bookings for events starting within `event_reminder_hours` that haven't had a reminder sent
   - Need a `reminder_sent_us` column on `bookings` table (or a separate `booking_notifications` table)
@@ -365,28 +342,57 @@ build/
 - [x] Added `reminder_sent_us` column to `bookings` table
 - [x] Added `send_event_reminders` command (alias `ser`) to test helper executable
 
-### 8b: Expired Token Cleanup
-- [ ] Create `TokenCleanup` in `business_logic/auth/`:
-  - Delete device tokens where `created_us + max_duration < now`
-  - Delete email verifications past expiration
-  - Return counts of deleted records
-- [ ] Create `POST /api/admin/cleanup_expired_tokens` endpoint
-- [ ] Tests for cleanup logic and endpoint
+## Phase 4: Scaled Photo Cache Cleanup
+**Cleanup endpoint — uses existing `kScaledPhotoMaxAgeUs` secret.**
 
-### 8c: Idempotency Key Cleanup
-- [ ] Create `IdempotencyCleanup` in `business_logic/payment/`:
-  - Delete idempotency keys where `expires_us < now`
-  - Return count of deleted records
-- [ ] Create `POST /api/admin/cleanup_idempotency_keys` endpoint
-- [ ] Tests for cleanup logic and endpoint
-
-### 8d: Scaled Photo Cache Cleanup
 - [ ] Add a `DeleteOlderThan(int64_t cutoffUs)` method to `ScaledPhotosTable` (`sql_util/table_helpers/scaled_photos.{h,cpp}`):
   - Deletes scaled photo rows whose age exceeds `kScaledPhotoMaxAgeUs`
   - Returns count of deleted records
   - Tests in `scaled_photos_test.cpp` (insert rows with varying ages, run cleanup, verify the right rows are deleted and counts returned)
 - [ ] Create `POST /api/admin/cleanup_scaled_photos` endpoint that reads `kScaledPhotoMaxAgeUs` from secrets and calls the table helper. Endpoint test for auth + happy path.
 - [ ] No on-disk blob cleanup needed — scaled photos are stored entirely in the `scaled_photos` table.
+
+## Phase 5: Executable Skeleton
+**Get the basic helper executable building.**
+
+- [ ] Create `src/scheduler/` directory with `CMakeLists.txt`
+- [ ] Add `knotty_yoga_scheduler` library and `knottyyoga_helper` executable to top-level CMake
+- [ ] Implement `main.cpp` with `absl::flags` for all command-line options
+- [ ] Verify the executable builds, links against `knotty_yoga_core`, and runs with `--help`
+
+## Phase 6: API Client with Authentication
+**Authenticated HTTP client for calling admin endpoints.**
+
+- [ ] Implement `ApiClient` class wrapping `Http::HttpClient`:
+  - `Login(email, password)` → calls `POST /api/login`, parses `Set-Cookie` headers from the response, stores cookie name/value pairs internally
+  - `CallEndpoint(method, path)` → attaches `Cookie:` header from the stored map and makes an authenticated HTTP call
+  - On `401`, clears the cookie map, re-calls `Login`, retries the original request once
+  - Configurable base URL
+- [ ] Tests for `ApiClient` (mock `HttpClient`, verify auth flow, verify cookie attach, verify retry on 401)
+
+## Phase 7: Job Scheduler
+**Timer-based execution of scheduled jobs.**
+
+- [ ] Define `ScheduledJob` struct: name, endpoint path, HTTP method, interval, last-run timestamp, enabled flag
+- [ ] Implement `JobScheduler` class:
+  - Owns a set of `ScheduledJob` definitions
+  - Uses Boost.Asio timers to fire jobs on their intervals
+  - Calls `ApiClient` for each job
+  - Logs results (success/failure, response summary)
+  - Handles wall-clock alignment using the host's local timezone (e.g., "run at 1:00 AM daily" via `std::localtime`/`std::mktime`)
+- [ ] Configure all jobs from Section 1 (existing + new endpoints)
+- [ ] Tests for `JobScheduler` (mock `ApiClient`, verify timer firing, verify job execution)
+
+## Phase 8: Main Loop Assembly
+**Wire everything together.**
+
+- [ ] Implement `Scheduler` class (main orchestrator):
+  - Creates `boost::asio::io_context`
+  - Initializes `ApiClient`, `JobScheduler`
+  - Runs `io_context.run()` as the main event loop
+  - Handles SIGTERM/SIGINT for graceful shutdown
+- [ ] Wire up in `main.cpp`
+- [ ] Integration test: start helper, verify it calls endpoints on schedule (depends on Phase 9 service account)
 
 ## Phase 9: Service Account Setup
 **Create the service account used by the helper for authentication.**
@@ -402,7 +408,22 @@ build/
   - `knottyyoga_database_helper` test: missing env var fails loudly; present env var creates the row idempotently.
   - Admin user-list endpoint test: service-account row is filtered out.
 
-## Phase 8: Logging & Operational Concerns
+## Phase 10: Waitlist Refund Endpoint
+**Hourly job to refund unfulfilled waitlist bookings after the event passes.**
+
+Blocked on the waitlist feature (Phase 10 of `Product, Event, and Subscription Admin Portal.md`). Listed here so it isn't forgotten when waitlist lands.
+
+- [ ] Create business-logic helper that:
+  - Finds events where `end_time_us < now_us()` that have waitlisted bookings
+  - For each remaining waitlisted booking, processes a full refund via `PaymentHelper`
+  - Sets booking status to `cancelled` with reason "Event passed — waitlist refund"
+  - Idempotent (re-running does nothing if all waitlisted bookings have already been refunded)
+  - Returns count of refunds processed
+- [ ] Create `POST /api/admin/process_waitlist_refunds` endpoint
+- [ ] Add the job to the helper's scheduler config (hourly)
+- [ ] Tests for helper and endpoint
+
+## Phase 11: Logging & Operational Polish
 **Production-readiness.**
 
 - [ ] Structured logging for all operations:
@@ -493,29 +514,22 @@ knottyyoga_helper.exe ^
 All design questions for this plan are now resolved. Decisions are folded into the relevant sections above; this list is a quick reference.
 
 - ~~**Boost.Process version**~~ — No longer needed; the helper doesn't manage processes. AWS infrastructure handles restarts.
-- ~~**Event reminder tracking**~~ — `reminder_sent_us` column added to `bookings` table. Endpoint implemented in Phase 8a.
+- ~~**Event reminder tracking**~~ — `reminder_sent_us` column added to `bookings` table. Endpoint implemented in Phase 3.
 - ~~**Should the helper manage the web server?**~~ — No. systemd manages the Docker container. Helper is scheduler-only.
-- ~~**Scaled photo cleanup mechanism**~~ — Add a `DeleteOlderThan(cutoffUs)` method to the existing `ScaledPhotosTable` helper, with tests in `scaled_photos_test.cpp`. No on-disk blob cleanup needed — scaled photos live entirely in the `scaled_photos` table. See Phase 8d.
+- ~~**Scaled photo cleanup mechanism**~~ — Add a `DeleteOlderThan(cutoffUs)` method to the existing `ScaledPhotosTable` helper, with tests in `scaled_photos_test.cpp`. No on-disk blob cleanup needed — scaled photos live entirely in the `scaled_photos` table. See Phase 4.
 - ~~**Wall-clock alignment for daily jobs**~~ — Use the host's local timezone via `std::localtime` / `std::mktime`. On AWS the EC2 host TZ is set via cloud-init; on Windows dev it maps to the developer's local time. No timezone secret. See Section 3.3.
 - ~~**Service account creation**~~ — Automatic creation by `knottyyoga_database_helper`. Password sourced from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` env var (single source of truth, read by both processes via the shared `/etc/knottyyoga/server.env`). Fail loudly if missing — no auto-generation. Service accounts identified by `@knottyyoga.local` email domain (no new column on `people`); admin user-list endpoints filter that domain out. See Section 3.2 and Phase 9.
 - ~~**HttpClient cookie support**~~ — Cookie jar logic lives inside the helper's `ApiClient` wrapper, not in `HttpClient`. `HttpClient` stays stateless. Implementation is ~30 lines: parse `Set-Cookie` after login, attach `Cookie:` header on subsequent requests, re-login on 401 and retry once. See Section 3.4.
 
 ---
 
-# 10. Recommended Implementation Order
+# 10. Phase Dependency Notes
 
-The phases above are ordered by dependency, but for practical development, the recommended sequence is:
+The phases in Section 5 are listed in recommended implementation order. A few cross-cutting notes:
 
-1. **Phase 0** — ✅ Health endpoint (done — Phase 1.2 of AWS deploy)
-2. **Phase 5b, 5c** — Cleanup endpoints (simple, low risk, independently valuable)
-3. **Phase 5a** — Event reminders (partially done — endpoint exists, needs integration)
-4. **Phase 5d** — Photo cleanup (needs investigation of photo storage)
-5. **Phase 1** — Executable skeleton (CMake, main.cpp, flag parsing)
-6. **Phase 2** — API client with authentication
-7. **Phase 3** — Job scheduler (timer-based execution engine)
-8. **Phase 4** — Main loop assembly (wire it all together)
-9. **Phase 6** — Service account setup
-10. **Phase 7** — Waitlist refund endpoint
-11. **Phase 8** — Logging and operational polish
+- **Phases 1–4 (admin endpoints) are independent of phases 5–11 (helper executable).** They can be developed, reviewed, and merged in any order — the existing test helper executable can invoke them directly while the scheduler is still being built. This is also the lowest-risk place to start.
+- **Phase 8 (Main Loop Assembly) depends on Phase 9 (Service Account Setup) for end-to-end integration testing.** Phases 5–7 can be unit-tested without a real service account by mocking `HttpClient` / `ApiClient`.
+- **Phase 10 (Waitlist Refund) is blocked** on the waitlist feature in `Product, Event, and Subscription Admin Portal.md`. Listed last so it isn't forgotten when waitlist lands.
+- **Phase 11 (Logging & Polish) layers on top** of phases 5–9 and can be deferred until the helper is otherwise functional.
 
 This is a much simpler plan than the original — no watchdog, no TCP ping, no process management. The helper is just a timer loop that calls HTTP endpoints. AWS infrastructure handles all the process health monitoring.
