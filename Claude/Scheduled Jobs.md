@@ -309,15 +309,13 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] Tests: green path, DB-failure path, env-var handling, JSON shape, full HTTP integration
 - [x] Wired into `web_app.cpp`
 
-## Phase 1: Expired Token Cleanup Endpoint
+## Phase 1: Expired Token Cleanup Endpoint ✅
 **Cleanup endpoint — simple, low-risk, independently valuable.**
 
-- [ ] Create `TokenCleanup` in `business_logic/auth/`:
-  - Delete device tokens where `created_us + max_duration < now`
-  - Delete email verifications past expiration
-  - Return counts of deleted records
-- [ ] Create `POST /api/admin/cleanup_expired_tokens` endpoint
-- [ ] Tests for cleanup logic and endpoint
+- [x] Added `DeleteExpired(Transaction&, int64_t asOfUs)` to `TableHelpers::DeviceTokens` and `TableHelpers::EmailVerifications`. Both use `DELETE ... WHERE expires_at < $1 RETURNING id` and return the count of deleted rows. Tests added to both `device_tokens_test.cpp` and `email_verifications_test.cpp` covering: expired vs. fresh row separation, empty database, and the strict-less-than boundary.
+- [x] Created `Auth::TokenCleanupHelper` in `business_logic/auth/token_cleanup_helper.{h,cpp}`. `CleanupExpired(Transaction&, int64_t asOfUs = 0)` returns a `TokenCleanupResult { deviceTokensDeleted, emailVerificationsDeleted }`. When `asOfUs == 0`, looks up `now_us()` from the database. Tests in `token_cleanup_helper_test.cpp` cover both-tables-deleted, empty-database, and explicit `asOfUs` cases.
+- [x] Created `POST /api/admin/cleanup_expired_tokens` endpoint in `endpoints/admin_cleanup_expired_tokens.{h,cpp}`. Auth: requires login + `manage_subscriptions` permission (consistent with the other scheduler-driven admin endpoints). Returns `{"device_tokens_deleted": N, "email_verifications_deleted": M}`. Endpoint tests cover 401 unauthenticated, 403 missing permission, 200 nothing-to-clean, and 200 deletes-expired-rows-and-leaves-fresh-ones.
+- [x] Wired into `web_app.cpp`, `endpoints/CMakeLists.txt`, and `business_logic/auth/CMakeLists.txt`.
 
 ## Phase 2: Idempotency Key Cleanup Endpoint
 **Cleanup endpoint — simple, low-risk, independently valuable.**
