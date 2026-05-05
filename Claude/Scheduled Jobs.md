@@ -471,15 +471,34 @@ knottyyoga_helper.exe ^
 
 # 9. Open Questions
 
-| # | Question | Status | Notes |
-|---|----------|--------|-------|
-| 1 | ~~**Boost.Process version**~~ | ✅ Resolved | No longer needed — the helper doesn't manage processes. AWS infrastructure handles restarts. |
-| 2 | ~~**Event reminder tracking**~~ | ✅ Resolved | `reminder_sent_us` column added to `bookings` table. Endpoint implemented in Phase 8a. |
-| 3 | **Scaled photo cleanup**: What table/mechanism stores scaled photos? | Open | Need to examine `business_logic/images/` for how scaled photos are stored. |
-| 4 | **Wall-clock alignment**: Should daily jobs run at specific wall-clock times (e.g., 1:00 AM) or simply at fixed intervals from startup? | Open | Recommend: wall-clock alignment using the studio's configured timezone. |
-| 5 | ~~**Should the helper manage the web server?**~~ | ✅ Resolved | No. systemd manages the Docker container. Helper is scheduler-only. |
-| 6 | **Service account creation**: Should this be automatic (part of `knottyyoga_database_helper`) or manual? | Open | Recommend: automatic creation in database helper with a well-known email. Password set via secret/env var. |
-| 7 | **HttpClient cookie support**: Does the existing `HttpClient` wrapper support cookies across requests? | Open | Need to examine `util/http/http_client.h/cpp`. |
+## 9.1 Already Resolved
+
+- ~~**Boost.Process version**~~ — No longer needed; the helper doesn't manage processes. AWS infrastructure handles restarts.
+- ~~**Event reminder tracking**~~ — `reminder_sent_us` column added to `bookings` table. Endpoint implemented in Phase 8a.
+- ~~**Should the helper manage the web server?**~~ — No. systemd manages the Docker container. Helper is scheduler-only.
+
+## 9.2 Open — Please Answer
+
+1. **Scaled photo cleanup table/mechanism.** Scaled photos are stored in the `scaled_photos` table (helpers at `sql_util/table_helpers/scaled_photos.{h,cpp}`, schema in `db_schema/photos.{h,cpp}`). Cleanup would mean deleting rows older than `kScaledPhotoMaxAgeUs`. Should the cleanup business logic live in `business_logic/images/scaled_photo_cleanup.{h,cpp}` and delegate row deletion to a new method on the existing `ScaledPhotosTable` helper, or should it issue the delete query directly via `DbCrud`? Any other state to clean up beyond the table rows (e.g., on-disk blobs)?
+
+   **Answer:**
+
+2. **Wall-clock alignment for daily jobs.** Should daily jobs run at specific wall-clock times (e.g., billing at 1:00 AM, grace at 1:30 AM, etc., as listed in Section 1.1) using the studio's configured timezone, or simply at fixed intervals from startup? If wall-clock, where does the timezone come from — a new secret, an existing one, or the host's local time?
+
+   **Answer:**
+
+3. **Service account creation — automatic vs. manual.** Should the `scheduler@knottyyoga.local` service account be created automatically by `knottyyoga_database_helper` (with `manage_subscriptions` permission, marked verified, password sourced from a secret/env var), or created manually as a one-time provisioning step? If automatic, should the password default to a generated value on first run, or require operator-supplied input?
+
+   **Answer:**
+
+4. **HttpClient cookie support.** The existing `HttpClient` interface (`util/http/http_client.h`) is a single `Execute(HttpRequest) → HttpResponse` call — `HttpRequest` has a `headers` map and `HttpResponse` exposes `headers`, but there is no built-in cookie jar. Three options for how the helper handles auth cookies:
+   - **(a)** Extend `HttpClient` (or add a `CookieJar` member) so cookies are persisted across `Execute` calls automatically. Benefits other consumers and tests.
+   - **(b)** Add cookie-jar logic only inside the helper's `ApiClient` wrapper — parse `Set-Cookie` headers from the login response, attach `Cookie:` header on subsequent requests. Keeps `HttpClient` minimal.
+   - **(c)** Skip session cookies entirely — give admin endpoints an alternative auth mechanism (e.g., a static service token header) that the helper can use without login.
+
+   Which option do you prefer?
+
+   **Answer:**
 
 ---
 
