@@ -481,7 +481,7 @@ knottyyoga_helper.exe ^
 
 1. **Scaled photo cleanup table/mechanism.** Scaled photos are stored in the `scaled_photos` table (helpers at `sql_util/table_helpers/scaled_photos.{h,cpp}`, schema in `db_schema/photos.{h,cpp}`). Cleanup would mean deleting rows older than `kScaledPhotoMaxAgeUs`. Should the cleanup business logic live in `business_logic/images/scaled_photo_cleanup.{h,cpp}` and delegate row deletion to a new method on the existing `ScaledPhotosTable` helper, or should it issue the delete query directly via `DbCrud`? Any other state to clean up beyond the table rows (e.g., on-disk blobs)?
 
-   **Answer:**
+   **Answer:** Mason- Let's 
 
 2. **Wall-clock alignment for daily jobs.** Should daily jobs run at specific wall-clock times (e.g., billing at 1:00 AM, grace at 1:30 AM, etc., as listed in Section 1.1) using the studio's configured timezone, or simply at fixed intervals from startup? If wall-clock, where does the timezone come from — a new secret, an existing one, or the host's local time?
 
