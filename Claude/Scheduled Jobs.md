@@ -317,14 +317,12 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] Created `POST /api/admin/cleanup_expired_tokens` endpoint in `endpoints/admin_cleanup_expired_tokens.{h,cpp}`. Auth: requires login + `manage_subscriptions` permission (consistent with the other scheduler-driven admin endpoints). Returns `{"device_tokens_deleted": N, "email_verifications_deleted": M}`. Endpoint tests cover 401 unauthenticated, 403 missing permission, 200 nothing-to-clean, and 200 deletes-expired-rows-and-leaves-fresh-ones.
 - [x] Wired into `web_app.cpp`, `endpoints/CMakeLists.txt`, and `business_logic/auth/CMakeLists.txt`.
 
-## Phase 2: Idempotency Key Cleanup Endpoint
+## Phase 2: Idempotency Key Cleanup Endpoint ✅
 **Cleanup endpoint — simple, low-risk, independently valuable.**
 
-- [ ] Create `IdempotencyCleanup` in `business_logic/payment/`:
-  - Delete idempotency keys where `expires_us < now`
-  - Return count of deleted records
-- [ ] Create `POST /api/admin/cleanup_idempotency_keys` endpoint
-- [ ] Tests for cleanup logic and endpoint
+- [x] Reused the existing `Payment::IdempotencyHelper::CleanupExpiredKeys` rather than creating a new helper. Changed both `IdempotencyKeys::DeleteExpiredIdempotencyKeys` (table helper) and `IdempotencyHelper::CleanupExpiredKeys` (business logic) to return `int64_t` (deleted count). Underlying SQL switched to `DELETE ... WHERE expires_us < $1 RETURNING id`. Updated the existing `IdempotencyKeysTest.DeleteExpiredIdempotencyKeysBasic` and `IdempotencyHelperTest.CleanupExpiredKeys` tests to verify the count, and added new edge-case tests for empty database and the strict-less-than boundary.
+- [x] Created `POST /api/admin/cleanup_idempotency_keys` endpoint in `endpoints/admin_cleanup_idempotency_keys.{h,cpp}`. Auth: requires login + `manage_subscriptions`. Returns `{"idempotency_keys_deleted": N}`. Endpoint tests cover 401 unauthenticated, 403 missing permission, 200 nothing-to-clean, and 200 deletes-expired-leaves-fresh.
+- [x] Wired into `web_app.cpp` and `endpoints/CMakeLists.txt`.
 
 ## Phase 3: Event Reminder Emails
 **Most-requested SHOULD HAVE feature; partially done.**
