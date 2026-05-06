@@ -78,6 +78,27 @@ A multi-agent review of `business_logic/auth/`, `endpoints/`, all SQL building p
 
 The fixes are grouped into phases that respect the layering of the system: each phase starts at the lowest layer touched (db schema → table helpers → business logic → endpoints → frontend) before moving up. Tests are mandatory for every code-bearing item per `feedback_always_test.md` / `feedback_test_every_cpp_change.md`.
 
+## Decisions Locked In
+
+These were resolved in the Open Questions section below. Recording them here so the plan body is self-contained:
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | CSRF approach | Double-submit cookie (`csrft` non-HttpOnly + `X-CSRF-Token` header) + Origin allow-list. |
+| 2 | Verification email link | Points at SPA route `/verify?email=…&secret=…`; SPA POSTs to `/api/verify` and `history.replaceState`s the URL bar. Default verification window reduced to **1 hour**. |
+| 3 | Argon2id strength | `MODERATE` (3 ops, ~256 MB). Tunable via `kAuthArgon2OpsLimit` secret. |
+| 4 | Dev CORS | No-op by default (Angular proxy makes everything same-origin); opt-in via `KNOTTYYOGA_DEV_CORS_ORIGIN` env var for direct API testing. |
+| 5 | Lockout thresholds | Per-email 10/15-min → 30-min lockout. Per-IP 50/15-min → 1-h block. Verify 30/15-min/IP → 30-min. Remember 50/15-min/IP → 1-h. All secret-driven. Generic 401/429 responses; never reveal lockout reason. |
+| 6 | Encryption key | v1: env var `KNOTTYYOGA_SECRET_KEY` injected by ECS task definition from AWS Secrets Manager. v2 (deferred): AWS KMS + envelope encryption. |
+| 7 | Mason/Tyler hardcode | Delete outright; admins are minted via seed data + role-management UI. |
+| 8 | Sensitive column protection | Column-level redact map populated in `create_database.cpp`, enforced at the JSON boundary in `database_rest_helper.cpp`. Reconsider if `people` is ever exposed to anonymous reads. |
+| 9 | Secrets admin UI | Dedicated endpoint + UI; values masked, never returned to client; writes audited to `admin_alerts`. |
+| 10 | SameSite | Stay with `Lax` for all auth cookies. `Strict` would break email-driven `/verify` flow. |
+| 11 | Rate-limit persistence | PostgreSQL with **write-behind** via existing `ThreadPool`. Synchronous read for the threshold check; synchronous lockout decision; async write of attempt records. Multi-instance ECS safe; login latency unchanged (Argon2id dominates). |
+| 12 | `/api/me` GET | Switch from POST to GET (no contract to break — pre-deploy). |
+| 13 | Ownership checks | Verified correct on `change_purchase_recipient` and `gift_permissions`; just adding regression tests. |
+| 14 | Phase ordering | Pull Phase 7 (security headers) and Phase 12.1 (startup guards) forward as 1b/1c. Pull Phase 6 (cookie hygiene) ahead of Phase 4 (CSRF) so the shared clear-cookies helper exists when CSRF starts using it. |
+
 ## Phase 1 — Schema integrity & lookup performance
 
 **Why first**: every later auth fix sits on top of these tables. Adding indices + uniqueness now also avoids painful migrations after data accumulates.
@@ -269,29 +290,69 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ### 4.4 Logout must also clear `csrft`
 - [ ] `endpoints/logout.cpp` clears `session_token`, `device_token`, **and `csrft`** with matching attributes (see also H10 / Phase 6)
 
-## Phase 5 — Rate limiting & brute-force defense
+## Phase 5 — Rate limiting & brute-force defense (PostgreSQL with write-behind via ThreadPool — Decision #11)
+
+**Architecture rationale:** in-memory rate limiting on each ECS task means a multi-instance attacker spreads load across N tasks for N× allowance. Worse, ECS auto-scales — the "limit" floats with the fleet. Persistent state in PostgreSQL is the only multi-instance-safe option. To keep login latency tight, we **write attempt records asynchronously** via the existing `ThreadPool` (the same one used by `SessionUsed` for last-seen updates). Reads are synchronous (one indexed `SELECT count(*)`).
+
+**Key invariant:** the *recording* of a failure is async; the *decision to lock* is sync (in the same transaction as the password check). This way two parallel attempts at the threshold can over-count by at most one (acceptable), but the lockout, once decided, is committed before the response goes back.
 
 ### 5.1 `login_attempts` table
-- [ ] `db_schema/login_attempts.{h,cpp}` — `(id BIGSERIAL, email_lower citext NOT NULL, ip inet NOT NULL, attempted_at BIGINT NOT NULL, success BOOLEAN NOT NULL)` with indexes on `(email_lower, attempted_at DESC)` and `(ip, attempted_at DESC)`
-- [ ] Register in `make_database_info.cpp` and `create_database.cpp::CreateTables`. Do **not** add to the admin CRUD list.
-- [ ] `sql_util/table_helpers/login_attempts.{h,cpp,_test.cpp}` — `RecordAttempt(transaction, email, ip, success)`, `RecentFailureCountForEmail(transaction, email, windowMicros)`, `RecentFailureCountForIp(transaction, ip, windowMicros)`, `PurgeOlderThan(transaction, ageMicros)`
+- [ ] `db_schema/login_attempts.{h,cpp}` — columns: `id BIGSERIAL PK`, `email_lower citext NOT NULL`, `ip inet NOT NULL`, `attempted_at BIGINT NOT NULL` (microseconds since epoch), `success BOOLEAN NOT NULL`, `kind TEXT NOT NULL` (one of `login`, `verify`, `remember`)
+- [ ] Indexes: `(email_lower, attempted_at DESC)` and `(ip, attempted_at DESC)`
+- [ ] Register in `make_database_info.cpp` and `create_database.cpp::CreateTables`. Do **not** add to the admin CRUD list (sensitive PII; access only via dedicated admin reports if ever needed).
+- [ ] `sql_util/table_helpers/login_attempts.{h,cpp,_test.cpp}`:
+  - `void RecordAttempt(Transaction&, string_view emailLower, string_view ip, string_view kind, bool success)`
+  - `int64_t RecentFailureCountForEmail(Transaction&, string_view emailLower, string_view kind, int64_t windowMicros)`
+  - `int64_t RecentFailureCountForIp(Transaction&, string_view ip, string_view kind, int64_t windowMicros)`
+  - `void PurgeOlderThan(Transaction&, int64_t ageMicros)` — for the periodic cleanup job
 
-### 5.2 Per-email and per-IP login throttling
-- [ ] Secrets: `kAuthLoginMaxFailuresPerEmailPerWindow` (default 10), `kAuthLoginFailureWindowInMicros` (default 15 min in µs), `kAuthLoginMaxFailuresPerIpPerWindow` (default 50), `kAuthAccountLockoutAfterFailures` (default 10), `kAuthAccountLockoutDurationInMicros` (default 30 min)
-- [ ] `business_logic/auth/person.cpp::VerifyPassword` (or a wrapper `Login`) — before the password check, consult `LoginAttempts` for both keys and `people.locked_until`; reject early with a generic "invalid credentials" error if blocked. After the check, record the attempt (success or failure), and on failure increment `people.failed_login_attempts`, setting `locked_until` if the threshold is hit. On success, zero the counter and clear `locked_until`.
-- [ ] Tests: `person_test.cpp::LoginRateLimitedPerEmail`, `LoginRateLimitedPerIp`, `LoginAccountLockoutAfterRepeatedFailures`, `LoginSuccessClearsLockout`
+### 5.2 Synchronous gate before password verify (per-email + per-IP)
+- [ ] Add secrets:
+  - `kAuthLoginMaxFailuresPerEmailPerWindow` (default 10)
+  - `kAuthLoginFailureWindowInMicros` (default 15 min in µs)
+  - `kAuthLoginMaxFailuresPerIpPerWindow` (default 50)
+  - `kAuthAccountLockoutAfterFailures` (default 10)
+  - `kAuthAccountLockoutDurationInMicros` (default 30 min)
+- [ ] Add a `business_logic/auth/login_gate.{h,cpp}` helper:
+  - `enum class LoginGateResult { Allow, RateLimitedEmail, RateLimitedIp, AccountLocked }`
+  - `LoginGateResult CheckBeforeVerify(Transaction&, SecretsHelperPtr, string_view email, string_view ip)` — runs three small queries: `people.locked_until` (combined with the password-hash lookup the auth path was going to do anyway), per-email failure count, per-IP failure count. Returns the first failing reason, or `Allow`.
+- [ ] `business_logic/auth/person.cpp::VerifyPassword` (or a new `LoginPerson` wrapper) — call `CheckBeforeVerify` before doing Argon2id; on rate-limited result, return early with a generic failure (don't even verify the password — saves CPU and avoids timing leaks via the password-verify branch).
+- [ ] Tests on `login_gate_test.cpp` covering each branch.
 
-### 5.3 IP plumbing
-- [ ] `endpoints/login.cpp` — extract the client IP via `proxy_trust.cpp`'s helper (which already prefers `X-Forwarded-For` only when `KNOTTYYOGA_TRUST_PROXY` is set, falling back to the connection peer otherwise) and pass it to `Login`
-- [ ] Add a unit test on `proxy_trust_test.cpp` that confirms the trust gate is honored
+### 5.3 Synchronous lockout decision (sticky on the row)
+- [ ] On a failed password verify, in the same transaction:
+  - `UPDATE people SET failed_login_attempts = failed_login_attempts + 1, locked_until = CASE WHEN failed_login_attempts + 1 >= $threshold THEN now_us() + $duration ELSE locked_until END WHERE id = $id` (one statement so it's atomic)
+  - If the `RETURNING` shows `locked_until` was just set, also enqueue an `admin_alerts` row via the same async pipe (Phase 9) — but the lockout itself is already committed
+- [ ] On a successful password verify: `UPDATE people SET failed_login_attempts = 0, locked_until = NULL WHERE id = $id`
+- [ ] Tests on `person_test.cpp`: `LoginAccountLockoutAtThreshold`, `LoginSuccessClearsLockout`, `LoginAccountStaysLockedDuringWindow`, `LoginAccountUnlocksAfterWindow`
 
-### 5.4 Verification & remember-me throttling
-- [ ] Reuse the same per-IP machinery for `/api/verify` and `/api/remember` (looser limits — e.g., 30 failures / 15 min / IP) — protects against device-token stuffing
-- [ ] Tests on `verify_test.cpp` and `remember_test.cpp`
+### 5.4 Asynchronous attempt recording (write-behind via ThreadPool)
+- [ ] After the synchronous password-verify path returns to the endpoint, enqueue a single lambda on `ThreadPool::GetInstance().Queue(...)` that:
+  - Captures the `TransactionProvider&` by reference (the singleton lives at least as long as the request handler)
+  - Captures `email`, `ip`, `kind`, `success` by value
+  - Inside the lambda: `RunInTransaction { LoginAttempts::RecordAttempt(...) }`
+- [ ] The lambda is fire-and-forget; the HTTP response goes back to the client without waiting. Login latency budget is unchanged (Argon2id at ≈250ms dominates).
+- [ ] Tests in `person_test.cpp` use `ThreadPool::GetInstance().Shutdown()` (which calls `Join`) at the end of the test to make assertions deterministic — same pattern as `SessionUsedBasic`.
+- [ ] Multi-instance correctness: every task reads the latest count from PG; no shared in-memory state needed.
 
-### 5.5 Generic 401/429 error shape
-- [ ] All auth-failure paths return the same JSON body and status (`401 invalid_credentials` or `429 too_many_attempts` after lockout) so attackers can't distinguish "wrong password" from "account locked"
-- [ ] Test that `429` is returned only after the threshold is exceeded
+### 5.5 IP plumbing
+- [ ] `business_logic/auth/proxy_trust.cpp` — confirm/extend `ResolveClientIp(crow::request&)` so it returns the right client IP regardless of whether we're behind CloudFront or running locally. Reads `KNOTTYYOGA_TRUST_PROXY` env var (already in place); when set, prefers `X-Forwarded-For` last entry; otherwise falls back to the connection peer address from `req.remote_ip_address` (or whatever Crow exposes).
+- [ ] `endpoints/login.cpp`, `endpoints/verify.cpp`, `endpoints/remember.cpp` — call `ResolveClientIp` and pass into the gate / async recorder.
+- [ ] Tests on `proxy_trust_test.cpp` for both trust-on and trust-off modes.
+
+### 5.6 Verification & remember-me throttling
+- [ ] Reuse the same gate machinery for `/api/verify` (kind=`verify`, default 30 failures / 15 min / IP, 30-min block) and `/api/remember` (kind=`remember`, default 50 failures / 15 min / IP, 1 h block).
+- [ ] New secrets: `kAuthVerifyMaxFailuresPerIpPerWindow`, `kAuthVerifyFailureWindowInMicros`, `kAuthRememberMaxFailuresPerIpPerWindow`, `kAuthRememberFailureWindowInMicros` (defaults as above).
+- [ ] Tests on `verify_test.cpp::VerifyRateLimitedPerIp` and `remember_test.cpp::RememberRateLimitedPerIp`.
+
+### 5.7 Generic error shape (no enumeration)
+- [ ] All auth-failure paths return the same response shape: `401 {"error":"invalid_credentials"}` for any failure (wrong password, unknown email, account locked) below the rate-limit threshold; `429 {"error":"too_many_attempts"}` only when rate-limited or locked.
+- [ ] Specifically, do **not** distinguish "account is locked" from "wrong password" in 401 responses — both look identical from the outside. The 429 means "stop trying for now"; no detail about why.
+- [ ] Test `person_test.cpp::LoginUnknownUserSameAsWrongPassword` (timing — pad with a no-op Argon2id verify against a sentinel hash so unknown-email and wrong-password take similar wall-clock time). Optional but worth doing.
+
+### 5.8 Periodic cleanup
+- [ ] Add a `ThreadPool` job in `main.cpp` that, every hour, calls `LoginAttempts::PurgeOlderThan(transaction, kAuthLoginAttemptsRetentionInMicros)` (default: 30 days). Prevents unbounded growth.
+- [ ] Test in `login_attempts_test.cpp::PurgeOlderThanBasic`.
 
 ## Phase 6 — Cookie hygiene cleanup
 
@@ -326,18 +387,37 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [ ] Audit endpoints that currently echo `e.what()` (e.g., `endpoints/db_schema.cpp:31`) and replace with the generic shape via `ErrorResponse::InternalError`
 - [ ] Tests: `web_app_test.cpp` (or per-endpoint) — throw inside a handler, assert response is generic and the exception text is *not* in the body
 
-## Phase 8 — Secrets at rest
+## Phase 8 — Secrets at rest (env-var-from-Secrets-Manager v1; KMS later — Decision #6)
+
+**Architecture (v1):** the master encryption key lives in an env var `KNOTTYYOGA_SECRET_KEY`. In production, ECS task definitions inject this value from AWS Secrets Manager via the `secrets:` block on the container — the container sees a normal env var; AWS handles secret storage, IAM, and rotation lifecycle. **No AWS SDK in the C++ build.** Just `std::getenv` + base64-decode at startup.
+
+**Architecture (v2, deferred):** AWS KMS + envelope encryption. Generate a Customer Master Key. On startup, call `GenerateDataKey` to get a plaintext data key + an encrypted version. Encrypt secrets with the data key; store the encrypted data key alongside. On read, call `Decrypt` on the encrypted data key. Pros: KMS rotates the master without code change, IAM controls who can decrypt, every decrypt audited in CloudTrail. Cons: AWS SDK dependency, a network call in startup hot path, IAM plumbing, mock KMS client for tests. Defer until audit pressure or compliance requires it.
+
+**Why v1 first:** zero external dependencies, ships in days not weeks, gets us off "plaintext credentials in PG" today. The day we want v2, the encryption boundary is already in place — we just swap the key source.
 
 ### 8.1 Encrypt `config_secrets.value`
-- [ ] Add a master encryption key bootstrapped from env var `KNOTTYYOGA_SECRET_KEY` (32 bytes, base64). Refuse to start in prod mode if it's missing.
-- [ ] In `sql_util/table_helpers/config_secrets.cpp` (or a new wrapper layer in `business_logic/auth/secrets_at_rest.{h,cpp}`), encrypt with `crypto_secretbox_easy` (libsodium) on write and decrypt on read. Store ciphertext + nonce concatenated and base64-encoded.
-- [ ] Migration: a one-shot startup pass that reads each row, detects whether it's already in the new format (nonce|ciphertext prefix), and rewrites if not.
-- [ ] Tests: `config_secrets_test.cpp` round-trip; `secrets_helper_test.cpp` ensures the higher layer continues to read the cleartext
+- [ ] Add a singleton `business_logic/auth/secrets_at_rest.{h,cpp}` that reads `std::getenv("KNOTTYYOGA_SECRET_KEY")` once at startup, base64-decodes to 32 bytes, and exposes `Encrypt(plaintext)` / `Decrypt(ciphertext)` using `crypto_secretbox_easy` (libsodium). Store as `base64(nonce || ciphertext)` so the value column stays a `TEXT`.
+- [ ] In test mode, `SecretsAtRest` accepts an injected key (use a fixed test key in `endpoint_test_helper.cpp`).
+- [ ] Wire `SecretsAtRest` through `sql_util/table_helpers/config_secrets.cpp::AddSecret` / `LookupSecret`. Existing callers (`SecretsHelper`) continue to see plaintext; encryption is fully internal.
+- [ ] **Migration**: one-shot startup pass in `database_helper/create_database.cpp` (or a new `migrate_secrets.{h,cpp}` called from `main.cpp`) that reads every row, detects format (any value not starting with the `v1:` prefix is treated as legacy plaintext), encrypts it, and rewrites. Idempotent: running twice is a no-op.
+- [ ] Tests:
+  - `secrets_at_rest_test.cpp::EncryptDecryptRoundTrip`, `DecryptOfTamperedCiphertextThrows`, `DecryptWithWrongKeyThrows`
+  - `config_secrets_test.cpp::AddSecretEncryptsValue` (assert the raw row is not the plaintext) and `LookupSecretReturnsPlaintext`
+  - `secrets_helper_test.cpp` — existing tests should still pass unchanged (callers see plaintext)
 
-### 8.2 Locked-down admin secrets endpoint
-- [ ] (Replaces the deletion in 1.8) `endpoints/admin_secrets.{h,cpp}` — `GET` returns `{name}` only (no values), `PUT` writes a value (audited to `admin_alerts`). Requires `admin` role.
-- [ ] Frontend adjustments: change the admin "secrets" UI to use this endpoint instead of generic CRUD on `config_secrets`
-- [ ] Tests on both ends
+### 8.2 Startup validation (Decision #6 v1 + Phase 12.1)
+- [ ] `main.cpp` after `ServerConfig::Initialize`: when `IsProdMode()` is true, fail-fast if `KNOTTYYOGA_SECRET_KEY` is unset/empty/wrong-length. Log a clear message ("ECS task definition must inject KNOTTYYOGA_SECRET_KEY from Secrets Manager") and exit non-zero.
+- [ ] In dev/test mode, fall back to a fixed dev key if the env var is unset (with a `[DEV]` warning log) so local builds don't require the env var.
+- [ ] Document the AWS Secrets Manager → ECS task definition wiring in a new ops note in the Obsidian vault: create entry `Claude/Deploying — secrets and env vars.md` with the JSON snippet for the task definition's `secrets:` block.
+
+### 8.3 Locked-down admin secrets endpoint (Decision #9)
+- [ ] (Replaces the deletion in 1.8) `endpoints/admin_secrets.{h,cpp}` — `GET /api/admin/secrets` returns `[{name}, ...]` (names only, no values, never the key). `PUT /api/admin/secrets/{name}` body `{value}` writes a value via `SecretsHelper`, which encrypts via `SecretsAtRest` (Phase 8.1). Both require the `admin` permission.
+- [ ] Audit every write: insert an `admin_alerts` row with `kind=secret_changed`, `description={name} updated by person_id={...}`. Don't include the value — names only.
+- [ ] **Never** return secret values to the client, even to admins. The right pattern is "set new value, blind-write" — if the admin needs to verify it, they do it via the feature that uses the secret (e.g., send a test email).
+- [ ] Frontend: replace the generic-CRUD secrets editor with a new component under `ui/src/app/admin/secrets/`. Lists names, has a "Set Value" form per row that masks the input and POSTs to the new endpoint.
+- [ ] Tests:
+  - `admin_secrets_test.cpp::GetReturnsNamesOnly`, `PutRequiresAdmin`, `PutEmitsAdminAlert`, `PutEncryptsAtRest`
+  - Frontend: `secrets.component.spec.ts` — masked input, post-on-save, refresh-list-on-success
 
 ## Phase 9 — Observability for security events
 
