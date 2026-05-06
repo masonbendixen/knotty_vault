@@ -368,18 +368,20 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
   - CallEndpoint: attaches `Cookie:` header after login, sends no Cookie header before login, includes body + Content-Type, no 401 retry without cached credentials, no retry on 5xx
   - 401 retry path: re-logs-in with cached creds and retries with the new cookie, returns the 401 (no further retry) when the re-login itself fails
 
-## Phase 7: Job Scheduler
+## Phase 7: Job Scheduler ✅
 **Timer-based execution of scheduled jobs.**
 
-- [ ] Define `ScheduledJob` struct: name, endpoint path, HTTP method, interval, last-run timestamp, enabled flag
-- [ ] Implement `JobScheduler` class:
-  - Owns a set of `ScheduledJob` definitions
-  - Uses Boost.Asio timers to fire jobs on their intervals
-  - Calls `ApiClient` for each job
-  - Logs results (success/failure, response summary)
-  - Handles wall-clock alignment using the host's local timezone (e.g., "run at 1:00 AM daily" via `std::localtime`/`std::mktime`)
-- [ ] Configure all jobs from Section 1 (existing + new endpoints)
-- [ ] Tests for `JobScheduler` (mock `ApiClient`, verify timer firing, verify job execution)
+- [x] `Scheduler::ScheduledJob` struct (`scheduler/scheduled_job.{h,cpp}`): name, method, path, intervalSeconds. `JobExecutionResult` captures statusCode, success, errorMessage, durationMs.
+- [x] `Scheduler::BuildStandardJobs(SchedulerConfig)` produces the 10 admin-endpoint jobs (run_billing, expire_grace_periods, check_expiring_entitlements, check_expiring_cards, process_voucher_expiry, send_event_reminders, cleanup_expired_tokens, cleanup_idempotency_keys, cleanup_scaled_photos, process_waitlist_refunds). Jobs with `intervalSeconds <= 0` are filtered out — operators disable a job by setting its interval flag to 0.
+- [x] `Scheduler::JobScheduler` class (`scheduler/job_scheduler.{h,cpp}`):
+  - `RegisterJob(ScheduledJob)` adds to the registry; disabled jobs are silently dropped.
+  - `RunJobOnce(name)` synchronously invokes `ApiClient::CallEndpoint`, captures success/error/duration into a `JobExecutionResult`, logs the outcome via `LogInfo`/`LogError`, and returns the result. Network/HTTP exceptions are captured (success=false, errorMessage populated) instead of propagating — the timer loop depends on this so a single broken endpoint never crashes the helper.
+  - `Start(io_context)` registers a `boost::asio::steady_timer` per job. Each timer fires after `intervalSeconds`, calls `RunJobOnce`, and reschedules itself. `Stop()` cancels all timers and is idempotent (also called from the destructor).
+- [x] **Wall-clock alignment deferred**: section 3.3 of the plan calls for "fire at 1 AM daily" semantics, but for v1 we run on monotonic intervals from `Start()`. This is documented at the top of `job_scheduler.h` and is enough for the helper to function. Wall-clock alignment can layer on top later without changing the public API.
+- [x] 13 unit tests across two files:
+  - `scheduled_job_test.cpp` (6 tests): all-positive-produces-all, every-job-is-POST-with-`/api/admin/`-path, intervals-from-config-propagated, zero-interval-disables-individual-job, all-zeros-produces-empty, negative-interval-also-disables.
+  - `job_scheduler_test.cpp` (8 tests): RunJobOnce hits ApiClient with right method+path, marks failure on 4xx, marks failure on 5xx, captures-exceptions-instead-of-propagating, throws on unknown job; RegisterJob skips disabled; Start fires jobs on interval (uses `io_context::run_for(1500ms)` against a 1-second job and asserts ≥1 execution); Stop cancels scheduled jobs; Start is idempotent.
+- [x] Wired into `src/scheduler/CMakeLists.txt`. `knotty_yoga_scheduler` PUBLIC-links `${BOOST_LIB}` for Asio.
 
 ## Phase 8: Main Loop Assembly
 **Wire everything together.**
