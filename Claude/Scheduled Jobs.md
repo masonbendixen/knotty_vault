@@ -383,16 +383,23 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
   - `job_scheduler_test.cpp` (8 tests): RunJobOnce hits ApiClient with right method+path, marks failure on 4xx, marks failure on 5xx, captures-exceptions-instead-of-propagating, throws on unknown job; RegisterJob skips disabled; Start fires jobs on interval (uses `io_context::run_for(1500ms)` against a 1-second job and asserts ≥1 execution); Stop cancels scheduled jobs; Start is idempotent.
 - [x] Wired into `src/scheduler/CMakeLists.txt`. `knotty_yoga_scheduler` PUBLIC-links `${BOOST_LIB}` for Asio.
 
-## Phase 8: Main Loop Assembly
+## Phase 8: Main Loop Assembly ✅
 **Wire everything together.**
 
-- [ ] Implement `Scheduler` class (main orchestrator):
-  - Creates `boost::asio::io_context`
-  - Initializes `ApiClient`, `JobScheduler`
-  - Runs `io_context.run()` as the main event loop
-  - Handles SIGTERM/SIGINT for graceful shutdown
-- [ ] Wire up in `main.cpp`
-- [ ] Integration test: start helper, verify it calls endpoints on schedule (depends on Phase 9 service account)
+- [x] `Scheduler::Scheduler` orchestrator class (`scheduler/scheduler.{h,cpp}`):
+  - Constructor takes `SchedulerConfig` + `Http::HttpClientPtr`. Builds an `ApiClient` with `config.serverUrl` and a `JobScheduler` wrapping it.
+  - `Initialize()` calls `apiClient->Login(email, password)` and on success registers every job from `BuildStandardJobs(config)` with the JobScheduler. Returns false if login fails so `main` can exit non-zero.
+  - `Run()` installs `SIGINT`/`SIGTERM` handlers via `boost::asio::signal_set`, starts the JobScheduler timers, and blocks on `io_context.run()` until a signal triggers `Shutdown()`.
+  - `RunFor(duration)` is the test-friendly variant — drives `io_context::run_for(duration)` without installing process-wide signal handlers. Calls `restart()` when the io_context was previously stopped, so tests can call it repeatedly.
+  - `Shutdown()` is idempotent: stops timers, calls `io_context::stop()`, cancels the signal_set. Called automatically from the destructor and from the signal handler.
+- [x] `main.cpp` updated. After config validation, constructs `Scheduler::Scheduler(config, MakeHttpClient())`, calls `Initialize()` (returns 1 on failure), then `Run()` (blocks until signal, returns 0).
+- [x] 9 unit tests in `scheduler_test.cpp` driving a `TestHttpClient`:
+  - Initialize: logs in with configured credentials, populates the cookie on the ApiClient, returns false on 401, registers all 10 standard jobs by default, skips jobs with `interval=0`.
+  - RunFor: executes enabled jobs (1-second interval, 1500ms run window asserts ≥1 fire), is a no-op before Initialize.
+  - Shutdown: stops timers (job scheduled 3600s out, Shutdown() before any fire, RunFor(100ms) sees zero fires), is idempotent.
+  - Construction: ApiClient inherits `config.serverUrl` (login URL is derived correctly).
+- [x] **Integration test deferred to Phase 9.** The plan calls for "start helper, verify it calls endpoints on schedule" — that needs the service account row to exist in the database, which Phase 9 creates. The unit tests above cover the orchestration logic itself.
+- [x] Wired into `src/scheduler/CMakeLists.txt`.
 
 ## Phase 9: Service Account Setup
 **Create the service account used by the helper for authentication.**
