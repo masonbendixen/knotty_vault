@@ -352,8 +352,11 @@ The fixes are grouped into phases that respect the layering of the system: each 
 These are the decisions I want your input on rather than guessing:
 
 1. **CSRF approach** — happy with the double-submit cookie pattern (`csrft` non-HttpOnly + `X-CSRF-Token` header) per your design doc, or do you prefer the alternative of a per-session CSRF token stored on the server and signed?
+	- Mason- Which would you recommend and why?
 2. **Verification email link target** — for moving `/api/verify` off URL-path-with-secret (item 3.3): is it OK if the verification link in the email points at the SPA (e.g., `/verify?email=...&secret=...`) and the SPA POSTs to the API? That removes the secret from server logs but does put it in browser history of whoever opens the email.
+	- Mason- What do you think and suggest?
 3. **Argon2id strength** — is `MODERATE` (≈250ms login on a modern server) acceptable, or do you want `INTERACTIVE` to keep logins snappier?
+	- Mason- Is there a security risk going with the faster option?
 4. **CORS in dev mode** — the prod path is correct; should I leave the comment-only dev path as-is (relying on Angular proxy) or wire dev CORS so the API works without the Angular proxy too?
 5. **Lockout duration / threshold** — is 10 failures / 15-min window / 30-min lockout per email acceptable, or do you want different numbers? Same question for IP.
 6. **Encryption key storage** — for Phase 8, can we depend on a `KNOTTYYOGA_SECRET_KEY` env var, or is there a key-management story (KMS, HSM) you want to plug into instead?
