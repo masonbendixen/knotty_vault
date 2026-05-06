@@ -417,20 +417,22 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
   - `EnsureSchedulerServiceAccount`: creates person with expected fields (verified, hashed password, role assigned), grants manage_subscriptions via the scheduler role (verified through `GetPermissionsForUser`), is idempotent (second call doesn't duplicate the row, exactly 1 row by email), does not overwrite the password on second call (operators rotate by deleting), throws when `manage_subscriptions` is missing.
 - [x] 1 new test in `staff_search_people_test.cpp` (`ServiceAccountsAreFilteredOut`): inserts a `scheduler@knottyyoga.local` row directly via `PersonHelper::CreateFullyValidatedUser`, confirms the row exists in the DB, then asserts that searching for "Scheduler" or "knottyyoga.local" returns no matching rows from the staff search endpoint.
 
-## Phase 10: Waitlist Refund Endpoint
+## Phase 10: Waitlist Refund Endpoint ✅
 **Hourly job to refund unfulfilled waitlist bookings after the event passes.**
 
-Blocked on the waitlist feature (Phase 10 of `Product, Event, and Subscription Admin Portal.md`). Listed here so it isn't forgotten when waitlist lands.
+The waitlist feature exists in production, so this is no longer blocked.
 
-- [ ] Create business-logic helper that:
-  - Finds events where `end_time_us < now_us()` that have waitlisted bookings
-  - For each remaining waitlisted booking, processes a full refund via `PaymentHelper`
-  - Sets booking status to `cancelled` with reason "Event passed — waitlist refund"
-  - Idempotent (re-running does nothing if all waitlisted bookings have already been refunded)
-  - Returns count of refunds processed
-- [ ] Create `POST /api/admin/process_waitlist_refunds` endpoint
-- [ ] Add the job to the helper's scheduler config (hourly)
-- [ ] Tests for helper and endpoint
+- [x] `Scheduling::WaitlistRefundHelper` (`business_logic/scheduling/waitlist_refund_helper.{h,cpp}`):
+  - `ProcessExpiredWaitlistedBookings(transaction)` finds bookings with status `waitlisted` whose `event_sessions.end_time_us < now_us()`. For each, sets booking status to `cancelled`, stamps `cancelled_us`, writes "Event passed — waitlist refund" into `notes`, and cancels the underlying pending purchase via `PurchaseHelper::CancelPurchase`.
+  - **No Square refund call** — waitlisted bookings hold a *pending* purchase that was never charged. Cancelling the purchase is the operational equivalent of a refund. Documented at the top of the helper header so the next reader doesn't expect a Square refund roundtrip.
+  - Returns `WaitlistRefundResult { totalProcessed }`.
+  - Idempotent: a second run finds no `waitlisted` rows on past events because the prior run moved them to `cancelled`.
+- [x] `POST /api/admin/process_waitlist_refunds` endpoint refactored to be thin: auth check, permission check, delegate to the helper, format response. Pre-existing endpoint had inline SQL + booking updates + purchase cancel that broke the layering rule (cleanup brings it in line with Phases 1/2/4).
+- [x] **Security fix**: endpoint previously had `IsLoggedIn()` but no `manage_subscriptions` check — same security bug pattern as Phase 3. Any logged-in user could fire the refund job. Fixed.
+- [x] Job already registered in `BuildStandardJobs` with hourly default (`waitlistRefundsSeconds = 3600`) — added in Phase 7, no further wiring needed here.
+- [x] 6 helper-level tests in `waitlist_refund_helper_test.cpp`: empty-database returns 0; refunds-waitlisted-on-past-event (verifies booking status, cancellation timestamp, notes text, purchase status); ignores-confirmed-on-past-event (we only refund unfulfilled waitlist entries); ignores-waitlisted-on-future-event (built via `BookEvent` since past events block normal booking); idempotent (second run reports 0); processes-multiple-at-once.
+- [x] 5 endpoint tests in `admin_process_waitlist_refunds_test.cpp` (4 pre-existing + 1 new): refunds-waitlisted-on-past-event, ignores-future-events, idempotent-run-twice, 401 unauthenticated, **new** 403 when logged in but missing `manage_subscriptions`. Test fixture extended to grant the permission via role/role-permission/role-assignment by default; the 403 test passes `grantPermission=false`.
+- [x] Wired into `business_logic/scheduling/CMakeLists.txt`.
 
 ## Phase 11: Logging & Operational Polish
 **Production-readiness.**
