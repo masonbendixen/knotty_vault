@@ -401,19 +401,21 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] **Integration test deferred to Phase 9.** The plan calls for "start helper, verify it calls endpoints on schedule" — that needs the service account row to exist in the database, which Phase 9 creates. The unit tests above cover the orchestration logic itself.
 - [x] Wired into `src/scheduler/CMakeLists.txt`.
 
-## Phase 9: Service Account Setup
+## Phase 9: Service Account Setup ✅
 **Create the service account used by the helper for authentication.**
 
-- [ ] Add service account creation to `knottyyoga_database_helper`:
-  - Read `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` env var. If missing, fail with a clear message instructing the operator to generate a strong password and add it to `/etc/knottyyoga/server.env`.
-  - Create a `people` row for `scheduler@knottyyoga.local` with the hashed password, `email_verified = true`, and a placeholder display name like "Scheduler Service Account".
-  - Assign `manage_subscriptions` permission via the existing role-assignment helpers.
-  - Idempotent: if the row already exists, skip creation (don't update the password — operators rotate by deleting + re-running).
-- [ ] Update admin user-list endpoints to filter out rows whose email ends in `@knottyyoga.local` so service accounts don't appear in the admin user list.
-- [ ] `knottyyoga_helper` reads the same env var at startup. Pass via flag `--service_account_password=$SCHEDULER_SERVICE_ACCOUNT_PASSWORD` in the systemd unit, OR have the helper read the env var directly if the flag is unset.
-- [ ] Tests:
-  - `knottyyoga_database_helper` test: missing env var fails loudly; present env var creates the row idempotently.
-  - Admin user-list endpoint test: service-account row is filtered out.
+- [x] New `business_logic/auth/service_account.{h,cpp}` houses the constants (email `scheduler@knottyyoga.local`, domain `@knottyyoga.local`, role name `scheduler`, env-var `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`) and three functions:
+  - `IsServiceAccountEmail(email)` — suffix check used by user-facing endpoints to filter out service accounts. Substring-safe (rejects `foo@knottyyoga.local.example.com`).
+  - `ReadSchedulerServiceAccountPassword()` — reads the env var, throws `std::runtime_error` with operator-facing instructions if unset/empty.
+  - `EnsureSchedulerServiceAccount(transaction, databaseHelper, password)` — idempotently creates the `people` row, the `scheduler` role, the role↔permission link to existing `manage_subscriptions`, and the role assignment. Idempotent guard uses `LookupPersonByEmail` (row-exists check) rather than `IsPerson` (verified check), so a partial prior write doesn't trigger a duplicate-insert on retry. Throws if `manage_subscriptions` is missing.
+- [x] `database_helper/create_database.cpp` calls `Auth::EnsureSchedulerServiceAccount(transaction, databaseHelper, Auth::ReadSchedulerServiceAccountPassword())` after `PopulateRoleAssignments`, so a fresh database includes the row from the start.
+- [x] `knottyyoga_helper` (`src/scheduler/main.cpp`) now reads `Auth::kSchedulerServiceAccountPasswordEnvVar` instead of a locally-duplicated string — single source of truth across both executables.
+- [x] **User-list filter**: `staff_search_people.cpp` adds `AND email NOT ILIKE $2` (with `$2 = '%@knottyyoga.local'`) so service accounts never appear in staff lookups, gift-recipient pickers, etc. The generic admin table viewer (`/api/get_table_rows/people`) intentionally still shows the row so operators can manage it (e.g., delete to rotate password) — documented inline.
+- [x] 7 unit tests in `service_account_test.cpp`:
+  - `IsServiceAccountEmail`: recognizes `@knottyyoga.local`, rejects real domains and substring matches.
+  - `ReadSchedulerServiceAccountPassword`: returns env value, throws when unset, throws when empty.
+  - `EnsureSchedulerServiceAccount`: creates person with expected fields (verified, hashed password, role assigned), grants manage_subscriptions via the scheduler role (verified through `GetPermissionsForUser`), is idempotent (second call doesn't duplicate the row, exactly 1 row by email), does not overwrite the password on second call (operators rotate by deleting), throws when `manage_subscriptions` is missing.
+- [x] 1 new test in `staff_search_people_test.cpp` (`ServiceAccountsAreFilteredOut`): inserts a `scheduler@knottyyoga.local` row directly via `PersonHelper::CreateFullyValidatedUser`, confirms the row exists in the DB, then asserts that searching for "Scheduler" or "knottyyoga.local" returns no matching rows from the staff search endpoint.
 
 ## Phase 10: Waitlist Refund Endpoint
 **Hourly job to refund unfulfilled waitlist bookings after the event passes.**
