@@ -361,6 +361,7 @@ These are the decisions I want your input on rather than guessing:
 		3. **It's the industry default for SPA-cookie auth** (Django CSRF middleware, Rails `protect_from_forgery`, ASP.NET anti-forgery). Lots of prior art for the failure modes.
 		4. The one weakness of double-submit (a same-origin XSS can read the cookie and forge requests) is **not** materially worse than signed tokens — at that point an XSS can also read your other in-page state. CSP (Phase 7) is the right defense for that, not signed CSRF tokens.
 		- **Defense in depth** I'd add on top of the double-submit: also reject when `Origin` header is present and not in the prod allow-list. That's already in plan item 4.2.
+	- Mason- I-l
 2. **Verification email link target** — for moving `/api/verify` off URL-path-with-secret (item 3.3): is it OK if the verification link in the email points at the SPA (e.g., `/verify?email=...&secret=...`) and the SPA POSTs to the API? That removes the secret from server logs but does put it in browser history of whoever opens the email.
 	- Mason- What do you think and suggest?
 	- Claude — **Yes, SPA-routed.** The email link is a GET to `/verify?email=...&secret=...`; the SPA reads the params and immediately POSTs to `/api/verify`, then routes the user to the next step (login or dashboard).
