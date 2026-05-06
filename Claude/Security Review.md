@@ -361,7 +361,7 @@ These are the decisions I want your input on rather than guessing:
 		3. **It's the industry default for SPA-cookie auth** (Django CSRF middleware, Rails `protect_from_forgery`, ASP.NET anti-forgery). Lots of prior art for the failure modes.
 		4. The one weakness of double-submit (a same-origin XSS can read the cookie and forge requests) is **not** materially worse than signed tokens — at that point an XSS can also read your other in-page state. CSP (Phase 7) is the right defense for that, not signed CSRF tokens.
 		- **Defense in depth** I'd add on top of the double-submit: also reject when `Origin` header is present and not in the prod allow-list. That's already in plan item 4.2.
-	- Mason- I-l
+	- Mason- I'll go with the double submit :)
 2. **Verification email link target** — for moving `/api/verify` off URL-path-with-secret (item 3.3): is it OK if the verification link in the email points at the SPA (e.g., `/verify?email=...&secret=...`) and the SPA POSTs to the API? That removes the secret from server logs but does put it in browser history of whoever opens the email.
 	- Mason- What do you think and suggest?
 	- Claude — **Yes, SPA-routed.** The email link is a GET to `/verify?email=...&secret=...`; the SPA reads the params and immediately POSTs to `/api/verify`, then routes the user to the next step (login or dashboard).
@@ -371,6 +371,7 @@ These are the decisions I want your input on rather than guessing:
 			2. **Short TTL** — `kEmailVerificationExpirationWindowInMicros` (already a secret). Recommend setting it to 1 hour for new registrations, not the current "default several days" if that's still in place; check the default.
 			3. After the SPA POSTs, **`history.replaceState({}, '', '/verify-success')`** so the secret is replaced in the browser's URL bar and history within milliseconds.
 		- The alternative ("mail link points directly at `GET /api/verify` because it's idempotent") puts the secret in CloudFront access logs, your server access logs, and any CDN log retention. Worse than browser history, which is local-only.
+	- Mason- Let's stay with SPA-routed and I'm okay reducing the window to one hour.
 3. **Argon2id strength** — is `MODERATE` (≈250ms login on a modern server) acceptable, or do you want `INTERACTIVE` to keep logins snappier?
 	- Mason- Is there a security risk going with the faster option?
 	- Claude — **Recommend `MODERATE`, but it's not a huge deal either way for a yoga-studio app.** Risk model:
@@ -380,6 +381,7 @@ These are the decisions I want your input on rather than guessing:
 		- Against a **weak** password (top 10k common, ~13 bits), `INTERACTIVE` cracks in ~0.5s, `MODERATE` in ~2.5s. Neither helps. Real defense for weak passwords is the breach-list check you can add later (e.g., HaveIBeenPwned password range API).
 		- **Net:** `MODERATE` adds ~200ms to logins (imperceptible to users since it's once per 8h) and 5× the offline-attack cost. Cheap insurance.
 		- The plan already makes the parameter a secret (`kAuthArgon2OpsLimit`), so you can A/B if you're worried.
+	- Mason- Let's stay with moderate then.
 4. **CORS in dev mode** — the prod path is correct; should I leave the comment-only dev path as-is (relying on Angular proxy) or wire dev CORS so the API works without the Angular proxy too?
 	- Mason- I definitely want ng-serve to continue working. What do you recommend here?
 	- Claude — **Keep the no-CORS-in-dev path as the default** (so `ng serve` + Angular proxy keeps working unchanged), and **add an opt-in** that activates only when an env var is set:
@@ -389,6 +391,7 @@ These are the decisions I want your input on rather than guessing:
 			2. Direct API testing (curl from another origin, a second SPA running on a different port, exploratory work in Postman with a different origin): you set the env var and it just works.
 			3. Prod path is unchanged.
 		- Document the env var in `CLAUDE.md` and in `proxy.conf.json` comments.
+	- Mason- Your recommendation sounds great.
 5. **Lockout duration / threshold** — is 10 failures / 15-min window / 30-min lockout per email acceptable, or do you want different numbers? Same question for IP.
 	- Mason- Do these seem okay to you? Should we make these configurable via server secrets?
 	- Claude — **Yes, all configurable via secrets** (the plan already lists them: `kAuthLoginMaxFailuresPerEmailPerWindow`, `kAuthLoginFailureWindowInMicros`, `kAuthLoginMaxFailuresPerIpPerWindow`, `kAuthAccountLockoutAfterFailures`, `kAuthAccountLockoutDurationInMicros`). Recommended defaults:
@@ -398,6 +401,7 @@ These are the decisions I want your input on rather than guessing:
 		- **Remember endpoint:** 50 failures / 15 min / IP → 1 h block.
 		- **Tuning** — start with these defaults, watch `admin_alerts` for "account locked" events, adjust. The whole point of using secrets is you can tune without redeploying.
 		- **Important UX note:** when lockout is hit, the response should be a generic 401 ("invalid credentials") or 429 ("too many attempts") — never reveal *which* user is locked. Plan item 5.5 covers this.
+	- Mason- That sounds great.
 6. **Encryption key storage** — for Phase 8, can we depend on a `KNOTTYYOGA_SECRET_KEY` env var, or is there a key-management story (KMS, HSM) you want to plug into instead?
 	- Mason- What do you recommend? Is there a better solution for letting AWS manage this?
 	- Claude — **Two-tier recommendation**, ship the simple one now and upgrade later:
@@ -406,6 +410,7 @@ These are the decisions I want your input on rather than guessing:
 		- **Why not v2 now:** adds AWS SDK dependency, network calls in startup hot path, IAM plumbing, and tests need a mock KMS client. For a small studio app, v1 (env-var-from-Secrets-Manager) is the right risk/effort tradeoff.
 		- **What v1 needs in the codebase:** literally just `std::getenv("KNOTTYYOGA_SECRET_KEY")` and base64-decode it to 32 bytes. No AWS SDK in the C++ build.
 		- **One non-obvious thing:** Secrets Manager → ECS env var injection happens at task-start time. If you rotate the secret, ECS won't pick it up until the next task revision. That's fine for an at-rest encryption key (which you rarely rotate); not fine for short-lived API tokens (which is why `kSquareAccessToken` etc. live in `config_secrets`, not env vars — they can be rotated via the admin UI without an ECS deploy).
+	- Mason- I'll go with your recommendation but please update the documentation accordingly.
 7. **Removing the "Mason"/"Tyler" hardcode (3.5)** — am I OK to delete this outright assuming the seed-data path mints at least one admin? If you currently bootstrap admin only via that hardcode, I need to add a seed-data admin first.
 	- Mason- I did this during bootstrapping to get things working but now we build those accounts and give them the right permissions so this is no longer needed. Feel free to delete.
 8. **Generic CRUD redaction (3.8)** — is the column-level redact map acceptable, or do you want sensitive columns moved to entirely separate tables (e.g., `people_credentials`) so they can never accidentally be selected?
@@ -416,6 +421,7 @@ These are the decisions I want your input on rather than guessing:
 		3. **The "physical separation" win you'd be paying for is small in your model.** It buys "no risk of accidental SELECT \*" — but you don't write SELECT \* in this codebase; the JSON layer reflects against the table's columns. The redact pass runs at the same point.
 		- **The exception that would change my mind:** if you ever expose a *public, unauthenticated* read on `people` (a public studio directory, instructor bios, etc.), I'd want secrets in a separate table. You'd be one config bug away from leaking hashes. Until then, the redact map is the better tradeoff.
 		- **Concrete recommendation:** put the map in `database_helper/create_database.cpp` next to the existing admin metadata population, key on `(table, column) → redaction-policy`, and apply in `sql_util/json/database_rest_helper.cpp::JsonFromDataResults` so the policy is enforced at the JSON boundary, not in each endpoint.
+	- Mason- Okay, let's go with the column-level redact map. Please add all of this to the documentation though.
 9. **`config_secrets` admin UI (8.2)** — is it acceptable to drop the generic table editor for secrets in favor of a dedicated UI that masks values, or do you need to keep the generic editor for now?
 	- Mason- I'm fine with moving this to a dedicated UI. I just needed something to get up and running.
 10. **SameSite policy** — your current code uses `Lax`. Are you open to `Strict` for `session_token` (UX cost: cross-site links into the app log the user out)? `Lax` is fine; just confirming.
