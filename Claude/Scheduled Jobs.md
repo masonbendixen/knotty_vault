@@ -507,14 +507,49 @@ The helper uses `--network host` so it can reach the server container on `localh
 
 ## 8.2 Windows (Development)
 
-Run from command line alongside the web server (started separately in Visual Studio):
+Both `knottyyoga_database_helper` (which provisions the service-account row) and `knottyyoga_helper` (which logs in as it) need `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` set in the environment. The database helper now **fails fast** if the variable is missing — by design, so production never silently runs without a password.
+
+### Setting the env var in Visual Studio CMake "Open Folder" mode
+
+The repo uses Visual Studio's CMake-folder workflow, so there's no `.vcxproj` to edit. Per-target debug environment lives in `.vs/launch.vs.json`. Add an `"env"` block to each launch configuration that runs the helpers:
+
+```json
+{
+  "type": "default",
+  "project": "CMakeLists.txt",
+  "projectTarget": "knottyyoga_database_helper.exe (src\\database_helper\\knottyyoga_database_helper.exe)",
+  "name": "knottyyoga_database_helper.exe (src\\database_helper\\knottyyoga_database_helper.exe)",
+  "env": {
+    "SCHEDULER_SERVICE_ACCOUNT_PASSWORD": "dev"
+  }
+}
+```
+
+Repeat the `"env"` block for `knottyyoga_helper.exe` (the helper hits the same env var at startup if the `--service_account_password` flag is empty).
+
+`launch.vs.json` lives under `.vs/` which is `.gitignore`d, so the setting stays per-machine. If multiple devs need the same default, move it to `CMakeSettings.json`'s `environments` block (committed).
+
+### Running `knottyyoga_helper` from a shell
+
+If you'd rather start it from a terminal alongside the web server (which Visual Studio runs separately):
+
+```powershell
+$env:SCHEDULER_SERVICE_ACCOUNT_PASSWORD = "dev"
+knottyyoga_helper.exe `
+    --server_url=http://localhost:18080 `
+    --service_account_email=scheduler@knottyyoga.local
+```
+
+Or pass the password directly via flag if you'd prefer not to set the env var:
 
 ```batch
 knottyyoga_helper.exe ^
     --server_url=http://localhost:18080 ^
     --service_account_email=scheduler@knottyyoga.local ^
-    --service_account_password=%SCHEDULER_PASSWORD%
+    --service_account_password=dev
 ```
+
+The dev password value doesn't matter, so long as it matches between the database helper run (which hashes and stores it) and the helper run (which sends it to `/api/login`).
 
 ---
 
