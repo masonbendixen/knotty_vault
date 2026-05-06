@@ -355,15 +355,18 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] Created `Scheduler::SchedulerConfig`, `Scheduler::ValidateSchedulerConfig` (returns a list of human-readable errors so all problems surface at once), and `Scheduler::ResolveServiceAccountPassword` (flag-then-env-var fallback for `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`). All three live in the library so they're independently testable.
 - [x] 10 unit tests in `scheduler_config_test.cpp`: validate-accepts-defaults, rejects-empty-server-url, rejects-empty-email, rejects-empty-password, accepts-all-zeros (intervals = "all jobs disabled"), rejects-negative-intervals (verifies multiple errors are reported), reports-all-errors-at-once, password-prefers-flag, password-falls-back-to-env, password-empty-when-neither-set, password-passes-through-empty-env-string. Env-var tests use an RAII `EnvScope` guard so siblings can't see leaked state.
 
-## Phase 6: API Client with Authentication
+## Phase 6: API Client with Authentication ✅
 **Authenticated HTTP client for calling admin endpoints.**
 
-- [ ] Implement `ApiClient` class wrapping `Http::HttpClient`:
-  - `Login(email, password)` → calls `POST /api/login`, parses `Set-Cookie` headers from the response, stores cookie name/value pairs internally
-  - `CallEndpoint(method, path)` → attaches `Cookie:` header from the stored map and makes an authenticated HTTP call
-  - On `401`, clears the cookie map, re-calls `Login`, retries the original request once
-  - Configurable base URL
-- [ ] Tests for `ApiClient` (mock `HttpClient`, verify auth flow, verify cookie attach, verify retry on 401)
+- [x] `Scheduler::ApiClient` in `src/scheduler/api_client.{h,cpp}`. Wraps `Http::HttpClient`. Constructor takes the HTTP client and base URL (trailing slash trimmed).
+- [x] `Login(email, password)` posts `{"email":..., "password":..., "remember":false}` to `/api/login`, harvests `Set-Cookie` from the response (case-insensitive header lookup), stores `name=value` pairs internally, and caches the credentials for the 401-retry path. Returns `true` on 200.
+- [x] `CallEndpoint(method, path, body)` attaches the stored cookies via a `Cookie:` header. On 401, clears cookies, re-invokes `Login`, and retries the original request **once**. Skips the retry if there are no cached credentials or if the re-login itself fails (so we never loop).
+- [x] Cookie parsing is intentionally minimal per §3.4: `name=value` before the first `;`, no full RFC 6265. Single trusted origin. ~30 lines of cookie logic, all confined to `ApiClient` so `HttpClient` stays stateless.
+- [x] 14 unit tests in `api_client_test.cpp` using the existing `Http::Test::TestHttpClient`:
+  - URL building (joins base+path, strips trailing slash from base)
+  - Login: sends correct request body + Content-Type, stores cookie on 200, accepts both `Set-Cookie` and lowercase `set-cookie`, returns false on non-200, ignores malformed Set-Cookie, clears prior cookies even when re-login fails
+  - CallEndpoint: attaches `Cookie:` header after login, sends no Cookie header before login, includes body + Content-Type, no 401 retry without cached credentials, no retry on 5xx
+  - 401 retry path: re-logs-in with cached creds and retries with the new cookie, returns the 401 (no further retry) when the re-login itself fails
 
 ## Phase 7: Job Scheduler
 **Timer-based execution of scheduled jobs.**
