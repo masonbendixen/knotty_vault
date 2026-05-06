@@ -358,12 +358,19 @@ These are the decisions I want your input on rather than guessing:
 3. **Argon2id strength** — is `MODERATE` (≈250ms login on a modern server) acceptable, or do you want `INTERACTIVE` to keep logins snappier?
 	- Mason- Is there a security risk going with the faster option?
 4. **CORS in dev mode** — the prod path is correct; should I leave the comment-only dev path as-is (relying on Angular proxy) or wire dev CORS so the API works without the Angular proxy too?
+	- Mason- I definitely want ng-serve to continue working. What do you recommend here?
 5. **Lockout duration / threshold** — is 10 failures / 15-min window / 30-min lockout per email acceptable, or do you want different numbers? Same question for IP.
+	- Mason- Do these seem okay to you? Should we make these configurable via server secrets?
 6. **Encryption key storage** — for Phase 8, can we depend on a `KNOTTYYOGA_SECRET_KEY` env var, or is there a key-management story (KMS, HSM) you want to plug into instead?
+	- Mason- What do you recommend? Is there a better solution for letting AWS manage this?
 7. **Removing the "Mason"/"Tyler" hardcode (3.5)** — am I OK to delete this outright assuming the seed-data path mints at least one admin? If you currently bootstrap admin only via that hardcode, I need to add a seed-data admin first.
+	- Mason- I did this during bootstrapping to get things working but now we build those accounts and give them the right permissions so this is no longer needed. Feel free to delete.
 8. **Generic CRUD redaction (3.8)** — is the column-level redact map acceptable, or do you want sensitive columns moved to entirely separate tables (e.g., `people_credentials`) so they can never accidentally be selected?
+	- Mason- What do you recommend?
 9. **`config_secrets` admin UI (8.2)** — is it acceptable to drop the generic table editor for secrets in favor of a dedicated UI that masks values, or do you need to keep the generic editor for now?
+	- Mason- I'm fine with moving this to a dedicated UI. I just needed something to get up and running.
 10. **SameSite policy** — your current code uses `Lax`. Are you open to `Strict` for `session_token` (UX cost: cross-site links into the app log the user out)? `Lax` is fine; just confirming.
+	- Mason- Honestly, I was just getting things working. I n
 11. **Rate limiting persistence** — `login_attempts` in PostgreSQL is simple and correct but adds write load. Are you OK with that, or do you want an in-memory rate limiter keyed off IP/email for the hot path with the DB used only for permanent lockouts?
 12. **`/api/me` GET (3.4)** — switching from POST to GET technically changes the public API contract. Confirm you want this; otherwise leave it as POST and just exempt it from CSRF for being read-only.
 13. **`change_purchase_recipient` / `gift_permissions` ownership** — please confirm whether these endpoints already check ownership; if you remember, save me the grep.
