@@ -165,13 +165,25 @@ The fixes are grouped into phases that respect the layering of the system: each 
 - [ ] Update `ui/src/app/shared/services/server-access.mock.ts` and `server-access.mock.spec.ts`
 - [ ] `register.component.spec.ts` — confirm it still asserts the success/failure branches
 
-### 3.3 `/api/verify` — switch to POST body
-- [ ] Same shape of change as 3.1 for `endpoints/verify.cpp`. The verify URL is still constructable from the email (the email contains a link), so the email body needs the link to point at a small client page that POSTs the secret rather than calling the backend directly. Two ways:
-  - (a) Keep the email-link a GET to the SPA at `/verify?secret=...&email=...`; the SPA reads the params and POSTs to `/api/verify`. (recommended)
-  - (b) Allow GET fallback on the server but require a CSRF-equivalent nonce embedded in the token itself
-- [ ] Update `business_logic/auth/person_verify_mail.cpp` template to point at the SPA `/verify` route, not the API
-- [ ] Add the SPA route + component or reuse an existing one
-- [ ] Tests: backend `verify_test.cpp` for the new POST shape; frontend component spec for the new component
+### 3.3 `/api/verify` — SPA-routed POST with 1-hour TTL (Decision #2)
+The verification email link points at the SPA, not the API. The SPA reads the secret from the query string, immediately POSTs to `/api/verify`, then scrubs the URL via `history.replaceState` so the secret doesn't linger in browser history.
+
+**Backend:**
+- [ ] `endpoints/verify.cpp` — change route to `POST /api/verify` reading `{ email, secret }` from JSON body. Drop the URL-path-secret variant entirely.
+- [ ] `verify_test.cpp` — flip every test to body-based POST; add `VerifyMissingFieldBadRequest`
+- [ ] Add the verify endpoint to the CSRF-exempt allow-list in Phase 4 (it's a bootstrap endpoint — the user has no `csrft` cookie yet) but enforce a strict `Origin` check there
+- [ ] **Reduce the verification window default** — `business_logic/auth/secret_keys.h::kEmailVerificationExpirationWindowInMicros` default → **1 hour** (3,600,000,000 µs). Existing behavior is configurable via secret; only the default changes. Update the corresponding test value in `email_verifications_test.cpp` if it asserts on the default.
+
+**Email content:**
+- [ ] `business_logic/auth/person_verify_mail.cpp` — template's `{verify_link}` becomes `https://{kWebsiteAddress}/verify?email={url-encoded-email}&secret={url-encoded-base64url-secret}`. No `/api/` prefix; this is the SPA route, not the API.
+- [ ] `person_verify_mail_test.cpp` — update the expected URL shape
+
+**Frontend:**
+- [ ] Add Angular route `/verify` → new `VerifyComponent` under `ui/src/app/auth/verify/`
+- [ ] On `ngOnInit`: read `email` and `secret` from `ActivatedRoute.snapshot.queryParamMap`, call `serverAccess.verify(email, secret)` (POST `/api/verify`), and `history.replaceState({}, '', '/verify-success')` immediately after the POST is fired (don't wait for the response — the secret is what we want out of the URL bar)
+- [ ] On success: route to `/login` with a "verified, please log in" toast
+- [ ] On failure: route to `/login` with a generic "verification failed or expired" toast — do not echo the server message
+- [ ] Tests: `verify.component.spec.ts` covering success, failure, missing-params; `server-access.mock.spec.ts` for the new `verify(email, secret)` mock method
 
 ### 3.4 `/api/me` — switch to GET
 - [ ] `endpoints/me.cpp` registers `crow::HTTPMethod::Get`
@@ -195,10 +207,38 @@ The fixes are grouped into phases that respect the layering of the system: each 
 - [ ] `endpoints/get_scaled_photo.cpp` — add the same auth check; replace the dedicated connection with the shared `TransactionProvider`
 - [ ] Tests: `get_photo_test.cpp::GetPhotoForbiddenTable`, `GetPhotoUnauthenticated` (already exists?), `get_scaled_photo_test.cpp` similar
 
-### 3.8 Strip sensitive columns from generic CRUD reads
-- [ ] Add a column-redaction map in `database_helper/create_database.cpp` (a new `PopulateAdminColumnRedactions` step) — `(people, password_hash)`, `(device_tokens, secret_hash)`, `(email_verifications, token_hash)`, `(sessions, uuid)`
-- [ ] Wire the map through `endpoints/endpoint_auth_helper.h/cpp` and apply it inside `sql_util/json/database_rest_helper.cpp::JsonFromDataResults` (or one level up, before the data leaves the server)
-- [ ] Tests: `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns`, plus `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash`
+### 3.8 Strip sensitive columns from generic CRUD reads via column-level redact map (Decision #8)
+**Approach:** column-level redact map, not a separate `people_credentials` table. Rationale:
+1. **No surgery in the auth path.** `PersonHelper::VerifyPassword` reads `people.password_hash` directly today; splitting tables forces a join in the most security-critical code path. High risk for marginal gain.
+2. **Single source of truth.** The map lives next to the existing admin metadata in `create_database.cpp`. A test ensures any column flagged as redacted never appears in a JSON response.
+3. **Enforced at the JSON boundary**, so it covers every endpoint that uses `JsonFromDataResults` (the entire generic CRUD layer + any handler that uses it).
+4. **The exception** that would change this decision: if we ever expose `people` to anonymous reads (e.g., a public studio directory). At that point a separate-table layout is worth the surgery. Until then, redact map is the right tradeoff.
+
+**Schema-side / metadata layer:**
+- [ ] In `sql_util/table_helpers/`, add a new helper `admin_column_redactions.{h,cpp,_test.cpp}` modeled after `admin_column_data_info.h/cpp`. Stores `(table_name, column_name)` rows in a new `admin_column_redactions` DB table.
+- [ ] `db_schema/admin_column_redactions.{h,cpp}` — define the table; treat the same way as the other admin metadata tables.
+- [ ] Register in `make_database_info.cpp` and `create_database.cpp::CreateTables` (do NOT add to the admin CRUD allow set — this metadata is read-only at runtime).
+
+**Population:**
+- [ ] In `database_helper/create_database.cpp`, add `PopulateAdminColumnRedactions(...)` that inserts the canonical redact list:
+  - `(people, password_hash)` — never leak credential material
+  - `(device_tokens, secret_hash)` — never leak token material
+  - `(email_verifications, token_hash)` — never leak verification material
+  - `(sessions, uuid)` — never leak session cookies via JSON; only the cookie path should ever emit it
+  - `(login_attempts, *)` after Phase 5 — entire table; consider redacting at the table level rather than column level if cleaner
+- [ ] Call `PopulateAdminColumnRedactions` from `CreateAndPopulateDatabases` next to the other `Populate*` calls.
+
+**Enforcement at the JSON boundary:**
+- [ ] In `sql_util/json/database_rest_helper.cpp`, the `DatabaseRESTHelper` (or its caller in `endpoint_auth_helper.cpp`) reads the redact map at startup into an in-memory `std::set<std::pair<std::string, std::string>>`.
+- [ ] Modify `JsonFromDataResults(tableName, results)` to take the redact set and skip any column whose `(tableName, columnName)` is in the set. Same for `KeyValueTableToJson` overloads that know the source table.
+- [ ] For endpoints that don't have a single source table (joins, custom JSON), the call site is responsible — but the audit shows the generic CRUD endpoints all flow through `JsonFromDataResults`, so this catches them.
+
+**Tests:**
+- [ ] `admin_column_redactions_test.cpp::AddAndListBasic`, plus a `RedactionMapContainsExpectedDefaults` test asserting `(people, password_hash)` etc. are present after `CreateAndPopulateDatabases`
+- [ ] `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns` — call with `(tableName=people)` and confirm `password_hash` is absent from the JSON
+- [ ] `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash` — end-to-end via `handle_full`
+- [ ] `endpoints/get_table_rows_test.cpp::GetTableRowsPeopleHidesPasswordHash` — same for the list variant
+- [ ] Negative test: `JsonFromDataResultsKeepsNonRedactedColumns` so we know the redaction is targeted, not accidentally aggressive
 
 ### 3.9 Lock down ownership-sensitive endpoints with regression tests
 - [x] (Verified on follow-up) `endpoints/change_purchase_recipient.cpp:99-106` already rejects when `payerPersonId != loggedInPersonId`
@@ -431,6 +471,7 @@ These are the decisions I want your input on rather than guessing:
 		2. **`Strict` is hostile to email-driven flows** like `/verify` (Phase 3.3). The link from the verification email is a top-level navigation; with `Strict` the cookie isn't sent. With `Lax` it is.
 		3. **`Lax` works the same way through the Angular proxy in dev.** Same-origin requests aren't subject to SameSite at all, so the proxy makes this a non-issue. `Strict` would also work in dev but I'd rather match dev to prod behavior.
 		- **The compromise to consider** if you want the strictest viable posture: `SameSite=Strict` for the `session_token` cookie *only*, keep `Lax` for `device_token` (so cross-site nav from email still triggers `/api/remember` re-auth) and `csrft`. The cost is the user gets a one-time re-auth via the device token whenever they land in the app from outside. Not awful UX. But honestly, **stick with `Lax`** until you have a reason to go further.
+	- Mason- Let's stick with Lax.
 11. **Rate limiting persistence** — `login_attempts` in PostgreSQL is simple and correct but adds write load. Are you OK with that, or do you want an in-memory rate limiter keyed off IP/email for the hot path with the DB used only for permanent lockouts?
 	- Mason- I'm okay doing that in memory if it speeds things up and doesn't cause issues. Does this cause an issue if we move to ECS and have multiple server instances? The server is stateless currently and that is an important design. If we need to hit the database, can we have this write on a worker thread but still return immediately to the client?
 	- Claude — Your instinct is exactly right. **Use PostgreSQL with write-behind via the existing `ThreadPool`.** Keep the server stateless across instances. Concrete shape:
@@ -446,6 +487,7 @@ These are the decisions I want your input on rather than guessing:
 		- **One subtlety:** if the threshold is at the boundary, two parallel attempts could both pass the synchronous read before either's async write lands. Acceptable for rate-limiting (worst case attacker gets +1 attempt past the limit). Not acceptable for the hard-lock decision — when the synchronous read shows "this is the 10th failure", the lockout `UPDATE` should be **synchronous** (in the same transaction as the lockout decision). Async only the *recording* of failures, not the decision to lock.
 		- **`admin_alerts` event for "account locked"** is also written by the same async worker; one DB round-trip total per attempt.
 		- **Multi-instance safe**: all state lives in Postgres; any task can read the current count.
+	- Mason- That sounds great. I'll go with your recommendation but please add all of this to the documentation.
 12. **`/api/me` GET (3.4)** — switching from POST to GET technically changes the public API contract. Confirm you want this; otherwise leave it as POST and just exempt it from CSRF for being read-only.
 	- Mason- I'm okay moving this to post. We haven't deployed yet. So there is no contract to break. Hence why I'm doing this review now :)
 13. **`change_purchase_recipient` / `gift_permissions` ownership** — please confirm whether these endpoints already check ownership; if you remember, save me the grep.
@@ -471,3 +513,4 @@ These are the decisions I want your input on rather than guessing:
 		- **Phase 10** (frontend bootstrap + returnUrl allow-list). Independent of backend phases; can be done by anyone in parallel.
 		- **Phase 11** (latent SQL-concat in `create_database.cpp` cleanup). Pure code-quality cleanup — bottom of the stack. Or pair with Phase 1 since you're touching that file anyway.
 		- **Why this order**: the early phases (1, 1b, 1c) are nearly risk-free and produce a server that's noticeably more production-ready immediately. The auth primitives (2) unlock the high-value middleware work (4, 5). Phase 10 (frontend) can be parallelized to a different person's work queue if you ever pick up help.
+	- Mason- That sounds great to me.
