@@ -346,13 +346,14 @@ Phases are listed in recommended implementation order. Phases 1–4 are new admi
 - [x] Endpoint tests in `admin_cleanup_scaled_photos_test.cpp`: 401 unauthenticated, 403 missing permission, 200 nothing-to-clean (fresh-only photo), 200 deletes-aged-rows-and-cascades (verifies the `photo_instances` rows are also gone).
 - [x] Wired into `web_app.cpp` and `endpoints/CMakeLists.txt`.
 
-## Phase 5: Executable Skeleton
-**Get the basic helper executable building.**
+## Phase 5: Executable Skeleton ✅
+**Basic helper executable building.**
 
-- [ ] Create `src/scheduler/` directory with `CMakeLists.txt`
-- [ ] Add `knotty_yoga_scheduler` library and `knottyyoga_helper` executable to top-level CMake
-- [ ] Implement `main.cpp` with `absl::flags` for all command-line options
-- [ ] Verify the executable builds, links against `knotty_yoga_core`, and runs with `--help`
+- [x] Created `src/scheduler/` directory with `CMakeLists.txt`. Library `knotty_yoga_scheduler` and executable `knottyyoga_helper` defined.
+- [x] Added `knotty_yoga_scheduler` library to top-level `CMakeLists.txt` and `add_subdirectory(scheduler)` to `src/CMakeLists.txt`. `knotty_yoga_tests` is `PUBLIC`-linked against `knotty_yoga_scheduler` so unit tests can find scheduler symbols.
+- [x] `main.cpp` declares all 13 absl flags described in §3.1 (server URL, service-account email/password, plus the 10 per-job interval overrides). Builds a `Scheduler::SchedulerConfig`, validates it, prints a summary, and exits. Phases 6–8 will replace the stub with the actual API client + job scheduler + io_context loop.
+- [x] Created `Scheduler::SchedulerConfig`, `Scheduler::ValidateSchedulerConfig` (returns a list of human-readable errors so all problems surface at once), and `Scheduler::ResolveServiceAccountPassword` (flag-then-env-var fallback for `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`). All three live in the library so they're independently testable.
+- [x] 10 unit tests in `scheduler_config_test.cpp`: validate-accepts-defaults, rejects-empty-server-url, rejects-empty-email, rejects-empty-password, accepts-all-zeros (intervals = "all jobs disabled"), rejects-negative-intervals (verifies multiple errors are reported), reports-all-errors-at-once, password-prefers-flag, password-falls-back-to-env, password-empty-when-neither-set, password-passes-through-empty-env-string. Env-var tests use an RAII `EnvScope` guard so siblings can't see leaked state.
 
 ## Phase 6: API Client with Authentication
 **Authenticated HTTP client for calling admin endpoints.**
