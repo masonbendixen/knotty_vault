@@ -78,26 +78,42 @@ A multi-agent review of `business_logic/auth/`, `endpoints/`, all SQL building p
 
 The fixes are grouped into phases that respect the layering of the system: each phase starts at the lowest layer touched (db schema → table helpers → business logic → endpoints → frontend) before moving up. Tests are mandatory for every code-bearing item per `feedback_always_test.md` / `feedback_test_every_cpp_change.md`.
 
-## Decisions Locked In
+## Resolved Decisions
 
-These were resolved in the Open Questions section below. Recording them here so the plan body is self-contained:
+The architectural decisions below were settled before drafting the per-phase work items; their rationale is baked into the relevant phase body (column on the right). Recording them here so the plan is self-contained.
 
-| # | Topic | Decision |
+| Topic | Decision | Phase |
 |---|---|---|
-| 1 | CSRF approach | Double-submit cookie (`csrft` non-HttpOnly + `X-CSRF-Token` header) + Origin allow-list. |
-| 2 | Verification email link | Points at SPA route `/verify?email=…&secret=…`; SPA POSTs to `/api/verify` and `history.replaceState`s the URL bar. Default verification window reduced to **1 hour**. |
-| 3 | Argon2id strength | `MODERATE` (3 ops, ~256 MB). Tunable via `kAuthArgon2OpsLimit` secret. |
-| 4 | Dev CORS | No-op by default (Angular proxy makes everything same-origin); opt-in via `KNOTTYYOGA_DEV_CORS_ORIGIN` env var for direct API testing. |
-| 5 | Lockout thresholds | Per-email 10/15-min → 30-min lockout. Per-IP 50/15-min → 1-h block. Verify 30/15-min/IP → 30-min. Remember 50/15-min/IP → 1-h. All secret-driven. Generic 401/429 responses; never reveal lockout reason. |
-| 6 | Encryption key | v1: env var `KNOTTYYOGA_SECRET_KEY` injected by ECS task definition from AWS Secrets Manager. v2 (deferred): AWS KMS + envelope encryption. |
-| 7 | Mason/Tyler hardcode | Delete outright; admins are minted via seed data + role-management UI. |
-| 8 | Sensitive column protection | Column-level redact map populated in `create_database.cpp`, enforced at the JSON boundary in `database_rest_helper.cpp`. Reconsider if `people` is ever exposed to anonymous reads. |
-| 9 | Secrets admin UI | Dedicated endpoint + UI; values masked, never returned to client; writes audited to `admin_alerts`. |
-| 10 | SameSite | Stay with `Lax` for all auth cookies. `Strict` would break email-driven `/verify` flow. |
-| 11 | Rate-limit persistence | PostgreSQL with **write-behind** via existing `ThreadPool`. Synchronous read for the threshold check; synchronous lockout decision; async write of attempt records. Multi-instance ECS safe; login latency unchanged (Argon2id dominates). |
-| 12 | `/api/me` GET | Switch from POST to GET (no contract to break — pre-deploy). |
-| 13 | Ownership checks | Verified correct on `change_purchase_recipient` and `gift_permissions`; just adding regression tests. |
-| 14 | Phase ordering | Pull Phase 7 (security headers) and Phase 12.1 (startup guards) forward as 1b/1c. Pull Phase 6 (cookie hygiene) ahead of Phase 4 (CSRF) so the shared clear-cookies helper exists when CSRF starts using it. |
+| CSRF model | Double-submit cookie (`csrft` non-HttpOnly + `X-CSRF-Token` header) plus `Origin` allow-list. Stateless, fits multi-instance ECS, industry default for SPA-cookie auth. | 4 |
+| Verification email | Email link points at SPA route `/verify?email=…&secret=…`. SPA reads params, POSTs to `/api/verify`, `history.replaceState`s the URL bar to scrub the secret. Default verification window reduced to **1 hour**. | 3.3 |
+| Argon2id strength | `MODERATE` (3 ops, ~256 MB). ~5× the offline-attack cost of `INTERACTIVE` for ~200 ms extra latency once per 8 h. Tunable via `kAuthArgon2OpsLimit` / `kAuthArgon2MemLimitKb` secrets. | 2.5 |
+| Dev CORS | No-op by default (Angular proxy keeps everything same-origin). Opt-in via `KNOTTYYOGA_DEV_CORS_ORIGIN` env var when developers want to hit the API directly without the proxy. | 7.2 |
+| Lockout thresholds | Per-email 10 fail / 15 min → 30 min lockout. Per-IP 50/15-min → 1 h block. Verify 30/15-min/IP → 30 min. Remember 50/15-min/IP → 1 h. All secret-driven; generic 401/429 responses never reveal lockout reason. | 5 |
+| Secrets-at-rest key | **v1 (now):** env var `KNOTTYYOGA_SECRET_KEY`, injected by ECS task definition from AWS Secrets Manager. **v2 (deferred):** AWS KMS + envelope encryption. v1 needs only `std::getenv` + base64 — no AWS SDK in the C++ build. | 8 |
+| Mason/Tyler hardcode | Delete outright. Admins are now minted via seed data and the role-management UI. | 3.5 |
+| Sensitive column protection | Column-level redact map populated in `create_database.cpp`, enforced at the JSON boundary in `database_rest_helper.cpp`. Reconsider only if `people` is ever exposed to anonymous reads. | 3.8 |
+| Secrets admin UI | Dedicated endpoint + UI; values masked, never returned to client; every write audited to `admin_alerts`. Generic-CRUD editor for `config_secrets` is removed. | 8.3 |
+| SameSite policy | Stay with `Lax` for all auth cookies. `Strict` would break email-driven `/verify` flow. | 4.1, 6 |
+| Rate-limit persistence | PostgreSQL via the existing `ThreadPool` with **write-behind**: synchronous read for the threshold check, synchronous lockout decision, async write of attempt records. Multi-instance ECS safe; login latency unchanged because Argon2id dominates. | 5 |
+| `/api/me` HTTP method | Switch from POST to GET. No contract break — pre-deploy. | 3.4 |
+| Ownership checks on `change_purchase_recipient` / `gift_permissions` | Verified correct on follow-up. Plan reduces to adding regression tests for the negative cases. | 3.9 |
+
+## Implementation Order
+
+Phases are numbered by topic (so the doc reads as a logical grouping), but they ship in the order below. Earlier work is risk-free / unblocks later work; nothing here forces a serial bottleneck on Mason once Phase 1 is in.
+
+1. **Phase 1** — Schema integrity & lookup performance. Everything later depends on these tables/indices.
+2. **Phase 7** *(pulled forward)* — Security headers, error handler, server banner. Single middleware change, zero behavior risk, immediate prod-readiness win.
+3. **Phase 12.1** *(pulled forward)* — Fail-loud startup guards. Tiny, isolated, prevents whole classes of "deployed without `X` set" foot-guns.
+4. **Phase 2** — Auth primitives hardening. Adds the constant-time helper that Phase 4 depends on, plus atomic verification / device-token rotation.
+5. **Phase 3** — Endpoint authn/authz corrections. Register-as-POST, kill the Mason/Tyler hardcode, staff role gate, image authz, redact map.
+6. **Phase 6** *(pulled ahead of Phase 4)* — Cookie hygiene cleanup. The shared `ClearAuthCookies` helper lands here so Phase 4 can reuse it for `csrft`.
+7. **Phase 4** — CSRF middleware (server) + interceptor (client).
+8. **Phase 5** — Rate limiting + lockout. Can run in parallel with Phase 4.
+9. **Phase 8** — Secrets at rest + admin secrets endpoint. Independent; slot in any time after Phase 1.
+10. **Phase 9** — Auth event log + admin_alerts delivery. Builds on phases 5 and 8.
+11. **Phase 10** — Frontend bootstrap + returnUrl allow-list. Independent of backend phases; can be parallelized.
+12. **Phase 11** — Latent SQL-concat cleanup in `create_database.cpp`. Pure code-quality cleanup; pair with Phase 1 if convenient.
 
 ## Phase 1 — Schema integrity & lookup performance
 
@@ -378,9 +394,11 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [ ] Wire into `App` middleware list in `web_app.h`
 - [ ] Tests confirming headers are present on a sample of endpoints (auth, public, admin)
 
-### 7.2 Vary: Origin on CORS responses
+### 7.2 CORS hardening (`Vary: Origin` + opt-in dev CORS)
 - [ ] `business_logic/auth/server_config.cpp::ConfigureCors` — add `Vary: Origin` header (Crow's CORS middleware may already do this; verify and add if not)
-- [ ] `server_config_test.cpp` — assert the header is present in a CORS-handled response
+- [ ] In dev mode, leave the no-CORS path intact (Angular proxy keeps everything same-origin), but add an opt-in: when `KNOTTYYOGA_DEV_CORS_ORIGIN` is set, `ConfigureCors` registers that exact origin with `allow_credentials()`, methods `GET/POST/OPTIONS`, and headers `Content-Type, Authorization, X-CSRF-Token`. Unset → no-op (today's behavior).
+- [ ] Document `KNOTTYYOGA_DEV_CORS_ORIGIN` in the root `CLAUDE.md` env-vars section and in `ui/proxy.conf.json` comments (so devs know there are two ways to talk to the API in dev).
+- [ ] `server_config_test.cpp` — assert `Vary: Origin` is present in a CORS-handled response, and add tests covering the dev-CORS env-var path (set vs unset).
 
 ### 7.3 Global Crow error handler
 - [ ] In `endpoints/web_app.cpp`, register a fallthrough that converts uncaught exceptions to `500 internal_server_error` with body `{"error":"internal_server_error"}` and logs the exception text server-side only
