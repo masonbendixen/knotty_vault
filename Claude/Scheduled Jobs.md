@@ -434,14 +434,32 @@ The waitlist feature exists in production, so this is no longer blocked.
 - [x] 5 endpoint tests in `admin_process_waitlist_refunds_test.cpp` (4 pre-existing + 1 new): refunds-waitlisted-on-past-event, ignores-future-events, idempotent-run-twice, 401 unauthenticated, **new** 403 when logged in but missing `manage_subscriptions`. Test fixture extended to grant the permission via role/role-permission/role-assignment by default; the 403 test passes `grantPermission=false`.
 - [x] Wired into `business_logic/scheduling/CMakeLists.txt`.
 
-## Phase 11: Logging & Operational Polish
+## Phase 11: Logging & Operational Polish ✅
 **Production-readiness.**
 
-- [ ] Structured logging for all operations:
-  - Job execution: name, start time, duration, success/failure, response summary
-  - Authentication: login success/failure, re-auth events
-- [ ] Use stdout logging (same `InitializeLogging()` as the server, Phase 1.3 of AWS deploy). Docker/systemd captures stdout to the journal, CloudWatch Logs agent tails it.
-- [ ] Graceful shutdown: handle SIGTERM/SIGINT to stop timers cleanly (Docker sends SIGTERM on `docker stop`)
+- [x] **Structured logging conventions.** All scheduler-side log lines now use the `[<prefix>] event=<name> key=value …` format. Two prefixes: `[scheduler]` (lifecycle, job execution, signal handling) and `[api_client]` (HTTP/auth-level events). Example lines:
+  - `[scheduler] event=startup_config server_url=… service_account_email=…`
+  - `[scheduler] event=initialized jobs=10`
+  - `[scheduler] event=event_loop_starting` / `event=event_loop_exited`
+  - `[scheduler] event=signal_received signal=15 action=graceful_shutdown`
+  - `[scheduler] event=job_success job=run_billing status=200 duration_ms=42`
+  - `[scheduler] event=job_exception job=run_billing error="…" duration_ms=…`
+  - `[scheduler] event=job_http_error job=run_billing status=503 duration_ms=…`
+  - `[scheduler] event=timer_error job_index=… message="…"`
+  - `[api_client] event=login_success email=… status=200 cookies=1`
+  - `[api_client] event=login_failure email=… status=401`
+  - `[api_client] event=reauth_required path=… method=…`
+  - `[api_client] event=reauth_failed path=… method=…`
+- [x] **Re-auth events** (the gap the plan called out specifically): when `ApiClient::CallEndpoint` hits a 401 with cached credentials, it now logs `event=reauth_required` before re-login and `event=reauth_failed` if the re-login itself fails.
+- [x] **Login outcome logging** moved into `ApiClient::Login` so the HTTP-level details (status code, cookie count) live where they're observed. `Scheduler::Initialize` no longer double-logs the attempt; it only records `event=initialize_failed` when login returns false (so the `[scheduler]` stream alone tells operators whether bootstrap succeeded).
+- [x] **`main.cpp`** replaced the `std::cout`-based config dump with a single-line `LogInfo() << "[scheduler] event=startup_config …"` so it flows through `InitializeLogging()` and respects `KNOTTYYOGA_LOG_DEST`. One greppable line instead of fourteen.
+- [x] **Stdout logging.** `main()` calls `InitializeLogging()` first thing, before any LogInfo() call. Default destination is stdout (already wired in Phase 1.3 of AWS deploy). Docker/systemd captures it; the CloudWatch Logs agent tails the journal.
+- [x] **Graceful shutdown.** SIGTERM/SIGINT handlers were already installed in Phase 8. The signal callback now logs `event=signal_received signal=N action=graceful_shutdown` before calling `Shutdown()`. `Shutdown()` is idempotent (Phase 8). Docker's default `docker stop` sends SIGTERM, which the helper handles cleanly.
+- [x] **3 new tests in `api_client_test.cpp`** using a tiny RAII `CoutCapture` helper (swaps `std::cout`'s rdbuf — `g_logStream` defaults to `&std::cout`, so capturing cout captures `LogInfo()`/`LogError()` output too):
+  - `LoginSuccessEmitsStructuredLog` — asserts `event=login_success`, the email, `status=200`, `cookies=1` all appear.
+  - `LoginFailureEmitsStructuredLog` — asserts `event=login_failure` with `status=401`.
+  - `ReauthEmitsStructuredLog` — drives the full 401-retry path and asserts `event=reauth_required` plus two `event=login_success` lines (initial + re-auth).
+  - The 11 pre-existing `ApiClientTest` tests already cover the *behavioral* contract; these three are dedicated to the log surface so a future change that silently drops a log line breaks the build.
 
 ---
 
