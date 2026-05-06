@@ -370,8 +370,12 @@ These are the decisions I want your input on rather than guessing:
 9. **`config_secrets` admin UI (8.2)** — is it acceptable to drop the generic table editor for secrets in favor of a dedicated UI that masks values, or do you need to keep the generic editor for now?
 	- Mason- I'm fine with moving this to a dedicated UI. I just needed something to get up and running.
 10. **SameSite policy** — your current code uses `Lax`. Are you open to `Strict` for `session_token` (UX cost: cross-site links into the app log the user out)? `Lax` is fine; just confirming.
-	- Mason- Honestly, I was just getting things working. I n
+	- Mason- Honestly, I was just getting things working. I need the local dev scenario to keep working though. What would you recommend here? I am okay with strict but I need ng-serve with the proxy continuing to work for dev scenario work.
 11. **Rate limiting persistence** — `login_attempts` in PostgreSQL is simple and correct but adds write load. Are you OK with that, or do you want an in-memory rate limiter keyed off IP/email for the hot path with the DB used only for permanent lockouts?
+	- Mason- I'm okay doing that in memory if it speeds things up and doesn't cause issues. Does this cause an issue if we move to ECS and have multiple server instances? The server is stateless currently and that is an important design. If we need to hit the database, can we have this write on a worker thread but still return immediately to the client?
 12. **`/api/me` GET (3.4)** — switching from POST to GET technically changes the public API contract. Confirm you want this; otherwise leave it as POST and just exempt it from CSRF for being read-only.
+	- Mason- I'm okay moving this to post. We haven't deployed yet. So there is no contract to break. Hence why I'm doing this review now :)
 13. **`change_purchase_recipient` / `gift_permissions` ownership** — please confirm whether these endpoints already check ownership; if you remember, save me the grep.
+	- Mason- I don't remember. Please look this up.
 14. **Phase ordering** — would you prefer to interleave phases (e.g., do Phase 7 security headers very early since they're zero-risk) or strictly sequential as written? The plan is bottom-up by layering, but some phases are independent.
+	- Mason- I don't have an opinion here. What do you recommend?
