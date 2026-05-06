@@ -37,7 +37,7 @@ A multi-agent review of `business_logic/auth/`, `endpoints/`, all SQL building p
 ## High
 - **H1. Generic CRUD endpoints can reach sensitive tables.** `endpoints/{add_item,update_item,delete_item,get_row,get_rows_by_column,get_table_rows,get_filtered_table_rows,get_row_by_values}.cpp` rely on `IsTableAllowed()` (the union of `admin_top_level_tables`, `admin_nested_tables`, and the per-permission map). The `people` table is in this set, and the endpoints have no per-column redaction, so a `GET /api/get_row/people/id/N` returns `password_hash` to any user who has read access to the `people` table. `database_helper/create_database.cpp` `PopulateAdminTopLevelTables` and `PopulateAdminTablePermissions` need a column-level allow/deny list, or the endpoints need a redact pass.
 - **H2. Image endpoints lack object-level authorization.** `endpoints/get_photo.cpp` requires only `IsLoggedIn`; any logged-in user can fetch any image keyed by `(table, item_id)`. `endpoints/get_scaled_photo.cpp` does **no** auth and creates a fresh DB connection per request — both an authz gap and a connection-exhaustion DoS vector.
-- **H3. No CSRF / Origin / Referer enforcement on payment, purchase, and gift-permission endpoints.** `endpoints/{purchase_create,purchase_pay_card,payments,cards,change_purchase_recipient,gift_permissions}.cpp`. Combined with C1, these are forgery-prone; combined with absent ownership checks (verify these exist) they're escalation-prone. Audit `change_purchase_recipient` and `gift_permission_{accept,deny}` for ownership checks against `session.GetPersonId()`.
+- **H3. No CSRF / Origin / Referer enforcement on payment, purchase, and gift-permission endpoints.** `endpoints/{purchase_create,purchase_pay_card,payments,cards,change_purchase_recipient,gift_permissions}.cpp`. Combined with C1, these are forgery-prone. *Ownership checks confirmed correct* on follow-up: `change_purchase_recipient.cpp:99-106` rejects when `payerPersonId != loggedInPersonId`; `gift_permission_helper.cpp::AcceptRequest/DenyRequest/Revoke` verify the requesting person is the grantee (or grantor for revoke). Risk is therefore CSRF-only, addressed in Phase 4.
 - **H4. Token-hash and verification-token comparisons use plain `==` (timing-leak surface).** `business_logic/auth/person.cpp:233` compares the email-verification stored hash to the supplied hash with `std::string::operator==`. Use `sodium_memcmp` or compare hashes only after a constant-time function. This also applies to any device-token-secret comparison done outside `crypto_pwhash_str_verify` (which is constant-time itself).
 - **H5. Email-verification attempts increment is a TOCTOU race.** `sql_util/table_helpers/email_verifications.cpp` reads `attempts`, evaluates `attempts < limit`, then issues a separate `UPDATE` to bump `attempts` on failure. Two concurrent attackers can both observe the same low value and exceed the limit. Replace with a single `UPDATE ... SET attempts = attempts + 1 WHERE ... RETURNING ...` and decide based on the returned new count, or take a `SELECT ... FOR UPDATE` lock first.
 - **H6. Device-token rotation is not atomic.** `business_logic/auth/person.cpp::TryLoginWithDeviceToken` checks the secret hash, then `UpdateDeviceToken` writes a fresh secret. Two parallel requests with the same device cookie can both pass validation before either writes. Wrap the read+update in a single SQL statement (e.g. `UPDATE ... SET secret_hash=$new, uuid=gen_random_uuid() WHERE secret_hash=$old AND NOT revoked AND now_us() < expires_at RETURNING ...`) and only mint a session on a non-empty RETURNING.
@@ -59,7 +59,7 @@ A multi-agent review of `business_logic/auth/`, `endpoints/`, all SQL building p
 - **M9. No `APP_INITIALIZER` calling `/api/me` → `/api/remember`.** `ui/src/app/app.config.ts`. After page refresh the user appears logged out until they hit a protected route; the design doc explicitly calls for this bootstrap pattern. Reduces UX friction and avoids surprise 401 redirects on first action.
 - **M10. CORS sets `Access-Control-Allow-Origin: <site>` but does not emit `Vary: Origin`** in `business_logic/auth/server_config.cpp::ConfigureCors`. Caches in front of the API can serve cross-origin responses to the wrong origin.
 - **M11. SQL string concatenation in `database_helper/create_database.cpp:2031,2049,2062`.** Currently safe (the spliced values are hard-coded), but it's a divergence from the codebase's parameterization discipline and a foot-gun for the next maintainer.
-- **M12. `change_purchase_recipient` and `gift_permission_*` ownership checks need verification.** Listed for completeness — the audit could not confirm these always check `session.GetPersonId()` against the row owner.
+- **M12. (Resolved on follow-up.)** `change_purchase_recipient.cpp:99-106` and `gift_permission_helper.cpp::AcceptRequest/DenyRequest/Revoke` already check ownership. Plan item 3.9 reduces to adding regression tests so this stays true.
 
 ## Low
 - **L1. Argon2id hash buffer not zeroed after use.** `business_logic/auth/auth_helper.cpp` returns the hash by value but does not call `sodium_memzero` on intermediate buffers. Lowest priority, real-world impact is small.
@@ -200,9 +200,11 @@ The fixes are grouped into phases that respect the layering of the system: each 
 - [ ] Wire the map through `endpoints/endpoint_auth_helper.h/cpp` and apply it inside `sql_util/json/database_rest_helper.cpp::JsonFromDataResults` (or one level up, before the data leaves the server)
 - [ ] Tests: `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns`, plus `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash`
 
-### 3.9 Verify ownership on object-mutating endpoints
-- [ ] `endpoints/change_purchase_recipient.cpp` — confirm it checks the row's `recipient_person_id` (or buyer) against `session.GetPersonId()` before mutating; add the check if missing; add a `_NotOwnerForbidden` test
-- [ ] `endpoints/gift_permissions.cpp` (Accept/Deny/Delete) — same check, ensure only the intended grantee/grantor can act; tests for each of the three negative cases
+### 3.9 Lock down ownership-sensitive endpoints with regression tests
+- [x] (Verified on follow-up) `endpoints/change_purchase_recipient.cpp:99-106` already rejects when `payerPersonId != loggedInPersonId`
+- [x] (Verified on follow-up) `business_logic/payment/gift_permission_helper.cpp::AcceptRequest/DenyRequest` reject when the active user isn't the grantee, and `Revoke` requires either grantor or grantee
+- [ ] Add `change_purchase_recipient_test.cpp::PostChangePurchaseRecipientNotPayerForbidden` (a logged-in non-payer attempts to change the recipient and gets 403)
+- [ ] Add `gift_permissions_test.cpp::AcceptNotGranteeForbidden`, `DenyNotGranteeForbidden`, `RevokeOutsiderForbidden`
 - [ ] `endpoints/set_user_info.cpp` and `endpoints/update_user_password.cpp` — confirm they always operate on `session.GetPersonId()` and never on a person_id read from the request body; add a test that a request body explicitly passing another person's ID is ignored
 
 ## Phase 4 — CSRF (cross-cutting; lower layers + endpoints + client)
@@ -353,29 +355,112 @@ These are the decisions I want your input on rather than guessing:
 
 1. **CSRF approach** — happy with the double-submit cookie pattern (`csrft` non-HttpOnly + `X-CSRF-Token` header) per your design doc, or do you prefer the alternative of a per-session CSRF token stored on the server and signed?
 	- Mason- Which would you recommend and why?
+	- Claude — **Double-submit cookie.** Reasons:
+		1. **Stateless on the server.** No new per-session row to track — fits your stateless-ECS design (you flagged this in Q11). The signed-token alternative needs either a server-side store or an HMAC key managed in the same way as Phase 8's secret key.
+		2. **Crow already has `CookieParser`**, so reading/writing `csrft` is a couple of lines. The signed-token variant needs you to maintain an HMAC key, signature format, and rotation story.
+		3. **It's the industry default for SPA-cookie auth** (Django CSRF middleware, Rails `protect_from_forgery`, ASP.NET anti-forgery). Lots of prior art for the failure modes.
+		4. The one weakness of double-submit (a same-origin XSS can read the cookie and forge requests) is **not** materially worse than signed tokens — at that point an XSS can also read your other in-page state. CSP (Phase 7) is the right defense for that, not signed CSRF tokens.
+		- **Defense in depth** I'd add on top of the double-submit: also reject when `Origin` header is present and not in the prod allow-list. That's already in plan item 4.2.
 2. **Verification email link target** — for moving `/api/verify` off URL-path-with-secret (item 3.3): is it OK if the verification link in the email points at the SPA (e.g., `/verify?email=...&secret=...`) and the SPA POSTs to the API? That removes the secret from server logs but does put it in browser history of whoever opens the email.
 	- Mason- What do you think and suggest?
+	- Claude — **Yes, SPA-routed.** The email link is a GET to `/verify?email=...&secret=...`; the SPA reads the params and immediately POSTs to `/api/verify`, then routes the user to the next step (login or dashboard).
+		- The "secret in browser history" concern is real but small: the secret is single-use, and the email itself is already visible to anyone with the user's mailbox.
+		- The mitigations to layer on:
+			1. **Single-use enforcement** is already there (`DoEmailVerification` deletes the row on success; Phase 2.3 makes attempt counting atomic).
+			2. **Short TTL** — `kEmailVerificationExpirationWindowInMicros` (already a secret). Recommend setting it to 1 hour for new registrations, not the current "default several days" if that's still in place; check the default.
+			3. After the SPA POSTs, **`history.replaceState({}, '', '/verify-success')`** so the secret is replaced in the browser's URL bar and history within milliseconds.
+		- The alternative ("mail link points directly at `GET /api/verify` because it's idempotent") puts the secret in CloudFront access logs, your server access logs, and any CDN log retention. Worse than browser history, which is local-only.
 3. **Argon2id strength** — is `MODERATE` (≈250ms login on a modern server) acceptable, or do you want `INTERACTIVE` to keep logins snappier?
 	- Mason- Is there a security risk going with the faster option?
+	- Claude — **Recommend `MODERATE`, but it's not a huge deal either way for a yoga-studio app.** Risk model:
+		- The thing Argon2id defends against is **offline brute-force after a database compromise**. Online guessing is bounded by network round-trips and the rate-limiter (Phase 5).
+		- Rough numbers per password guess on a single modern CPU core: `INTERACTIVE` ≈ 50ms, `MODERATE` ≈ 250ms. Translate to hardware an attacker actually has (cheap GPU farm, ~1000 cores effective): `INTERACTIVE` ≈ 20k guesses/sec, `MODERATE` ≈ 4k guesses/sec.
+		- Against a strong random password (10+ chars from a 70-char alphabet ≈ 60 bits), both make brute force impractical.
+		- Against a **weak** password (top 10k common, ~13 bits), `INTERACTIVE` cracks in ~0.5s, `MODERATE` in ~2.5s. Neither helps. Real defense for weak passwords is the breach-list check you can add later (e.g., HaveIBeenPwned password range API).
+		- **Net:** `MODERATE` adds ~200ms to logins (imperceptible to users since it's once per 8h) and 5× the offline-attack cost. Cheap insurance.
+		- The plan already makes the parameter a secret (`kAuthArgon2OpsLimit`), so you can A/B if you're worried.
 4. **CORS in dev mode** — the prod path is correct; should I leave the comment-only dev path as-is (relying on Angular proxy) or wire dev CORS so the API works without the Angular proxy too?
 	- Mason- I definitely want ng-serve to continue working. What do you recommend here?
+	- Claude — **Keep the no-CORS-in-dev path as the default** (so `ng serve` + Angular proxy keeps working unchanged), and **add an opt-in** that activates only when an env var is set:
+		- New env var `KNOTTYYOGA_DEV_CORS_ORIGIN`. If set in dev mode, `ServerConfig::ConfigureCors` adds that exact origin with `allow_credentials()`. If unset (the default), the dev path stays a no-op like today.
+		- That way:
+			1. Day-to-day with `ng serve`: no change. Proxy makes everything same-origin, no CORS needed.
+			2. Direct API testing (curl from another origin, a second SPA running on a different port, exploratory work in Postman with a different origin): you set the env var and it just works.
+			3. Prod path is unchanged.
+		- Document the env var in `CLAUDE.md` and in `proxy.conf.json` comments.
 5. **Lockout duration / threshold** — is 10 failures / 15-min window / 30-min lockout per email acceptable, or do you want different numbers? Same question for IP.
 	- Mason- Do these seem okay to you? Should we make these configurable via server secrets?
+	- Claude — **Yes, all configurable via secrets** (the plan already lists them: `kAuthLoginMaxFailuresPerEmailPerWindow`, `kAuthLoginFailureWindowInMicros`, `kAuthLoginMaxFailuresPerIpPerWindow`, `kAuthAccountLockoutAfterFailures`, `kAuthAccountLockoutDurationInMicros`). Recommended defaults:
+		- **Per email:** 10 failures / 15 min → 30-min soft lockout. After 3 lockouts in 24 h, hard-lock requiring email-based unlock. (The 24h+lockout-counter logic can be a follow-up; not in v1.)
+		- **Per IP:** 50 failures / 15 min → 1 h temporary block. Wider net to catch credential stuffing across many accounts from the same IP.
+		- **Verify endpoint:** 30 failures / 15 min / IP → 30 min block. Looser because legitimate users may click multiple verification links from the same IP.
+		- **Remember endpoint:** 50 failures / 15 min / IP → 1 h block.
+		- **Tuning** — start with these defaults, watch `admin_alerts` for "account locked" events, adjust. The whole point of using secrets is you can tune without redeploying.
+		- **Important UX note:** when lockout is hit, the response should be a generic 401 ("invalid credentials") or 429 ("too many attempts") — never reveal *which* user is locked. Plan item 5.5 covers this.
 6. **Encryption key storage** — for Phase 8, can we depend on a `KNOTTYYOGA_SECRET_KEY` env var, or is there a key-management story (KMS, HSM) you want to plug into instead?
 	- Mason- What do you recommend? Is there a better solution for letting AWS manage this?
+	- Claude — **Two-tier recommendation**, ship the simple one now and upgrade later:
+		1. **v1 (now): env var fed from AWS Secrets Manager.** In your ECS task definition, set the container env var `KNOTTYYOGA_SECRET_KEY` from a Secrets Manager entry (`secrets:` block in the task definition). The container sees a normal env var; AWS handles secret storage, rotation, and IAM. **No code changes** beyond reading the env var. This is the standard pattern for ECS and is what most teams ship as "v1".
+		2. **v2 (later, when it matters): AWS KMS + envelope encryption.** Generate a KMS Customer Master Key. On startup, the server uses the AWS SDK to call `GenerateDataKey`, which returns a plaintext data key + an encrypted version. You encrypt secrets with the data key and store the *encrypted* data key alongside (or in `config_secrets`). On read, you call `Decrypt` on the encrypted data key. Benefits: KMS rotates the master key without code changes, IAM controls who can decrypt, every decrypt is audited in CloudTrail.
+		- **Why not v2 now:** adds AWS SDK dependency, network calls in startup hot path, IAM plumbing, and tests need a mock KMS client. For a small studio app, v1 (env-var-from-Secrets-Manager) is the right risk/effort tradeoff.
+		- **What v1 needs in the codebase:** literally just `std::getenv("KNOTTYYOGA_SECRET_KEY")` and base64-decode it to 32 bytes. No AWS SDK in the C++ build.
+		- **One non-obvious thing:** Secrets Manager → ECS env var injection happens at task-start time. If you rotate the secret, ECS won't pick it up until the next task revision. That's fine for an at-rest encryption key (which you rarely rotate); not fine for short-lived API tokens (which is why `kSquareAccessToken` etc. live in `config_secrets`, not env vars — they can be rotated via the admin UI without an ECS deploy).
 7. **Removing the "Mason"/"Tyler" hardcode (3.5)** — am I OK to delete this outright assuming the seed-data path mints at least one admin? If you currently bootstrap admin only via that hardcode, I need to add a seed-data admin first.
 	- Mason- I did this during bootstrapping to get things working but now we build those accounts and give them the right permissions so this is no longer needed. Feel free to delete.
 8. **Generic CRUD redaction (3.8)** — is the column-level redact map acceptable, or do you want sensitive columns moved to entirely separate tables (e.g., `people_credentials`) so they can never accidentally be selected?
 	- Mason- What do you recommend?
+	- Claude — **Column-level redact map.** Reasons:
+		1. **No schema migration / no code surgery in the auth path.** Today `people.password_hash` is read directly by `PersonHelper::VerifyPassword`. Splitting it into `people_credentials` means the auth path needs a join (or a second lookup), and so does every other place that touches the password (registration, password change, hash format upgrades). All of that is risky surgery in the most security-sensitive code path you have.
+		2. **The redact map is auditable in one place.** A new dev adding a sensitive column adds it to the redact map next to the column declaration; there's a single test that fails if a configured-redact column appears in a JSON response. Splitting tables is auditable too, but only if every developer remembers the convention every time.
+		3. **The "physical separation" win you'd be paying for is small in your model.** It buys "no risk of accidental SELECT \*" — but you don't write SELECT \* in this codebase; the JSON layer reflects against the table's columns. The redact pass runs at the same point.
+		- **The exception that would change my mind:** if you ever expose a *public, unauthenticated* read on `people` (a public studio directory, instructor bios, etc.), I'd want secrets in a separate table. You'd be one config bug away from leaking hashes. Until then, the redact map is the better tradeoff.
+		- **Concrete recommendation:** put the map in `database_helper/create_database.cpp` next to the existing admin metadata population, key on `(table, column) → redaction-policy`, and apply in `sql_util/json/database_rest_helper.cpp::JsonFromDataResults` so the policy is enforced at the JSON boundary, not in each endpoint.
 9. **`config_secrets` admin UI (8.2)** — is it acceptable to drop the generic table editor for secrets in favor of a dedicated UI that masks values, or do you need to keep the generic editor for now?
 	- Mason- I'm fine with moving this to a dedicated UI. I just needed something to get up and running.
 10. **SameSite policy** — your current code uses `Lax`. Are you open to `Strict` for `session_token` (UX cost: cross-site links into the app log the user out)? `Lax` is fine; just confirming.
 	- Mason- Honestly, I was just getting things working. I need the local dev scenario to keep working though. What would you recommend here? I am okay with strict but I need ng-serve with the proxy continuing to work for dev scenario work.
+	- Claude — **Stay with `Lax`.** Specifically:
+		1. **`Lax` is sufficient against CSRF that SameSite is meant to prevent.** Browsers downgrade to no-cookies on cross-site **POST/PUT/PATCH/DELETE/`fetch()` from another origin**. The only thing `Strict` adds is "no cookies on top-level navigations from another origin" — i.e. clicking a link from email or a Google search result into your app shows the user logged out, which is a UX cliff for no real security gain (we already have CSRF middleware in Phase 4, security headers in Phase 7, and CloudFront origin guard).
+		2. **`Strict` is hostile to email-driven flows** like `/verify` (Phase 3.3). The link from the verification email is a top-level navigation; with `Strict` the cookie isn't sent. With `Lax` it is.
+		3. **`Lax` works the same way through the Angular proxy in dev.** Same-origin requests aren't subject to SameSite at all, so the proxy makes this a non-issue. `Strict` would also work in dev but I'd rather match dev to prod behavior.
+		- **The compromise to consider** if you want the strictest viable posture: `SameSite=Strict` for the `session_token` cookie *only*, keep `Lax` for `device_token` (so cross-site nav from email still triggers `/api/remember` re-auth) and `csrft`. The cost is the user gets a one-time re-auth via the device token whenever they land in the app from outside. Not awful UX. But honestly, **stick with `Lax`** until you have a reason to go further.
 11. **Rate limiting persistence** — `login_attempts` in PostgreSQL is simple and correct but adds write load. Are you OK with that, or do you want an in-memory rate limiter keyed off IP/email for the hot path with the DB used only for permanent lockouts?
 	- Mason- I'm okay doing that in memory if it speeds things up and doesn't cause issues. Does this cause an issue if we move to ECS and have multiple server instances? The server is stateless currently and that is an important design. If we need to hit the database, can we have this write on a worker thread but still return immediately to the client?
+	- Claude — Your instinct is exactly right. **Use PostgreSQL with write-behind via the existing `ThreadPool`.** Keep the server stateless across instances. Concrete shape:
+		1. **In-memory only does NOT work for multi-instance ECS.** Each task has its own counter, so an attacker spreads requests across N tasks and gets N× the allowance. Worse, ECS auto-scales — your "limit" floats with the fleet. So in-memory is out.
+		2. **Pure synchronous DB-write per attempt** is correct but adds an extra `INSERT` (and an `UPDATE people SET failed_login_attempts = …`) on every login. Login isn't a hot path, but each request adding two writes is wasteful.
+		3. **Recommended pattern (write-behind):**
+			- **Synchronous read** of "recent failure count for (email, window)" via one indexed `SELECT count(*)`. Fast, cached by Postgres' shared buffers within the window.
+			- **Synchronous read** of `people.locked_until`. Single column on a row you're about to read for password verify anyway — effectively free (combine into one query).
+			- Reject early if either threshold is hit.
+			- Run the password verify (the slow part — Argon2id, ~50–250ms).
+			- **Asynchronous write** of the attempt record + the per-user counter via `ThreadPool::GetInstance().Queue(...)`. The lambda captures a `TransactionProvider` reference and the relevant ints by value, runs `RunInTransaction`, returns. The HTTP response goes back to the client without waiting.
+			- The user-visible login latency budget is unchanged (Argon2id dominates by orders of magnitude).
+		- **One subtlety:** if the threshold is at the boundary, two parallel attempts could both pass the synchronous read before either's async write lands. Acceptable for rate-limiting (worst case attacker gets +1 attempt past the limit). Not acceptable for the hard-lock decision — when the synchronous read shows "this is the 10th failure", the lockout `UPDATE` should be **synchronous** (in the same transaction as the lockout decision). Async only the *recording* of failures, not the decision to lock.
+		- **`admin_alerts` event for "account locked"** is also written by the same async worker; one DB round-trip total per attempt.
+		- **Multi-instance safe**: all state lives in Postgres; any task can read the current count.
 12. **`/api/me` GET (3.4)** — switching from POST to GET technically changes the public API contract. Confirm you want this; otherwise leave it as POST and just exempt it from CSRF for being read-only.
 	- Mason- I'm okay moving this to post. We haven't deployed yet. So there is no contract to break. Hence why I'm doing this review now :)
 13. **`change_purchase_recipient` / `gift_permissions` ownership** — please confirm whether these endpoints already check ownership; if you remember, save me the grep.
 	- Mason- I don't remember. Please look this up.
+	- Claude — Looked. **Both already enforce ownership correctly.**
+		- `endpoints/change_purchase_recipient.cpp:99-106` — fetches the purchase row, reads `payer_person_id`, and rejects with `NotAuthorized("Only the payer can change the recipient")` if it doesn't equal `session.GetPersonId()`.
+		- `business_logic/payment/gift_permission_helper.cpp::AcceptRequest` (lines 71-107) and `DenyRequest` (109-134) both check `actualGranteeId != granteePersonId` and throw `invalid_argument("Only the grantee can …")`.
+		- `gift_permission_helper.cpp::Revoke` (136-154) allows either grantor or grantee, throws otherwise.
+		- I downgraded the H3 finding and rewrote plan item 3.9 to "verified — add regression tests for the negative cases". Findings M12 is resolved.
 14. **Phase ordering** — would you prefer to interleave phases (e.g., do Phase 7 security headers very early since they're zero-risk) or strictly sequential as written? The plan is bottom-up by layering, but some phases are independent.
 	- Mason- I don't have an opinion here. What do you recommend?
+	- Claude — **Slightly re-ordered**, pulling the cheap-and-independent wins forward:
+		- **Phase 1** (schema integrity & lookup performance) — first; everything later depends on these tables/indices.
+		- **Phase 1b — pull forward Phase 7** (security headers + Crow error handler + server banner). Single-middleware change, no behavior risk, immediate prod-readiness win. Would be embarrassing to ship without.
+		- **Phase 1c — pull forward Phase 12.1** (fail-loud-in-prod startup checks) and the `KNOTTYYOGA_TRUST_PROXY` / `KNOTTYYOGA_ORIGIN_SECRET` assertions. Tiny, isolated, prevents an entire class of "we deployed without `X` set" foot-guns.
+		- **Phase 2** (auth primitives — constant-time compare, atomic verify counter, atomic device-token rotation, Argon2id bump). Low layer, supports later phases. Adds the helpers Phase 4 needs.
+		- **Phase 3** (endpoint authn/authz — register-as-POST, kill the Mason/Tyler hardcode, staff role gate, image authz, redact map). Medium risk, high value, mostly endpoint-level.
+		- **Phase 6** (cookie hygiene cleanup — logout cookie attributes). Pull forward — it's a small fix that removes the SameSite=None-without-Secure bug. Doing it before CSRF means the new `csrft` cookie can be cleared correctly by the same shared helper.
+		- **Phase 4** (CSRF middleware + frontend interceptor). Now that auth primitives exist and cookie clearing is fixed.
+		- **Phase 5** (rate limiting + lockout). Needs the lockout columns from Phase 1 and the async pattern is the same as what's used elsewhere; can run in parallel with Phase 4 if you want.
+		- **Phase 8** (encryption at rest + admin secrets endpoint). Independent; can slot in any time after Phase 1, but nice to do after Phase 5 so there's a stable observability baseline.
+		- **Phase 9** (auth event log + admin_alerts delivery). Builds on phases 5 and 8.
+		- **Phase 10** (frontend bootstrap + returnUrl allow-list). Independent of backend phases; can be done by anyone in parallel.
+		- **Phase 11** (latent SQL-concat in `create_database.cpp` cleanup). Pure code-quality cleanup — bottom of the stack. Or pair with Phase 1 since you're touching that file anyway.
+		- **Why this order**: the early phases (1, 1b, 1c) are nearly risk-free and produce a server that's noticeably more production-ready immediately. The auth primitives (2) unlock the high-value middleware work (4, 5). Phase 10 (frontend) can be parallelized to a different person's work queue if you ever pick up help.
