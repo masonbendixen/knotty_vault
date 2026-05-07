@@ -180,9 +180,15 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 - [x] Phase 5 will wire up reads/writes; this phase only added the schema slots. **Latent maintenance smell flagged:** the skip-list pattern is brittle — every column added to `people` requires touching ~25 test sites. If this happens again, worth introducing a `kPeopleAutoSetColumns` constant so it's a one-line update.
 
 ### 1.8 Remove `config_secrets` from generic CRUD exposure
-- [ ] `database_helper/create_database.cpp::PopulateAdminTopLevelTables` — remove `config_secrets` (and any other table holding live credentials) from the admin-CRUD allow set
-- [ ] If admins currently rely on the generic table editor for secrets, replace with a dedicated `/api/admin/secrets` endpoint in Phase 8 that masks the value and audits writes
-- [ ] `endpoints/get_row_test.cpp` — add a regression that `GET /api/get_row/config_secrets/...` returns 403/400
+- [x] `database_helper/create_database.cpp::PopulateAdminTopLevelTables` — `config_secrets` removed from the admin-CRUD allow set. (`sessions`, `device_tokens`, `email_verifications` were never in the set.)
+- [x] Also removed `config_secrets` admin metadata: column data info (`PopulateAdminColumnDataInfo`), column friendly names (`PopulateAdminColumnFriendlyNames`), and table friendly name (`PopulateAdminTableFriendlyNames`). The table still exists and is still seeded; the bootstrap `INSERT INTO config_secrets …` path is unchanged.
+- [x] Frontend mock + integration spec updated to match: `ServerAccess.mock.ts` no longer includes `config_secrets` in the schema or root_tables, and the integration spec asserts `config_secrets` is **not** present (positive negative-assertion). Generic admin UI iterates `getDbSchema().root_tables`, so config_secrets simply stops appearing.
+- [x] `endpoints/get_row_test.cpp` — added two regressions: `GetRowConfigSecretsAnonymousForbidden` and `GetRowConfigSecretsAdminForbidden`. Both expect HTTP 400 with `Table(config_secrets) is not an allowed table.` The admin variant adds a sentinel admin table to `admin_top_level_tables` and sanity-checks that the admin login path works against the sentinel before asserting config_secrets is rejected — so the regression catches an accidental re-add to `admin_top_level_tables`, not just a broken admin login.
+- [x] Dedicated `/api/admin/secrets` endpoint with masking and audit logging: deferred to Phase 8.3 as designed.
+
+**Notes:**
+- Dev/ops tools under `src/test_helper/*` access `config_secrets` via direct SQL (not generic CRUD), so they're unaffected.
+- `SecretsHelper` (the in-process secrets accessor used by the auth path, mailer, Square client, etc.) reads/writes the table directly via its own table helper. It's unaffected by the CRUD allow-set change.
 
 ## Phase 2 — Auth primitives hardening (lower layers, no behavior changes user-visible)
 
