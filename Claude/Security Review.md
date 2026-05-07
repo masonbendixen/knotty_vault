@@ -172,9 +172,12 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 - The single-column-uuid round-trip caveat from Phase 1.1–1.5 still stands (defaults are lost in the metadata reverse-engineering for `sessions.uuid` / `device_tokens.uuid`). 1.6 fixed user-defined-type round-trip, but the defaults gap is an independent future fix.
 
 ### 1.7 Add lockout columns to `people`
-- [ ] `db_schema/people.cpp` — add `failed_login_attempts BIGINT NOT NULL DEFAULT 0` and `locked_until BIGINT NULL` (microseconds since epoch, NULL = not locked)
-- [ ] Don't expose these via the generic CRUD `admin_top_level_tables` mapping — only the auth path writes them
-- [ ] Defer the *use* of these columns to Phase 5; this phase only adds the schema slot
+- [x] Added `kPeopleFailedLoginAttempts` (BIGINT NOT NULL DEFAULT 0) and `kPeopleLockedUntil` (BIGINT NULL — microseconds since epoch, NULL = not locked) to `db_schema/people.{h,cpp}`.
+- [x] Did NOT add entries in `PopulateAdminColumnDataInfo` / `PopulateAdminColumnFriendlyNames` — the columns are auth-internal and stay invisible to the admin UI. The remaining JSON-level exposure via the generic CRUD endpoints is closed by the redact map in Phase 3.8 (which will list both columns alongside `password_hash`).
+- [x] `db_schema/people_test.cpp` — added `FailedLoginAttemptsColumnIsBigintWithZeroDefault`, `LockedUntilColumnIsNullableBigint`, `GenerateCreateTableSqlEmitsLockoutColumns`.
+- [x] `sql_util/table_helpers/people_test.cpp::AddPersonInitializesLockoutColumns` — confirms a freshly added person has `failed_login_attempts=0` and `locked_until` NULL/empty.
+- [x] Updated skip-list comparisons in 9 test files so the two new columns are excluded from full-row equality checks: `sql_util/table_helpers/people_test.cpp`, `sql_util/json/database_rest_helper_test.cpp`, and the endpoint tests `add_item`, `add_item_fetch_primary_key`, `delete_item`, `update_item`, `get_filtered_table_rows`, `get_rows_by_column`, `get_row_by_values`.
+- [x] Phase 5 will wire up reads/writes; this phase only added the schema slots. **Latent maintenance smell flagged:** the skip-list pattern is brittle — every column added to `people` requires touching ~25 test sites. If this happens again, worth introducing a `kPeopleAutoSetColumns` constant so it's a one-line update.
 
 ### 1.8 Remove `config_secrets` from generic CRUD exposure
 - [ ] `database_helper/create_database.cpp::PopulateAdminTopLevelTables` — remove `config_secrets` (and any other table holding live credentials) from the admin-CRUD allow set
