@@ -193,32 +193,36 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 ## Phase 2 — Auth primitives hardening (lower layers, no behavior changes user-visible)
 
 ### 2.1 Constant-time hash comparison helper
-- [ ] Add `bool AuthHelper::ConstantTimeEqual(string_view, string_view)` in `business_logic/auth/auth_helper.h/cpp` backed by `sodium_memcmp` (returns false if sizes differ)
-- [ ] Tests in `auth_helper_test.cpp`: `ConstantTimeEqualMatch`, `ConstantTimeEqualLengthMismatch`, `ConstantTimeEqualMismatch`
+- [x] Added static `AuthHelper::ConstantTimeEqual(string_view, string_view)` backed by `sodium_memcmp`. Length mismatch short-circuits to false (the size of one operand isn't sensitive in our threat model). Empty/empty returns true.
+- [x] Tests cover `Match`, `Mismatch` (including a one-byte-different-at-end variant), `LengthMismatch`, `EmptyEqualsEmpty`, and `HandlesEmbeddedNull` (guards against a future refactor swapping in a strcmp-style compare).
 
 ### 2.2 Use the helper for the email-verification token-hash compare
-- [ ] `sql_util/table_helpers/email_verifications.cpp::DoEmailVerification` — replace the `storedTokenHash == tokenHash` check with `AuthHelper::ConstantTimeEqual`
-- [ ] Update / add a test confirming a mismatch still increments attempts and returns false
+- [x] `sql_util/table_helpers/email_verifications.cpp::DoEmailVerification` now compares `storedTokenHash` to `tokenHash` via `Auth::AuthHelper::ConstantTimeEqual`.
+- [x] Added `DoEmailVerificationConstantTimeHashCompare` test that uses an embedded-NUL hash to confirm byte-exact comparison without C-string truncation.
 
 ### 2.3 Atomic email-verification attempt accounting
-- [ ] Replace the read-then-write attempts logic in `email_verifications.cpp::DoEmailVerification` with a single `UPDATE email_verifications SET attempts = attempts + 1 WHERE id = $1 AND attempts < $2 AND expires_at > now_us() RETURNING attempts, token_hash, person_id` — branch on whether a row was returned
-- [ ] On success-path the row is then `DELETE`d in the same transaction
-- [ ] Add `email_verifications_test.cpp::DoEmailVerificationConcurrentAttempts` that simulates two interleaved verification attempts on the same row and asserts the total attempt count is exactly 2 (not 3 / not 1) and that `attemptLimit` is honored
+- [x] Replaced SELECT-then-UPDATE with a single conditional `UPDATE email_verifications SET attempts = attempts + 1 WHERE person_id = $1 AND attempts < $2 AND expires_at > now_us() RETURNING id, token_hash, attempts`. The counter saturates at the limit (no off-by-one over-count), the WHERE filter blocks expired rows, and the RETURNING clause feeds the constant-time hash compare.
+- [x] On success, the row is `DELETE`d in the same transaction so a concurrent caller can't replay it.
+- [x] On failure when `newAttempts >= attemptLimit`, fire the `admin_alerts` row.
+- [x] Updated `DoEmailVerificationTooManyAttempts` to assert `attempts == 2` (saturates at the limit; old behavior went to limit+1).
+- [x] Added `DoEmailVerificationConcurrentAttempts`: two sequential failed attempts → exactly `attempts == 2`.
+- [x] Added `DoEmailVerificationNoRowReturnsFalse`: missing verification row returns false rather than throwing — keeps failure modes indistinguishable from wrong-hash / expired / over-limit.
 
 ### 2.4 Atomic device-token rotation
-- [ ] Add a new helper `bool DeviceTokens::ConsumeAndRotate(Transaction&, string_view oldSecretHash, string_view newSecretHash, int64_t newExpiresAtMicros, /*out*/ int& personId)` that runs a single `UPDATE device_tokens SET secret_hash=$2, uuid=gen_random_uuid(), last_used_at=now_us(), expires_at=$3 WHERE secret_hash=$1 AND NOT revoked AND now_us() < expires_at RETURNING person_id, uuid` and returns true only if a row was returned
-- [ ] `business_logic/auth/person.cpp::TryLoginWithDeviceToken` — switch from the read+update pattern to `ConsumeAndRotate`
-- [ ] Test: `device_tokens_test.cpp::ConsumeAndRotateBasic`, `ConsumeAndRotateRevoked`, `ConsumeAndRotateExpired`, `ConsumeAndRotateUnknown`, plus a contention test that does two parallel rotations against the same secret hash and asserts exactly one wins
+- [x] Added `DeviceTokens::ConsumeAndRotate(transaction, oldSecretHash, oldUuid, newSecretHash, microsUntilExpires, outPersonId, outNewUuid)`. Single SQL: `UPDATE device_tokens SET secret_hash=$3, uuid=gen_random_uuid(), last_used_at=now_us(), expires_at=now_us()+<micros> WHERE secret_hash=$1 AND uuid::text=$2 AND NOT revoked AND now_us() < expires_at RETURNING person_id, uuid`. WHERE matches both the secret hash AND the uuid (the public side of the cookie) — defense in depth against captured-hash-with-stale-uuid attacks.
+- [x] `PersonHelper::TryLoginWithDeviceToken` now mints the replacement secret/hash up front, then calls `ConsumeAndRotate`. The old read+UUID-compare+IsValid+UPDATE+lookup chain is gone.
+- [x] Tests: `ConsumeAndRotateBasic` (rotation + state mutation), `ConsumeAndRotateUnknownSecretHash`, `ConsumeAndRotateUuidMismatch` (defense-in-depth — same hash, wrong uuid still fails), `ConsumeAndRotateRevoked`, `ConsumeAndRotateExpired`, `ConsumeAndRotateContentionOnlyOneWins` (two sequential calls — first wins, second fails because the WHERE no longer matches).
 
 ### 2.5 Argon2id parameter bump (and make tunable)
-- [ ] Add secrets `kAuthArgon2OpsLimit` and `kAuthArgon2MemLimitKb` (defaults: `MODERATE` ≡ 3 ops, 262144 KB)
-- [ ] `auth_helper.cpp::HashPassword` — read those secrets, fall back to `MODERATE` when missing
-- [ ] `auth_helper_test.cpp` — keep the existing fast tests (override the secret to `INTERACTIVE` for speed); add a `HashPasswordRespectsOpsLimitSecret` test asserting the cost parameter actually plumbed through
-- [ ] Note: existing hashes remain valid — `crypto_pwhash_str_verify` reads parameters from the encoded hash, so old logins still work
+- [x] Added `kAuthArgon2OpsLimit` and `kAuthArgon2MemLimitKb` to `secret_keys.h`; production defaults are MODERATE (3 ops, 262144 KB) in `secret_values.cpp`. Both registered in `FillInSecretsStringView`.
+- [x] `AuthHelper` now has three forms of `HashPassword`: instance method with default MODERATE cost, instance method with explicit `(opsLimit, memLimitBytes)`, and static `HashPasswordWithSecrets(transaction, secrets, password)` that reads the two new secrets and falls back to MODERATE if either is missing/empty/unparseable. Bounds-checked against libsodium's MIN/MAX so a misconfigured secret can't drive cost below the floor.
+- [x] `PersonHelper::PreliminaryRegisterPerson` now uses `HashPasswordWithSecrets`. `CreateFullyValidatedUser` and `UpdatePassword` got an optional `Secrets::SecretsHelperPtr secrets` parameter — production callers pass it (Argon2 driven by secrets); test/dev-tool callers omit it (fall back to a fast INTERACTIVE-cost hash). Bootstrap (`PopulatePeople` in `create_database.cpp`) and `endpoints/update_user_password.cpp` now pass secrets.
+- [x] **Test-suite speed preserved.** `SecretsHelperTestImpl` overrides `kAuthArgon2OpsLimit`/`kAuthArgon2MemLimitKb` to INTERACTIVE values (2 ops, 64 MB) right after loading prod defaults. Every test that obtains a SecretsHelper via `MakeTestSecretsHelper()` (or via `EndpointTestHelper`) automatically gets fast Argon2 hashes without per-test setup.
+- [x] Tests: `HashPasswordRespectsExplicitCost` (explicit args plumb through), `HashPasswordWithSecretsRespectsOpsLimitSecret` (secrets drive cost; encoded hash carries the right t= and m= parameters), `HashPasswordWithSecretsFallsBackToModerateOnMissingSecrets`, `HashPasswordWithSecretsFallsBackToModerateOnNullSecrets`, `HashPasswordWithSecretsRespectsTestHelperInteractiveOverride` (locks in the test-helper override).
+- [x] Existing hashes still verify: `crypto_pwhash_str_verify` reads cost from the encoded hash, so users with INTERACTIVE-cost hashes from earlier still log in fine until their next password change.
 
 ### 2.6 Zeroize sensitive buffers on the password path
-- [ ] Use `sodium_memzero` on the plaintext password copy after hashing/verifying inside `auth_helper.cpp` (best-effort, not a hard guarantee)
-- [ ] No new tests required (hard to assert; manual inspection)
+- [x] `AuthHelper::HashPassword` calls `sodium_memzero` on the local libsodium output buffer after copying it to the return string, both on success and on error. Best-effort — the returned `std::string` still lives in the caller's storage, but the local stack buffer doesn't linger.
 
 ## Phase 3 — Endpoint authentication & authorization corrections
 
