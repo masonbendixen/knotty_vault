@@ -120,28 +120,30 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 **Why first**: every later auth fix sits on top of these tables. Adding indices + uniqueness now also avoids painful migrations after data accumulates.
 
 ### 1.1 Add unique index on `sessions.uuid` (db_schema layer)
-- [ ] Add `AddIndex(kSessionsUuid, /*unique=*/ true)` (or equivalent in the schema DSL) in `db_schema/sessions.cpp::MakeSessionsTable`
-- [ ] Verify `db_schema/db_and_table_operations.cpp` emits `CREATE UNIQUE INDEX` correctly (extend if no unique-index helper exists)
-- [ ] Add a metadata-level unit test in `db_schema/sessions_test.cpp` (or the equivalent) asserting the index is present in `DatabaseInfo`
-- [ ] Add a `db_and_table_operations_test.cpp` regression that DDL output includes `UNIQUE INDEX` when the column is so flagged
+- [x] Added `AddUniqueConstraint(kSessionsTable, kSessionsUuid)` in `db_schema/sessions.cpp::MakeSessionsTable`. (Used the existing table-level unique-constraint DSL rather than introducing a separate `AddIndex` primitive — Postgres implements `UNIQUE` via a unique index, so the lookup performance and correctness goals are met.)
+- [x] Verified the existing `db_and_table_operations.cpp::GenerateCreateTableSql` emits `UNIQUE (col)` correctly for table-level constraints. No DSL extension needed.
+- [x] Added `db_schema/sessions_test.cpp` asserting the constraint is present in `DatabaseInfo` and that the DDL emits `UNIQUE (uuid)`.
+- [x] Added `db_and_table_operations_test.cpp::GenerateCreateTableSqlSingleColumnUniqueConstraint` regression — confirms the table-level `UNIQUE (col)` round-trips correctly when paired with `NOT NULL DEFAULT GEN_RANDOM_UUID()` (the sessions/device_tokens uuid pattern).
 
 ### 1.2 Add unique index on `device_tokens.uuid`
-- [ ] `db_schema/device_tokens.cpp::MakeDeviceTokensTable` — add unique index on `kDeviceTokensUuid`
-- [ ] Schema test in `db_schema/device_tokens_test.cpp` (or `database_metadata_test.cpp`) asserting uniqueness
+- [x] Added `AddUniqueConstraint(kDeviceTokensTable, kDeviceTokensUuid)` in `db_schema/device_tokens.cpp::MakeDeviceTokensTable`.
+- [x] Added `db_schema/device_tokens_test.cpp` asserting uniqueness at both metadata and DDL level.
 
 ### 1.3 Add `UNIQUE(person_id)` to `email_verifications`
-- [ ] `db_schema/email_verifications.cpp` — add unique constraint on `kEmailVerificationsPersonId`
-- [ ] Update `sql_util/table_helpers/email_verifications.cpp::AddEmailVerificationByEmail/Id` to do a `DELETE` of any existing row for the person *in the same transaction* before insert (so resending a verification is still allowed). Add a unit test that issues two consecutive `AddEmailVerificationByEmail` calls and asserts only one row exists for that person.
-- [ ] Backfill plan note: existing data is dev-only, schema reset acceptable
+- [x] Added `AddUniqueConstraint(kEmailVerificationsTable, kEmailVerificationsPersonId)` in `db_schema/email_verifications.cpp`.
+- [x] Rewrote `sql_util/table_helpers/email_verifications.cpp::AddEmailVerificationById` to `DELETE` any existing row for the person *in the same transaction* before insert (replaces the old throw-on-existing behavior). Replaced the `AddEmailVerificationByIdAlreadyExists` test with `AddEmailVerificationByIdReplacesExisting` and added `AddEmailVerificationByEmailReplacesExisting`. Both assert exactly one row remains, the old PK is gone, and the row carries the new hash.
+- [x] Added `db_schema/email_verifications_test.cpp`.
+- [x] Backfill: dev-only data, no migration needed.
 
 ### 1.4 Add `UNIQUE(person_id, role_id)` to `role_assignments`
-- [ ] `db_schema/role_assignments.cpp` — composite unique
-- [ ] Update `sql_util/table_helpers/role_assignments.cpp::AddRoleAssignment` test to assert duplicate insert throws the unique-violation
-- [ ] Add an `AddRoleAssignmentDuplicate` test that confirms the constraint fires
+- [x] Added `AddUniqueConstraint(kRoleAssignmentsTable, kRoleAssignmentsPersonId, kRoleAssignmentsRoleId)` in `db_schema/role_assignments.cpp`.
+- [x] Added `RoleAssignmentsTest::AddRoleAssignmentDuplicate` in `sql_util/table_helpers/role_assignments_test.cpp` — asserts `EXPECT_THROW` on duplicate `(person_id, role_id)`.
+- [x] Added `db_schema/role_assignments_test.cpp`.
 
 ### 1.5 Add `UNIQUE(role_id, permission_id)` to `role_permissions`
-- [ ] `db_schema/role_permissions.cpp` — composite unique
-- [ ] Mirror test additions in `sql_util/table_helpers/role_permissions_test.cpp`
+- [x] Added `AddUniqueConstraint(kRolePermissionsTable, kRolePermissionsRoleId, kRolePermissionsPermissionId)` in `db_schema/role_permissions.cpp`.
+- [x] Added `RolePermissionsTest::AddRolePermissionDuplicate` in `sql_util/table_helpers/role_permissions_test.cpp`.
+- [x] Added `db_schema/role_permissions_test.cpp`.
 
 ### 1.6 Make `people.email` case-insensitive
 - [ ] Switch `db_schema/people.cpp::kPeopleEmail` to `citext` (preferred — requires `CREATE EXTENSION citext` in `database_helper/create_database.cpp`'s pre-table phase)
