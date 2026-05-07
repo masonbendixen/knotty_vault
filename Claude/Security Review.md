@@ -145,10 +145,28 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 - [x] Added `RolePermissionsTest::AddRolePermissionDuplicate` in `sql_util/table_helpers/role_permissions_test.cpp`.
 - [x] Added `db_schema/role_permissions_test.cpp`.
 
-### 1.6 Make `people.email` case-insensitive
-- [ ] Switch `db_schema/people.cpp::kPeopleEmail` to `citext` (preferred — requires `CREATE EXTENSION citext` in `database_helper/create_database.cpp`'s pre-table phase)
-- [ ] If `citext` requires more plumbing than desired, alternative: keep `text` but add `CHECK (email = lower(email))` and lowercase on every write in `sql_util/table_helpers/people.cpp::AddPerson` / `UpdatePerson`
-- [ ] `people_test.cpp` — add `AddPersonEmailCaseInsensitive` test that inserts `Mason@x.com`, then asserts `LookupPersonByEmail("mason@x.com")` returns the same row, and that a second insert with mixed case throws on the unique constraint
+### 1.6 Make `people.email` case-insensitive (via `DB_TYPE_CITEXT`)
+**Approach:** Add Postgres's `citext` extension and surface it as a first-class `DB_TYPE_CITEXT` in the schema DSL. Every comparison, unique check, and index lookup on a citext column is automatically case-insensitive at the DB level — no per-call discipline required. The reverse-engineering path is generalized at the same time so the next user-defined Postgres type (hstore, ltree, custom enums, PostGIS geometry, …) drops into the DSL with one enum addition instead of needing a special case in the metadata reader. This is the platform-quality move.
+
+**DSL extension (lower layer first):**
+- [ ] `sql_util/database_common.h` — add `DB_TYPE_CITEXT` to the `DatabaseTypes` enum
+- [ ] `sql_util/schema/column_info.cpp::SqlTypeFromDatabaseType` — map `DB_TYPE_CITEXT` → `"CITEXT"`
+- [ ] `sql_util/schema/column_info_test.cpp` — assert `SqlTypeFromDatabaseType(DB_TYPE_CITEXT)` returns `"CITEXT"` and that a `ColumnInfo(name, DB_TYPE_CITEXT)` round-trips its type via `GetSqlType()`
+- [ ] `sql_util/database_access/database_metadata.cpp::DatabaseTypesFromDatabaseColumnInfo` — **generalize** the lookup: when `data_type == "USER-DEFINED"`, fall back to a second lookup table keyed on `udt_name` (initially just `{"citext", DB_TYPE_CITEXT}`, but structured so future user-defined types are one-line additions). Throw the same way as today if neither table matches.
+- [ ] `sql_util/database_access/database_metadata_test.cpp` — add a test that creates a table with a `CITEXT` column, runs `DatabaseInfoFromDatabase`, and asserts the column round-trips as `DB_TYPE_CITEXT`. This exercises the new `udt_name` fallback path.
+- [ ] `sql_util/database_access/db_and_table_operations_test.cpp` — add a regression that `GenerateCreateTableSql` emits `column_name CITEXT NOT NULL` for `AddColumnSimple(table, col, DB_TYPE_CITEXT)` (and similar for nullable / unique / default flavors as appropriate)
+
+**Schema bootstrap:**
+- [ ] `database_helper/create_database.cpp` — emit `CREATE EXTENSION IF NOT EXISTS citext` before any table is created. Place it alongside whatever pre-table setup already runs (e.g., next to `CreateStoredProceduresBeforeTables` if that's the convention) so it's loaded before `MakePeopleTable` runs at startup.
+- [ ] If a corresponding extension-creation helper doesn't exist, add a tiny `sql_util/database_access/extensions.{h,cpp}` (or fold into the existing pre-table helper) that wraps `CREATE EXTENSION IF NOT EXISTS <name>` and is callable from `create_database.cpp`. Keeps the next extension (e.g., pgcrypto if we ever want it explicitly) one-line.
+- [ ] Test that the extension is present after `CreateAndPopulateDatabases` runs (existing test fixtures will catch this implicitly when the schema test below runs, but a direct `SELECT 1 FROM pg_extension WHERE extname = 'citext'` test in `database_metadata_test.cpp` is cheap insurance).
+
+**Apply to `people.email`:**
+- [ ] `db_schema/people.cpp::MakePeopleTable` — change `kPeopleEmail` from `DB_TYPE_STRING` to `DB_TYPE_CITEXT` (keep `UNIQUE`, keep `NOT NULL`)
+- [ ] `db_schema/people_test.cpp` (new file, mirror the pattern from `db_schema/sessions_test.cpp`) — assert `GetTableInfo(kPeopleTable).GetColumn(kPeopleEmail).GetDatabaseType() == DB_TYPE_CITEXT` and that `GenerateCreateTableSql` emits `email CITEXT UNIQUE`. Add it to `db_schema/CMakeLists.txt`.
+- [ ] `sql_util/table_helpers/people_test.cpp` — add `AddPersonEmailCaseInsensitive`: insert `Mason@x.com`, then assert `LookupPersonByEmail("mason@x.com")` and `LookupPersonByEmail("MASON@X.COM")` both return the same row, and a second `AddPerson` with `mason@x.com` throws on the unique constraint.
+
+**Round-trip note (Phase 1.1–1.5 carryover):** with this change in place, the `database_metadata.cpp` reader now correctly handles user-defined types, so the `people` table can also round-trip cleanly. The single-column-uuid round-trip caveat I flagged in Phase 1.1–1.5 still stands (defaults aren't in the round-trip), but that's an unrelated future cleanup.
 
 ### 1.7 Add lockout columns to `people`
 - [ ] `db_schema/people.cpp` — add `failed_login_attempts BIGINT NOT NULL DEFAULT 0` and `locked_until BIGINT NULL` (microseconds since epoch, NULL = not locked)
