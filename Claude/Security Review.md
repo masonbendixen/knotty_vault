@@ -259,26 +259,28 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [ ] Tests: `verify.component.spec.ts` covering success, failure, missing-params; `server-access.mock.spec.ts` for the new `verify(email, secret)` mock method
 
 ### 3.4 `/api/me` — switch to GET
-- [ ] `endpoints/me.cpp` registers `crow::HTTPMethod::Get`
-- [ ] `me_test.cpp` and the `me.mock` frontend update
-- [ ] Important interaction with Phase 4: `/api/me` is read-only so a CSRF check should not be required — confirm the eventual CSRF middleware skips safe methods
+- [x] `endpoints/me.cpp` registers `crow::HTTPMethod::Get` (HandlePost renamed to HandleGet for clarity).
+- [x] `me_test.cpp` updated to use GET.
+- [x] Frontend: `ServerAccessNetwork.ts::me()` switched from `http.post` to `http.get`. Phase 4's eventual CSRF middleware will naturally skip safe methods.
 
 ### 3.5 Remove hardcoded "Mason"/"Tyler" admin grant
-- [ ] `endpoints/account_activation.cpp:65-82` — delete the name-based branch entirely
-- [ ] Replace with: nothing — admins are minted via the seed-data path in `database_helper/create_database.cpp` or via the role-management UI
-- [ ] Update / add `account_activation_test.cpp::AccountActivationDoesNotGrantAdminByName` that registers `firstName="Mason"` and asserts no `role_assignments` rows for the admin role exist after activation
-- [ ] Confirm the seed path: ensure `create_database.cpp` provisions at least one admin user so that initial setup still works
+- [x] `endpoints/account_activation.cpp` — name-based branch deleted; comment in the source explains why.
+- [x] `account_activation_test.cpp::AccountActivationDoesNotGrantAdminByName` (firstName=Mason) and `…AndNameTyler` (firstName=Tyler) — both register/activate the user and assert no admin role assignment lands. Belt-and-suspenders so a future regression on either hardcoded name is caught.
+- [x] Existing seed-data path in `create_database.cpp::PopulateRoleAssignments` continues to mint admins.
 
 ### 3.6 Staff endpoints — enforce a `staff_access` permission
-- [ ] Choose the permission name (`staff_access`) and seed it in `database_helper/create_database.cpp` (add the row to `permissions` and the `admin → staff_access` link in `role_permissions`)
-- [ ] Add a helper `EndpointAuthHelper::RequirePermission(string_view name, crow::response& resp)` that returns `false` and writes `ErrorResponse::NotAuthorized` if the active user lacks the permission, so each endpoint becomes a one-liner
-- [ ] Apply to: `endpoints/staff_checkin.cpp`, `staff_create_quick_account.cpp`, `staff_dropin_booking.cpp`, `staff_search_people.cpp`, `staff_upgrade_session.cpp`, `staff_upgrade_options.cpp`, `staff_upcoming_checkins.cpp`, and any other `staff_*.cpp` discovered while editing
-- [ ] Tests: each `*_test.cpp` gets a `*NotStaff` case asserting 403 for a logged-in non-staff user, and a `*StaffOK` case verifying the existing flow still works once the role is granted
+- [x] Added `kPermissionStaffAccess = "staff_access"` to `db_schema/permissions.h`.
+- [x] Seeded the permission row in `create_database.cpp::PopulatePermissions` and linked `admin → staff_access` in `PopulateRolePermissions` (id 8 — order matters, comments call it out).
+- [x] Added `EndpointAuthHelper::RequirePermission(transaction, name, resp)` — returns true on allow; on deny, writes `NotAuthenticated` (401) when not logged in or `NotAuthorized` (403) when missing the permission. Catches the underlying `runtime_error` from `Session::ActiveUserHasPermission` so an unseeded permission name fails closed without leaking the message.
+- [x] Wired into all seven staff endpoints inside the existing `RunInTransaction` block: `staff_checkin.cpp`, `staff_create_quick_account.cpp`, `staff_dropin_booking.cpp`, `staff_search_people.cpp`, `staff_upgrade_session.cpp`, `staff_upgrade_options.cpp`, `staff_upcoming_checkins.cpp`.
+- [x] Added `EndpointTestHelper::GrantPermissionToPerson(transaction, personId, name)` so each test setup is a one-line addition. Updates the existing `Setup*` helpers in all seven `staff_*_test.cpp` files so the existing happy-path tests continue to exercise success.
+- [x] Added `NotStaffForbidden` regression tests for `staff_create_quick_account` and `staff_search_people` (the two highest-value gates — account creation and PII enumeration). Both expect HTTP 403 when a logged-in customer hits the endpoint without the permission.
+- [ ] **Follow-up**: add `NotStaffForbidden` tests for the other five (`staff_checkin`, `staff_dropin_booking`, `staff_upgrade_session`, `staff_upgrade_options`, `staff_upcoming_checkins`). The gate is wired in production code and the existing tests grant the permission, so the success path is covered; only the negative regression is missing for these five. Pattern is identical to the two that exist — copy/paste with the right URL.
 
 ### 3.7 Image endpoint authorization
-- [ ] `endpoints/get_photo.cpp` — require both `IsLoggedIn` and that the requested `(table, item_id)` is one the active user is allowed to read. Reuse `IsTableAllowed` and add an item-scoped check helper if any tables expose private images. Document a small allow-list of tables for which any logged-in user can fetch images.
-- [ ] `endpoints/get_scaled_photo.cpp` — add the same auth check; replace the dedicated connection with the shared `TransactionProvider`
-- [ ] Tests: `get_photo_test.cpp::GetPhotoForbiddenTable`, `GetPhotoUnauthenticated` (already exists?), `get_scaled_photo_test.cpp` similar
+- [x] `endpoints/get_photo.cpp` — kept the `IsLoggedIn` check, added `IsTableAllowed` so the active user must have read access to the requested table. Anonymous callers still get 401; authenticated users without permission to the table get 400.
+- [x] `endpoints/get_scaled_photo.cpp` — fully rewritten: removed the dedicated DB connection (a connection-exhaustion DoS vector), routed through `EndpointAuthHelper`, added the same `IsLoggedIn + IsTableAllowed` gate. Public-image flows (home page carousel) keep using the dedicated `home_page_photos` endpoint.
+- [x] Tests: `GetPhotoForbiddenTable` (logged-in non-admin gets 400), pre-existing `GetPhotoNotLoggedIn` still passes. `get_scaled_photo_test.cpp` rewritten to go through `handle_full` for full-stack coverage — added `Success`, `Returns304WhenETagMatches`, `NotFound`, `NotLoggedIn`, `ForbiddenTable`. Updated the existing test setup helpers to grant admin (matching the new permission requirement).
 
 ### 3.8 Strip sensitive columns from generic CRUD reads via column-level redact map (Decision #8)
 **Approach:** column-level redact map, not a separate `people_credentials` table. Rationale:
@@ -316,9 +318,9 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ### 3.9 Lock down ownership-sensitive endpoints with regression tests
 - [x] (Verified on follow-up) `endpoints/change_purchase_recipient.cpp:99-106` already rejects when `payerPersonId != loggedInPersonId`
 - [x] (Verified on follow-up) `business_logic/payment/gift_permission_helper.cpp::AcceptRequest/DenyRequest` reject when the active user isn't the grantee, and `Revoke` requires either grantor or grantee
-- [ ] Add `change_purchase_recipient_test.cpp::PostChangePurchaseRecipientNotPayerForbidden` (a logged-in non-payer attempts to change the recipient and gets 403)
-- [ ] Add `gift_permissions_test.cpp::AcceptNotGranteeForbidden`, `DenyNotGranteeForbidden`, `RevokeOutsiderForbidden`
-- [ ] `endpoints/set_user_info.cpp` and `endpoints/update_user_password.cpp` — confirm they always operate on `session.GetPersonId()` and never on a person_id read from the request body; add a test that a request body explicitly passing another person's ID is ignored
+- [x] `change_purchase_recipient_test.cpp::ChangeRecipientNotPayer` — already existed pre-Phase-3, exact regression we wanted (logged-in stranger tries to change recipient → 403).
+- [x] `gift_permissions_test.cpp::AcceptWrongPerson` already existed (pinned the `AcceptNotGrantee` case). Added `DenyNotGranteeForbidden` and `RevokeOutsiderForbidden` to round out the trio.
+- [x] `set_user_info_test.cpp::SetUserInfoIgnoresPersonIdInBody` — the most important regression: two users A and B; logged in as A, POST a body that explicitly sets `person_id` and `id` to B's id along with new field values. Assert A's row was modified (the session user, never the body's id) and B's row is untouched. `update_user_password.cpp` already operates on `session.GetPersonId()` only — verified by inspection; no body field maps to person_id.
 
 ## Phase 4 — CSRF (cross-cutting; lower layers + endpoints + client)
 
