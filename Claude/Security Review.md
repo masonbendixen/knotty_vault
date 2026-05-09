@@ -381,32 +381,30 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [x] Tests in `person_test.cpp`: `LoginPersonSuccessClearsFailureCount` (resets pre-seeded failures), `LoginPersonWrongPasswordIncrementsCount` (under threshold), `LoginAccountLockoutAtThreshold` (3 wrong = locked, justLocked=true, lockedUntil>0), `LoginSuccessClearsLockout` (post-expired lock), `LoginAccountStaysLockedDuringWindow` (documents that LoginPerson is intentionally lock-agnostic — gate's job to refuse), `LoginAccountUnlocksAfterWindow` (backdated lock), `LoginPersonUnknownEmailReturnsFailureWithNoSideEffect` (no row created, no row touched).
 
 ### 5.4 Asynchronous attempt recording (write-behind via ThreadPool)
-- [ ] After the synchronous password-verify path returns to the endpoint, enqueue a single lambda on `ThreadPool::GetInstance().Queue(...)` that:
-  - Captures the `TransactionProvider&` by reference (the singleton lives at least as long as the request handler)
-  - Captures `email`, `ip`, `kind`, `success` by value
-  - Inside the lambda: `RunInTransaction { LoginAttempts::RecordAttempt(...) }`
-- [ ] The lambda is fire-and-forget; the HTTP response goes back to the client without waiting. Login latency budget is unchanged (Argon2id at ≈250ms dominates).
-- [ ] Tests in `person_test.cpp` use `ThreadPool::GetInstance().Shutdown()` (which calls `Join`) at the end of the test to make assertions deterministic — same pattern as `SessionUsedBasic`.
-- [ ] Multi-instance correctness: every task reads the latest count from PG; no shared in-memory state needed.
+- [x] `login.cpp::EnqueueAttemptRecord` — captures `TransactionProvider`, `DatabaseHelper`, `email`, `ip`, `kind`, `success` by value into a `ThreadPool::GetInstance().Queue(...)` lambda. The lambda opens a fresh transaction inside `provider->RunInTransaction` and inserts via `LoginAttempts::RecordAttempt`. Wrapped in try/catch so DB blips don't crash the worker.
+- [x] Same pattern in `verify.cpp::EnqueueVerifyAttempt` and `remember.cpp::EnqueueRememberAttempt` (5.6 below).
+- [x] Gate-refused requests (429) **don't** enqueue a row — the existing rows are why we got the 429; another would re-extend the lockout window. Sub-threshold failures DO enqueue.
+- [x] Tests use `ThreadPool::GetInstance().Shutdown()` to flush queued work before asserting (mirrors `SessionUsedBasic`). The test transaction provider routes the async write back into the test's outer transaction so it's both visible AND rolled back at end-of-test (no cross-test pollution).
+- [x] Multi-instance correctness preserved: nothing in-memory; every gate read goes to Postgres.
 
 ### 5.5 IP plumbing
-- [ ] `business_logic/auth/proxy_trust.cpp` — confirm/extend `ResolveClientIp(crow::request&)` so it returns the right client IP regardless of whether we're behind CloudFront or running locally. Reads `KNOTTYYOGA_TRUST_PROXY` env var (already in place); when set, prefers `X-Forwarded-For` last entry; otherwise falls back to the connection peer address from `req.remote_ip_address` (or whatever Crow exposes).
-- [ ] `endpoints/login.cpp`, `endpoints/verify.cpp`, `endpoints/remember.cpp` — call `ResolveClientIp` and pass into the gate / async recorder.
-- [ ] Tests on `proxy_trust_test.cpp` for both trust-on and trust-off modes.
+- [x] `Auth::ResolveClientIp(req)` added to `proxy_trust.{h,cpp}` — when the proxy is trusted AND `X-Forwarded-For` is set, returns the first entry (the actual viewer); otherwise falls back to `req.remote_ip_address` (Crow's connection peer). Returns empty when neither source has a value; the gate / recorder treat empty as "skip per-IP path" rather than as a sentinel.
+- [x] Wired into all three endpoints: `login.cpp`, `verify.cpp`, `remember.cpp`.
+- [x] 4 new tests in `proxy_trust_test.cpp::ResolveClientIpTest`: `PrefersForwardedHeaderWhenProxyTrusted`, `FallsBackToConnectionPeerWhenProxyUntrusted`, `FallsBackToConnectionPeerWhenForwardedHeaderMissing`, `ReturnsEmptyWhenNeitherSourceAvailable`.
 
 ### 5.6 Verification & remember-me throttling
-- [ ] Reuse the same gate machinery for `/api/verify` (kind=`verify`, default 30 failures / 15 min / IP, 30-min block) and `/api/remember` (kind=`remember`, default 50 failures / 15 min / IP, 1 h block).
-- [ ] New secrets: `kAuthVerifyMaxFailuresPerIpPerWindow`, `kAuthVerifyFailureWindowInMicros`, `kAuthRememberMaxFailuresPerIpPerWindow`, `kAuthRememberFailureWindowInMicros` (defaults as above).
-- [ ] Tests on `verify_test.cpp::VerifyRateLimitedPerIp` and `remember_test.cpp::RememberRateLimitedPerIp`.
+- [x] `verify.cpp` and `remember.cpp` call `LoginGate::CheckBeforeVerify` / `CheckBeforeRemember` before their existing auth checks. Refused requests get the same generic `TooManyAttempts` 429 as login (Phase 5.7). Both endpoints async-record outcomes via per-endpoint enqueuers (`EnqueueVerifyAttempt`, `EnqueueRememberAttempt`) keyed by `kind=verify` / `kind=remember`. Remember passes empty `email_lower` since there's no authenticated email at that point.
+- [x] Secrets added (5.2 above): defaults `30/15min` for verify, `50/15min` for remember.
+- [x] Tests: `verify_test.cpp::VerifyRateLimitedPerIp` (3-row pre-seed → 429), `VerifyRecordsFailureAttemptAsync` (sub-threshold failure records); `remember_test.cpp::RememberRateLimitedPerIp`, `RememberRecordsFailureAttemptAsync`. Each test sets `req.remote_ip_address` directly so `ResolveClientIp`'s connection-peer fallback returns a non-empty IP for the synthesized request.
 
 ### 5.7 Generic error shape (no enumeration)
-- [ ] All auth-failure paths return the same response shape: `401 {"error":"invalid_credentials"}` for any failure (wrong password, unknown email, account locked) below the rate-limit threshold; `429 {"error":"too_many_attempts"}` only when rate-limited or locked.
-- [ ] Specifically, do **not** distinguish "account is locked" from "wrong password" in 401 responses — both look identical from the outside. The 429 means "stop trying for now"; no detail about why.
-- [ ] Test `person_test.cpp::LoginUnknownUserSameAsWrongPassword` (timing — pad with a no-op Argon2id verify against a sentinel hash so unknown-email and wrong-password take similar wall-clock time). Optional but worth doing.
+- [x] New `ErrorResponse::TooManyAttempts` (HTTP 429, type `too_many_attempts`). Returned for ALL gate refusals: per-email burst, per-IP burst, AND sticky account-lockout. Caller can't tell the buckets apart; operator gets the breakdown in server logs.
+- [x] Wrong-password and unknown-email both return identical 401 `invalid_credentials` with the same `detail` text. `LoginTest::LoginWrongPasswordSameShapeAsUnknownEmail` pins the response shape — pulls both response bodies and asserts type/detail equality.
+- [ ] **Wall-clock timing parity (deferred)**: padding the unknown-email branch with a no-op Argon2 verify against a sentinel hash. The design doc marks this "optional"; the response-shape test above covers the more impactful side-channel. Defer to a follow-up.
 
 ### 5.8 Periodic cleanup
-- [ ] Add a `ThreadPool` job in `main.cpp` that, every hour, calls `LoginAttempts::PurgeOlderThan(transaction, kAuthLoginAttemptsRetentionInMicros)` (default: 30 days). Prevents unbounded growth.
-- [ ] Test in `login_attempts_test.cpp::PurgeOlderThanBasic`.
+- [ ] **Deferred**: needs scheduler integration. Plan: add a `/api/admin/cleanup_login_attempts` endpoint that calls `LoginAttempts::PurgeOlderThan(tx, kAuthLoginAttemptsRetentionInMicros)`, then register it as a `ScheduledJob` in `scheduler/scheduler_config.h` (hourly). The `PurgeOlderThan` table-helper method and the `kAuthLoginAttemptsRetentionInMicros` secret (default 30 days) are already in place; only the endpoint + schedule wiring remains.
+- [x] `login_attempts_test.cpp::PurgeOlderThanBasic` and `::PurgeOlderThanZeroIsNoop` already pin the helper-side behavior so the deferred endpoint is a thin wrapper.
 
 ## Phase 6 — Cookie hygiene cleanup
 
