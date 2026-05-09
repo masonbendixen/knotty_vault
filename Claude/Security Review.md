@@ -227,36 +227,36 @@ Phases are numbered by topic (so the doc reads as a logical grouping), but they 
 ## Phase 3 — Endpoint authentication & authorization corrections
 
 ### 3.1 Move `/api/register` from URL path to JSON body — backend
-- [ ] Change route in `endpoints/register.cpp` to `POST /api/register` reading `{ first_name, last_name, email, password }` from `req.body` JSON
-- [ ] Validate each field; preserve existing `PreliminaryRegisterPerson` call
-- [ ] `endpoints/register_test.cpp` — flip every test to body-based POST; add `RegisterMissingFieldBadRequest`
-- [ ] No legacy fallback — old URL form is removed
+- [x] Route in `endpoints/register.cpp` is now `POST /api/register` reading `{ first_name, last_name, email, password }` from `req.body` JSON via `Json::Value::FromText`. Each missing/empty field returns `ValidationError` (400). `register.h` signature updated to take `const Json::Value& message`. No legacy URL-path form remains.
+- [x] Field validation preserved; `PreliminaryRegisterPerson` call path unchanged.
+- [x] `endpoints/register_test.cpp` — added `BuildRegisterBody` / `IssueRegisterRequest` helpers, flipped every existing test to body-based POST, added regressions: `RegisterMissingBody`, `RegisterMissingFieldFirstName/LastName/Email/Password`, `RegisterEmptyFieldRejected`, `RegisterNoLongerAcceptsLegacyPathParameters`.
+- [x] Side effect: `gift_permissions_endpoint_test::RegistrationConvertsInvitationToGiftPermission` was using the legacy GET URL — rewritten to POST + JSON body.
 
 ### 3.2 `/api/register` — frontend
-- [ ] `ui/src/app/shared/services/server-access.network.ts:206` (and the corresponding mock + spec) — switch to `POST /api/register` with JSON body, drop `withCredentials` for register? (no — keep `withCredentials` so the cookie set on the response sticks)
-- [ ] `ui/src/app/auth/register/register.component.ts` — verify the call site
-- [ ] Update `ui/src/app/shared/services/server-access.mock.ts` and `server-access.mock.spec.ts`
-- [ ] `register.component.spec.ts` — confirm it still asserts the success/failure branches
+- [x] `ServerAccessNetwork.register(...)` now does `http.post('/api/register', { first_name, last_name, email, password }, { withCredentials: true })`. `withCredentials` retained so the session cookie set in the response sticks.
+- [x] `register.component.ts` call site verified — already passes the four fields, no shape change needed.
+- [x] Mock + spec parity: `ServerAccess.mock.ts::register` and `ServerAccess.mock.spec.ts` track the new shape.
+- [x] `register.component.spec.ts` — existing success/failure branch assertions still cover the body-based call.
 
 ### 3.3 `/api/verify` — SPA-routed POST with 1-hour TTL (Decision #2)
 The verification email link points at the SPA, not the API. The SPA reads the secret from the query string, immediately POSTs to `/api/verify`, then scrubs the URL via `history.replaceState` so the secret doesn't linger in browser history.
 
 **Backend:**
-- [ ] `endpoints/verify.cpp` — change route to `POST /api/verify` reading `{ email, secret }` from JSON body. Drop the URL-path-secret variant entirely.
-- [ ] `verify_test.cpp` — flip every test to body-based POST; add `VerifyMissingFieldBadRequest`
-- [ ] Add the verify endpoint to the CSRF-exempt allow-list in Phase 4 (it's a bootstrap endpoint — the user has no `csrft` cookie yet) but enforce a strict `Origin` check there
-- [ ] **Reduce the verification window default** — `business_logic/auth/secret_keys.h::kEmailVerificationExpirationWindowInMicros` default → **1 hour** (3,600,000,000 µs). Existing behavior is configurable via secret; only the default changes. Update the corresponding test value in `email_verifications_test.cpp` if it asserts on the default.
+- [x] `endpoints/verify.cpp` — `POST /api/verify` reading `{ email, secret }` from JSON body. URL-path-secret variant gone. Failures return generic `ValidationError` (400) — caller can't distinguish "no row" / "expired" / "wrong secret" / "attempt limit hit".
+- [x] `verify_test.cpp` — every test flipped to body-based POST; added `VerifyMissingBody`, `VerifyMissingFieldEmail/Secret`, `VerifyWrongSecretReturnsGenericValidationError`, `VerifyNoLongerAcceptsLegacyPathParameters`.
+- [ ] Add the verify endpoint to the CSRF-exempt allow-list in Phase 4 (it's a bootstrap endpoint — the user has no `csrft` cookie yet) but enforce a strict `Origin` check there. *(deferred to Phase 4)*
+- [x] **Verification window default reduced** — `kEmailVerificationExpirationWindowInMicrosValue` in `util/secrets/secret_values.cpp` is `"3600000000"` (one hour). Still secret-overridable; only the default changed.
 
 **Email content:**
-- [ ] `business_logic/auth/person_verify_mail.cpp` — template's `{verify_link}` becomes `https://{kWebsiteAddress}/verify?email={url-encoded-email}&secret={url-encoded-base64url-secret}`. No `/api/` prefix; this is the SPA route, not the API.
-- [ ] `person_verify_mail_test.cpp` — update the expected URL shape
+- [x] `business_logic/auth/person_verify_mail.cpp` — template URL is now `{base}{kWebsiteActivationLink}?email={url-encoded-email}&secret={url-encoded-secret}`. `kWebsiteActivationLinkValue` is `"verify"` (no `/api/` prefix). `person.cpp::PreliminaryRegisterPerson` swapped to `kWebsiteAddressLogin` so the link points at the SPA host, not the API host.
+- [x] `person_verify_mail_test.cpp` and `person_verify_mail_test_util.cpp` — expected URL shape is `https://example.com/verify?email=user@example.com&secret=ABC123`.
 
 **Frontend:**
-- [ ] Add Angular route `/verify` → new `VerifyComponent` under `ui/src/app/auth/verify/`
-- [ ] On `ngOnInit`: read `email` and `secret` from `ActivatedRoute.snapshot.queryParamMap`, call `serverAccess.verify(email, secret)` (POST `/api/verify`), and `history.replaceState({}, '', '/verify-success')` immediately after the POST is fired (don't wait for the response — the secret is what we want out of the URL bar)
-- [ ] On success: route to `/login` with a "verified, please log in" toast
-- [ ] On failure: route to `/login` with a generic "verification failed or expired" toast — do not echo the server message
-- [ ] Tests: `verify.component.spec.ts` covering success, failure, missing-params; `server-access.mock.spec.ts` for the new `verify(email, secret)` mock method
+- [x] Angular route `/verify` registered in `ui/src/app/pages/auth/auth.routes.ts:12` → new `VerifyComponent` under `ui/src/app/pages/auth/verify/`.
+- [x] `verify.component.ts::ngOnInit` reads `email` + `secret` from `ActivatedRoute.snapshot.queryParamMap`, fires `serverAccess.verify(email, secret)`, and calls `history.replaceState({}, '', '/verify-success')` **before** awaiting the response — the secret is gone from the URL bar by the time the POST resolves.
+- [x] On success: navigate to `/login` with the verified toast.
+- [x] On failure (or missing params): navigate to `/login` with a generic "verification failed or expired" toast. Server-supplied messages are never echoed.
+- [x] Tests: `verify.component.spec.ts` covers success, failure, missing-params, and the URL-scrub-before-response timing assertion. `ServerAccess.mock.spec.ts` covers the new `verify(email, secret)` mock method.
 
 ### 3.4 `/api/me` — switch to GET
 - [x] `endpoints/me.cpp` registers `crow::HTTPMethod::Get` (HandlePost renamed to HandleGet for clarity).
