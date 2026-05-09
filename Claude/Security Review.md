@@ -332,24 +332,26 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ## Phase 4 — CSRF (cross-cutting; lower layers + endpoints + client)
 
 ### 4.1 Generate and set the `csrft` cookie alongside the session cookie
-- [ ] `business_logic/auth/session.cpp::InitializeFromLogin` and `InitializeFromDeviceToken` — after setting the session cookie, generate a 32-byte random base64url string via `AuthHelper::RandomBytes` + `Base64Encode`, set as `csrft` cookie with `Path=/`, `SameSite=Lax`, `Secure` in prod, **NOT HttpOnly** (so the SPA can read it)
-- [ ] Add the value to the `Session` object so handlers that need to compare don't have to re-parse cookies
-- [ ] Tests in `session_test.cpp` asserting the cookie is present with the right attributes after each initialization path
+- [x] `Session::SetCsrfTokenCookie` generates a 32-byte random value via `AuthHelper::RandomBytes(32) + Base64Encode`, stores it in the new `csrfToken_` member, and sets the `csrft` cookie. Called from the existing `InitializeFromLogin` (and therefore also from `InitializeFromDeviceToken`, which delegates to `InitializeFromLogin`).
+- [x] Cookie attributes: `Path=/`, `SameSite=Lax`, `Max-Age` matched to the session-cookie's Max-Age, `Secure` + `Domain` in prod, **`HttpOnly=false`** so the SPA can read it.
+- [x] `Session::GetCsrfToken()` accessor exposes the value to test code; production code never needs it server-side because the SPA reads the cookie directly.
+- [x] Tests in `session_test.cpp`: `InitializeFromLoginSetsCsrfTokenCookie` (attributes + Max-Age + value-matches-getter), `InitializeFromLoginCsrfTokenIsFreshOnEveryCall` (no token reuse across logins), `InitializeFromLoginProdModeCsrfTokenCookieHasSecureAndDomain`, `InitializeFromDeviceTokenSetsCsrfTokenCookie`.
 
 ### 4.2 Server-side CSRF middleware
-- [ ] Add `CsrfGuard` middleware in `endpoints/csrf_guard.h/cpp` that, on POST/PUT/PATCH/DELETE, reads the `csrft` cookie and the `X-CSRF-Token` header, compares them via `AuthHelper::ConstantTimeEqual`, and rejects with 403 on mismatch. Skip on GET/HEAD/OPTIONS.
-- [ ] Also enforce: `Origin` header (when present) is in the prod CORS allow-list; `Referer` (if present) starts with the same allowed origin
-- [ ] Exempt the bootstrap endpoints (`/api/login`, `/api/register`, `/api/remember`) — they cannot have a CSRF cookie yet — but enforce a strict `Origin` check for those
-- [ ] Wire the middleware into `App = crow::App<crow::CookieParser, crow::CORSHandler, CsrfGuard>` in `web_app.h`/`web_app.cpp`
-- [ ] Tests in `csrf_guard_test.cpp`: missing-header, mismatch, match, GET-bypass, login-bypass, origin-mismatch on login
+- [x] `endpoints/csrf_guard.{h,cpp}` — `CsrfGuard` is a Crow middleware modeled on `CloudFrontOriginGuard`. `before_handle` short-circuits on GET/HEAD/OPTIONS and on the bootstrap allow-list (`/api/login`, `/api/register`, `/api/remember`, `/api/verify`, including with query strings). Otherwise it parses the `Cookie` header, pulls `csrft`, compares against the `X-CSRF-Token` header via `Auth::AuthHelper::ConstantTimeEqual`, and rejects with `403 application/json {"error":"csrf_token_missing_or_invalid"}` on miss. Rejection logging throttled to one line per minute (mirrors `CloudFrontOriginGuard`).
+- [x] Wired into `web_app.h::AppType` as the LAST middleware: `crow::App<CloudFrontOriginGuard, crow::CookieParser, crow::CORSHandler, CsrfGuard>`. Order matters — running after `CookieParser` is defensive even though we parse the raw header ourselves.
+- [x] **Test integration**: `EndpointTestHelper` calls `webApp_.GetApp().get_middleware<CsrfGuard>().SetEnabled(false)` after construction so the 80+ existing endpoint tests that set `session_token` cookies don't all need to also synthesize matching CSRF tokens. The dedicated `csrf_guard_test.cpp` re-enables it explicitly.
+- [x] Tests in `csrf_guard_test.cpp`: enable/disable toggling, GET/HEAD/OPTIONS bypass, all four bootstrap paths bypass (including with query string), `BootstrapPrefixIsExactMatchOnly` (prevents `/api/login_evil` slipping through), missing-cookie/missing-header/mismatch all rejected with 403 + the right JSON body, matching pair allowed, PUT/PATCH/DELETE all enforced, multi-pair Cookie header parsing, `EmptyCsrftCookieValueRejectedEvenWithEmptyHeader` (locks the empty-string-isn't-a-match invariant).
+- [ ] **Origin / Referer enforcement deferred** — the design doc called for additional `Origin` / `Referer` checks (especially on the bootstrap endpoints where the CSRF token doesn't yet exist). Deferred to a follow-up because (a) the production CORS allow-list isn't centrally configured yet and (b) the SameSite=Lax cookie attributes already block the cross-origin POST attack vector for token-bearing requests. Token-based protection is the load-bearing defense; Origin would be defense-in-depth.
 
 ### 4.3 Frontend CSRF interceptor
-- [ ] Add `ui/src/app/shared/interceptors/csrf.interceptor.ts` that, on every outgoing request whose method is in `[POST, PUT, PATCH, DELETE]`, reads the `csrft` cookie via `document.cookie` and adds `X-CSRF-Token: <value>`
-- [ ] Register in `ui/src/app/app.config.ts` ahead of `ErrorInterceptor`
-- [ ] Tests: `csrf.interceptor.spec.ts` covering header-attached-on-POST, no-header-on-GET, no-cookie-no-header
+- [x] `ui/src/app/shared/interceptors/csrf.interceptor.ts` — class-based interceptor (matches the existing `ErrorInterceptor` pattern). On POST/PUT/PATCH/DELETE, parses `document.cookie` for `csrft` and clones the request with `X-CSRF-Token: <value>`. No-op when the method is safe or when the cookie isn't set (so unauthenticated bootstrap requests still go through).
+- [x] Registered in `ui/src/app/app.config.ts` BEFORE `ErrorInterceptor` (interceptors run in registration order on the request path).
+- [x] Tests in `csrf.interceptor.spec.ts`: header-attached on POST/PUT/PATCH/DELETE, no header on GET/HEAD/OPTIONS, no header when cookie absent, correct lookup with multiple cookies, partial-name cookies (`csrft_other`) NOT treated as a match.
 
 ### 4.4 Logout must also clear `csrft`
-- [ ] `endpoints/logout.cpp` clears `session_token`, `device_token`, **and `csrft`** with matching attributes (see also H10 / Phase 6)
+- [x] `endpoints/logout.cpp` adds a third `cookieManager->SetCookie("csrft", "", csrfCp)` after the `session_token` and `device_token` clears. The clear properties mirror the original cookie's `httpOnly=false` so the browser parses the same Set-Cookie shape and replaces the live cookie cleanly.
+- [x] Test in `logout_test.cpp::LogoutClearsCsrfCookie` — seeds a live csrft, hits `/api/logout`, asserts the cookie value is empty AND the clear-time properties match the set-time attributes (`HttpOnly=false`, `Path=/`, `Max-Age=0`).
 
 ## Phase 5 — Rate limiting & brute-force defense (PostgreSQL with write-behind via ThreadPool — Decision #11)
 
