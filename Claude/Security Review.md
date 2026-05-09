@@ -290,30 +290,32 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 4. **The exception** that would change this decision: if we ever expose `people` to anonymous reads (e.g., a public studio directory). At that point a separate-table layout is worth the surgery. Until then, redact map is the right tradeoff.
 
 **Schema-side / metadata layer:**
-- [ ] In `sql_util/table_helpers/`, add a new helper `admin_column_redactions.{h,cpp,_test.cpp}` modeled after `admin_column_data_info.h/cpp`. Stores `(table_name, column_name)` rows in a new `admin_column_redactions` DB table.
-- [ ] `db_schema/admin_column_redactions.{h,cpp}` — define the table; treat the same way as the other admin metadata tables.
-- [ ] Register in `make_database_info.cpp` and `create_database.cpp::CreateTables` (do NOT add to the admin CRUD allow set — this metadata is read-only at runtime).
+- [x] `db_schema/admin_column_redactions.{h,cpp}` — table with `(id BIGSERIAL, table_name, column_name)`. Intentionally NOT FK'd to `admin_top_level_tables` so we can redact tables that are deliberately invisible to the admin CRUD list (sessions, device_tokens, email_verifications). Constants exposed via `kAdminColumnRedactionsTable / Id / TableName / ColumnName`.
+- [x] `sql_util/table_helpers/admin_column_redactions.{h,cpp,_test.cpp}` — `Add/Delete/IsRedacted/GetAdminColumnRedactions/LoadColumnRedactionSet`. Defines the canonical `using ColumnRedactionSet = std::set<std::pair<std::string, std::string>>` next to the helper. Tests cover `AddAndListBasic`, `IsRedactedReturnsTrueOnlyForExactPair`, `DeleteRemovesEntry`, `LoadColumnRedactionSetEmptyByDefault`, and `RedactionMapContainsExpectedDefaults`.
+- [x] Registered in `make_database_info.cpp::MakeDatabaseInfo` and `create_database.cpp::CreateTables`. Not added to admin top-level / nested lists — the table is read-only at runtime.
 
 **Population:**
-- [ ] In `database_helper/create_database.cpp`, add `PopulateAdminColumnRedactions(...)` that inserts the canonical redact list:
-  - `(people, password_hash)` — never leak credential material
-  - `(device_tokens, secret_hash)` — never leak token material
-  - `(email_verifications, token_hash)` — never leak verification material
-  - `(sessions, uuid)` — never leak session cookies via JSON; only the cookie path should ever emit it
-  - `(login_attempts, *)` after Phase 5 — entire table; consider redacting at the table level rather than column level if cleaner
-- [ ] Call `PopulateAdminColumnRedactions` from `CreateAndPopulateDatabases` next to the other `Populate*` calls.
+- [x] `database_helper/create_database.cpp::PopulateAdminColumnRedactions` seeds the four canonical entries via `TableHelpers::AdminColumnRedactions::AddAdminColumnRedaction`:
+  - `(people, password_hash)`
+  - `(device_tokens, secret_hash)`
+  - `(email_verifications, token_hash)`
+  - `(sessions, uuid)`
+- [x] Wired into `PopulateTables` next to `PopulateAdminColumnDataInfo`.
+- [ ] `(login_attempts, *)` deferred to Phase 5 (login_attempts table doesn't exist yet).
 
 **Enforcement at the JSON boundary:**
-- [ ] In `sql_util/json/database_rest_helper.cpp`, the `DatabaseRESTHelper` (or its caller in `endpoint_auth_helper.cpp`) reads the redact map at startup into an in-memory `std::set<std::pair<std::string, std::string>>`.
-- [ ] Modify `JsonFromDataResults(tableName, results)` to take the redact set and skip any column whose `(tableName, columnName)` is in the set. Same for `KeyValueTableToJson` overloads that know the source table.
-- [ ] For endpoints that don't have a single source table (joins, custom JSON), the call site is responsible — but the audit shows the generic CRUD endpoints all flow through `JsonFromDataResults`, so this catches them.
+- [x] `WebApp` constructor takes `TableHelpers::ColumnRedactionSet`; `WebApp::GetColumnRedactions()` returns it. `main.cpp` loads the set via `AdminColumnRedactions::LoadColumnRedactionSet` once at startup and passes it to the `WebApp` ctor; `EndpointTestHelper` does the same in its initialiser list (so tests that insert redaction rows BEFORE constructing the helper get those redactions applied to their `WebApp`).
+- [x] `EndpointAuthHelper::GetColumnRedactions()` delegates to the WebApp accessor.
+- [x] `DatabaseRESTHelper` constructor now takes an optional `ColumnRedactionSet` (default `{}` — empty, all columns visible). Private `ApplyRedactions(tableName, KeyValueTable&)` and `ApplyRedactions(tableName, KeyValueTableArray&)` strip any column whose `(tableName, columnName)` is in the set. Applied inside `GetTableValues`, `GetRowsByColumn`, `GetRowsByColumnWithCount`, `GetRowsByValuesWithCount`, `GetRow`, `GetRowByValues`, `GetTableValue`.
+- [x] All five generic-CRUD read endpoints updated to construct the helper with the redaction set: `get_row.cpp`, `get_table_rows.cpp`, `get_rows_by_column.cpp`, `get_row_by_values.cpp`, `get_filtered_table_rows.cpp`. The other DatabaseRESTHelper consumers (`add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item`, `db_schema`, `get_fk_options`, `resolve_fk_display`) are write-paths or metadata/PK-only paths where row data is not echoed back, so no redaction is needed.
+- [x] **Note on the design doc's prescription**: the doc said to overload `JsonFromDataResults(tableName, results, redactSet)`. I implemented the equivalent at the `DatabaseRESTHelper` layer instead — every callsite that has a `tableName` is already inside that class, and filtering before constructing `DataResults` keeps `util/json_util.cpp` agnostic of the redaction concept. Same security outcome, smaller blast radius.
 
 **Tests:**
-- [ ] `admin_column_redactions_test.cpp::AddAndListBasic`, plus a `RedactionMapContainsExpectedDefaults` test asserting `(people, password_hash)` etc. are present after `CreateAndPopulateDatabases`
-- [ ] `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns` — call with `(tableName=people)` and confirm `password_hash` is absent from the JSON
-- [ ] `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash` — end-to-end via `handle_full`
-- [ ] `endpoints/get_table_rows_test.cpp::GetTableRowsPeopleHidesPasswordHash` — same for the list variant
-- [ ] Negative test: `JsonFromDataResultsKeepsNonRedactedColumns` so we know the redaction is targeted, not accidentally aggressive
+- [x] `admin_column_redactions_test.cpp::AddAndListBasic`, `IsRedactedReturnsTrueOnlyForExactPair`, `DeleteRemovesEntry`, `LoadColumnRedactionSetEmptyByDefault`, `RedactionMapContainsExpectedDefaults` (asserts the four canonical entries on the loaded set).
+- [x] `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns` (column header AND every cell scanned for the secret values), `GetRowRedactsConfiguredColumns`, `GetRowByValuesRedactsConfiguredColumns`, `RedactionsAreTableScoped`.
+- [x] Negative: `JsonFromDataResultsKeepsNonRedactedColumns` proves the filter is a no-op when the set is empty.
+- [x] `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash` — full `handle_full` round-trip with admin session, redaction row inserted before constructing `EndpointTestHelper`. Asserts: 200, no `password_hash` column, admin's email present, no cell value beginning with `$argon2`.
+- [x] `endpoints/get_table_rows_test.cpp::GetTableRowsPeopleHidesPasswordHash` — same shape for the list endpoint.
 
 ### 3.9 Lock down ownership-sensitive endpoints with regression tests
 - [x] (Verified on follow-up) `endpoints/change_purchase_recipient.cpp:99-106` already rejects when `payerPersonId != loggedInPersonId`
