@@ -360,34 +360,25 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 **Key invariant:** the *recording* of a failure is async; the *decision to lock* is sync (in the same transaction as the password check). This way two parallel attempts at the threshold can over-count by at most one (acceptable), but the lockout, once decided, is committed before the response goes back.
 
 ### 5.1 `login_attempts` table
-- [ ] `db_schema/login_attempts.{h,cpp}` — columns: `id BIGSERIAL PK`, `email_lower citext NOT NULL`, `ip inet NOT NULL`, `attempted_at BIGINT NOT NULL` (microseconds since epoch), `success BOOLEAN NOT NULL`, `kind TEXT NOT NULL` (one of `login`, `verify`, `remember`)
-- [ ] Indexes: `(email_lower, attempted_at DESC)` and `(ip, attempted_at DESC)`
-- [ ] Register in `make_database_info.cpp` and `create_database.cpp::CreateTables`. Do **not** add to the admin CRUD list (sensitive PII; access only via dedicated admin reports if ever needed).
-- [ ] `sql_util/table_helpers/login_attempts.{h,cpp,_test.cpp}`:
-  - `void RecordAttempt(Transaction&, string_view emailLower, string_view ip, string_view kind, bool success)`
-  - `int64_t RecentFailureCountForEmail(Transaction&, string_view emailLower, string_view kind, int64_t windowMicros)`
-  - `int64_t RecentFailureCountForIp(Transaction&, string_view ip, string_view kind, int64_t windowMicros)`
-  - `void PurgeOlderThan(Transaction&, int64_t ageMicros)` — for the periodic cleanup job
+- [x] `db_schema/login_attempts.{h,cpp}` — columns: `id BIGSERIAL PK`, `email_lower CITEXT`, `ip TEXT`, `attempted_at BIGINT` (microseconds since epoch), `success BOOL`, `kind TEXT`. **Stored ip as TEXT, not Postgres `inet`**, so the schema-helper layer stays type-agnostic; we only ever equality-match and count.
+- [x] Three indexes via `CreateLoginAttemptsIndexes(transaction)` called from `CreateTables`: `(email_lower, kind, attempted_at DESC)`, `(ip, kind, attempted_at DESC)`, and `(attempted_at)` for the purge job. Without these, the gate's `SELECT count(*)` on every login goes sequential and turns into a DoS in its own right.
+- [x] Registered in `make_database_info.cpp::MakeDatabaseInfo` and `create_database.cpp::CreateTables`. NOT added to the admin CRUD list (sensitive PII).
+- [x] `sql_util/table_helpers/login_attempts.{h,cpp,_test.cpp}` — full surface: `RecordAttempt` (uses `now_us()` at insert time so write-behind latency doesn't backdate), `RecentFailureCountForEmail/Ip` (success rows excluded; kind-scoped), `PurgeOlderThan`. Defensive: zero/negative window/age returns 0 / no-op rather than throw or wipe everything.
+- [x] Tests: 9 cases including `RecordAttemptInsertsRow`, `EmailLowerIsCaseInsensitive` (CITEXT collation), `RecentFailureCountForEmailExcludesSuccesses`, `RecentFailureCountForEmailIsScopedByKind`, `RecentFailureCountForEmailRespectsWindow`, `RecentFailureCountForIpScopedByIp`, `ZeroOrNegativeWindowReturnsZero`, `PurgeOlderThanBasic`, `PurgeOlderThanZeroIsNoop`.
 
 ### 5.2 Synchronous gate before password verify (per-email + per-IP)
-- [ ] Add secrets:
-  - `kAuthLoginMaxFailuresPerEmailPerWindow` (default 10)
-  - `kAuthLoginFailureWindowInMicros` (default 15 min in µs)
-  - `kAuthLoginMaxFailuresPerIpPerWindow` (default 50)
-  - `kAuthAccountLockoutAfterFailures` (default 10)
-  - `kAuthAccountLockoutDurationInMicros` (default 30 min)
-- [ ] Add a `business_logic/auth/login_gate.{h,cpp}` helper:
-  - `enum class LoginGateResult { Allow, RateLimitedEmail, RateLimitedIp, AccountLocked }`
-  - `LoginGateResult CheckBeforeVerify(Transaction&, SecretsHelperPtr, string_view email, string_view ip)` — runs three small queries: `people.locked_until` (combined with the password-hash lookup the auth path was going to do anyway), per-email failure count, per-IP failure count. Returns the first failing reason, or `Allow`.
-- [ ] `business_logic/auth/person.cpp::VerifyPassword` (or a new `LoginPerson` wrapper) — call `CheckBeforeVerify` before doing Argon2id; on rate-limited result, return early with a generic failure (don't even verify the password — saves CPU and avoids timing leaks via the password-verify branch).
-- [ ] Tests on `login_gate_test.cpp` covering each branch.
+- [x] Added all 11 new secrets in `secret_keys.h` + `secret_values.cpp`: `kAuthLoginMaxFailuresPerEmailPerWindow=10`, `kAuthLoginMaxFailuresPerIpPerWindow=50`, `kAuthLoginFailureWindowInMicros=15min`, `kAuthAccountLockoutAfterFailures=10`, `kAuthAccountLockoutDurationInMicros=30min`, `kAuthVerifyMaxFailuresPerIpPerWindow=30`, `kAuthVerifyFailureWindowInMicros=15min`, `kAuthRememberMaxFailuresPerIpPerWindow=50`, `kAuthRememberFailureWindowInMicros=15min`, `kAuthLoginAttemptsRetentionInMicros=30days`.
+- [x] `business_logic/auth/login_gate.{h,cpp,_test.cpp}` — three entry points instead of one: `CheckBeforeLogin(tx, secrets, email, ip)`, `CheckBeforeVerify(tx, secrets, ip)`, `CheckBeforeRemember(tx, secrets, ip)`. Login consults `people.locked_until`, per-email, and per-IP; verify and remember are per-IP only (no authenticated email at those stages). Email check takes precedence over IP when both would trip — operator gets the more specific signal in logs. Empty IP skips the per-IP check (so a misconfigured deploy without proxy plumbing doesn't false-positive). Missing secrets fall back to defensive defaults.
+- [x] **The gate runs INSIDE `login.cpp` / `verify.cpp` / `remember.cpp` BEFORE the auth check**, not inside `PersonHelper::VerifyPassword`. Rationale: VerifyPassword stays usable from places that don't want side effects (e.g. tests asserting on hash semantics). The endpoint layer is the right place to attach gate + IP plumbing + async recorder, since that's where the request lives.
+- [x] 16 tests in `login_gate_test.cpp`: each branch (Allow / AccountLocked / RateLimitedEmail / RateLimitedIp), precedence (email before ip; account-locked before failure counts), expired-lockout-is-ignored, unknown-email-falls-through-to-IP-check, missing-secrets-fall-back, empty-IP skips, plus dedicated coverage of `CheckBeforeVerify` and `CheckBeforeRemember` including kind scoping.
 
 ### 5.3 Synchronous lockout decision (sticky on the row)
-- [ ] On a failed password verify, in the same transaction:
-  - `UPDATE people SET failed_login_attempts = failed_login_attempts + 1, locked_until = CASE WHEN failed_login_attempts + 1 >= $threshold THEN now_us() + $duration ELSE locked_until END WHERE id = $id` (one statement so it's atomic)
-  - If the `RETURNING` shows `locked_until` was just set, also enqueue an `admin_alerts` row via the same async pipe (Phase 9) — but the lockout itself is already committed
-- [ ] On a successful password verify: `UPDATE people SET failed_login_attempts = 0, locked_until = NULL WHERE id = $id`
-- [ ] Tests on `person_test.cpp`: `LoginAccountLockoutAtThreshold`, `LoginSuccessClearsLockout`, `LoginAccountStaysLockedDuringWindow`, `LoginAccountUnlocksAfterWindow`
+- [x] New high-level wrapper `PersonHelper::LoginPerson(tx, secrets, email, password) -> LoginAttemptResult` (struct: `success`, `justLocked`, `personId`, `failedLoginAttempts`, `lockedUntil`). Single atomic UPDATE in both branches:
+  - **Success path**: `UPDATE people SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1 RETURNING failed_login_attempts, COALESCE(locked_until, 0)`
+  - **Failure path**: `UPDATE people SET failed_login_attempts = failed_login_attempts + 1, locked_until = CASE WHEN failed_login_attempts + 1 >= $threshold THEN now_us() + $duration ELSE locked_until END WHERE id = $1 RETURNING ...` — one statement so two parallel verifies at the threshold over-count by at most one (acceptable per the design doc's invariant).
+  - `VerifyPassword` is left untouched so existing tests/callers still work.
+- [x] `justLocked = (newAttempts == threshold) AND (newLockedUntil > 0)` — fires exactly on the crossing, not on subsequent failures past the threshold. Hooks into the admin_alerts pipe in Phase 9 (deferred — admin_alerts table exists, but the alert insert call is not yet wired).
+- [x] Tests in `person_test.cpp`: `LoginPersonSuccessClearsFailureCount` (resets pre-seeded failures), `LoginPersonWrongPasswordIncrementsCount` (under threshold), `LoginAccountLockoutAtThreshold` (3 wrong = locked, justLocked=true, lockedUntil>0), `LoginSuccessClearsLockout` (post-expired lock), `LoginAccountStaysLockedDuringWindow` (documents that LoginPerson is intentionally lock-agnostic — gate's job to refuse), `LoginAccountUnlocksAfterWindow` (backdated lock), `LoginPersonUnknownEmailReturnsFailureWithNoSideEffect` (no row created, no row touched).
 
 ### 5.4 Asynchronous attempt recording (write-behind via ThreadPool)
 - [ ] After the synchronous password-verify path returns to the endpoint, enqueue a single lambda on `ThreadPool::GetInstance().Queue(...)` that:
