@@ -314,8 +314,13 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [x] `admin_column_redactions_test.cpp::AddAndListBasic`, `IsRedactedReturnsTrueOnlyForExactPair`, `DeleteRemovesEntry`, `LoadColumnRedactionSetEmptyByDefault`, `RedactionMapContainsExpectedDefaults` (asserts the four canonical entries on the loaded set).
 - [x] `database_rest_helper_test.cpp::JsonFromDataResultsRedactsConfiguredColumns` (column header AND every cell scanned for the secret values), `GetRowRedactsConfiguredColumns`, `GetRowByValuesRedactsConfiguredColumns`, `RedactionsAreTableScoped`.
 - [x] Negative: `JsonFromDataResultsKeepsNonRedactedColumns` proves the filter is a no-op when the set is empty.
-- [x] `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash` — full `handle_full` round-trip with admin session, redaction row inserted before constructing `EndpointTestHelper`. Asserts: 200, no `password_hash` column, admin's email present, no cell value beginning with `$argon2`.
-- [x] `endpoints/get_table_rows_test.cpp::GetTableRowsPeopleHidesPasswordHash` — same shape for the list endpoint.
+- [x] **End-to-end `handle_full` redaction tests for every modified endpoint** (every endpoint that constructs `DatabaseRESTHelper` with the redaction set is covered):
+  - `endpoints/get_row_test.cpp::GetRowPeopleHidesPasswordHash` — admin session, full round-trip. Asserts: 200, no `password_hash` column, admin's email present, no cell value beginning with `$argon2`.
+  - `endpoints/get_table_rows_test.cpp::GetTableRowsPeopleHidesPasswordHash` — same shape for the list endpoint.
+  - `endpoints/get_rows_by_column_test.cpp::GetRowsByColumnPeopleHidesPasswordHash` — paginated/sorted variant.
+  - `endpoints/get_row_by_values_test.cpp::FetchPeopleHidesPasswordHash` — POST-with-filter-pairs variant.
+  - `endpoints/get_filtered_table_rows_test.cpp::FilteredPeopleHidesPasswordHash` — covers BOTH the no-filter and with-filter branches inside one test, since `GetRowsByValuesWithCount` takes both paths.
+  - Each test scans every cell for the secret hash value as a belt-and-suspenders check (defends against a future bug that strips the column header but leaves the data).
 
 ### 3.9 Lock down ownership-sensitive endpoints with regression tests
 - [x] (Verified on follow-up) `endpoints/change_purchase_recipient.cpp:99-106` already rejects when `payerPersonId != loggedInPersonId`
