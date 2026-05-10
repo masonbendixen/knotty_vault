@@ -424,26 +424,24 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ## Phase 7 — Security headers, error handling, server banner
 
 ### 7.1 SecurityHeaders middleware
-- [ ] `endpoints/security_headers.{h,cpp}` middleware that, on every response, sets:
-  - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` (only in prod mode)
-  - `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'` (tune in real deploy)
-  - `X-Content-Type-Options: nosniff`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-  - Override `Server: Knotty Yoga` (or omit entirely)
-- [ ] Wire into `App` middleware list in `web_app.h`
-- [ ] Tests confirming headers are present on a sample of endpoints (auth, public, admin)
+- [x] `endpoints/security_headers.{h,cpp}` — Crow middleware modeled on `CsrfGuard`. Emits in `after_handle` so headers land on every response (handler-set, error-set, anything else). Always-on headers: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `Server: Knotty Yoga` (banner override). Prod-only: `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` and the canonical `Content-Security-Policy` from the design doc.
+- [x] Defensive: when `Auth::ServerConfig::GetInstance()` throws (early-startup paths, some test fixtures), the middleware falls back to "not prod" rather than crashing — the always-on headers still emit; the prod-only ones are skipped.
+- [x] Wired into `web_app.h::AppType` as the LAST middleware. Crow runs `after_handle` in REVERSE declaration order, so `SecurityHeaders.after_handle` fires FIRST and the headers land before any other middleware mutates the response.
+- [x] **Test integration**: `EndpointTestHelper` calls `webApp_.GetApp().get_middleware<SecurityHeaders>().SetEnabled(false)` after construction — same trick used for `CsrfGuard` (Phase 4.2) — so the 100+ pre-existing endpoint tests don't have to assert on or strip the new headers. The dedicated `security_headers_test.cpp` re-enables it explicitly.
+- [x] 9 tests in `security_headers_test.cpp`: `EnabledByDefault`, `SetEnabledFlipsState`, `DisabledMiddlewareIsANoOp`, `TestModeEmitsAlwaysOnHeaders` (exact strings for all four always-on headers), `EmitsVaryOrigin` (Phase 7.2 — see below), `TestModeOmitsHstsAndCsp`, `NoServerConfigOmitsHstsAndCsp` (defensive), `ProdModeEmitsHstsAndCsp` (full integration through `EndpointTestHelper`+`ServerConfig::Initialize`; spot-checks load-bearing CSP directives `default-src 'self'`, `frame-ancestors 'none'`, `base-uri 'none'`), `IntegrationHeadersLandOnRealResponse` (drives `/api/health` through `handle_full` with the middleware re-enabled), `EndpointTestHelperLeavesMiddlewareDisabled` (regression — the default-off behavior the test fixture promises).
 
 ### 7.2 CORS hardening (`Vary: Origin` + opt-in dev CORS)
-- [ ] `business_logic/auth/server_config.cpp::ConfigureCors` — add `Vary: Origin` header (Crow's CORS middleware may already do this; verify and add if not)
-- [ ] In dev mode, leave the no-CORS path intact (Angular proxy keeps everything same-origin), but add an opt-in: when `KNOTTYYOGA_DEV_CORS_ORIGIN` is set, `ConfigureCors` registers that exact origin with `allow_credentials()`, methods `GET/POST/OPTIONS`, and headers `Content-Type, Authorization, X-CSRF-Token`. Unset → no-op (today's behavior).
-- [ ] Document `KNOTTYYOGA_DEV_CORS_ORIGIN` in the root `CLAUDE.md` env-vars section and in `ui/proxy.conf.json` comments (so devs know there are two ways to talk to the API in dev).
-- [ ] `server_config_test.cpp` — assert `Vary: Origin` is present in a CORS-handled response, and add tests covering the dev-CORS env-var path (set vs unset).
+- [x] `Vary: Origin` is added by `SecurityHeaders.after_handle` (Crow's `CORSHandler` does NOT add it itself). Always-on so shared caches don't serve a CORS response keyed for one origin to a request from a different origin. Pinned by `SecurityHeadersTest::EmitsVaryOrigin`.
+- [x] Dev-mode CORS opt-in: `KNOTTYYOGA_DEV_CORS_ORIGIN` env var. When set (e.g. `http://localhost:4200`), `server_config.cpp::Initialize` registers that origin with `allow_credentials()`, methods `GET/POST/OPTIONS`, headers `Content-Type, Authorization, X-CSRF-Token`. Unset → dev mode stays no-CORS (Angular proxy keeps everything same-origin — long-standing default).
+- [x] Production CORS allow-list also extended to include `X-CSRF-Token` so the SPA's CSRF interceptor (Phase 4.3) can attach the header on cross-origin POSTs without a preflight rejection.
+- [x] Documented `KNOTTYYOGA_DEV_CORS_ORIGIN` (and the rest of the process-level env vars) in a new `## Environment Variables` section in `CLAUDE.md`. **`ui/proxy.conf.json` comments deferred** — JSON doesn't support comments and converting to `proxy.conf.js` is out of scope for this PR; the env var is documented in the only file that supports it.
+- [x] 4 new tests in `server_config_test.cpp::ServerConfigTest`: `DevCorsOriginUnsetLeavesCorsAtDefault` (default `Access-Control-Allow-Origin: *`, no credentials), `DevCorsOriginSetRegistersThatOrigin` (specific origin echoed; `Access-Control-Allow-Credentials: true`), `DevCorsOriginEmptyValueIsTreatedAsUnset` (empty env var = unset), `DevCorsOriginIgnoredInProdMode` (prod always pins to `kWebsiteAddress`, never the dev env var even if set to a hostile value). `DevCorsOriginEnvScope` RAII guard scrubs the env var on entry/exit so leaked state can't bleed across tests.
 
 ### 7.3 Global Crow error handler
-- [ ] In `endpoints/web_app.cpp`, register a fallthrough that converts uncaught exceptions to `500 internal_server_error` with body `{"error":"internal_server_error"}` and logs the exception text server-side only
-- [ ] Audit endpoints that currently echo `e.what()` (e.g., `endpoints/db_schema.cpp:31`) and replace with the generic shape via `ErrorResponse::InternalError`
-- [ ] Tests: `web_app_test.cpp` (or per-endpoint) — throw inside a handler, assert response is generic and the exception text is *not* in the body
+- [x] `ErrorResponse::InternalError(serverContext)` refactored: response body is ALWAYS the generic `"An unexpected error occurred. Please try again later"`, never echoes the argument. The argument is logged server-side via `[error_response] event=internal_error_context context="..."` so operators can correlate. Pre-existing call sites (`catch (std::exception& e) { resp = ErrorResponse::InternalError(e.what()); }`) stop leaking exception text without code change.
+- [x] Audited the codebase for raw `crow::response(NNN, e.what())` patterns. Found exactly 2: `endpoints/db_schema.cpp:31` and `endpoints/add_item_fetch_primary_key.cpp:25`. Both replaced with `ErrorResponse::InternalError(e.what())`. The `add_item_fetch_primary_key.cpp` site also fixed an unrelated `crow::response(400, "No message body.")` to use `ErrorResponse::BadRequest` for consistency.
+- [x] **No global Crow exception handler added** — Crow doesn't expose an `app.exception_handler(...)` API. The existing per-endpoint try/catch pattern catches everything; the gap was the *content* of the response body, not the absence of catching. With `InternalError` always-generic, the throw-inside-handler scenario the design doc calls out is fully covered: every handler that wraps in try/catch + `InternalError` now produces the generic shape automatically.
+- [x] 3 new tests in `error_response_test.cpp`: `InternalErrorDoesNotEchoServerContext` (passes a sensitive SQL error string, asserts NEITHER the structured `detail` nor the raw response body contains any of it; spot-checks `password_hash`, `ERROR:`, `LINE 1`), `InternalErrorEmptyServerContextStillGeneric`, `InternalErrorDefaultArgIsGeneric` (default-arg overload matches explicit empty-string).
 
 ## Phase 8 — Secrets at rest (env-var-from-Secrets-Manager v1; KMS later — Decision #6)
 
