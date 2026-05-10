@@ -1053,6 +1053,37 @@ knottyyoga_test_helper --command=cla
 
 **Source reference**: Phase 5.8 of `Security Review.md`. Same business logic the scheduler invokes via `POST /api/admin/cleanup_login_attempts`; here we skip the endpoint and call the helper directly.
 
+### 26. `notify_admin_alerts` — Manually Trigger admin_alerts Digest (alias `naa`)
+
+**What it does**: Calls the digest logic equivalent to `POST /api/admin/notify_admin_alerts` directly. Reads `kAdminAlertsLastNotifiedUs`, pulls every `admin_alerts` row newer than that watermark via `AdminAlerts::GetAdminAlertsSince`, optionally emails the digest to `kAdminAlertsRecipient`, and stamps the watermark forward to `max(created_at)`.
+
+**Flags**:
+- `--dry_run` (optional — list the alerts that would be sent but DON'T mail and DON'T advance the watermark. Useful for inspecting the queue before triggering a real send.)
+- `--reset_watermark` (optional — set `kAdminAlertsLastNotifiedUs = 0` before running so the next call re-sends the entire history. Pairs naturally with `--dry_run` to preview the full backfill.)
+- `--send_real_email` (optional — actually invoke the production mail helper. Default uses the test mail helper which captures messages in-process.)
+
+**Operations**:
+1. If `--reset_watermark` is set, write `kAdminAlertsLastNotifiedUs = 0` first.
+2. Look up the recipient secret and the current watermark.
+3. Pull rows via `AdminAlerts::GetAdminAlertsSince(transaction, watermark)`.
+4. If `--dry_run`, print the rows and exit without mailing or advancing.
+5. Otherwise: if there are rows AND a recipient is configured, render and send the digest, then stamp the watermark to `max(created_at)`.
+6. Print summary: `{count, mail_sent, new_watermark}`.
+
+**Why manual testing needs this**: Phase 9.2 of the security review is an "every hour the scheduler ticks" path. During testing you often want to seed a few `admin_alerts` rows and immediately see the digest land in your inbox rather than waiting for the next hourly tick — or you want to preview the queue with `--dry_run` before flipping `kAdminAlertsRecipient` on in production.
+
+**Example workflow**:
+```bash
+# Preview what the next scheduler tick would send.
+knottyyoga_test_helper --command=notify_admin_alerts --dry_run
+
+# Re-send the entire history of admin_alerts to a configured recipient
+# (e.g., to validate the digest renders correctly after a template edit).
+knottyyoga_test_helper --command=naa --reset_watermark --send_real_email
+```
+
+**Source reference**: Phase 9.2 of `Security Review.md`. Same business logic the scheduler invokes via `POST /api/admin/notify_admin_alerts`; this command short-circuits the endpoint and HTTP plumbing so it works against a paused server too.
+
 ## Updated Command List
 
 ```
@@ -1097,6 +1128,7 @@ Commands:
   set_secret                    Set a configuration secret value
   send_test_email               Send a test email to verify mail configuration
   cleanup_login_attempts (cla)  Purge login_attempts rows past retention
+  notify_admin_alerts (naa)     Trigger the admin_alerts digest mail
 
 Common flags:
   --command=<name>              Command to run (required)
