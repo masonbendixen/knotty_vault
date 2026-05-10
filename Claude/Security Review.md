@@ -411,13 +411,15 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ## Phase 6 — Cookie hygiene cleanup
 
 ### 6.1 Logout clears cookies with attributes that match the originals
-- [ ] `endpoints/logout.cpp` — refactor to call a shared `Auth::ClearAuthCookies(cookieManager, secrets, isProd)` helper that knows the canonical attributes (path, domain, secure, httpOnly, sameSite) and writes `Max-Age=0` for `session_token`, `device_token`, and `csrft`
-- [ ] Drop `SameSite=None`; use the same `Lax` value used at set-time
-- [ ] Tests in `logout_test.cpp` asserting cookie attributes on the response match the set-time attributes (use the `CookieManagerTest::GetCookieProperties()` map)
+- [x] New `business_logic/auth/auth_cookies.{h,cpp,_test.cpp}` with two functions: `BuildAuthCookieProperties(transaction, secrets, isProd, httpOnly, maxAgeMicros)` builds the canonical `CookieProperties` for any auth cookie (Path=/, SameSite=Lax, Secure+Domain in prod, configurable HttpOnly), and `ClearAuthCookies(transaction, secrets, cookieManager)` invokes it three times with `Max-Age=0` to clear `session_token` (HttpOnly), `device_token` (HttpOnly), and `csrft` (NOT HttpOnly).
+- [x] `session.cpp::SetCookieHelper` and `Session::SetCsrfTokenCookie` refactored to use `BuildAuthCookieProperties` so set-time and clear-time can never drift again (single source of truth for the attribute matrix).
+- [x] `endpoints/logout.cpp` refactored — old inline `CookieProperties` block (which used SameSite=None at clear-time, mismatching session.cpp's Lax at set-time and causing browsers to refuse the deletion) replaced by a single `Auth::ClearAuthCookies(...)` call.
+- [x] 9 tests in `auth_cookies_test.cpp`: `BuildAuthCookiePropertiesTestModeHttpOnly`, `BuildAuthCookiePropertiesTestModeNotHttpOnly`, `BuildAuthCookiePropertiesProdModeHasSecureAndDomain`, `ClearAuthCookiesEmitsAllThreeCookies`, `ClearAuthCookiesUsesMaxAgeZero`, `ClearAuthCookiesUsesSameSiteLax` (regression for the actual bug), `ClearAuthCookiesPreservesHttpOnlyDistinction`, `ClearAuthCookiesProdModeHasSecureAndDomain`, `ClearAuthCookiesNullCookieManagerIsNoop`, plus `SetAndClearAttributesMatchExceptForMaxAge` which pins the load-bearing invariant directly.
+- [x] `logout_test.cpp::LogoutClearedCookiesUseSameSiteLax` — endpoint-level regression that seeds a SameSite=None cookie (mimicking what a browser had pre-fix) and asserts the logout overwrites it with Lax for all three cookies, with HttpOnly preserved per cookie type.
 
 ### 6.2 Defensive: CookieManager warns on `SameSite=None` without `Secure`
-- [ ] In the production `CookieManagerImpl::SetCookie`, log an error if `sameSite == None && !secure` (fail-fast in dev/test). Cheap insurance against re-introduction.
-- [ ] Test in `cookie_manager_test.cpp`
+- [x] `Auth::Detail::CheckCookieAttributes(key, props)` in `cookie_manager.h/cpp` returns a non-empty diagnostic string when SameSite=None && !secure, empty otherwise. Production `CookieManagerImpl::SetCookie` calls it on every cookie write and emits `LogError() << "[cookie_manager] event=invalid_attributes ..."` when it returns a warning. Advisory only — the cookie is still set so behavior is unchanged for callers, but the operator gets a greppable line in the journal.
+- [x] 5 tests in `cookie_manager_test.cpp`: `SameSiteNoneWithoutSecureIsFlagged` (warning includes cookie name + "SameSite=None" + "Secure"), `SameSiteNoneWithSecureIsAccepted` (legitimate cross-origin case), `SameSiteLaxAcceptsAnySecureValue` (project default works on plain HTTP), `SameSiteStrictAcceptsAnySecureValue`, `OtherAttributesDoNotInfluenceTheCheck` (HttpOnly/Path/Domain/Max-Age all irrelevant — only SameSite+Secure matter).
 
 ## Phase 7 — Security headers, error handling, server banner
 
