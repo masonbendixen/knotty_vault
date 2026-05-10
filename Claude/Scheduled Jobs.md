@@ -67,6 +67,7 @@ These scheduled tasks don't have admin endpoints yet. Each needs a new endpoint 
 | 7 | `/api/admin/cleanup_idempotency_keys` | POST | Daily | Delete expired idempotency keys (where `expires_us` is past). Prevents unbounded table growth. | `idempotency_keys` table has `expires_us` column. `IdempotencyHelper` checks expiry but doesn't reap old records. |
 | 8 | `/api/admin/cleanup_scaled_photos` | POST | Daily | Delete scaled photo cache entries older than `kScaledPhotoMaxAgeUs`. Secret keys for interval (`kScaledPhotoReaperIntervalUs`, default 24h) and max age (`kScaledPhotoMaxAgeUs`) already exist. | `secret_keys.h` defines both configuration keys. No reaper implementation exists yet. |
 | 12 | `/api/admin/process_waitlist_refunds` | POST | Hourly | Find all events where `end_time_us < now_us()` that have waitlisted bookings. For each remaining waitlisted booking, process a full refund and set status to cancelled with reason "Event passed — waitlist refund". Idempotent. | Phase 10 Waitlist Management in Product, Event, and Subscription Admin Portal.md. |
+| 13 | `/api/admin/cleanup_login_attempts` | POST | Daily | Purge rows from the `login_attempts` table older than `kAuthLoginAttemptsRetentionInMicros` (default 30 days). The Phase 5 brute-force-defense gate writes one row per auth attempt; without retention this table grows unbounded. Idempotent. | Phase 5.8 of `Security Review.md`. Helper method `LoginAttempts::PurgeOlderThan` was already in place; only the endpoint + schedule wiring was missing. |
 
 ## 1.3 Future Scheduled Jobs (Not Yet Implementable)
 
@@ -124,6 +125,7 @@ Scheduling interval overrides (seconds, 0 = disabled):
   --idempotency_cleanup_interval  Default: 86400 (daily)
   --photo_cleanup_interval    Default: 86400 (daily)
   --waitlist_refunds_interval Default: 3600 (hourly)
+  --login_attempts_cleanup_interval  Default: 86400 (daily)
 ```
 
 No watchdog flags — process health is handled by systemd + CloudWatch (see Section 2).
@@ -191,6 +193,9 @@ The helper runs a single main loop using **Boost.Asio** timers:
 │  Timer: photo_cleanup (every 24h)                             │
 │    → POST /api/admin/cleanup_scaled_photos                    │
 │                                                               │
+│  Timer: login_attempts_cleanup (every 24h)                    │
+│    → POST /api/admin/cleanup_login_attempts                   │
+│                                                               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -243,7 +248,9 @@ server/knottyyoga_server/
 │   │   ├── admin_cleanup_idempotency.h     # New: POST /api/admin/cleanup_idempotency_keys
 │   │   ├── admin_cleanup_idempotency.cpp
 │   │   ├── admin_cleanup_photos.h          # New: POST /api/admin/cleanup_scaled_photos
-│   │   └── admin_cleanup_photos.cpp
+│   │   ├── admin_cleanup_photos.cpp
+│   │   ├── admin_cleanup_login_attempts.h  # New: POST /api/admin/cleanup_login_attempts
+│   │   └── admin_cleanup_login_attempts.cpp
 │   │
 │   ├── business_logic/
 │   │   ├── scheduling/
@@ -460,6 +467,17 @@ The waitlist feature exists in production, so this is no longer blocked.
   - `LoginFailureEmitsStructuredLog` — asserts `event=login_failure` with `status=401`.
   - `ReauthEmitsStructuredLog` — drives the full 401-retry path and asserts `event=reauth_required` plus two `event=login_success` lines (initial + re-auth).
   - The 11 pre-existing `ApiClientTest` tests already cover the *behavioral* contract; these three are dedicated to the log surface so a future change that silently drops a log line breaks the build.
+
+## Phase 12: login_attempts Cleanup Endpoint ✅
+**Phase 5.8 of `Security Review.md` — closes the deferred cleanup item from the brute-force defense work.**
+
+The Phase 5 brute-force-defense gate writes one row to `login_attempts` per auth attempt. The table-helper method `LoginAttempts::PurgeOlderThan(transaction, ageMicros)` and the retention secret `kAuthLoginAttemptsRetentionInMicros` (default 30 days) were already in place; only the endpoint + scheduler wiring was missing.
+
+- [x] `POST /api/admin/cleanup_login_attempts` in `endpoints/admin_cleanup_login_attempts.{h,cpp}`. Auth: requires login + `manage_subscriptions` (consistent with the four other cleanup endpoints). Reads the retention secret with a defensive 30-day fallback when the secret is missing/unparseable. Returns `{"login_attempts_deleted": N}`.
+- [x] 5 endpoint tests in `admin_cleanup_login_attempts_test.cpp`: 401 unauthenticated, 403 missing permission, 200 nothing-to-clean, 200 deletes-aged-rows-leaves-fresh, 200 missing-retention-secret-falls-back-to-default. The test mirrors `admin_cleanup_idempotency_keys_test.cpp` so the four cleanup endpoints all look the same to a future reader.
+- [x] Wired into `endpoints/CMakeLists.txt` and `endpoints/web_app.cpp` (forced-link via `g_PostAdminCleanupLoginAttempts`).
+- [x] **Scheduler wiring**: added `loginAttemptsCleanupSeconds = 86400` (daily) to `JobIntervals`; new `--login_attempts_cleanup_interval` flag in `main.cpp`; `cleanup_login_attempts` registered in `BuildStandardJobs`; `LogConfigSummary` includes the new interval. `BuildStandardJobs` test count bumped from 10 to 11; new `LoginAttemptsCleanupCanBeDisabled` test pins the disable-with-zero-interval contract.
+- [x] **Manual trigger via `knottyyoga_test_helper`**: new `cleanup_login_attempts` command (alias `cla`) in `commands/utility_commands.cpp`. Reads the retention from the `kAuthLoginAttemptsRetentionInMicros` secret by default, accepts `--retention_micros=<n>` for ad-hoc testing. Calls `LoginAttempts::PurgeOlderThan` directly via the table helper — no HTTP roundtrip, no service-account login, just the DELETE. Useful after a load test or attack drill where the table has filled up and you want to purge it without waiting for the scheduler tick or running the helper.
 
 ---
 

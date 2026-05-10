@@ -403,8 +403,10 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 - [ ] **Wall-clock timing parity (deferred)**: padding the unknown-email branch with a no-op Argon2 verify against a sentinel hash. The design doc marks this "optional"; the response-shape test above covers the more impactful side-channel. Defer to a follow-up.
 
 ### 5.8 Periodic cleanup
-- [ ] **Deferred**: needs scheduler integration. Plan: add a `/api/admin/cleanup_login_attempts` endpoint that calls `LoginAttempts::PurgeOlderThan(tx, kAuthLoginAttemptsRetentionInMicros)`, then register it as a `ScheduledJob` in `scheduler/scheduler_config.h` (hourly). The `PurgeOlderThan` table-helper method and the `kAuthLoginAttemptsRetentionInMicros` secret (default 30 days) are already in place; only the endpoint + schedule wiring remains.
-- [x] `login_attempts_test.cpp::PurgeOlderThanBasic` and `::PurgeOlderThanZeroIsNoop` already pin the helper-side behavior so the deferred endpoint is a thin wrapper.
+- [x] `POST /api/admin/cleanup_login_attempts` (`endpoints/admin_cleanup_login_attempts.{h,cpp}`). Auth: login + `manage_subscriptions`. Reads `kAuthLoginAttemptsRetentionInMicros` from secrets with a defensive 30-day fallback when missing/unparseable. Calls `LoginAttempts::PurgeOlderThan` and returns `{"login_attempts_deleted": N}`. 5 endpoint tests (401, 403, nothing-to-clean, deletes-aged-rows-leaves-fresh, missing-secret-falls-back).
+- [x] Registered as a daily scheduled job in `Scheduler::BuildStandardJobs`. New `loginAttemptsCleanupSeconds = 86400` field on `JobIntervals`, new `--login_attempts_cleanup_interval` flag in `scheduler/main.cpp`, included in `LogConfigSummary`. `BuildStandardJobsTest` count bumped from 10 to 11; new `LoginAttemptsCleanupCanBeDisabled` test pins the disable-with-zero-interval contract. Phase 12 of `Scheduled Jobs.md`.
+- [x] Manual trigger via `knottyyoga_test_helper`: new `cleanup_login_attempts` command (alias `cla`) under the Configuration category. Calls the table helper directly (no HTTP roundtrip, no service-account login). Useful after load tests / attack drills where the table needs purging without waiting for the scheduler tick. Documented as scenario 25 in `Manual Testing Helper Executable.md`.
+- [x] `login_attempts_test.cpp::PurgeOlderThanBasic` and `::PurgeOlderThanZeroIsNoop` already pin the helper-side behavior; the new endpoint test is the thin wrapper around them.
 
 ## Phase 6 — Cookie hygiene cleanup
 

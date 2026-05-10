@@ -1027,6 +1027,32 @@ Commands that accept `--person_id` use the current user's ID when the flag is om
 3. Send the email
 4. Print success/failure
 
+### 25. `cleanup_login_attempts` — Manually Trigger login_attempts Purge (alias `cla`)
+
+**What it does**: Calls `TableHelpers::LoginAttempts::PurgeOlderThan` directly. Equivalent to what the helper executable's daily `cleanup_login_attempts` job does, but runs in-process against the database — no HTTP roundtrip, no service-account login, no waiting for the scheduler tick.
+
+**Flags**:
+- `--retention_micros=<n>` (optional — override the retention window in microseconds. Defaults to the `kAuthLoginAttemptsRetentionInMicros` secret value, normally 30 days.)
+
+**Operations**:
+1. Resolve the retention window (flag → secret → fail). Validates that it's positive.
+2. Construct a `LoginAttempts` table helper.
+3. Call `PurgeOlderThan(transaction, retentionMicros)` and print the deleted-row count.
+
+**Why manual testing needs this**: Phase 5's brute-force-defense gate writes one row to `login_attempts` per auth attempt. After running a load test, attack drill, or just a noisy debugging session, the table can have thousands of rows of stale data. The scheduler purges daily, but during testing you often want the table empty *now* so the next gate read is clean.
+
+**Example workflow**:
+```bash
+# After hammering /api/login with bad credentials in a test, purge anything
+# older than 1 second so the next attempt sees a clean gate.
+knottyyoga_test_helper --command=cleanup_login_attempts --retention_micros=1000000
+
+# Or use the production retention (30 days) — usually a no-op on a dev DB.
+knottyyoga_test_helper --command=cla
+```
+
+**Source reference**: Phase 5.8 of `Security Review.md`. Same business logic the scheduler invokes via `POST /api/admin/cleanup_login_attempts`; here we skip the endpoint and call the helper directly.
+
 ## Updated Command List
 
 ```
@@ -1070,6 +1096,7 @@ Commands:
   create_test_user              Create a fully validated test user
   set_secret                    Set a configuration secret value
   send_test_email               Send a test email to verify mail configuration
+  cleanup_login_attempts (cla)  Purge login_attempts rows past retention
 
 Common flags:
   --command=<name>              Command to run (required)
