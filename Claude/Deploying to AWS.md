@@ -281,24 +281,13 @@ knottyyoga:<version>
 
 ## 2.2 systemd units (Docker-based)
 
-- [ ] `knottyyoga-server.service` — `ExecStart=/usr/bin/docker run --rm --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`, `ExecStop=/usr/bin/docker stop knottyyoga-server`, `Restart=on-failure`.
-- [ ] `knottyyoga-helper.service` — runs the scheduled-jobs helper from the same image:
-  ```
-  ExecStart=/usr/bin/docker run --rm --name knottyyoga-helper \
-      --network host \
-      --env-file /etc/knottyyoga/server.env \
-      --entrypoint knottyyoga_helper \
-      knottyyoga:<version> \
-      --server_url=http://localhost:80 \
-      --service_account_email=scheduler@knottyyoga.local
-  ExecStop=/usr/bin/docker stop knottyyoga-helper
-  Restart=on-failure
-  After=knottyyoga-server.service
-  Wants=knottyyoga-server.service
-  ```
-  `After=` ensures the server is up first; `Wants=` (vs `Requires=`) keeps the helper running across server restarts. The helper handles SIGTERM cleanly (see `Scheduled Jobs.md` §3.3 / Phase 8 of the helper plan), so `docker stop` produces a graceful shutdown. The `--service_account_password` flag is intentionally omitted — the helper falls back to the `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` env var from `server.env`.
-- [ ] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH: `docker exec -it knottyyoga-server knottyyoga_test_helper`.
-- [ ] Log lines validating env var wiring (matches 1.1 / 1.3). Docker captures stdout/stderr automatically; systemd journals it.
+- [x] `knottyyoga-server.service` written at `server/knottyyoga_server/package/systemd/knottyyoga-server.service`. `Type=simple` foreground `docker run --rm`, `Restart=on-failure`, `RestartSec=5s`, `TimeoutStopSec=30s`. `ExecStartPre=-/usr/bin/docker rm -f knottyyoga-server` defends against zombie containers from a hard crash. Image tag pinned via `EnvironmentFile=/etc/knottyyoga/version.env` (`${KNOTTYYOGA_IMAGE_TAG}`).
+- [x] `knottyyoga-helper.service` written at `server/knottyyoga_server/package/systemd/knottyyoga-helper.service`. Same `Type=simple` pattern. `--network host` so the helper hits the server on `localhost:80`. `--entrypoint knottyyoga_helper` plus `--server_url` and `--service_account_email` flags; `--service_account_password` intentionally omitted so the helper falls back to `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from `server.env`. `After=knottyyoga-server.service` + `Wants=` (not `Requires=`) keeps the helper running across server restarts. `RestartSec=10s` gives the server breathing room after a restart so the helper's first login doesn't immediately fail. SIGTERM-clean per Phase 11 of `Scheduled Jobs.md`.
+- [x] **Version pinning via `EnvironmentFile=/etc/knottyyoga/version.env`** (single-line `KNOTTYYOGA_IMAGE_TAG=vX.Y.Z`) instead of `sed`'ing the unit files in-place. Deploy script atomically rewrites that file and runs `systemctl restart` — no `daemon-reload` needed since the unit files themselves don't change. `version.env.example` ships in the tarball; install-time copy + edit.
+- [x] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH: `docker exec -it knottyyoga-server knottyyoga_test_helper`.
+- [x] Unit files bundled into the tarball at `systemd/` (build script copies from `package/systemd/`; build fails fast if any of the four expected files — both `.service` files, `version.env.example`, `README.md` — is missing).
+- [x] `package/systemd/README.md` documents the first-time install procedure, the update procedure, why each directive was chosen, and the common failure modes (most importantly: helper login failure when `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` changes after the initial `--migrate`).
+- [x] Log lines validating env var wiring (matches 1.1 / 1.3). Docker captures stdout/stderr automatically; systemd journals it. The structured log format from Phase 11 of `Scheduled Jobs.md` (`[scheduler] event=…` / `[api_client] event=…`) is greppable in `journalctl`.
 
 ## 2.3 Frontend artifact
 
