@@ -506,8 +506,12 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ## Phase 11 — Cleanup of latent SQL-concat in DB initializer
 
 ### 11.1 Replace concatenation in `create_database.cpp`
-- [ ] `database_helper/create_database.cpp:2031,2049,2062` — switch each to `transaction.RunSqlStatementReturningOneValue(... $1 ...)`
-- [ ] No new tests required — existing init runs on every test fixture
+- [x] Three concat sites replaced with `$1`-parameterized queries (planning-doc line numbers were stale — actual sites were inside `PopulateSchedulingExamples`):
+  - The spa-code `UPDATE products SET ... WHERE code = '<code>'` loop over `{"early-bird-spa", "non-peak-spa", "peak-spa"}` — now `WHERE code = $1` with `std::string(spaCode)` bound.
+  - The `room_schedule_templates` INSERT that splices `spaRoomId` into the `VALUES (...)` clause — now `VALUES ($1::bigint, ...)` with `spaRoomId` bound (explicit `::bigint` cast keeps the column type happy since libpqxx binds text by default).
+  - The `AddScheduleWindow` lambda's `SELECT id FROM products WHERE code = '<productCode>'` — now `WHERE code = $1` with `std::string(productCode)` bound.
+- [x] Each site has an inline comment noting Phase 11.1 and explaining that the spliced values were trusted (hard-coded list / SELECT result / lambda parameter) but the codebase's convention is parameterized SQL everywhere so a future maintainer can't accidentally copy the concat pattern into a path that takes untrusted input.
+- [x] No new tests added. The original plan said "existing init runs on every test fixture" but that's incorrect — `GlobalDatabaseTestSupport::SetupAllTables` runs only the DDL (table CREATE), not `PopulateTables`/`PopulateSchedulingExamples`. The populate path is invoked only by the `knottyyoga_database_helper` executable at production seed time and has no automated test coverage today (pre-existing gap, not introduced by Phase 11). However, the parameterized SQL machinery the refactor relies on — `RunSqlStatement(... $1 ...)` with string params, `$1::bigint` casts inside `VALUES (...)`, parameter binding through `ExecParamsHelper::AddParam` — is exercised by hundreds of existing tests via `DbCrud::UpdateRow`, `DbCrud::GetRow`, `now_us_test`, and every endpoint test that issues a parameterized statement. A typo regression in the three edited statements (wrong placeholder number, missing cast, mismatched parameter count) would surface the next time an operator ran the database-helper executable; this matches the existing risk profile for the rest of `PopulateTables`. Adding a real test for the populate path would require linking `knotty_yoga_database_helper` into the test binary and seeding the prerequisite tables — that's a worthwhile follow-up but out of scope for this phase, which is strictly a no-behavior-change refactor.
 
 ## Phase 12 — Operational guard rails
 
