@@ -57,7 +57,7 @@ You have prior AWS experience (S3, RDS, Lambda, EC2 at Tableau), so the write-up
 - **DNS**: Route 53 hosted zone; apex + `www` alias records → CloudFront distribution.
 - **Email**: Amazon SES.
 - **Square**: sandbox initially; flip `kSquareEnvironment` secret to `production` later.
-- **Scheduled jobs**: `knottyyoga_helper` runs under systemd on the same EC2 when it lands (see `Scheduled Jobs.md`). Not blocking for initial deploy.
+- **Scheduled jobs**: `knottyyoga_helper` is **complete** (see `Scheduled Jobs.md` — all 11 phases done) and ships with the initial deploy. Runs under its own systemd unit on the same EC2, in a separate container from the server, sharing `/etc/knottyyoga/server.env` via `--env-file`. Handles billing, reminders, voucher expiry, cleanup jobs, and waitlist refunds. Authenticates as the `scheduler@knottyyoga.local` service account which `knottyyoga_database_helper --migrate` provisions during initial deploy.
 - **Admin / ops access**: SSH to the EC2 for running `knottyyoga_test_helper` ad-hoc.
 
 ## Why no nginx
@@ -102,7 +102,7 @@ These come first — they're the Phase 1 work. Each is detailed in its phase sec
 1. **DB connection is hardcoded** in `sql_util/database_access/database_helper_init.cpp` (user=docker, password=docker, host=postgresql). This **must** be driven by env vars before we can point at RDS.
 2. **Secret bootstrap**: secrets live in the `config_secrets` table, but database credentials themselves can't live there (chicken-and-egg). DB credentials + a few startup-only flags are env vars; everything else stays DB-backed.
 3. **Frontend `environment.prod.ts`** is a stub — missing Square Application ID and Location ID.
-4. **No health endpoint** (needed for the `knottyyoga_helper` watchdog mode, CloudFront health checks, and manual smoke tests).
+4. **No health endpoint** (needed for the CloudWatch Synthetics canary, CloudFront health checks, and manual smoke tests).
 5. **No CloudFront origin-secret middleware** — Phase 1.7 adds it.
 6. **No migration mechanism** — `database_helper` destructively rebuilds the DB, which is fine for dev but will wipe customer data in prod. Must add a forward-only, versioned migration path before the second deploy.
 7. **No production build pipeline** — we'll ship native x86-64 Linux binaries from GitLab CI.
@@ -137,7 +137,7 @@ Touches the lowest layer (database access). Everything above depends on the DB, 
 
 ## 1.2 Add a health-check endpoint
 
-Used by: the `knottyyoga_helper` watchdog (see `Scheduled Jobs.md`), any future load balancer, monitoring.
+Used by: CloudWatch Synthetics canary (Phase 5.3), any future load balancer, manual smoke tests. **Not** consumed by `knottyyoga_helper` — the helper-as-watchdog idea was dropped in favor of AWS-native primitives (see `Scheduled Jobs.md` §2).
 
 - [x] Add `endpoints/health.cpp` / `health.h` with a `GET /api/health` handler returning `{"status":"ok|fail","db":"ok|fail","version":"<git-sha>"}`.
   - Runs a trivial `SELECT 1` inside a transaction (`ProbeDatabase`) to validate DB connectivity.
@@ -252,13 +252,13 @@ knottyyoga:<version>
 ├── /opt/knottyyoga/bin/knottyyoga_the_server      (default entrypoint)
 ├── /opt/knottyyoga/bin/knottyyoga_database_helper
 ├── /opt/knottyyoga/bin/knottyyoga_test_helper
-├── /opt/knottyyoga/bin/knottyyoga_helper           (when it exists)
+├── /opt/knottyyoga/bin/knottyyoga_helper
 └── /opt/knottyyoga/certs/cacert.pem
 ```
 
 - **Server container**: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`
-- **Helper container** (scheduled jobs): same image, different entrypoint: `--entrypoint knottyyoga_helper`
-- **DB migration** (one-shot at deploy): `docker run --rm --env-file ... knottyyoga:<version> knottyyoga_database_helper --migrate`
+- **Helper container** (scheduled jobs): same image, different entrypoint and `--network host` so it can hit the server on `localhost:80`: `docker run -d --name knottyyoga-helper --network host --env-file /etc/knottyyoga/server.env --entrypoint knottyyoga_helper knottyyoga:<version> --server_url=http://localhost:80 --service_account_email=scheduler@knottyyoga.local`
+- **DB migration** (one-shot at deploy): `docker run --rm --env-file ... knottyyoga:<version> knottyyoga_database_helper --migrate`. Reads `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from the env file to provision the scheduler service-account row (fails fast if unset).
 - **Test helper** (ad-hoc via SSH): `docker exec -it knottyyoga-server knottyyoga_test_helper`
 
 - [x] Wrote `server/knottyyoga_server/package/Dockerfile` — multi-stage build:
@@ -267,8 +267,7 @@ knottyyoga:<version>
   - Build: `docker build -t knottyyoga:<ver> --build-arg KNOTTYYOGA_VERSION=<ver> -f package/Dockerfile .`
   - Image size: ~100-150 MB (vs ~2 GB builder stage).
 - [x] Wrote `server/knottyyoga_server/package/build_linux_release.sh`. Runs `conan install`, `cmake -DCMAKE_BUILD_TYPE=Release`, `cmake --build`, then assembles a staging tree:
-  - `bin/knottyyoga_the_server`, `bin/knottyyoga_database_helper`, `bin/knottyyoga_test_helper` (all required; build fails fast if missing).
-  - `bin/knottyyoga_helper` is detected via `find` anywhere under the build tree and bundled if present, skipped if not (won't exist until Scheduled Jobs lands).
+  - `bin/knottyyoga_the_server`, `bin/knottyyoga_database_helper`, `bin/knottyyoga_test_helper`, `bin/knottyyoga_helper` (all required; build fails fast if missing).
   - All bin files are stripped (`strip --strip-unneeded`) to keep the tarball small.
   - `lib/` populated by walking each binary's `ldd` output, filtering OS-provided libs (anything under `/lib`, `/usr/lib`, `/lib64`, `/usr/lib64`), and copying every other shared object. `patchelf --set-rpath '$ORIGIN/../lib'` rewrites each binary's RPATH so the bundled libs resolve without `LD_LIBRARY_PATH`. Bundled libs themselves get `$ORIGIN` so inter-lib deps stay inside `lib/`.
   - `certs/cacert.pem` copied from the source tree (libcurl trust store).
@@ -283,7 +282,21 @@ knottyyoga:<version>
 ## 2.2 systemd units (Docker-based)
 
 - [ ] `knottyyoga-server.service` — `ExecStart=/usr/bin/docker run --rm --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`, `ExecStop=/usr/bin/docker stop knottyyoga-server`, `Restart=on-failure`.
-- [ ] `knottyyoga-helper.service` — same image, `--entrypoint knottyyoga_helper` (when it exists).
+- [ ] `knottyyoga-helper.service` — runs the scheduled-jobs helper from the same image:
+  ```
+  ExecStart=/usr/bin/docker run --rm --name knottyyoga-helper \
+      --network host \
+      --env-file /etc/knottyyoga/server.env \
+      --entrypoint knottyyoga_helper \
+      knottyyoga:<version> \
+      --server_url=http://localhost:80 \
+      --service_account_email=scheduler@knottyyoga.local
+  ExecStop=/usr/bin/docker stop knottyyoga-helper
+  Restart=on-failure
+  After=knottyyoga-server.service
+  Wants=knottyyoga-server.service
+  ```
+  `After=` ensures the server is up first; `Wants=` (vs `Requires=`) keeps the helper running across server restarts. The helper handles SIGTERM cleanly (see `Scheduled Jobs.md` §3.3 / Phase 8 of the helper plan), so `docker stop` produces a graceful shutdown. The `--service_account_password` flag is intentionally omitted — the helper falls back to the `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` env var from `server.env`.
 - [ ] **Do not** create a unit for `knottyyoga_test_helper` — it stays manual via SSH: `docker exec -it knottyyoga-server knottyyoga_test_helper`.
 - [ ] Log lines validating env var wiring (matches 1.1 / 1.3). Docker captures stdout/stderr automatically; systemd journals it.
 
@@ -380,7 +393,7 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [ ] Allocate an Elastic IP and attach it. Free while attached. Needed so the CloudFront origin target doesn't change on stop/start.
 - [ ] First boot: `apt update && apt upgrade`; install `docker.io` and `postgresql-client`.
 - [ ] Docker handles port binding — no `cap_net_bind_service` needed. The container runs as root internally (standard for single-process containers); the EC2 host user doesn't matter.
-- [ ] Create `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, the `KNOTTYYOGA_DB_*` vars, and `KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`.
+- [ ] Create `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, the `KNOTTYYOGA_DB_*` vars, `KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`, and `SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<random>`. Generate the scheduler password with `openssl rand -base64 32` (or any source ≥24 chars); both `knottyyoga_database_helper` and `knottyyoga_helper` read this var from the same env file, so set it once.
 - [ ] Enable `ufw`: deny incoming default, allow 22 + 80.
 - [ ] Install CloudWatch Agent if you want metrics beyond basic EC2 ones. Optional for v1 — the systemd journal tailed to CloudWatch Logs is enough.
 
@@ -452,10 +465,11 @@ Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull f
 
 - [ ] Document this sequence in `RUNBOOK.md`:
   1. Provision DB; create app user.
-  2. Write `/etc/knottyyoga/server.env` with `KNOTTYYOGA_DB_*` vars.
-  3. Run `knottyyoga_database_helper --migrate` (creates schema + `config_secrets` table empty).
+  2. Write `/etc/knottyyoga/server.env` with `KNOTTYYOGA_DB_*` vars **and** `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`. The migrate step below fails fast if the scheduler password isn't set, so it must be present before step 3.
+  3. Run `knottyyoga_database_helper --migrate` (creates schema + `config_secrets` table empty + **provisions the `scheduler@knottyyoga.local` row in `people` with the env-var password hashed in**). The provision step is idempotent — a second run with the same password is a no-op; rotating the password means deleting the row and re-running.
   4. Run `knottyyoga_test_helper` to insert initial secret rows (or write a dedicated `knottyyoga_database_helper --seed-secrets-from-file secrets.json` subcommand — small scope, worth doing).
   5. `systemctl start knottyyoga-server`. Server now boots, loads secrets, configures Square + Mail + CORS.
+  6. `systemctl start knottyyoga-helper`. Helper authenticates as the scheduler service account (env-var password matches the hash from step 3), kicks off its timer loop.
 - [ ] Add the `--seed-secrets-from-file` subcommand to `database_helper` + a test that validates ingestion.
 
 ---
