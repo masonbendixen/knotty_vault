@@ -483,9 +483,10 @@ Purposely manual — gets you comfortable with the pieces before automating.
 - [ ] Build the Docker image locally: `docker build -t knottyyoga:v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server`.
 - [ ] Push to ECR (or `docker save | scp | docker load` for the first deploy before ECR is set up).
 - [ ] On the EC2, run `deploy/install.sh` which:
-  - Runs `docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<version> knottyyoga_database_helper --migrate`.
-  - Updates the version tag in the systemd unit and restarts: `systemctl restart knottyyoga-server`.
+  - Runs `docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<version> knottyyoga_database_helper --migrate` (creates schema, provisions the scheduler service account from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`).
+  - Updates the version tag in both systemd units and restarts in order: `systemctl restart knottyyoga-server` then `systemctl restart knottyyoga-helper`.
 - [ ] Smoke test: `curl https://knottyyoga.example/api/health`.
+- [ ] Smoke test the helper: `journalctl -u knottyyoga-helper -n 50` — expect to see `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=1` shortly after start, then `[scheduler] event=event_loop_starting`. If `event=login_failure` appears instead, the env-var password doesn't match the hash in the `people` row (most likely: env-var was added after the initial `--migrate`, so re-run migrate to update the hash or delete the row first).
 - [ ] Log in via the frontend, register a user, process a sandbox Square payment end-to-end.
 
 ## 5.2 SSH access hardening
@@ -607,11 +608,13 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 - [ ] Operator clicks `deploy-manual` in GitLab → artifact deploys to EC2.
 - [ ] EC2 `install.sh`:
   1. Pulls image: `docker pull <ecr-repo>/knottyyoga:vX.Y.Z`.
-  2. Runs migrations: `docker run --rm --env-file /etc/knottyyoga/server.env <image> knottyyoga_database_helper --migrate`.
-  3. Stops old container: `docker stop knottyyoga-server`.
-  4. Starts new container: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env <image>`.
-  5. Health-check poll; abort + rollback to previous image tag if health fails within 30s.
-  6. Prune old images: `docker image prune -f`.
+  2. Runs migrations: `docker run --rm --env-file /etc/knottyyoga/server.env <image> knottyyoga_database_helper --migrate`. (Idempotent for the scheduler service-account row — second-and-later runs are a no-op.)
+  3. Stops the helper first: `systemctl stop knottyyoga-helper`. SIGTERM-clean per Phase 11 of `Scheduled Jobs.md` — graceful shutdown takes <1s.
+  4. Stops the server: `docker stop knottyyoga-server`.
+  5. Starts the new server: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env <image>`.
+  6. Health-check poll on `/api/health`; abort + rollback to previous image tag (both containers) if health fails within 30s.
+  7. Starts the new helper: `systemctl start knottyyoga-helper`. Verify in journalctl that it re-authenticates successfully.
+  8. Prune old images: `docker image prune -f`.
 
 ---
 
@@ -627,6 +630,7 @@ Not required to ship; listed so we don't forget.
 - [ ] Encrypted secrets-at-rest in the `config_secrets` table (column-level encryption with a key from env var) instead of plaintext. Plaintext is ok for a tiny soft launch but you'll want this before real revenue flows.
 - [ ] CloudFront access logs → S3 for HTTP-level visibility (free aside from S3 storage of the log files).
 - [ ] Buy the 1-yr Compute Savings Plan once the instance type is confirmed.
+- [ ] **Helper liveness alarm**: CloudWatch Logs metric filter on the `knottyyoga-helper` log group looking for `[scheduler] event=job_success` lines, with an alarm if no match in the last 25 hours (longest interval is daily billing). Catches the case where the helper is "running" per systemd but its login keeps failing, so no jobs ever execute. Cheap insurance once we have customer data depending on the billing cycle.
 
 ---
 
@@ -727,7 +731,7 @@ All previously open questions are answered. Decisions are recorded here so we ca
   2. CloudWatch alarm on the EC2 instance-status check + SNS email tells you if the VM itself is wedged.
   3. CloudWatch Synthetics canary (or a free external uptime probe like UptimeRobot) hits `/api/health` every ~5 min and pages on failure.
   4. Auto-scaling-group-of-one with an instance-replacement policy is overkill for a soft launch but worth knowing exists.
-  → **Decision**: in `knottyyoga_helper`, keep only the **scheduled-jobs runner** (subscription renewals, reminders, etc.). Drop the watchdog/watchdog-of-watchdog pieces. Phase 5.3 will add the CloudWatch alarms + Synthetics canary. Update `Scheduled Jobs.md` to reflect this when you implement that helper.
+  → **Decision** (already implemented in `Scheduled Jobs.md`): `knottyyoga_helper` is the **scheduled-jobs runner only** — subscription renewals, reminders, voucher expiry, cleanup jobs, waitlist refunds. No watchdog mode. Phase 5.3 covers the CloudWatch alarms + Synthetics canary.
 - ✅ **Square credentials** — values come from `secret_values.cpp` (the `production`/`debug` ifdef'd block). Phase 1.4 will pull the sandbox values for `environment.prod.ts` and the production values when you flip live.
 - ✅ **Backup testing** — exercise RDS restore once during initial deploy, then quarterly. (Tracked in Phase 5.1 + Phase 8.)
 - ✅ **Savings Plan timing** — run on-demand for 2–4 weeks, then buy a **1-yr Compute Savings Plan**. Switching is easy: Compute Savings Plans commit to a $/hr spend, not a specific instance, so changing instance type/family/size/region (e.g., later migrating to ARM `t4g.small`) keeps the discount as long as you stay within the committed hourly burn. The lock-in cost is "you owe AWS this $/hr for 12 months even if you scale down." For RDS the equivalent is a Reserved Instance, which *is* tied to instance family — so RDS RI commitment should wait until you're confident on `db.t3.micro`, OR be skipped (the RDS RI savings on a single small instance are only ~$50/yr; not worth the inflexibility).
@@ -735,6 +739,7 @@ All previously open questions are answered. Decisions are recorded here so we ca
 - ✅ **Admin access** — Mason only on day one, but design for granting access to others. **Use AWS Systems Manager Session Manager**, not raw SSH key juggling, for the secondary operator. SSM gives you: no public key on the EC2, AWS-IAM-controlled access (grant/revoke instantly via IAM policy), full audit trail in CloudTrail, no inbound port 22 needed. The retired-friend gets an IAM user + Session Manager permission, runs `aws ssm start-session --target <instance-id>` from their machine, and they're in. Phase 5.2 details.
 - ✅ **`db_schema/` snapshots** — git tags only; no directory copies.
 - ✅ **Destructive migration safety** — `--recreate_database` blocked in prod unless `KNOTTYYOGA_ALLOW_DESTRUCTIVE=1` env var is set. (Phase 3.3.)
+- ✅ **Scheduler service-account password** — single env var `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` in `/etc/knottyyoga/server.env`, read by both `knottyyoga_database_helper` (hashes it into the `people` row) and `knottyyoga_helper` (uses it to log in). The database helper fails fast if the env var isn't set, so production can't accidentally provision the row without a password. Rotation: delete the row in `people`, update the env var, re-run `--migrate`. See `Scheduled Jobs.md` §3.2.
 
 ---
 
@@ -746,5 +751,5 @@ All previously open questions are answered. Decisions are recorded here so we ca
 - [x] Square sandbox values confirmed — pull from `secret_values.cpp` ifdef'd `production`/`debug` block
 - [ ] SES sender identity agreed (likely `noreply@knottyyoga.com`; needs your call on the local-part)
 - [x] Staging env — **no**, soft-launch environment doubles as staging (no DNS, sandbox Square, friends-only)
-- [x] `knottyyoga_helper` in-scope for soft launch — scheduled-jobs runner only; AWS Synthetics + CloudWatch alarms replace the custom watchdog
+- [x] `knottyyoga_helper` in-scope for soft launch — scheduled-jobs runner only; **all 11 phases of `Scheduled Jobs.md` complete**; AWS Synthetics + CloudWatch alarms replace the custom watchdog
 - [x] Resolved Questions log filled in
