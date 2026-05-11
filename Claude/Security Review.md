@@ -516,16 +516,18 @@ The verification email link points at the SPA, not the API. The SPA reads the se
 ## Phase 12 — Operational guard rails
 
 ### 12.1 Fail loud in prod when guards aren't configured
-- [ ] In `main.cpp` after `ServerConfig::Initialize`, when `IsProdMode()` is true:
-  - assert `KNOTTYYOGA_ORIGIN_SECRET` is set
-  - assert `KNOTTYYOGA_TRUST_PROXY` is set
-  - assert `KNOTTYYOGA_SECRET_KEY` is set (Phase 8)
-  - assert `kWebsiteAddress` secret is set
-  - throw and exit nonzero on any miss
-- [ ] Test in `server_config_test.cpp` for the prod-validation path (mock the env via test-mode flag)
+- [x] Added `Auth::ServerConfig::ValidateProdEnvironment(transaction, secrets)` static method. No-op in dev/test mode (the prod guards are advisory locally — devs must not need to export prod-only env vars). In prod mode it collects ALL missing items into a list (`std::vector<std::string>`) and throws once with the full list, so the operator can fix every misconfiguration in one redeploy instead of whack-a-mole. Checks four items:
+  - env var `KNOTTYYOGA_ORIGIN_SECRET` set and non-empty (Phase 1.7 CloudFront origin guard);
+  - env var `KNOTTYYOGA_TRUST_PROXY` truthy per `ProxyTrustEnabled()` — i.e., "1"/"true" case-insensitive (Phase 5.5 rate-limit per-IP correctness behind CloudFront);
+  - env var `KNOTTYYOGA_SECRET_KEY` set and non-empty (Phase 8.1 at-rest master key);
+  - secret `kWebsiteAddress` set and non-empty (prod CORS pin + verification-email link base URL).
+- [x] Wired into `main.cpp` immediately after `ServerConfig::Initialize`, inside the same `RunInTransaction` block. The throw propagates up to `main()` so the process exits non-zero — ECS / systemd then flags the misconfiguration immediately instead of letting a half-protected server stay up.
+- [x] 11 tests in `server_config_test.cpp` under `ServerConfigProdValidationTest`: `DevModeIsAlwaysAnNoOp`, `TestModeIsAlwaysAnNoOp` (load-bearing — local devs don't need real env vars), `ProdAllSetPasses` (happy path), `ProdMissingOriginSecretThrows`, `ProdEmptyOriginSecretIsTreatedAsMissing` (defensive — `export KNOTTYYOGA_ORIGIN_SECRET=""` must not pass), `ProdMissingTrustProxyThrows`, `ProdTrustProxyFalseValueIsTreatedAsMissing` (matches `ProxyTrustEnabled` semantics), `ProdMissingSecretKeyThrows`, `ProdMissingWebsiteAddressThrows`, `ProdAllMissingListsEveryFailureAtOnce` (asserts the message names all four items so an operator sees the whole list), `ProdThrowsBeforeAcceptingConnections` (pins exception type for the main-loop guard). Tests use a new `ProdValidationEnvScope` RAII guard that scrubs every relevant env var on entry and exit — env state can't bleed between tests.
 
 ### 12.2 Log on first request that the server is in prod mode and that the guards are active
-- [ ] Single startup log line summarizing `prod=true|false, csrf_guard=on, origin_secret=set, proxy_trust=set, security_headers=on`. Helps catch misconfiguration in deploy.
+- [x] Added `Auth::ServerConfig::BuildSecurityPostureSummary()` static method that returns the formatted line as a `std::string`. main.cpp pipes the result to `LogInfo`. Pure function (no logging side effects, no env mutation) so tests can pin the format string directly without a log-capture facility.
+- [x] Format: `[security_posture] prod=<true|false> csrf_guard=on origin_secret=<set|unset> proxy_trust=<set|unset> secret_key=<set|unset> security_headers=on`. The `csrf_guard=on`/`security_headers=on` flags are unconditional (the middleware is always wired post-Phases 4 and 7). The `<set|unset>` flags reflect process env-var state — they tell an operator at a glance whether each guard is configured for this run. `proxy_trust=set` is reported only when the value is recognized as truthy by `ProxyTrustEnabled()`; "0"/"false"/empty/unset all report `unset` (since they all produce the same effective behavior — silently misreporting "set" for a false value would be the worst kind of bug).
+- [x] 6 tests in `server_config_test.cpp` under `ServerConfigSecurityPostureTest`: `ProdAllGuardsSetReportsAllSet` (pins every key + the `[security_posture]` prefix used by deploy-log grep), `DevAllGuardsUnsetReportsAllUnset` (catches a hypothetical bug where unset env vars hardcoded to `set`), `ProxyTrustEmptyStringReportsUnsetNotSet`, `ProxyTrustZeroValueReportsUnsetNotSet` (both defensive — silently misreporting a falsy proxy_trust as "set" would cause silent rate-limit collapse behind CloudFront), `PartialSetReportsAccurately` (catches a bug where the implementation might've ANDed all flags into one boolean), `TestModeReportsProdFalse`.
 
 # Future Considerations
 
