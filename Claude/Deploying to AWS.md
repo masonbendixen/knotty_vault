@@ -324,20 +324,25 @@ What you already have that's unusual: the C++ code *is* the schema source of tru
 - [x] Added `schema_migrations` table at `db_schema/schema_migrations.{h,cpp}`. Columns:
   - `id` TEXT primary key (e.g. `"0001_baseline"`).
   - `applied_at_us` BIGINT NOT NULL DEFAULT `now_us()` — microseconds since epoch, matching every other timestamp column in the schema (the plan loosely said TIMESTAMPTZ; consistency with `admin_alerts.created_at`, `bookings.cancelled_us`, etc. won).
-- [x] Registered the new table in `make_database_info.cpp` (created on every fresh DB build) and in `create_database.cpp` `CreateTables()` (first table created, before anything else, so the migration runner can use it during bootstrap). Added to `db_schema/CMakeLists.txt`.
-- [x] Added `Migration::MigrationRunner` at `business_logic/migration/migration_runner.{h,cpp}`:
-  - `EnsureSchemaMigrationsTable(transaction)` — idempotent `CREATE TABLE IF NOT EXISTS` so the runner bootstraps the table on legacy hosts that predate this commit.
-  - `IsApplied(transaction, id)` / `ListApplied(transaction)` — inspection helpers.
-  - `ApplyOne(transaction, migration)` — applies one migration if not already applied, records id in schema_migrations; returns true if applied, false if skipped. Inside an existing transaction (caller-managed).
-  - `ApplyPending(transactionProvider, migrations)` — applies every unapplied migration **each in its own transaction via the supplied provider**, so a mid-list failure leaves earlier migrations committed and skips later ones. On failure throws `MigrationFailure { migrationId(), what() }` so callers get the failing id without parsing strings.
-  - Structured logging via existing `LogInfo`/`LogError`: `[migration] event=applied|skipped|apply_failed id=…`.
-- [x] **13 unit tests** in `business_logic/migration/migration_runner_test.cpp` covering:
-  - `EnsureSchemaMigrationsTable`: no-op when table exists; creates on fresh DB (test drops the pre-created table to simulate a legacy host); idempotent across repeated calls.
-  - `IsApplied`: false for unknown id and empty id; true after a manual insert.
+- [x] Registered the new table in `make_database_info.cpp` (created on every fresh DB build) and in `create_database.cpp` `CreateTables()` as the **first** table created, before anything else. Added to `db_schema/CMakeLists.txt`.
+- [x] **Table helper** at `sql_util/table_helpers/schema_migrations.{h,cpp}` — single owner of all schema_migrations CRUD, per the layering rule:
+  - `IsApplied(transaction, id)` → bool, via `DbCrud::LookupRowByValue`.
+  - `ListAppliedIds(transaction)` → `StringArray`, custom SQL with multi-column ORDER BY (`applied_at_us` ASC, `id` ASC as deterministic tiebreak; one of the documented DbCrud-can't-express cases, so direct SQL stays inside the table helper).
+  - `RecordApplied(transaction, id)` → inserts `(id, now_us())` via `DbCrud::AddRowToTable`. Duplicate ids throw on the underlying PK violation; gating is the caller's job.
+  - **7 unit tests** in `schema_migrations_test.cpp`: empty-table reads, record-then-IsApplied, duplicate-throws, ListAppliedIds empty + ordered, multi-column ORDER BY tiebreak (forces `applied_at_us` equal across rows and asserts `id`-ascending order), IsApplied distinguishes recorded from not-recorded.
+- [x] **Business-logic runner** at `business_logic/migration/migration_runner.{h,cpp}` — **no SQL in this layer**, pure orchestration that delegates every schema_migrations read/write to the table helper:
+  - `IsApplied(transaction, id)` / `ListApplied(transaction)` — pass-through to the helper.
+  - `ApplyOne(transaction, migration)` — if `helper.IsApplied(id)` skip; else `migration.apply(transaction)` then `helper.RecordApplied(id)`. Returns true/false.
+  - `ApplyPending(transactionProvider, migrations)` — applies every unapplied migration **each in its own transaction via the supplied provider**, so a mid-list failure leaves earlier migrations committed and skips later ones. On failure throws `MigrationFailure { migrationId(), what() }`.
+  - Structured logging: `[migration] event=applied|skipped|apply_failed id=…`.
+  - **No bootstrap method.** The table is created by the normal `MakeDatabaseInfo` + `CreateTables` flow during initial database setup. Pre-deploy there is no prior production state to defend against, so a `CREATE TABLE IF NOT EXISTS` fallback would be dead code.
+- [x] **11 unit tests** in `business_logic/migration/migration_runner_test.cpp`:
+  - `IsApplied`: false for unknown id / empty id; true after the table helper records the id.
   - `ListApplied`: empty on fresh DB; returns ids in apply order.
-  - `ApplyOne`: invokes apply callback and records id; **skips already-applied without calling the callback** (verified via invocation log); bootstraps the table if missing; **does NOT record id when apply throws** (verified via IsApplied false after exception); apply callback sees the same transaction (verified by creating a TEMP TABLE inside apply and reading from it afterward).
-  - `ApplyPending`: empty list → empty result; applies all in order on fresh DB; skips already-applied and applies remainder (mixed result with applied + skipped); stops at failing migration (verified via invocation log: 0001 ran, 0002 threw, 0003 never ran); wraps unknown-exception types in `MigrationFailure` (a `throw 42;` still surfaces as `MigrationFailure`); returns all-skipped result when nothing is new; bootstraps then applies on legacy DB.
-- [x] Wired into `business_logic/CMakeLists.txt` (`add_subdirectory(migration)`) and new `business_logic/migration/CMakeLists.txt`.
+  - `ApplyOne`: invokes callback + records id; **skips already-applied without calling the callback** (verified via invocation log); **does NOT record id when apply throws**; apply callback sees the same transaction (verified by creating a TEMP TABLE inside apply and reading from it afterward).
+  - `ApplyPending`: empty list → empty result; applies all in order on fresh DB; skips already-applied and applies remainder (mixed result); stops at failing migration (invocation-log proof that the migration after the failing one was never attempted); wraps non-`std::exception` throws in `MigrationFailure`; returns all-skipped result when nothing is new.
+- [x] Wired into `business_logic/CMakeLists.txt` (`add_subdirectory(migration)`), new `business_logic/migration/CMakeLists.txt`, and `sql_util/table_helpers/CMakeLists.txt` (new helper + test).
+- [x] **Architecture fix during implementation.** Initial pass put CRUD SQL directly in `MigrationRunner` (raw `CREATE TABLE IF NOT EXISTS`, `SELECT COUNT(*)`, `SELECT id ORDER BY…`, plus a direct `DbCrud::AddRowToTable`) and added a `CREATE TABLE IF NOT EXISTS` bootstrap for "legacy hosts that predate this commit." Both violations of the project's layering rules — corrected on review by introducing the `TableHelpers::SchemaMigrations` helper and removing the speculative bootstrap. Lesson captured in `feedback_no_sql_in_business_logic.md` and `feedback_no_premature_defensive_code.md`.
 
 ## 3.3 Split `knottyyoga_database_helper` into two modes
 
