@@ -291,9 +291,13 @@ knottyyoga:<version>
 
 ## 2.3 Frontend artifact
 
-- [ ] `ng build --configuration=production` in CI produces `ui/dist/ui/`.
-- [ ] Zip that up as `knottyyoga-ui-<version>.tar.gz`.
-- [ ] Deploy script extracts it to `/opt/knottyyoga/ui/` atomically (extract to a new dir then `mv` the symlink).
+- [x] `ui/package/build_ui_release.sh` produces a self-contained tarball of the SPA. Mirrors the server's `build_linux_release.sh` conventions (same env-var names — `KNOTTYYOGA_VERSION`, `OUT_DIR`, etc. — same `[knottyyoga-ui-build] event=...` log-prefix shape, same git-sha-with-`-dirty`-suffix version fallback) so one CI pipeline can drive both halves of a deploy with one version string.
+- [x] Build flow: `npm ci --no-audit --no-fund` (NOT `npm install` — `ci` refuses to start if the lockfile is out of sync, catching drift at CI time instead of papering over it); `npx ng build --configuration=production --output-path=<BUILD_DIR>`; auto-detect the servable directory (`dist/browser/` for Angular 17+ application-builder, `dist/` for the older browser-builder) so an Angular CLI upgrade can move the layout without breaking the script silently; stage everything at the tarball root (NOT under a `browser/` sub-prefix) so operators point Nginx's `root` at `/opt/knottyyoga/ui/` and `index.html` is right there.
+- [x] Tarball layout: `knottyyoga-ui-<version>/{index.html, *.js, *.css, assets/, ..., VERSION, MANIFEST.txt}`. Single top-level prefix dir (matches the server tarball pattern) so untarring anywhere produces one named directory. The script's last step is a sanity check that `index.html` actually landed at the staged root — refuses to ship without it (catches `angular.json` drift before the live site 404s).
+- [x] Tool requirements: bash, node ≥ 18, npm, tar. Script auto-installs `tar` when running as root on apt-based systems (the cheap one-liner case); refuses to auto-install Node because the distro packages are usually too old for Angular 19's engines field and a NodeSource install is the right call anyway. The Node-major-version check up front prints a clear error instead of letting the build die with a cryptic Webpack message 90 seconds in.
+- [x] `SKIP_NPM_CI=1` escape hatch documented for local iteration; the README explicitly forbids CI from setting it.
+- [x] `ui/package/README.md` mirrors `server/.../package/README.md`: quick-start, what's in the tarball, versioning rules, layout-detection rationale, and a sketch of the deploy-side extract-and-flip procedure (which is owned by Phase 5, not 2.3, but worth noting so a future reader knows where the producer hand-off ends).
+- [x] Deploy-side extraction script (atomic `ln -sfn` flip into `/opt/knottyyoga/ui`) is intentionally NOT in this phase — it lives with the host setup in Phase 5. The producer (this script) and consumer (Phase 5's deploy script) are split so the producer can run in a CI image that has Node but no shell access to the EC2 host.
 
 ---
 
