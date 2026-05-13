@@ -396,6 +396,8 @@ Goal: provision the accounts/services we'll actually deploy to.
 	- The login URL is:
 		- https://957014951609.signin.aws.amazon.com/console
 	- Turned on MFA (note that the first one is root and the second is user)
+	- IAM accounts don't have access to billing by default even as an admin
+		- https://docs.aws.amazon.com/IAM/latest/UserGuide/getting-started-account-iam.html
 - [ ] Set a **billing alarm** at $75/mo (sanity) so a misconfigured anything doesn't quietly run up a bill.
 - [ ] Region: `us-west-2` (Oregon) for everything except the ACM cert. The ACM cert lives in `us-east-1` (CloudFront-global limitation) — you'll create that explicitly in Phase 4.5.
 - [ ] In the AWS console region picker, default to `us-west-2`. When you switch over to ACM in Phase 4.5, remember to flip the region picker to `us-east-1` for that step only.
