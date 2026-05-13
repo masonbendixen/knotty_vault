@@ -387,8 +387,10 @@ Goal: provision the accounts/services we'll actually deploy to.
 
 ## 4.1 Account bootstrap
 
-- [ ] Create AWS account (or use existing).
+- [x] Create AWS account (or use existing). ✅ 2026-05-13
+	- Added knottyyoga account bound to knottyyogaandspa@gmail.com
 - [ ] Enable MFA on root. Never log in as root after bootstrap.
+	- Used Google Authenticator
 - [ ] Create an IAM admin user for yourself; create `AWSCLI` access keys stored in a password manager.
 - [ ] Set a **billing alarm** at $75/mo (sanity) so a misconfigured anything doesn't quietly run up a bill.
 - [ ] Region: `us-west-2` (Oregon) for everything except the ACM cert. The ACM cert lives in `us-east-1` (CloudFront-global limitation) — you'll create that explicitly in Phase 4.5.
