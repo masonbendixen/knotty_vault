@@ -344,19 +344,26 @@ What you already have that's unusual: the C++ code *is* the schema source of tru
 - [x] Wired into `business_logic/CMakeLists.txt` (`add_subdirectory(migration)`), new `business_logic/migration/CMakeLists.txt`, and `sql_util/table_helpers/CMakeLists.txt` (new helper + test).
 - [x] **Architecture fix during implementation.** Initial pass put CRUD SQL directly in `MigrationRunner` (raw `CREATE TABLE IF NOT EXISTS`, `SELECT COUNT(*)`, `SELECT id ORDER BY…`, plus a direct `DbCrud::AddRowToTable`) and added a `CREATE TABLE IF NOT EXISTS` bootstrap for "legacy hosts that predate this commit." Both violations of the project's layering rules — corrected on review by introducing the `TableHelpers::SchemaMigrations` helper and removing the speculative bootstrap. Lesson captured in `feedback_no_sql_in_business_logic.md` and `feedback_no_premature_defensive_code.md`.
 
-## 3.3 Split `knottyyoga_database_helper` into two modes
+## 3.3 Split `knottyyoga_database_helper` into two modes ✅
 
-Today `--recreate_database` is destructive. We want two modes:
+`knottyyoga_database_helper` is now split into two explicit, mutually-exclusive modes via flags. Both default to `false` so accidental invocation does nothing — the operator has to opt in.
 
-- [ ] Preserve `--recreate_database` for **dev/test only**. In prod, a safety env var (`KNOTTYYOGA_ALLOW_DESTRUCTIVE=0` by default) blocks it from running. The binary exits with a clear error.
-- [ ] Add `--migrate` which:
-  1. Connects using the same env vars as the server.
-  2. Ensures `schema_migrations` exists (bootstraps it if new DB).
-  3. Runs all pending migrations via `MigrationRunner`.
-  4. Exits 0 on success.
-- [ ] First "baseline" migration (`id = "0001_baseline"`) executes the *existing* schema-creation code path to produce the full current schema on an empty DB.
-- [ ] From then on, every schema change is a new migration file with a monotonic id (`0002_add_subscription_tier.sql`, `0003_soft_delete_bookings.cpp`, etc.).
-- [ ] Tests: `database_helper_test.cpp` — apply baseline twice (second is a no-op), apply sequential migrations, refuse destructive in prod.
+- [x] **`--recreate_database`** preserved for dev/test, blocked in prod by `KNOTTYYOGA_ALLOW_DESTRUCTIVE`. Guard lives at `util/destructive_guard.{h,cpp}` (`IsDestructiveAllowed()` / `EnsureDestructiveAllowed()`):
+  - Strict equality: only the literal string `"1"` authorizes. `"0"`, unset, `"true"`, `"yes"`, `"TRUE"`, `"01"`, `" 1"`, etc. all block — anything that looks like a typo fails closed.
+  - Error message names the env var and the required value so operators know what to fix without grep'ing the source.
+  - 9 unit tests in `destructive_guard_test.cpp` covering each case (unset / "0" / empty / non-one strings / exactly-"1") for both `IsDestructiveAllowed` and `EnsureDestructiveAllowed`, plus a test that asserts the error message mentions the env-var name and `"1"`. Uses an RAII `DestructiveEnvScope` guard so individual tests don't leak env state.
+- [x] **`--migrate`** added. Calls `Migration::RunMigrateCommand` (the thin orchestration wrapper from below) with the project's migration list. Exit code is forwarded to the OS so `install.sh` can fail-fast on a bad migration.
+- [x] **`business_logic/migration/migrate_command.{h,cpp}`** — `RunMigrateCommand(transactionProvider, databaseHelper, migrations) → int`. Pure orchestration on top of `MigrationRunner::ApplyPending`:
+  - Returns 0 on success (zero or more migrations applied/skipped cleanly).
+  - Returns 1 on `MigrationFailure` (a migration's apply() threw) — the per-migration failure was already logged by `ApplyPending`; this layer adds a single `[migrate] event=failure id=…` summary line for the operator.
+  - Returns 1 on any other `std::exception` escape (defensive).
+  - Takes the migration list as a parameter so tests can pass arbitrary fixtures without coupling to the project's current `BuildAllMigrations()`.
+  - 6 unit tests in `migrate_command_test.cpp`: empty-list-returns-zero, applies pending in order, idempotent across runs, returns-one-on-migration-failure, stops-at-failing-migration (3-migration list where #2 throws and #3 must NOT run — verified via invocation log), mixed applied-and-skipped returns zero.
+- [x] **`business_logic/migration/all_migrations.{h,cpp}`** — `BuildAllMigrations()` returns the project's canonical migration list. **Currently empty** per the no-premature-defensive-code rule: the fresh-install schema is built by `CreateAndPopulateDatabases` (the `--recreate_database` path), so until we have a real inter-version schema change to apply against a database with customer data, the list stays empty. The header documents the "when you add a migration" checklist.
+  - 5 unit tests in `all_migrations_test.cpp`: empty-pre-first-deploy (the prompt to remove this assertion is the first time the list grows), all ids unique, all ids non-empty, all ids in lexicographic order (assumes the zero-padded numeric-prefix convention), all migrations have an `apply` callback.
+- [x] **No baseline migration.** The spec originally called for a "0001_baseline" migration that re-runs the existing schema-creation code path. With `--recreate_database` as the canonical fresh-install path and no production state to defend against, a baseline migration would be speculative duplicate code. When we need it (e.g., to support `--migrate` directly against a truly empty DB in a future workflow), we'll add it then with knowledge of the actual schema-version-at-rest.
+- [x] **`main.cpp`** rewritten as a flag dispatcher: validates exactly-one-of (`--recreate_database` xor `--migrate`), prints a help message and exits 1 if neither or both are set, otherwise delegates to `RunRecreate()` or `RunMigrate()`. Each path emits structured `[database_helper] event=…_starting/_done` log lines for the journal.
+- [x] Wired into `util/CMakeLists.txt` and the existing `business_logic/migration/CMakeLists.txt`. No new CMake subdirs needed.
 
 ## 3.4 Snapshotting schema per release
 
