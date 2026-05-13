@@ -392,6 +392,7 @@ Goal: provision the accounts/services we'll actually deploy to.
 - [x] Enable MFA on root. Never log in as root after bootstrap. ✅ 2026-05-13
 	- Used Google Authenticator
 - [ ] Create an IAM admin user for yourself; create `AWSCLI` access keys stored in a password manager.
+	- Created an account masonbendixen with a password and created the group Administrators with the AdministratorAccess policy
 - [ ] Set a **billing alarm** at $75/mo (sanity) so a misconfigured anything doesn't quietly run up a bill.
 - [ ] Region: `us-west-2` (Oregon) for everything except the ACM cert. The ACM cert lives in `us-east-1` (CloudFront-global limitation) — you'll create that explicitly in Phase 4.5.
 - [ ] In the AWS console region picker, default to `us-west-2`. When you switch over to ACM in Phase 4.5, remember to flip the region picker to `us-east-1` for that step only.
