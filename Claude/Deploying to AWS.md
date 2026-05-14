@@ -498,7 +498,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- Note the Elastic IP — that's your origin endpoint for CloudFront in 4.6 and your SSH target.
 		- 34.215.204.200
 	- Cost note: an EIP is **free while attached** to a running instance; ~$3/mo only if unattached or attached to a stopped instance.
-- [ ] **First-boot system setup.** SSH from your laptop:
+- [x] **First-boot system setup.** SSH from your laptop: ✅ 2026-05-14
 	```bash
 	ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@<elastic-ip>
 	```
@@ -518,6 +518,10 @@ The default VPC plus two security groups is all we need. The default VPC already
 	openssl rand -base64 32   # use as KNOTTYYOGA_ORIGIN_SECRET
 	openssl rand -base64 32   # use as SCHEDULER_SERVICE_ACCOUNT_PASSWORD
 	```
+	- KNOTTYYOGA_ORIGIN_SECRET
+		- Rpxpk23whEtmToEMmEZpuFk0+KwK/ukpTZD3AQauoDQ=
+	- SCHEDULER_SERVICE_ACCOUNT_PASSWORD
+		- d5jLtv36Ng8mi/O7nKLW/JztPZR3St9/1HUkBH9x2Nw=
 - [ ] **Create `/etc/knottyyoga/server.env`.** On the EC2:
 	```bash
 	sudo mkdir -p /etc/knottyyoga
