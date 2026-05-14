@@ -398,6 +398,26 @@ Goal: provision the accounts/services we'll actually deploy to.
 	- Turned on MFA (note that the first one is root and the second is user)
 	- IAM accounts don't have access to billing by default even as an admin
 		- https://docs.aws.amazon.com/IAM/latest/UserGuide/getting-started-account-iam.html
+	- **Still to do — create CLI access keys for `masonbendixen`:**
+		1. Sign in to the AWS console as the `masonbendixen` IAM user (use the login URL above — select "IAM user", account ID `957014951609`).
+		2. Top search bar → **IAM** → IAM console → left sidebar → **Users** → click `masonbendixen`.
+		3. **Security credentials** tab → scroll to **Access keys** → **Create access key**.
+		4. Use case: **Command Line Interface (CLI)**. Acknowledge the recommendation banner (best-practice is Identity Center, but for a single-operator account a long-lived access key is fine). **Next**.
+		5. Optional description tag: `aws-cli local dev`. **Create access key**.
+		6. Copy both the **Access key ID** and **Secret access key** (or click **Download .csv file**). The secret is shown **only once** — if you lose it you must delete the key and create a new one.
+		7. Save both to your password manager, then add to `~/.aws/credentials`:
+			```
+			[knottyyoga]
+			aws_access_key_id = AKIA...
+			aws_secret_access_key = ...
+			```
+			And `~/.aws/config`:
+			```
+			[profile knottyyoga]
+			region = us-west-2
+			output = json
+			```
+		8. Verify: `aws --profile knottyyoga sts get-caller-identity` → should print your user ARN ending in `:user/masonbendixen`.
 - [x] Set a **billing alarm** at $75/mo (sanity) so a misconfigured anything doesn't quietly run up a bill. ✅ 2026-05-13
 	- As root: Billing → Preferences → enabled "Receive CloudWatch billing alerts". Billing metrics only live in `us-east-1` and can take hours to first appear.
 	- As root: enabled "IAM User and Role Access to Billing Information" so the admin IAM user can see billing data.
@@ -410,22 +430,118 @@ Goal: provision the accounts/services we'll actually deploy to.
 
 ## 4.2 Networking
 
-- [ ] Use the default VPC. Two public subnets (in different AZs) already exist — need both because RDS subnet groups require a minimum of two AZs even for single-AZ instances.
-- [ ] Security groups:
-  - `sg-knottyyoga-web` (EC2): allows 22 (SSH from your home IP only) and 80 (from 0.0.0.0/0 — origin protection is enforced in the Crow middleware, not the SG).
-  - `sg-knottyyoga-db` (RDS): allows 5432 from `sg-knottyyoga-web` only.
+The default VPC plus two security groups is all we need. The default VPC already has subnets in every us-west-2 AZ with route tables pointing at an internet gateway — no provisioning required, just verification.
+
+- [ ] **Confirm the default VPC and pick two subnets for the RDS subnet group.**
+	- AWS console region picker: **us-west-2 (Oregon)**.
+	- Top search bar → type **VPC** → click **VPC**.
+	- Left sidebar → **Your VPCs** → confirm one row with `Default VPC = Yes`. Note its VPC ID (e.g., `vpc-0abc…`).
+	- Left sidebar → **Subnets** → filter by that VPC ID (top filter box). You should see four subnets — one per AZ (`us-west-2a/b/c/d`). Pick any two AZs (e.g., `us-west-2a` and `us-west-2b`); you'll point the RDS subnet group at these in Phase 4.4.
+	- Sanity check: click each chosen subnet → **Route table** tab → there should be a route `0.0.0.0/0 → igw-…` (this is what makes it a *public* subnet).
+- [ ] **Create security group `sg-knottyyoga-web` (for EC2).**
+	- VPC console → left sidebar → **Security groups** → **Create security group**.
+	- **Name:** `sg-knottyyoga-web`
+	- **Description:** `Knotty Yoga web tier (EC2)`
+	- **VPC:** the default VPC
+	- **Inbound rules → Add rule** twice:
+		1. Type: `SSH` (port 22); Source: **My IP** (the dropdown auto-fills your current public IP as `/32`). If you're on a dynamic ISP IP this will need updating later — Phase 5.2 covers that.
+		2. Type: `HTTP` (port 80); Source: `Anywhere-IPv4` (`0.0.0.0/0`). Origin protection is enforced in the Crow middleware via `X-Origin-Secret`, not in the SG.
+	- **Outbound rules:** leave the default `All traffic → 0.0.0.0/0`.
+	- **Create security group**. Note the new SG ID.
+- [ ] **Create security group `sg-knottyyoga-db` (for RDS).**
+	- VPC console → **Security groups** → **Create security group**.
+	- **Name:** `sg-knottyyoga-db`
+	- **Description:** `Knotty Yoga DB tier (RDS)`
+	- **VPC:** the default VPC
+	- **Inbound rules → Add rule** once:
+		- Type: `PostgreSQL` (port 5432); Source: **Custom** → start typing `sg-` and pick `sg-knottyyoga-web` from the autocomplete. This is the key bit — only the web tier can talk to the DB.
+	- **Outbound rules:** leave default.
+	- **Create security group**.
+- [ ] **Verify.** Security Groups list should show both new SGs bound to the default VPC. Note both IDs — you'll select `sg-knottyyoga-web` in the EC2 wizard (Phase 4.3) and `sg-knottyyoga-db` in the RDS wizard (Phase 4.4).
 
 ## 4.3 Compute: EC2
 
-- [ ] Create key pair in EC2 console (or import your existing public key).
-- [ ] Launch `t3.small` (x86) instance, Ubuntu 22.04 LTS AMI, 20 GB gp3 root volume, in default VPC public subnet.
-- [ ] Attach `sg-knottyyoga-web`.
-- [ ] Allocate an Elastic IP and attach it. Free while attached. Needed so the CloudFront origin target doesn't change on stop/start.
-- [ ] First boot: `apt update && apt upgrade`; install `docker.io` and `postgresql-client`.
-- [ ] Docker handles port binding — no `cap_net_bind_service` needed. The container runs as root internally (standard for single-process containers); the EC2 host user doesn't matter.
-- [ ] Create `/etc/knottyyoga/server.env` (chmod 600) containing `PORT=80`, `KNOTTYYOGA_ORIGIN_SECRET=<random>`, `KNOTTYYOGA_TRUST_PROXY=1`, the `KNOTTYYOGA_DB_*` vars, `KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`, and `SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<random>`. Generate the scheduler password with `openssl rand -base64 32` (or any source ≥24 chars); both `knottyyoga_database_helper` and `knottyyoga_helper` read this var from the same env file, so set it once.
-- [ ] Enable `ufw`: deny incoming default, allow 22 + 80.
-- [ ] Install CloudWatch Agent if you want metrics beyond basic EC2 ones. Optional for v1 — the systemd journal tailed to CloudWatch Logs is enough.
+- [ ] **Create the SSH key pair you'll use to log in.**
+	- Region: **us-west-2**.
+	- Top search → **EC2** → EC2 console → left sidebar → **Network & Security → Key Pairs** → **Create key pair**.
+	- **Name:** `knottyyoga-ec2`
+	- **Key pair type:** `ED25519` (smaller, modern)
+	- **Private key file format:** `.pem` (Linux/macOS/OpenSSH on Windows) or `.ppk` (Windows + PuTTY)
+	- **Create key pair** — the browser downloads the private key. Move it somewhere safe (e.g., `~/.ssh/knottyyoga-ec2.pem`); AWS does **not** keep a copy.
+	- Lock the file: `chmod 400 ~/.ssh/knottyyoga-ec2.pem` (Linux/macOS); on Windows, right-click the file → Properties → Security → Advanced → Disable inheritance → grant only your user Read access.
+- [ ] **Launch the EC2 instance.**
+	- EC2 console → left sidebar → **Instances** → **Launch instances**.
+	- **Name:** `knottyyoga-server`
+	- **Application and OS Images (AMI):** click **Ubuntu** in the quick-start grid → confirm `Ubuntu Server 22.04 LTS (HVM), SSD Volume Type` → architecture **64-bit (x86)** (not ARM).
+	- **Instance type:** `t3.small`
+	- **Key pair (login):** `knottyyoga-ec2`
+	- **Network settings → Edit:**
+		- VPC: default
+		- Subnet: one of the two AZs you picked in 4.2 (e.g., `us-west-2a`)
+		- Auto-assign public IP: **Enable** (we'll attach an Elastic IP next, but first-boot needs network either way)
+		- Firewall (security groups): **Select existing security group** → check `sg-knottyyoga-web`. Uncheck any launch-wizard default SG.
+	- **Configure storage:** 1× `20 GiB`, volume type **gp3**. Leave Encryption ON (default).
+	- **Launch instance**.
+	- Wait ~30 seconds; refresh Instances → state `Running`, status checks `2/2 checks passed`.
+- [ ] **Allocate an Elastic IP and associate it.**
+	- EC2 console → left sidebar → **Network & Security → Elastic IPs** → **Allocate Elastic IP address** → **Allocate**.
+	- Select the new EIP → **Actions → Associate Elastic IP address**.
+	- **Resource type:** Instance; **Instance:** `knottyyoga-server` → **Associate**.
+	- Note the Elastic IP — that's your origin endpoint for CloudFront in 4.6 and your SSH target.
+	- Cost note: an EIP is **free while attached** to a running instance; ~$3/mo only if unattached or attached to a stopped instance.
+- [ ] **First-boot system setup.** SSH from your laptop:
+	```bash
+	ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@<elastic-ip>
+	```
+	Then on the EC2:
+	```bash
+	sudo apt update && sudo apt upgrade -y
+	sudo apt install -y docker.io postgresql-client ufw
+	sudo systemctl enable --now docker
+	sudo usermod -aG docker ubuntu
+	exit                                         # log out and back in so docker-group membership applies
+	ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@<elastic-ip>
+	docker ps                                    # should succeed without sudo
+	```
+- [ ] **No `cap_net_bind_service` setup needed.** Docker `-p 80:<internal>` maps the privileged host port regardless of the in-container user. The Crow process inside the container runs as root by default for single-process containers — fine, it's isolated by the container boundary.
+- [ ] **Generate the env-file secrets first.** On your laptop or on the EC2:
+	```bash
+	openssl rand -base64 32   # use as KNOTTYYOGA_ORIGIN_SECRET
+	openssl rand -base64 32   # use as SCHEDULER_SERVICE_ACCOUNT_PASSWORD
+	```
+- [ ] **Create `/etc/knottyyoga/server.env`.** On the EC2:
+	```bash
+	sudo mkdir -p /etc/knottyyoga
+	sudo nano /etc/knottyyoga/server.env
+	```
+	Paste (replace `<…>`; `KNOTTYYOGA_DB_HOST` and `KNOTTYYOGA_DB_PASSWORD` come from Phase 4.4):
+	```
+	PORT=80
+	KNOTTYYOGA_ORIGIN_SECRET=<from openssl rand above>
+	KNOTTYYOGA_TRUST_PROXY=1
+	KNOTTYYOGA_DB_HOST=<rds-endpoint-from-4.4>
+	KNOTTYYOGA_DB_NAME=knottyyoga
+	KNOTTYYOGA_DB_USER=knottyyoga
+	KNOTTYYOGA_DB_PASSWORD=<from-4.4>
+	KNOTTYYOGA_DB_SSLMODE=verify-full
+	KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem
+	SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<from openssl rand above>
+	```
+	Lock it:
+	```bash
+	sudo chmod 600 /etc/knottyyoga/server.env
+	sudo chown root:root /etc/knottyyoga/server.env
+	```
+- [ ] **Enable `ufw` (host firewall, defense in depth with the SG).** On the EC2:
+	```bash
+	sudo ufw default deny incoming
+	sudo ufw default allow outgoing
+	sudo ufw allow 22/tcp
+	sudo ufw allow 80/tcp
+	sudo ufw --force enable
+	sudo ufw status verbose
+	```
+- [ ] **CloudWatch Agent — skip for v1.** The systemd journal tailed to CloudWatch Logs (Phase 5.3) is enough. Install the agent later only when you actually want per-instance metrics beyond the EC2 defaults (memory, disk usage).
 
 ## 4.4 Database: RDS Postgres
 
