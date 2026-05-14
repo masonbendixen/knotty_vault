@@ -545,65 +545,296 @@ The default VPC plus two security groups is all we need. The default VPC already
 
 ## 4.4 Database: RDS Postgres
 
-- [ ] Create RDS subnet group spanning the two default-VPC public subnets.
-- [ ] Provision `db.t3.micro`, engine Postgres 15, single-AZ, 20 GB gp3 storage, auto-minor-version upgrades on.
-- [ ] Enable automated backups with 7-day retention (default). Turn on **deletion protection**.
-- [ ] Attach `sg-knottyyoga-db`.
-- [ ] Record the RDS endpoint; note it's a DNS name (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Put it in `/etc/knottyyoga/server.env` as `KNOTTYYOGA_DB_HOST`.
-- [ ] Create the application database and a non-superuser role:
-  ```sql
-  CREATE ROLE knottyyoga LOGIN PASSWORD '...';
-  CREATE DATABASE knottyyoga OWNER knottyyoga;
-  ```
-- [ ] Download the AWS RDS global CA bundle to `/etc/knottyyoga/rds-ca.pem`; set `KNOTTYYOGA_DB_SSLMODE=verify-full`. (Phase 1.1 plans the sslmode support.)
-- [ ] Verify PITR by running a toy restore as part of Phase 5.1 smoke tests.
+- [ ] **Create the RDS subnet group.**
+	- Region: **us-west-2**.
+	- Top search → **RDS** → RDS console → left sidebar → **Subnet groups** → **Create DB subnet group**.
+	- **Name:** `knottyyoga-db-subnet-group`
+	- **Description:** same
+	- **VPC:** default VPC
+	- **Availability Zones:** select the same two AZs you used in 4.2 (e.g., `us-west-2a`, `us-west-2b`). RDS requires ≥2 AZs in a subnet group even for single-AZ instances.
+	- **Subnets:** pick one subnet in each chosen AZ (the default-VPC public subnets you confirmed in 4.2)
+	- **Create**.
+- [ ] **Provision the RDS instance.**
+	- RDS console → left sidebar → **Databases** → **Create database**.
+	- **Choose a database creation method:** Standard create
+	- **Engine type:** PostgreSQL
+	- **Engine version:** latest 15.x (e.g., `15.5`)
+	- **Templates:** **Dev/Test** (the Production template forces Multi-AZ, which we're not paying for yet)
+	- **Availability and durability:** Single DB instance
+	- **Settings:**
+		- DB instance identifier: `knottyyoga`
+		- Master username: `postgres`
+		- Master password: generate with `openssl rand -base64 24`, save to password manager
+	- **Instance configuration → DB instance class:**
+		- Burstable classes (includes t classes)
+		- `db.t3.micro`
+	- **Storage:**
+		- Storage type: gp3
+		- Allocated storage: `20` GiB
+		- Storage autoscaling: enabled, Maximum storage threshold `100` GiB
+	- **Connectivity:**
+		- Compute resource: **Don't connect to an EC2 compute resource** (we'll wire it manually via SG)
+		- VPC: default VPC
+		- DB subnet group: `knottyyoga-db-subnet-group`
+		- Public access: **No**
+		- VPC security group (firewall): **Choose existing** → select `sg-knottyyoga-db`. **Remove** the auto-selected `default` SG if it's there.
+		- Availability Zone: pick either of your two AZs
+		- Database port: 5432
+	- **Database authentication:** Password authentication
+	- **Monitoring:** Enhanced Monitoring off for now (saves a few dollars; toggle on later if you need it)
+	- **Additional configuration:**
+		- Initial database name: **leave blank** — we'll create the app DB manually so it's owned by a non-superuser role
+		- Backup retention period: `7` days
+		- Backup window: a low-traffic window (e.g., 09:00–10:00 UTC = 2–3am Pacific)
+		- Encryption: **enabled** (default; can't be changed later)
+		- Maintenance window: a low-traffic window distinct from the backup window
+		- **Deletion protection: ENABLE** ← important
+		- Auto-minor-version upgrade: enabled (default)
+	- **Create database**.
+	- Wait ~10 minutes for status to flip from `Creating` to `Available`.
+- [ ] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Paste it into `/etc/knottyyoga/server.env` as `KNOTTYYOGA_DB_HOST` on the EC2.
+- [ ] **Download the RDS CA bundle to the EC2.** On the EC2:
+	```bash
+	sudo curl -fsSL -o /etc/knottyyoga/rds-ca.pem \
+	  https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+	sudo chmod 644 /etc/knottyyoga/rds-ca.pem
+	```
+	Pairs with `KNOTTYYOGA_DB_SSLMODE=verify-full` from the env file. (Phase 1.1 plans the sslmode support in the server's DB connection layer.)
+- [ ] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule):
+	```bash
+	PGPASSWORD='<master password>' psql \
+	  "host=<rds-endpoint> port=5432 user=postgres dbname=postgres sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem"
+	```
+	Then in the psql shell:
+	```sql
+	CREATE ROLE knottyyoga LOGIN PASSWORD '<app password>';
+	CREATE DATABASE knottyyoga OWNER knottyyoga;
+	\q
+	```
+	Save the app password as `KNOTTYYOGA_DB_PASSWORD` in `/etc/knottyyoga/server.env`. The `postgres` master password is only used for occasional maintenance — keep it in the password manager but **not** in the env file.
+- [ ] **Verify PITR (Point-in-Time Recovery) once.** RDS automated backups give 7-day PITR by default. Worth proving once before you need it for real: RDS console → Databases → `knottyyoga` → **Actions → Restore to point in time** → restore to a new instance named `knottyyoga-pitr-test` → connect via psql, run a `SELECT`, then **Actions → Delete** the test instance. Roll this into the 5.1 smoke-test checklist.
 
 ## 4.5 DNS + TLS
 
-`knottyyoga.com` is registered at a non-AWS provider. We're keeping the registrar there but moving DNS hosting to Route 53 so CloudFront alias records work cleanly. The registrar just needs its NS records updated.
+`knottyyoga.com` is registered at a non-AWS provider. We're keeping the registrar there but moving DNS *hosting* to Route 53 so CloudFront alias records work cleanly. The registrar just needs its NS records updated.
 
-- [ ] Create a Route 53 hosted zone for `knottyyoga.com` ($0.50/mo). Note the four NS records Route 53 assigns.
-- [ ] At your current DNS provider, change the nameservers for `knottyyoga.com` to those four Route 53 NS values. **Do not** delete the registration there; you only swap the NS pointers. Propagation is typically <1 hour but can take up to 48 hours.
-- [ ] (Optional, later) Migrate the registrar itself to Route 53. Costs roughly the same as your current registrar, consolidates billing. Can be done at any time without disturbing anything.
-- [ ] In ACM **in `us-east-1`** (CloudFront *only* reads certs from `us-east-1` regardless of where your app runs), request a public cert for `knottyyoga.com` and `www.knottyyoga.com` with DNS validation. Route 53 can auto-create the validation CNAMEs — one click in the ACM console.
-- [ ] **Do not** create `A` records for the domain yet — keep CloudFront accessible only via its `dXXXXXX.cloudfront.net` URL during the soft-launch / friends-and-family phase. That's how we avoid running production DNS while still letting testers reach the site (paste them the CloudFront URL directly).
-- [ ] When you're ready to flip live: in the Route 53 hosted zone, create two `A`-type *alias* records (apex `knottyyoga.com` and `www.knottyyoga.com`) pointing at the CloudFront distribution. Alias records are free of per-query charges.
-- [ ] At go-live, also flip the `kSquareEnvironment` secret from `sandbox` to `production` (Phase 4.8 secret bootstrap covers this).
+- [ ] **Create the Route 53 hosted zone.**
+	- Top search → **Route 53** → Route 53 console (region-agnostic — no picker needed).
+	- Left sidebar → **Hosted zones** → **Create hosted zone**.
+	- **Domain name:** `knottyyoga.com`
+	- **Type:** Public hosted zone
+	- **Create hosted zone**. Cost: $0.50/mo per zone.
+	- On the new zone's page, note the four values in the `NS` record (e.g., `ns-123.awsdns-12.com`, `ns-456.awsdns-34.net`, ...). You'll paste these at your registrar in the next step.
+- [ ] **Repoint your current registrar's nameservers at Route 53.**
+	- Log in to your existing DNS provider (where you registered the domain).
+	- Find **Nameservers** or **DNS Management → Custom Nameservers**.
+	- Replace the existing nameservers with the four Route 53 values from the previous step.
+	- **Do not** delete the domain registration itself — you're only changing who hosts the DNS records.
+	- Propagation is usually <1 hour but can take up to 48 hours. Monitor with `dig +short NS knottyyoga.com` (or https://www.whatsmydns.net/#NS/knottyyoga.com) — when both show the four `*.awsdns-*` values, propagation is done.
+- [ ] **(Optional, later)** Migrate the registrar itself to Route 53 (Route 53 → **Registered domains → Transfer in**). Costs roughly the same per year; consolidates billing. Non-urgent — can be done any time without disturbing anything.
+- [ ] **Request the ACM certificate in `us-east-1`.**
+	- AWS console region picker → **flip to us-east-1 (N. Virginia)**. CloudFront only reads certs from `us-east-1`, regardless of where your app runs. This is the #1 ACM gotcha.
+	- Top search → **Certificate Manager** → ACM console.
+	- **Request certificate** → **Request a public certificate** → **Next**.
+	- **Fully qualified domain names:**
+		- `knottyyoga.com`
+		- click **Add another name to this certificate** → `www.knottyyoga.com`
+	- **Validation method:** DNS validation (recommended)
+	- **Key algorithm:** RSA 2048
+	- **Request**.
+	- On the new certificate's page (status `Pending validation`), expand each domain row and click **Create records in Route 53** → confirm. ACM writes the validation `CNAME`s into your hosted zone for you (one click).
+	- Wait 5–30 minutes; status flips to `Issued`. Copy the certificate ARN — CloudFront needs it in 4.6.
+	- **Remember to flip the region picker back to `us-west-2` before any later step.**
+- [ ] **Do NOT create production `A` records yet.** Soft-launch / friends-and-family testers can hit the site via the `dXXXXXX.cloudfront.net` URL CloudFront gives you. Skipping the `A` records means there's no live production DNS to break while you're shaking things out.
+- [ ] **At go-live: create the alias records.**
+	- Route 53 → Hosted zones → `knottyyoga.com` → **Create record**.
+	- Record 1 (apex):
+		- Record name: (leave blank — apex)
+		- Record type: `A`
+		- **Alias:** ON
+		- Route traffic to: **Alias to CloudFront distribution** → pick yours
+		- **Create records**.
+	- Repeat for `www`:
+		- Record name: `www`
+		- Record type: `A`
+		- **Alias:** ON
+		- Route traffic to: **Alias to CloudFront distribution** → pick yours
+	- Alias records have no per-query charge (a `CNAME` would).
+- [ ] **At go-live: flip Square from sandbox to production.** Phase 4.8's secret bootstrap covers updating `kSquareEnvironment` and the access token in `config_secrets`.
 
 ## 4.6 S3 + CloudFront
 
 ### S3 bucket for the frontend
 
-- [ ] Create bucket `knottyyoga-ui-prod` in the same region as EC2. Block all public access (CloudFront will reach it via Origin Access Control — more secure than "make bucket public").
-- [ ] Enable versioning (cheap insurance if a bad deploy overwrites files).
-- [ ] Disable static website hosting on the bucket itself — we don't need it; CloudFront will serve the content.
-- [ ] Create IAM user `ci-deploy` with policy allowing `s3:PutObject` + `s3:DeleteObject` + `s3:ListBucket` on this bucket only + `cloudfront:CreateInvalidation` on the distribution. Store its access key in GitLab CI variables.
+- [ ] **Create the bucket.**
+	- Region: **us-west-2** (same as EC2 — keeps the API ↔ bucket latency low if anything ever needs cross-talk).
+	- Top search → **S3** → S3 console → **Create bucket**.
+	- **Bucket name:** `knottyyoga-ui-prod` (S3 names are globally unique — if taken, append a random suffix like `knottyyoga-ui-prod-7k2j`).
+	- **Object Ownership:** ACLs disabled (recommended).
+	- **Block Public Access settings:** leave **all four** blocks **ON**. CloudFront will reach the bucket via Origin Access Control (OAC) — far more secure than making the bucket public.
+	- **Bucket Versioning:** **Enable** (cheap insurance if a bad deploy overwrites files).
+	- **Default encryption:** SSE-S3 (default, free).
+	- **Create bucket**.
+- [ ] **Confirm static website hosting is OFF.** Bucket → **Properties** tab → "Static website hosting" should say **Disabled**. CloudFront serves the content, not S3's website endpoint.
+- [ ] **Create the `ci-deploy` IAM user (for GitLab CI to push builds).**
+	- Top search → **IAM** → IAM console → left sidebar → **Users → Create user**.
+	- **User name:** `ci-deploy`
+	- **Provide user access to the AWS Management Console:** **No** (programmatic-only).
+	- **Next → Permissions options:** **Attach policies directly**.
+	- Open a new browser tab → IAM → **Policies → Create policy** → **JSON** tab → paste:
+		```json
+		{
+		  "Version": "2012-10-17",
+		  "Statement": [
+		    {
+		      "Sid": "S3Deploy",
+		      "Effect": "Allow",
+		      "Action": ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+		      "Resource": [
+		        "arn:aws:s3:::knottyyoga-ui-prod",
+		        "arn:aws:s3:::knottyyoga-ui-prod/*"
+		      ]
+		    },
+		    {
+		      "Sid": "CloudFrontInvalidate",
+		      "Effect": "Allow",
+		      "Action": "cloudfront:CreateInvalidation",
+		      "Resource": "*"
+		    }
+		  ]
+		}
+		```
+		Name the policy `knottyyoga-ci-deploy` → **Create policy**.
+	- Back in the user-creation tab → refresh the policy list → search `knottyyoga-ci-deploy` → check it → **Next → Create user**.
+	- Open the new user → **Security credentials** tab → **Create access key** → use case **Application running outside AWS** → **Next → Create access key**.
+	- Copy the **Access key ID** and **Secret access key** — secret is shown **only once**. Save both to your password manager *and* to GitLab CI (Project → Settings → CI/CD → Variables) as:
+		- `AWS_ACCESS_KEY_ID` — **Masked**, **Protected**
+		- `AWS_SECRET_ACCESS_KEY` — **Masked**, **Protected**
 
 ### CloudFront distribution
 
-- [ ] Create a CloudFront distribution with two behaviors:
-  - **Default behavior** (`*`): origin = S3 bucket via **Origin Access Control** (OAC, the modern replacement for OAI). Viewer protocol policy = redirect HTTP→HTTPS. Cache policy = `Managed-CachingOptimized`. Response headers policy = `Managed-SecurityHeadersPolicy`. Compress objects automatically = yes.
-  - **API behavior** (`api/*`): origin = EC2 Elastic IP (HTTP, port 80). Viewer protocol = redirect HTTP→HTTPS. Cache policy = `Managed-CachingDisabled`. Origin request policy = `Managed-AllViewerExceptHostHeader` (forwards all cookies, headers, query strings to origin).
-- [ ] Alternate domain names (CNAMEs): `knottyyoga.example`, `www.knottyyoga.example`.
-- [ ] SSL certificate = the ACM cert created above (must be in us-east-1).
-- [ ] Custom error responses: map HTTP 403 and 404 from the S3 origin to `/index.html` with response code 200 — this is what makes Angular's deep-linked routes work on refresh.
-- [ ] **Origin protection**: generate a long random string, add a CloudFront "Origin custom header" `X-Origin-Secret: <value>` on the `/api/*` behavior's origin. The Crow middleware from Phase 1.7 rejects anything missing the header with 403. This is the "pragmatic answer" — no nginx needed, no SG-by-IP-prefix churn.
-- [ ] After deploy, invalidate `/index.html` (Angular's hashed asset filenames auto-bust cache; only `index.html` needs manual invalidation).
+- [ ] **Create the distribution with the S3 origin and default behavior.**
+	- CloudFront is a global service; the region picker doesn't matter for the distribution itself, but the **ACM cert dropdown only shows certs from `us-east-1`** — that's the constraint, not the picker setting.
+	- Top search → **CloudFront** → CloudFront console → **Create distribution**.
+	- **Origin:**
+		- **Origin domain:** click the dropdown → pick your S3 bucket (`knottyyoga-ui-prod.s3.us-west-2.amazonaws.com`).
+		- **Origin access:** **Origin access control settings (recommended)**. Click **Create new OAC** → keep defaults (Sign requests, S3 origin type) → **Create**. Select the new OAC in the dropdown.
+		- A yellow banner appears with a **bucket policy** for the S3 bucket — copy it to your clipboard; you'll paste it into S3 in the next step.
+	- **Default cache behavior:**
+		- Viewer protocol policy: **Redirect HTTP to HTTPS**
+		- Allowed HTTP methods: GET, HEAD
+		- Cache key and origin requests:
+			- Cache policy: `Managed-CachingOptimized`
+			- Origin request policy: (none)
+			- Response headers policy: `Managed-SecurityHeadersPolicy`
+		- Compress objects automatically: **Yes**
+	- **Web Application Firewall (WAF):** Do **not** enable security protections (skip WAF for v1 — it has a per-month base cost).
+	- **Settings:**
+		- Price class: **Use only North America and Europe** (cheaper than worldwide; fine for our audience)
+		- Alternate domain name (CNAME): `knottyyoga.com`, `www.knottyyoga.com`
+		- Custom SSL certificate: pick the ACM cert you issued in `us-east-1` (the dropdown filters to that region automatically)
+		- Supported HTTP versions: HTTP/2, HTTP/3
+		- Default root object: `index.html`
+		- Standard logging: optional (off for v1)
+	- **Create distribution**.
+	- Wait ~5–10 minutes for status `Deployed`. Note the distribution's domain name (`dXXXXXX.cloudfront.net`) and its **Distribution ID** (e.g., `E1234567890ABC`) — you'll need the ID for cache invalidations.
+- [ ] **Paste the OAC bucket policy into S3.**
+	- S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy → Edit** → paste the JSON CloudFront gave you → **Save changes**.
+	- Without this step, CloudFront gets `403 Forbidden` from S3 on every request.
+- [ ] **Add the API origin for `/api/*`.**
+	- CloudFront → your distribution → **Origins** tab → **Create origin**.
+	- **Origin domain:** the EC2 Elastic IP (just the bare IP, no `http://`, e.g., `54.123.45.67`)
+	- **Protocol:** **HTTP only**
+	- **HTTP port:** 80
+	- **Add custom header:**
+		- Header name: `X-Origin-Secret`
+		- Value: the `KNOTTYYOGA_ORIGIN_SECRET` value you put in `/etc/knottyyoga/server.env`. **Must match exactly** — the Crow middleware (Phase 1.7) compares this header on every API request and 403s without it.
+	- **Create origin**.
+	- Why a header instead of SG-by-IP-prefix? CloudFront's egress IP ranges churn; chasing them in security groups is operational pain. The shared-secret header is the pragmatic answer — no nginx needed.
+- [ ] **Add the `/api/*` behavior.**
+	- CloudFront → your distribution → **Behaviors** tab → **Create behavior**.
+	- **Path pattern:** `api/*`
+	- **Origin and origin groups:** the API origin you just created
+	- **Viewer protocol policy:** Redirect HTTP to HTTPS
+	- **Allowed HTTP methods:** GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE (the "all methods" option)
+	- **Cache key and origin requests:**
+		- Cache policy: `Managed-CachingDisabled`
+		- Origin request policy: `Managed-AllViewerExceptHostHeader` (forwards all cookies, query strings, and most headers — the Host header is stripped so the EC2 sees the right one)
+	- **Create behavior**.
+- [ ] **Add SPA fallback error responses.** Without this, refreshing on `/calendar` or any deep link returns 403/404 from S3 (the bucket doesn't actually contain `/calendar/index.html`).
+	- CloudFront → your distribution → **Error pages** tab → **Create custom error response**.
+	- Response 1:
+		- HTTP error code: **403: Forbidden**
+		- Customize error response: **Yes**
+		- Response page path: `/index.html`
+		- HTTP response code: **200: OK**
+	- Repeat for **404: Not Found**.
+- [ ] **Cache invalidation hygiene.** Angular's hashed asset filenames mean only `index.html` needs to be invalidated on each deploy — the rest auto-busts via the URL change. The deploy script below handles this with `cloudfront:CreateInvalidation`.
 
 ### Frontend deploy script (for GitLab CI and for operators)
 
-- [ ] Script `deploy/deploy-ui.sh`:
-  1. `aws s3 sync ui/dist/ui/ s3://knottyyoga-ui-prod/ --delete --cache-control 'public, max-age=31536000, immutable'` for hashed assets.
-  2. Override `--cache-control 'public, max-age=0, must-revalidate'` for `index.html` (so the browser always checks for a new one).
-  3. `aws cloudfront create-invalidation --distribution-id <ID> --paths /index.html`.
-- [ ] Document in `RUNBOOK.md` that frontend-only deploys can happen independently of backend.
+- [ ] **Write `deploy/deploy-ui.sh`** (template — adjust paths to match the Angular 19 build output):
+	```bash
+	#!/usr/bin/env bash
+	set -euo pipefail
+	DIST_DIR="ui/dist/ui/browser"           # confirm with `ng build` output
+	BUCKET="knottyyoga-ui-prod"
+	DISTRIBUTION_ID="EXXXXXXXXXXXXX"        # paste your CF distribution ID
+
+	# Sync hashed assets — cacheable forever
+	aws s3 sync "$DIST_DIR/" "s3://$BUCKET/" \
+	  --delete \
+	  --cache-control 'public, max-age=31536000, immutable' \
+	  --exclude 'index.html'
+
+	# Upload index.html with no-cache headers (browser must always recheck)
+	aws s3 cp "$DIST_DIR/index.html" "s3://$BUCKET/index.html" \
+	  --cache-control 'public, max-age=0, must-revalidate'
+
+	# Invalidate only index.html
+	aws cloudfront create-invalidation \
+	  --distribution-id "$DISTRIBUTION_ID" \
+	  --paths /index.html
+	```
+- [ ] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy-ui.sh`) run independently of backend deploys — no EC2 work needed.
 
 ## 4.7 Email via SES
 
-- [ ] Verify the sending domain in SES (add a CNAME/TXT in Route 53).
-- [ ] Request production access (SES starts in sandbox mode limiting to verified recipients only). This can take a day.
-- [ ] Create an SMTP credential pair in SES. Put the SMTP username/password in `config_secrets` via a one-time `knottyyoga_test_helper` run after first deploy.
-- [ ] Verify: trigger a test email path (e.g., `person_verify_mail`) and confirm delivery.
+SES has two trip wires: **(1) regional** — you verify the domain and request prod access *per region*, and **(2) sandbox mode** — until you request production access, SES will only deliver to addresses you've explicitly verified. Don't skip the production-access request.
+
+- [ ] **Verify the sending domain.**
+	- Region: **us-west-2** (pick one region and stick with it — the `config_secrets` SMTP host is region-specific).
+	- Top search → **Amazon Simple Email Service** → SES console.
+	- Left sidebar → **Verified identities** → **Create identity**.
+	- **Identity type:** Domain
+	- **Domain:** `knottyyoga.com`
+	- **Use a custom MAIL FROM domain:** leave off for now (can add later)
+	- **Advanced DKIM settings:** Easy DKIM (default; recommended)
+		- DKIM signing key length: `RSA_2048_BIT`
+	- **Publish DNS records to Route 53:** **Yes** (auto-creates three `CNAME` records in your hosted zone)
+	- **Create identity**.
+	- Wait ~5 minutes; the identity's **Verification status** flips to **Verified** and **DKIM status** to **Successful**. If it stays pending >10 min, double-check the Route 53 CNAMEs were actually created (Route 53 → Hosted zones → `knottyyoga.com` → look for three `*._domainkey.knottyyoga.com` records).
+- [ ] **Request production access (sandbox → production).** Until you do this, SES will only deliver to addresses you've added to **Verified identities** — useless for real users.
+	- SES console → left sidebar → **Account dashboard** → there'll be a banner or **Request production access** button (also under "Account details").
+	- Fill in the form:
+		- Mail type: **Transactional** (account verifications, payment receipts, password resets — *not* marketing)
+		- Website URL: `https://knottyyoga.com`
+		- Use case description — be specific. Example: *"Transactional email for a yoga studio web app: account-verification emails on signup, payment receipts after class purchases, and password reset emails. Estimated volume under 100/day initially. We will monitor bounces and complaints via SNS topics on the verified identity and immediately suppress problem addresses."*
+		- How you'll handle bounces/complaints: mention SNS notifications + automated suppression
+		- Additional contacts: leave default
+	- **Submit**. AWS typically responds within 24 hours; on approval, your daily sending quota jumps from 200 → 50,000.
+- [ ] **Create SMTP credentials.**
+	- SES console → left sidebar → **SMTP settings**.
+	- Note the **SMTP endpoint** (e.g., `email-smtp.us-west-2.amazonaws.com`) and ports (587 for STARTTLS, 465 for TLS-wrapped).
+	- **Create SMTP credentials** → IAM user name: `ses-smtp-knottyyoga` → **Create user**.
+	- This produces an **SMTP username** and **SMTP password** — these look different from regular IAM access keys (the password is derived from the IAM secret key via SES's signing algorithm — don't try to reuse a regular IAM secret here). Save both to your password manager; they aren't shown again.
+- [ ] **Load the SMTP credentials into `config_secrets` after first deploy.** Done via a one-time `knottyyoga_test_helper` run in Phase 4.8/5.1 against the running RDS. Required keys:
+	- `kMailHost` = `email-smtp.us-west-2.amazonaws.com`
+	- `kMailPort` = `587`
+	- `kMailUser` = the SES SMTP username
+	- `kMailPassword` = the SES SMTP password
+	- `kMailFromAddress` = `noreply@knottyyoga.com` (or similar from-address on the verified domain)
+- [ ] **Smoke test.** Once secrets are loaded and the server's running, trigger a verification email path (e.g., register a test user) and confirm delivery to a real inbox. If you're still in SES sandbox at this point, the test recipient address has to be added to **Verified identities** first.
 
 ## 4.8 Secret bootstrap ordering
 
