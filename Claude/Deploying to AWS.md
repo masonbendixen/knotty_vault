@@ -467,13 +467,15 @@ The default VPC plus two security groups is all we need. The default VPC already
 
 ## 4.3 Compute: EC2
 
-- [ ] **Create the SSH key pair you'll use to log in.**
+- [x] **Create the SSH key pair you'll use to log in.** ✅ 2026-05-14
 	- Region: **us-west-2**.
 	- Top search → **EC2** → EC2 console → left sidebar → **Network & Security → Key Pairs** → **Create key pair**.
 	- **Name:** `knottyyoga-ec2`
 	- **Key pair type:** `ED25519` (smaller, modern)
 	- **Private key file format:** `.pem` (Linux/macOS/OpenSSH on Windows) or `.ppk` (Windows + PuTTY)
 	- **Create key pair** — the browser downloads the private key. Move it somewhere safe (e.g., `~/.ssh/knottyyoga-ec2.pem`); AWS does **not** keep a copy.
+		- C:\Users\mason\.ssh
+		- Google drive / Knotty Yoga / Website / ssh
 	- Lock the file: `chmod 400 ~/.ssh/knottyyoga-ec2.pem` (Linux/macOS); on Windows, right-click the file → Properties → Security → Advanced → Disable inheritance → grant only your user Read access.
 - [ ] **Launch the EC2 instance.**
 	- EC2 console → left sidebar → **Instances** → **Launch instances**.
