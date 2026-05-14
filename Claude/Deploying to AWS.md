@@ -454,7 +454,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Outbound rules:** leave the default `All traffic → 0.0.0.0/0`.
 	- **Create security group**. Note the new SG ID.
 		- sg-0accf95c33945db08
-- [ ] **Create security group `knottyyoga-db` (for RDS).**
+- [x] **Create security group `knottyyoga-db` (for RDS).** ✅ 2026-05-14
 	- VPC console → **Security groups** → **Create security group**.
 	- **Name:** `knottyyoga-db`
 	- **Description:** `Knotty Yoga DB tier (RDS)`
@@ -463,7 +463,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Type: `PostgreSQL` (port 5432); Source: **Custom** → start typing `knottyyoga` and pick `knottyyoga-web` from the autocomplete. This is the key bit — only the web tier can talk to the DB.
 	- **Outbound rules:** leave default.
 	- **Create security group**.
-- [ ] **Verify.** Security Groups list should show both new SGs bound to the default VPC. Note both IDs — you'll select `knottyyoga-web` in the EC2 wizard (Phase 4.3) and `knottyyoga-db` in the RDS wizard (Phase 4.4).
+- [x] **Verify.** Security Groups list should show both new SGs bound to the default VPC. Note both IDs — you'll select `knottyyoga-web` in the EC2 wizard (Phase 4.3) and `knottyyoga-db` in the RDS wizard (Phase 4.4). ✅ 2026-05-14
 
 ## 4.3 Compute: EC2
 
