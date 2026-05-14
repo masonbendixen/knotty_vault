@@ -513,38 +513,16 @@ The default VPC plus two security groups is all we need. The default VPC already
 	docker ps                                    # should succeed without sudo
 	```
 - [ ] **No `cap_net_bind_service` setup needed.** Docker `-p 80:<internal>` maps the privileged host port regardless of the in-container user. The Crow process inside the container runs as root by default for single-process containers — fine, it's isolated by the container boundary.
-- [ ] **Generate the env-file secrets first.** On your laptop or on the EC2:
+- [ ] **Generate the env-file secrets and stash them.** On your laptop or on the EC2:
 	```bash
 	openssl rand -base64 32   # use as KNOTTYYOGA_ORIGIN_SECRET
 	openssl rand -base64 32   # use as SCHEDULER_SERVICE_ACCOUNT_PASSWORD
 	```
+	Record both values in your password manager — you'll paste them into `/etc/knottyyoga/server.env` at the **end of Phase 4.4**, once the RDS endpoint and DB password are also known. (Writing the file in one shot after 4.4 is cleaner than the two-pass approach where you create it here with placeholders and fill in DB fields later.)
 	- KNOTTYYOGA_ORIGIN_SECRET
 		- Rpxpk23whEtmToEMmEZpuFk0+KwK/ukpTZD3AQauoDQ=
 	- SCHEDULER_SERVICE_ACCOUNT_PASSWORD
 		- d5jLtv36Ng8mi/O7nKLW/JztPZR3St9/1HUkBH9x2Nw=
-- [ ] **Create `/etc/knottyyoga/server.env`.** On the EC2:
-	```bash
-	sudo mkdir -p /etc/knottyyoga
-	sudo nano /etc/knottyyoga/server.env
-	```
-	Paste (replace `<…>`; `KNOTTYYOGA_DB_HOST` and `KNOTTYYOGA_DB_PASSWORD` come from Phase 4.4):
-	```
-	PORT=80
-	KNOTTYYOGA_ORIGIN_SECRET=<from openssl rand above>
-	KNOTTYYOGA_TRUST_PROXY=1
-	KNOTTYYOGA_DB_HOST=<rds-endpoint-from-4.4>
-	KNOTTYYOGA_DB_NAME=knottyyoga
-	KNOTTYYOGA_DB_USER=knottyyoga
-	KNOTTYYOGA_DB_PASSWORD=<from-4.4>
-	KNOTTYYOGA_DB_SSLMODE=verify-full
-	KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem
-	SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<from openssl rand above>
-	```
-	Lock it:
-	```bash
-	sudo chmod 600 /etc/knottyyoga/server.env
-	sudo chown root:root /etc/knottyyoga/server.env
-	```
 - [ ] **Enable `ufw` (host firewall, defense in depth with the SG).** On the EC2:
 	```bash
 	sudo ufw default deny incoming
@@ -605,7 +583,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Auto-minor-version upgrade: enabled (default)
 	- **Create database**.
 	- Wait ~10 minutes for status to flip from `Creating` to `Available`.
-- [ ] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Paste it into `/etc/knottyyoga/server.env` as `KNOTTYYOGA_DB_HOST` on the EC2.
+- [ ] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Save it — you'll use it as `KNOTTYYOGA_DB_HOST` in the consolidated `server.env` step at the end of this phase.
 - [ ] **Download the RDS CA bundle to the EC2.** On the EC2:
 	```bash
 	sudo curl -fsSL -o /etc/knottyyoga/rds-ca.pem \
@@ -624,7 +602,30 @@ The default VPC plus two security groups is all we need. The default VPC already
 	CREATE DATABASE knottyyoga OWNER knottyyoga;
 	\q
 	```
-	Save the app password as `KNOTTYYOGA_DB_PASSWORD` in `/etc/knottyyoga/server.env`. The `postgres` master password is only used for occasional maintenance — keep it in the password manager but **not** in the env file.
+	Save the app password — you'll use it as `KNOTTYYOGA_DB_PASSWORD` in the consolidated `server.env` step below. The `postgres` master password is only used for occasional maintenance — keep it in the password manager but **not** in the env file.
+- [ ] **Create `/etc/knottyyoga/server.env`** (deferred from Phase 4.3 — all values are now known). On the EC2:
+	```bash
+	sudo mkdir -p /etc/knottyyoga
+	sudo nano /etc/knottyyoga/server.env
+	```
+	Paste, substituting the values you've collected so far (origin secret + scheduler password from Phase 4.3; RDS endpoint + app password from earlier in this phase):
+	```
+	PORT=80
+	KNOTTYYOGA_ORIGIN_SECRET=<from Phase 4.3 openssl rand>
+	KNOTTYYOGA_TRUST_PROXY=1
+	KNOTTYYOGA_DB_HOST=<RDS endpoint recorded above>
+	KNOTTYYOGA_DB_NAME=knottyyoga
+	KNOTTYYOGA_DB_USER=knottyyoga
+	KNOTTYYOGA_DB_PASSWORD=<app password from CREATE ROLE step>
+	KNOTTYYOGA_DB_SSLMODE=verify-full
+	KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem
+	SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<from Phase 4.3 openssl rand>
+	```
+	Lock it:
+	```bash
+	sudo chmod 600 /etc/knottyyoga/server.env
+	sudo chown root:root /etc/knottyyoga/server.env
+	```
 - [ ] **Verify PITR (Point-in-Time Recovery) once.** RDS automated backups give 7-day PITR by default. Worth proving once before you need it for real: RDS console → Databases → `knottyyoga` → **Actions → Restore to point in time** → restore to a new instance named `knottyyoga-pitr-test` → connect via psql, run a `SELECT`, then **Actions → Delete** the test instance. Roll this into the 5.1 smoke-test checklist.
 
 ## 4.5 DNS + TLS
