@@ -477,7 +477,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- C:\Users\mason\.ssh
 		- Google drive / Knotty Yoga / Website / ssh
 	- Lock the file: `chmod 400 ~/.ssh/knottyyoga-ec2.pem` (Linux/macOS); on Windows, right-click the file → Properties → Security → Advanced → Disable inheritance → grant only your user Read access.
-- [ ] **Launch the EC2 instance.**
+- [x] **Launch the EC2 instance.** ✅ 2026-05-14
 	- EC2 console → left sidebar → **Instances** → **Launch instances**.
 	- **Name:** `knottyyoga-server`
 	- **Application and OS Images (AMI):** click **Ubuntu** in the quick-start grid → confirm `Ubuntu Server 24.04 LTS (HVM), SSD Volume Type` → architecture **64-bit (x86)** (not ARM). (22.04 is no longer offered as a plain image in the us-west-2 quick-start grid; the surviving 22.04 AMIs are SQL Server bundles. 24.04 LTS is supported through April 2029 and Docker abstracts the host kernel from the `ubuntu:22.04` runtime container, so this swap is safe.)
@@ -496,6 +496,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- Select the new EIP → **Actions → Associate Elastic IP address**.
 	- **Resource type:** Instance; **Instance:** `knottyyoga-server` → **Associate**.
 	- Note the Elastic IP — that's your origin endpoint for CloudFront in 4.6 and your SSH target.
+		- 34.215.204.200
 	- Cost note: an EIP is **free while attached** to a running instance; ~$3/mo only if unattached or attached to a stopped instance.
 - [ ] **First-boot system setup.** SSH from your laptop:
 	```bash
