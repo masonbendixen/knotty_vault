@@ -443,7 +443,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- subnet-0a4544e5444e7fdcf
 		- subnet-0c50cfd5c793c5f1b
 	- Sanity check: click each chosen subnet → **Route table** tab → there should be a route `0.0.0.0/0 → igw-…` (this is what makes it a *public* subnet).
-- [ ] **Create security group `knottyyoga-web` (for EC2).**
+- [x] **Create security group `knottyyoga-web` (for EC2).** ✅ 2026-05-14
 	- VPC console → left sidebar → **Security groups** → **Create security group**.
 	- **Name:** `knottyyoga-web` (AWS rejects names that begin with `sg-` — that prefix is reserved for the auto-generated SG ID)
 	- **Description:** `Knotty Yoga web tier (EC2)`
@@ -453,6 +453,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		2. Type: `HTTP` (port 80); Source: `Anywhere-IPv4` (`0.0.0.0/0`). Origin protection is enforced in the Crow middleware via `X-Origin-Secret`, not in the SG.
 	- **Outbound rules:** leave the default `All traffic → 0.0.0.0/0`.
 	- **Create security group**. Note the new SG ID.
+		- sg-0accf95c33945db08
 - [ ] **Create security group `knottyyoga-db` (for RDS).**
 	- VPC console → **Security groups** → **Create security group**.
 	- **Name:** `knottyyoga-db`
