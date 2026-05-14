@@ -491,7 +491,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Configure storage:** 1× `20 GiB`, volume type **gp3**. Leave Encryption ON (default).
 	- **Launch instance**.
 	- Wait ~30 seconds; refresh Instances → state `Running`, status checks `2/2 checks passed`.
-- [ ] **Allocate an Elastic IP and associate it.**
+- [x] **Allocate an Elastic IP and associate it.** ✅ 2026-05-14
 	- EC2 console → left sidebar → **Network & Security → Elastic IPs** → **Allocate Elastic IP address** → **Allocate**.
 	- Select the new EIP → **Actions → Associate Elastic IP address**.
 	- **Resource type:** Instance; **Instance:** `knottyyoga-server` → **Associate**.
