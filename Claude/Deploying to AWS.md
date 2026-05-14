@@ -34,7 +34,7 @@ You have prior AWS experience (S3, RDS, Lambda, EC2 at Tableau), so the write-up
       /* (default)  │       │  /api/*   (CachingDisabled, AllViewer)
                     ▼       ▼
            ┌──────────┐   ┌──────────────────────────────────┐
-           │    S3    │   │  EC2 t3.small (x86, Ubuntu 22.04)│
+           │    S3    │   │  EC2 t3.small (x86, Ubuntu 24.04)│
            │ Angular  │   │  knottyyoga_the_server :80       │
            │  bundle  │   │  systemd, no TLS, no nginx       │
            │  (OAC)   │   │  CloudFrontOriginGuard middleware│
@@ -480,7 +480,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 - [ ] **Launch the EC2 instance.**
 	- EC2 console → left sidebar → **Instances** → **Launch instances**.
 	- **Name:** `knottyyoga-server`
-	- **Application and OS Images (AMI):** click **Ubuntu** in the quick-start grid → confirm `Ubuntu Server 22.04 LTS (HVM), SSD Volume Type` → architecture **64-bit (x86)** (not ARM).
+	- **Application and OS Images (AMI):** click **Ubuntu** in the quick-start grid → confirm `Ubuntu Server 24.04 LTS (HVM), SSD Volume Type` → architecture **64-bit (x86)** (not ARM). (22.04 is no longer offered as a plain image in the us-west-2 quick-start grid; the surviving 22.04 AMIs are SQL Server bundles. 24.04 LTS is supported through April 2029 and Docker abstracts the host kernel from the `ubuntu:22.04` runtime container, so this swap is safe.)
 	- **Instance type:** `t3.small`
 	- **Key pair (login):** `knottyyoga-ec2`
 	- **Network settings → Edit:**
@@ -886,7 +886,7 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 ### Session Manager (for additional operators, e.g., your retired friend)
 
-- [ ] Attach the AWS-managed `AmazonSSMManagedInstanceCore` IAM policy to the EC2's instance profile. Install the `amazon-ssm-agent` package (already preinstalled on Ubuntu 22.04 AMIs, just needs to be `enabled` and `started`).
+- [ ] Attach the AWS-managed `AmazonSSMManagedInstanceCore` IAM policy to the EC2's instance profile. Install the `amazon-ssm-agent` package (already preinstalled on Ubuntu 24.04 AMIs, just needs to be `enabled` and `started`).
 - [ ] Verify by running `aws ssm start-session --target i-xxxxxxxx` from your own machine — you should land in a shell on the EC2 without any SSH key involved.
 - [ ] Create an IAM user for each additional operator (e.g., `friend-of-mason`). Attach a policy that grants `ssm:StartSession` on this specific instance ARN, plus `ssm:TerminateSession` and `ssm:DescribeSessions` for their own sessions. They generate their own access keys and `aws ssm start-session --target i-xxxxxxxx`.
 - [ ] Document the onboarding/offboarding procedure in `RUNBOOK.md`: granting a new operator is "create IAM user + attach policy", revoking is "delete the IAM user". No rebooting, no editing files on the EC2.
