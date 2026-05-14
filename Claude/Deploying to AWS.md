@@ -432,11 +432,16 @@ Goal: provision the accounts/services we'll actually deploy to.
 
 The default VPC plus two security groups is all we need. The default VPC already has subnets in every us-west-2 AZ with route tables pointing at an internet gateway — no provisioning required, just verification.
 
-- [ ] **Confirm the default VPC and pick two subnets for the RDS subnet group.**
+- [x] **Confirm the default VPC and pick two subnets for the RDS subnet group.** ✅ 2026-05-14
 	- AWS console region picker: **us-west-2 (Oregon)**.
 	- Top search bar → type **VPC** → click **VPC**.
 	- Left sidebar → **Your VPCs** → confirm one row with `Default VPC = Yes`. Note its VPC ID (e.g., `vpc-0abc…`).
+		- vpc-0059b262559e0779a
 	- Left sidebar → **Subnets** → filter by that VPC ID (top filter box). You should see four subnets — one per AZ (`us-west-2a/b/c/d`). Pick any two AZs (e.g., `us-west-2a` and `us-west-2b`); you'll point the RDS subnet group at these in Phase 4.4.
+		- subnet-072002670dde5d5f0
+		- subnet-08c9d7ce4caad5c78
+		- subnet-0a4544e5444e7fdcf
+		- subnet-0c50cfd5c793c5f1b
 	- Sanity check: click each chosen subnet → **Route table** tab → there should be a route `0.0.0.0/0 → igw-…` (this is what makes it a *public* subnet).
 - [ ] **Create security group `sg-knottyyoga-web` (for EC2).**
 	- VPC console → left sidebar → **Security groups** → **Create security group**.
