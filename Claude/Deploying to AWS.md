@@ -443,9 +443,9 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- subnet-0a4544e5444e7fdcf
 		- subnet-0c50cfd5c793c5f1b
 	- Sanity check: click each chosen subnet → **Route table** tab → there should be a route `0.0.0.0/0 → igw-…` (this is what makes it a *public* subnet).
-- [ ] **Create security group `sg-knottyyoga-web` (for EC2).**
+- [ ] **Create security group `knottyyoga-web` (for EC2).**
 	- VPC console → left sidebar → **Security groups** → **Create security group**.
-	- **Name:** `sg-knottyyoga-web`
+	- **Name:** `knottyyoga-web` (AWS rejects names that begin with `sg-` — that prefix is reserved for the auto-generated SG ID)
 	- **Description:** `Knotty Yoga web tier (EC2)`
 	- **VPC:** the default VPC
 	- **Inbound rules → Add rule** twice:
@@ -453,16 +453,16 @@ The default VPC plus two security groups is all we need. The default VPC already
 		2. Type: `HTTP` (port 80); Source: `Anywhere-IPv4` (`0.0.0.0/0`). Origin protection is enforced in the Crow middleware via `X-Origin-Secret`, not in the SG.
 	- **Outbound rules:** leave the default `All traffic → 0.0.0.0/0`.
 	- **Create security group**. Note the new SG ID.
-- [ ] **Create security group `sg-knottyyoga-db` (for RDS).**
+- [ ] **Create security group `knottyyoga-db` (for RDS).**
 	- VPC console → **Security groups** → **Create security group**.
-	- **Name:** `sg-knottyyoga-db`
+	- **Name:** `knottyyoga-db`
 	- **Description:** `Knotty Yoga DB tier (RDS)`
 	- **VPC:** the default VPC
 	- **Inbound rules → Add rule** once:
-		- Type: `PostgreSQL` (port 5432); Source: **Custom** → start typing `sg-` and pick `sg-knottyyoga-web` from the autocomplete. This is the key bit — only the web tier can talk to the DB.
+		- Type: `PostgreSQL` (port 5432); Source: **Custom** → start typing `knottyyoga` and pick `knottyyoga-web` from the autocomplete. This is the key bit — only the web tier can talk to the DB.
 	- **Outbound rules:** leave default.
 	- **Create security group**.
-- [ ] **Verify.** Security Groups list should show both new SGs bound to the default VPC. Note both IDs — you'll select `sg-knottyyoga-web` in the EC2 wizard (Phase 4.3) and `sg-knottyyoga-db` in the RDS wizard (Phase 4.4).
+- [ ] **Verify.** Security Groups list should show both new SGs bound to the default VPC. Note both IDs — you'll select `knottyyoga-web` in the EC2 wizard (Phase 4.3) and `knottyyoga-db` in the RDS wizard (Phase 4.4).
 
 ## 4.3 Compute: EC2
 
@@ -484,7 +484,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- VPC: default
 		- Subnet: one of the two AZs you picked in 4.2 (e.g., `us-west-2a`)
 		- Auto-assign public IP: **Enable** (we'll attach an Elastic IP next, but first-boot needs network either way)
-		- Firewall (security groups): **Select existing security group** → check `sg-knottyyoga-web`. Uncheck any launch-wizard default SG.
+		- Firewall (security groups): **Select existing security group** → check `knottyyoga-web`. Uncheck any launch-wizard default SG.
 	- **Configure storage:** 1× `20 GiB`, volume type **gp3**. Leave Encryption ON (default).
 	- **Launch instance**.
 	- Wait ~30 seconds; refresh Instances → state `Running`, status checks `2/2 checks passed`.
@@ -582,7 +582,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- VPC: default VPC
 		- DB subnet group: `knottyyoga-db-subnet-group`
 		- Public access: **No**
-		- VPC security group (firewall): **Choose existing** → select `sg-knottyyoga-db`. **Remove** the auto-selected `default` SG if it's there.
+		- VPC security group (firewall): **Choose existing** → select `knottyyoga-db`. **Remove** the auto-selected `default` SG if it's there.
 		- Availability Zone: pick either of your two AZs
 		- Database port: 5432
 	- **Database authentication:** Password authentication
