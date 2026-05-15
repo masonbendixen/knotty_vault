@@ -594,7 +594,8 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Enable auto minor version upgrade: **keep CHECKED** (default). Same-major security/bug patches (e.g., 15.5 → 15.6) applied in the maintenance window — want these automatic on an unattended host. Major-version upgrades are never automatic; you still control those.
 	- **Create database**.
 	- Wait ~10 minutes for status to flip from `Creating` to `Available`.
-- [ ] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Save it — you'll use it as `KNOTTYYOGA_DB_HOST` in the consolidated `server.env` step at the end of this phase.
+- [x] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Save it — you'll use it as `KNOTTYYOGA_DB_HOST` in the consolidated `server.env` step at the end of this phase. ✅ 2026-05-15
+	- knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com
 - [ ] **Download the RDS CA bundle to the EC2.** On the EC2:
 	```bash
 	sudo curl -fsSL -o /etc/knottyyoga/rds-ca.pem \
