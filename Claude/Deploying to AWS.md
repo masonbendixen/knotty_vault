@@ -684,7 +684,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- ns-1637.awsdns-12.co.uk
 		- ns-786.awsdns-34.net 
 		- ns-148.awsdns-18.com
-- [ ] **Repoint your current registrar's nameservers at Route 53.**
+- [x] **Repoint your current registrar's nameservers at Route 53.** ✅ 2026-05-15
 	- Log in to your existing DNS provider (where you registered the domain).
 	- Find **Nameservers** or **DNS Management → Custom Nameservers**.
 	- Replace the existing nameservers with the four Route 53 values from the previous step.
