@@ -549,7 +549,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- RDS console → left sidebar → **Databases** → **Create database**.
 	- **Engine options:** the picker is now a combined **"Aurora and RDS"** screen. Choose **Amazon RDS** (NOT Amazon Aurora — Aurora is a separate, pricier engine that starts at ~2 instances' worth of cost and is overkill here), then engine **PostgreSQL**.
 	- **Choose a database creation method:** **Full configuration** (this is the renamed "Standard create"). Do **NOT** use **Easy create** — it applies production defaults and hides the knobs this plan needs (db.t3.micro, single-AZ, blank initial DB name, backup window, deletion protection).
-	- **Engine version:** latest 15.x (e.g., `15.5`)
+	- **Engine version:** any current major is fine — latest 15.x, 16.x, or 17.x. (Note: PG 16+ tightens `CREATE DATABASE ... OWNER` — see the `GRANT` line in the "Create the application role and database" step below.)
 	- **Templates:** if a Templates selector appears, pick **Dev/Test** or **Free tier** (the Production template forces Multi-AZ, which we're not paying for yet). The **Availability and durability** choice below is what actually controls cost, so that's the one that matters.
 	- **Availability and durability:** **Single-AZ instance deployment (1 instance)**. The other options — *Multi-AZ instance deployment (2 instances)* and *Multi-AZ cluster deployment (3 instances)* — add a synchronous standby / reader fleet at ~2× and ~3× the instance cost. Multi-AZ is a modify-in-place change later if HA is ever needed, so there's no lock-in from starting single-AZ.
 	- **Settings:**
@@ -609,7 +609,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	```
 	Save it to your password manager. It plugs into the `CREATE ROLE` statement below **and** becomes `KNOTTYYOGA_DB_PASSWORD` in `server.env`.
 	- LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb
-- [ ] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule):
+- [x] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule): ✅ 2026-05-15
 	```bash
 	PGPASSWORD='My84dSDdpIBwXgIKb4yi1doef2JoJA+T' psql \
 	  "host=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com port=5432 user=postgres dbname=postgres sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem"
@@ -617,11 +617,14 @@ The default VPC plus two security groups is all we need. The default VPC already
 	Then in the psql shell (paste the password from the previous step in place of `<app password>`):
 	```sql
 	CREATE ROLE knottyyoga LOGIN PASSWORD 'LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb';
+	GRANT knottyyoga TO postgres;   -- REQUIRED on PG 16+: CREATE DATABASE ... OWNER needs the
+	                                -- creating role to be a member of the owner role. Harmless on PG 15.
+	                                -- (`postgres` is the RDS master username you're connected as.)
 	CREATE DATABASE knottyyoga OWNER knottyyoga;
 	\q
 	```
 	Save the app password — you'll use it as `KNOTTYYOGA_DB_PASSWORD` in the consolidated `server.env` step below. The `postgres` master password is only used for occasional maintenance — keep it in the password manager but **not** in the env file.
-- [ ] **Create `/etc/knottyyoga/server.env`** (deferred from Phase 4.3 — all values are now known). On the EC2:
+- [x] **Create `/etc/knottyyoga/server.env`** (deferred from Phase 4.3 — all values are now known). On the EC2: ✅ 2026-05-15
 	```bash
 	sudo mkdir -p /etc/knottyyoga
 	sudo nano /etc/knottyyoga/server.env
