@@ -603,11 +603,12 @@ The default VPC plus two security groups is all we need. The default VPC already
 	sudo chmod 644 /etc/knottyyoga/rds-ca.pem
 	```
 	Pairs with `KNOTTYYOGA_DB_SSLMODE=verify-full` from the env file. (Phase 1.1 plans the sslmode support in the server's DB connection layer.) The **Certificate authority** dropdown in the create-database wizard (defaults to `rds-ca-rsa2048-g1`) needs no change — `global-bundle.pem` contains the roots for every RDS CA (RSA-2048, RSA-4096, ECC), so `verify-full` validates regardless of which one is selected. RSA-2048 default is the broadly-compatible choice and the `g1` CAs are valid into the 2060s (no `rds-ca-2019`-style forced rotation).
-- [ ] **Generate the application DB password.** This is NOT supplied by AWS — you create it yourself, now. It's a fresh, separate password for the app's `knottyyoga` database role (distinct from the RDS *master* password for `postgres`). On the EC2 or your laptop:
+- [x] **Generate the application DB password.** This is NOT supplied by AWS — you create it yourself, now. It's a fresh, separate password for the app's `knottyyoga` database role (distinct from the RDS *master* password for `postgres`). On the EC2 or your laptop: ✅ 2026-05-15
 	```bash
 	openssl rand -base64 24
 	```
 	Save it to your password manager. It plugs into the `CREATE ROLE` statement below **and** becomes `KNOTTYYOGA_DB_PASSWORD` in `server.env`.
+	- LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb
 - [ ] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule):
 	```bash
 	PGPASSWORD='My84dSDdpIBwXgIKb4yi1doef2JoJA+T' psql \
@@ -615,7 +616,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	```
 	Then in the psql shell (paste the password from the previous step in place of `<app password>`):
 	```sql
-	CREATE ROLE knottyyoga LOGIN PASSWORD '<app password>';
+	CREATE ROLE knottyyoga LOGIN PASSWORD 'LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb';
 	CREATE DATABASE knottyyoga OWNER knottyyoga;
 	\q
 	```
@@ -628,15 +629,15 @@ The default VPC plus two security groups is all we need. The default VPC already
 	Paste, substituting the values you've collected so far (origin secret + scheduler password from Phase 4.3; RDS endpoint + app password from earlier in this phase):
 	```
 	PORT=80
-	KNOTTYYOGA_ORIGIN_SECRET=<from Phase 4.3 openssl rand>
+	KNOTTYYOGA_ORIGIN_SECRET=Rpxpk23whEtmToEMmEZpuFk0+KwK/ukpTZD3AQauoDQ=
 	KNOTTYYOGA_TRUST_PROXY=1
-	KNOTTYYOGA_DB_HOST=<RDS endpoint recorded above>
+	KNOTTYYOGA_DB_HOST=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com
 	KNOTTYYOGA_DB_NAME=knottyyoga
 	KNOTTYYOGA_DB_USER=knottyyoga
-	KNOTTYYOGA_DB_PASSWORD=<app password from CREATE ROLE step>
+	KNOTTYYOGA_DB_PASSWORD=LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb
 	KNOTTYYOGA_DB_SSLMODE=verify-full
 	KNOTTYYOGA_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem
-	SCHEDULER_SERVICE_ACCOUNT_PASSWORD=<from Phase 4.3 openssl rand>
+	SCHEDULER_SERVICE_ACCOUNT_PASSWORD=d5jLtv36Ng8mi/O7nKLW/JztPZR3St9/1HUkBH9x2Nw=
 	```
 	Lock it:
 	```bash
