@@ -700,6 +700,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- click **Add another name to this certificate** → `www.knottyyoga.com`
 	- **Validation method:** DNS validation (recommended)
 	- **Key algorithm:** RSA 2048
+	- **Certificate export:** leave the default **Disable export**. The cert is consumed only by CloudFront (an ACM-integrated service that reads it directly from ACM), so the private key never needs to leave AWS. Non-exportable is free (exportable carries a per-cert charge), more secure (no downloadable key material), and auto-renews with no action. Enable export only if some non-AWS host ever needs the raw key — not the case here (TLS terminates at CloudFront; EC2 runs plain HTTP).
 	- **Request**.
 	- On the new certificate's page (status `Pending validation`), expand each domain row and click **Create records in Route 53** → confirm. ACM writes the validation `CNAME`s into your hosted zone for you (one click).
 	- Wait 5–30 minutes; status flips to `Issued`. Copy the certificate ARN — CloudFront needs it in 4.6.
