@@ -557,9 +557,11 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Master username: `postgres`
 		- Master password: generate with `openssl rand -base64 24`, save to password manager
 			- My84dSDdpIBwXgIKb4yi1doef2JoJA+T
-	- **Instance configuration → DB instance class:**
-		- Burstable classes (includes t classes)
-		- `db.t3.micro`
+	- **Instance configuration → Instance type** (the console renamed "DB instance class" → "Instance type"):
+		- The list defaults to a class-family filter. If you only see `db.m*`/`db.r*` classes at `.large` and up, the filter is on **Standard** or **Memory optimized** — switch the family selector to **Burstable classes (includes t classes)** to expose the `t` family.
+		- Pick **`db.t3.micro`**. If it doesn't appear even under the Burstable filter, use **`db.t4g.micro`** (Graviton/ARM burstable — ~10% cheaper, and the managed DB host's architecture is independent of our x86 app, so this is a no-downside swap). `db.t3.small` is the fallback if more RAM is wanted.
+		- **Caveat tied to the Availability choice above:** *Multi-AZ cluster deployment (3 instances)* does not support burstable classes at all — if you picked that, no `t`-class will ever show. Burstable requires **Single-AZ instance deployment (1 instance)** (or Multi-AZ *instance* deployment), which is what this plan uses.
+		- The `d`-suffixed variants (`db.m7gd.*` etc.) add local NVMe SSD and are irrelevant here — RDS data lives on the separate gp3 EBS volume configured under **Storage** below.
 	- **Storage:**
 		- Storage type: gp3
 		- Allocated storage: `20` GiB
