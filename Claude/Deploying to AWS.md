@@ -574,6 +574,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- VPC security group (firewall): **Choose existing** → select `knottyyoga-db`. **Remove** the auto-selected `default` SG if it's there.
 		- Availability Zone: pick either of your two AZs
 		- Database port: 5432
+		- **Create an RDS Proxy: leave UNCHECKED.** RDS Proxy is a managed connection pooler for serverless/Lambda apps that storm the DB with short-lived connections. This is a single long-running Crow process with a small stable libpqxx pool — no pooler needed. It also bills ~$0.015/vCPU-hr (~$22/mo on a 2-vCPU `db.t3.micro`, more than the instance itself). Can be added later without an instance rebuild if the API ever moves to Lambda or hits connection limits.
 	- **Database authentication:** Password authentication
 	- **Monitoring:** Enhanced Monitoring off for now (saves a few dollars; toggle on later if you need it)
 	- **Additional configuration:**
