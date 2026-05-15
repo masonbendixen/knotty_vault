@@ -594,7 +594,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	  https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 	sudo chmod 644 /etc/knottyyoga/rds-ca.pem
 	```
-	Pairs with `KNOTTYYOGA_DB_SSLMODE=verify-full` from the env file. (Phase 1.1 plans the sslmode support in the server's DB connection layer.)
+	Pairs with `KNOTTYYOGA_DB_SSLMODE=verify-full` from the env file. (Phase 1.1 plans the sslmode support in the server's DB connection layer.) The **Certificate authority** dropdown in the create-database wizard (defaults to `rds-ca-rsa2048-g1`) needs no change — `global-bundle.pem` contains the roots for every RDS CA (RSA-2048, RSA-4096, ECC), so `verify-full` validates regardless of which one is selected. RSA-2048 default is the broadly-compatible choice and the `g1` CAs are valid into the 2060s (no `rds-ca-2019`-style forced rotation).
 - [ ] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule):
 	```bash
 	PGPASSWORD='<master password>' psql \
