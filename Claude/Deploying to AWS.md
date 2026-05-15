@@ -545,7 +545,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Availability Zones:** select the same two AZs you used in 4.2 (e.g., `us-west-2a`, `us-west-2b`). RDS requires ≥2 AZs in a subnet group even for single-AZ instances.
 	- **Subnets:** pick one subnet in each chosen AZ (the default-VPC public subnets you confirmed in 4.2)
 	- **Create**.
-- [ ] **Provision the RDS instance.**
+- [x] **Provision the RDS instance.** ✅ 2026-05-15
 	- RDS console → left sidebar → **Databases** → **Create database**.
 	- **Engine options:** the picker is now a combined **"Aurora and RDS"** screen. Choose **Amazon RDS** (NOT Amazon Aurora — Aurora is a separate, pricier engine that starts at ~2 instances' worth of cost and is overkill here), then engine **PostgreSQL**.
 	- **Choose a database creation method:** **Full configuration** (this is the renamed "Standard create"). Do **NOT** use **Easy create** — it applies production defaults and hides the knobs this plan needs (db.t3.micro, single-AZ, blank initial DB name, backup window, deletion protection).
