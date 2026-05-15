@@ -556,6 +556,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- DB instance identifier: `knottyyoga`
 		- Master username: `postgres`
 		- Master password: generate with `openssl rand -base64 24`, save to password manager
+			- My84dSDdpIBwXgIKb4yi1doef2JoJA+T
 	- **Instance configuration → DB instance class:**
 		- Burstable classes (includes t classes)
 		- `db.t3.micro`
