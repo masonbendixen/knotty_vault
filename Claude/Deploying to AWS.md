@@ -647,7 +647,27 @@ The default VPC plus two security groups is all we need. The default VPC already
 	sudo chmod 600 /etc/knottyyoga/server.env
 	sudo chown root:root /etc/knottyyoga/server.env
 	```
-- [ ] **Verify PITR (Point-in-Time Recovery) once.** RDS automated backups give 7-day PITR by default. Worth proving once before you need it for real: RDS console → Databases → `knottyyoga` → **Actions → Restore to point in time** → restore to a new instance named `knottyyoga-pitr-test` → connect via psql, run a `SELECT`, then **Actions → Delete** the test instance. Roll this into the 5.1 smoke-test checklist.
+- [ ] **Verify PITR (Point-in-Time Recovery) once — DEFER TO PHASE 5.1. Do NOT run during 4.4.** At this point in 4.4 the `knottyyoga` database is empty (no schema, no data), so a restore proves nothing. This is a Phase 5.1 smoke-test task: run it only *after* the app is deployed and has real data. RDS gives 7-day PITR automatically; this just proves the restore mechanism works and the data is actually in the backups before you ever need it for real.
+
+	When you do it (Phase 5.1), step by step:
+	1. RDS console → Databases → select `knottyyoga` → **Actions → Restore to point in time**.
+	2. **Restore time:** choose **Latest restorable time** (you're proving the mechanism + data presence, not recovering a specific moment — no need for Custom).
+	3. The wizard opens the full create-DB form, pre-filled from the source instance. **Leave everything at the pre-filled values EXCEPT these overrides:**
+		- **DB instance identifier:** `knottyyoga-pitr-test` ← this is the "name" field you were looking for.
+		- **DB instance class:** confirm `db.t3.micro` (it lives only minutes — don't let it inherit anything bigger).
+		- **Availability & durability:** Single-AZ (don't let it flip to Multi-AZ — wasteful even briefly).
+		- **VPC:** default VPC; **DB subnet group:** `knottyyoga-db-subnet-group`; **Public access:** No.
+		- **VPC security group:** **`knottyyoga-db`** — *the critical override.* If the wizard defaults to the `default` SG, the EC2 can't reach the test instance on 5432 and the test will falsely look like a failure. Remove `default` if present.
+		- **Deletion protection:** **OFF.** The source has it ON and the restore may inherit it; turning it off here makes cleanup a single Delete with no extra modify step.
+	4. **Restore DB instance** → wait ~10 min for status `Available`.
+	5. Copy the test instance's endpoint (Connectivity & security tab). From the EC2, connect and prove data is present:
+		```bash
+		PGPASSWORD='<knottyyoga app password>' psql \
+		  "host=<knottyyoga-pitr-test endpoint> port=5432 user=knottyyoga dbname=knottyyoga sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem" \
+		  -c "SELECT count(*) FROM people;"
+		```
+		A non-zero count (or any table with data you expect post-smoke-test) confirms the backup contains real data.
+	6. **Clean up:** RDS console → select `knottyyoga-pitr-test` → **Actions → Delete** → **uncheck** "Create final snapshot", **uncheck** "Retain automated backups", type the confirmation phrase → **Delete**. (Deletion protection was set OFF in step 3, so this is one action.)
 
 ## 4.5 DNS + TLS
 
