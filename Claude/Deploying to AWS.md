@@ -547,11 +547,11 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Create**.
 - [ ] **Provision the RDS instance.**
 	- RDS console → left sidebar → **Databases** → **Create database**.
-	- **Choose a database creation method:** Standard create
-	- **Engine type:** PostgreSQL
+	- **Engine options:** the picker is now a combined **"Aurora and RDS"** screen. Choose **Amazon RDS** (NOT Amazon Aurora — Aurora is a separate, pricier engine that starts at ~2 instances' worth of cost and is overkill here), then engine **PostgreSQL**.
+	- **Choose a database creation method:** **Full configuration** (this is the renamed "Standard create"). Do **NOT** use **Easy create** — it applies production defaults and hides the knobs this plan needs (db.t3.micro, single-AZ, blank initial DB name, backup window, deletion protection).
 	- **Engine version:** latest 15.x (e.g., `15.5`)
-	- **Templates:** **Dev/Test** (the Production template forces Multi-AZ, which we're not paying for yet)
-	- **Availability and durability:** Single DB instance
+	- **Templates:** if a Templates selector appears, pick **Dev/Test** or **Free tier** (the Production template forces Multi-AZ, which we're not paying for yet). The **Availability and durability** choice below is what actually controls cost, so that's the one that matters.
+	- **Availability and durability:** **Single-AZ instance deployment (1 instance)**. The other options — *Multi-AZ instance deployment (2 instances)* and *Multi-AZ cluster deployment (3 instances)* — add a synchronous standby / reader fleet at ~2× and ~3× the instance cost. Multi-AZ is a modify-in-place change later if HA is ever needed, so there's no lock-in from starting single-AZ.
 	- **Settings:**
 		- DB instance identifier: `knottyyoga`
 		- Master username: `postgres`
