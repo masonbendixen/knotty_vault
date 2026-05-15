@@ -596,19 +596,24 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- Wait ~10 minutes for status to flip from `Creating` to `Available`.
 - [x] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Save it — you'll use it as `KNOTTYYOGA_DB_HOST` in the consolidated `server.env` step at the end of this phase. ✅ 2026-05-15
 	- knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com
-- [ ] **Download the RDS CA bundle to the EC2.** On the EC2:
+- [x] **Download the RDS CA bundle to the EC2.** On the EC2: ✅ 2026-05-15
 	```bash
 	sudo curl -fsSL -o /etc/knottyyoga/rds-ca.pem \
 	  https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 	sudo chmod 644 /etc/knottyyoga/rds-ca.pem
 	```
 	Pairs with `KNOTTYYOGA_DB_SSLMODE=verify-full` from the env file. (Phase 1.1 plans the sslmode support in the server's DB connection layer.) The **Certificate authority** dropdown in the create-database wizard (defaults to `rds-ca-rsa2048-g1`) needs no change — `global-bundle.pem` contains the roots for every RDS CA (RSA-2048, RSA-4096, ECC), so `verify-full` validates regardless of which one is selected. RSA-2048 default is the broadly-compatible choice and the `g1` CAs are valid into the 2060s (no `rds-ca-2019`-style forced rotation).
+- [ ] **Generate the application DB password.** This is NOT supplied by AWS — you create it yourself, now. It's a fresh, separate password for the app's `knottyyoga` database role (distinct from the RDS *master* password for `postgres`). On the EC2 or your laptop:
+	```bash
+	openssl rand -base64 24
+	```
+	Save it to your password manager. It plugs into the `CREATE ROLE` statement below **and** becomes `KNOTTYYOGA_DB_PASSWORD` in `server.env`.
 - [ ] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule):
 	```bash
-	PGPASSWORD='<master password>' psql \
-	  "host=<rds-endpoint> port=5432 user=postgres dbname=postgres sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem"
+	PGPASSWORD='My84dSDdpIBwXgIKb4yi1doef2JoJA+T' psql \
+	  "host=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com port=5432 user=postgres dbname=postgres sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem"
 	```
-	Then in the psql shell:
+	Then in the psql shell (paste the password from the previous step in place of `<app password>`):
 	```sql
 	CREATE ROLE knottyyoga LOGIN PASSWORD '<app password>';
 	CREATE DATABASE knottyyoga OWNER knottyyoga;
