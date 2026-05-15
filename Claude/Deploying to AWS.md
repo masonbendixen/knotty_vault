@@ -576,12 +576,17 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Database port: 5432
 		- **Create an RDS Proxy: leave UNCHECKED.** RDS Proxy is a managed connection pooler for serverless/Lambda apps that storm the DB with short-lived connections. This is a single long-running Crow process with a small stable libpqxx pool — no pooler needed. It also bills ~$0.015/vCPU-hr (~$22/mo on a 2-vCPU `db.t3.micro`, more than the instance itself). Can be added later without an instance rebuild if the API ever moves to Lambda or hits connection limits.
 	- **Database authentication:** Password authentication
-	- **Monitoring:** Enhanced Monitoring off for now (saves a few dollars; toggle on later if you need it)
+	- **Monitoring:**
+		- Enhanced Monitoring: **off** for now (saves a few dollars; toggle on later if you need it)
+		- **Performance Insights: ENABLE** with the default **7-day retention** (the 7-day tier is free and is the single most useful post-launch "why is it slow" tool — top SQL, waits, DB load). Do not raise retention (paid tier). If the wizard greys it out on `db.t3.micro` for the chosen engine version/region, skip it — no loss.
+		- **Log exports (publish to CloudWatch Logs): leave ALL unchecked for v1.** *IAM DB auth error log* is pointless — we use password auth, not IAM DB auth. *PostgreSQL log* / *Upgrade log* are viewable in the RDS console (Logs & events tab) without paying CloudWatch ingestion; exporting is a no-reboot modify you can enable later if you ever want centralized retention. (App-log → CloudWatch in Phase 5.3 is the Crow journal, a separate concern from DB logs.)
+		- **DevOps Guru: NO.** Paid per-resource ML anomaly detection — real monthly cost and overkill for one low-traffic `db.t3.micro`; Performance Insights covers what you'd actually inspect.
 	- **Additional configuration:**
 		- Initial database name: **leave blank** — we'll create the app DB manually so it's owned by a non-superuser role
 		- Backup retention period: `7` days
 		- Backup window: a low-traffic window (e.g., 09:00–10:00 UTC = 2–3am Pacific)
 		- Encryption: **enabled** (default; can't be changed later)
+			- **AWS KMS key: keep the default `aws/rds`** (AWS-managed key). Free, zero-maintenance, AES-256 at rest. A customer-managed key (CMK) is only worth its $1/mo + API cost for customer-controlled key policy, per-key CloudTrail audit, or **cross-account encrypted snapshot sharing** (snapshots under `aws/rds` can't be shared/copied to another account) — none planned here (single account, single instance). Key choice is fixed at creation like encryption itself. Unrelated to the app-level `config_secrets` encryption (`KNOTTYYOGA_SECRET_KEY` / Phase 8) — this only protects the RDS storage volume.
 		- Maintenance window: a low-traffic window distinct from the backup window
 		- **Deletion protection: ENABLE** ← important
 		- Auto-minor-version upgrade: enabled (default)
