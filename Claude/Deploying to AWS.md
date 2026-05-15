@@ -702,8 +702,11 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Key algorithm:** RSA 2048
 	- **Certificate export:** leave the default **Disable export**. The cert is consumed only by CloudFront (an ACM-integrated service that reads it directly from ACM), so the private key never needs to leave AWS. Non-exportable is free (exportable carries a per-cert charge), more secure (no downloadable key material), and auto-renews with no action. Enable export only if some non-AWS host ever needs the raw key — not the case here (TLS terminates at CloudFront; EC2 runs plain HTTP).
 	- **Request**.
-	- On the new certificate's page (status `Pending validation`), expand each domain row and click **Create records in Route 53** → confirm. ACM writes the validation `CNAME`s into your hosted zone for you (one click).
-	- Wait 5–30 minutes; status flips to `Issued`. Copy the certificate ARN — CloudFront needs it in 4.6.
+	- This is a **single certificate with two names** (`knottyyoga.com` primary + `www.knottyyoga.com` as a SAN) → **one ARN** covering both. There is not a separate cert/ARN per domain.
+	- On the new certificate's page (status `Pending validation`), expand **each** domain row and click **Create records in Route 53** → confirm. ACM writes the validation `CNAME`s into your hosted zone for you. Both names must validate before the cert issues, so don't skip either row.
+	- The ARN is assigned at request time and never changes — you can copy it now (during `Pending validation`); it's stable through to `Issued`. **But** CloudFront (4.6) only accepts the cert once status shows `Issued`, so the real gate for 4.6 is the status flip, not having the ARN.
+	- Wait 5–30 minutes for status `Pending validation` → `Issued`. Save the ARN — CloudFront needs it in 4.6.
+		- arn:aws:acm:us-west-2:957014951609:certificate/d34e2161-5bdb-417d-9a1d-60a8e8f197b1
 	- **Remember to flip the region picker back to `us-west-2` before any later step.**
 - [ ] **Do NOT create production `A` records yet.** Soft-launch / friends-and-family testers can hit the site via the `dXXXXXX.cloudfront.net` URL CloudFront gives you. Skipping the `A` records means there's no live production DNS to break while you're shaking things out.
 - [ ] **At go-live: create the alias records.**
