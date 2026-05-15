@@ -584,12 +584,14 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Additional configuration:**
 		- Initial database name: **leave blank** — we'll create the app DB manually so it's owned by a non-superuser role
 		- Backup retention period: `7` days
-		- Backup window: a low-traffic window (e.g., 09:00–10:00 UTC = 2–3am Pacific)
+		- Backup window: **Choose a window** (NOT "No preference" — that lets AWS pick a random slot that may hit booking hours). Set **09:00–10:00 UTC** (= 02:00–03:00 PDT, dead of night Pacific).
+		- Backup tags: leave **Copy tags to snapshots** checked (default) **and** also check **Copy tags to automated backup**. Hygiene only, zero cost — keeps orphaned backups/snapshots identifiable later.
+		- Backup replication: leave **Enable replication in another AWS Region UNCHECKED**. Cross-region backup copies add data-transfer + duplicate-storage cost; cross-region DR is explicitly out of scope for v1 (7-day in-region PITR + the manual PITR verification step cover us). The nested "Enable encryption" checkbox is moot while replication is off — ignore it.
 		- Encryption: **enabled** (default; can't be changed later)
 			- **AWS KMS key: keep the default `aws/rds`** (AWS-managed key). Free, zero-maintenance, AES-256 at rest. A customer-managed key (CMK) is only worth its $1/mo + API cost for customer-controlled key policy, per-key CloudTrail audit, or **cross-account encrypted snapshot sharing** (snapshots under `aws/rds` can't be shared/copied to another account) — none planned here (single account, single instance). Key choice is fixed at creation like encryption itself. Unrelated to the app-level `config_secrets` encryption (`KNOTTYYOGA_SECRET_KEY` / Phase 8) — this only protects the RDS storage volume.
-		- Maintenance window: a low-traffic window distinct from the backup window
+		- Maintenance window: **Choose a window** (NOT "No preference"). Must NOT overlap the backup window — AWS defers maintenance if it collides. Set **Sunday 11:00–12:00 UTC** (= 04:00–05:00 PDT Sunday): weekend, early-morning Pacific, cleanly after the 09:00–10:00 UTC backup window.
 		- **Deletion protection: ENABLE** ← important
-		- Auto-minor-version upgrade: enabled (default)
+		- Enable auto minor version upgrade: **keep CHECKED** (default). Same-major security/bug patches (e.g., 15.5 → 15.6) applied in the maintenance window — want these automatic on an unattended host. Major-version upgrades are never automatic; you still control those.
 	- **Create database**.
 	- Wait ~10 minutes for status to flip from `Creating` to `Available`.
 - [ ] **Record the endpoint.** RDS console → Databases → `knottyyoga` → **Connectivity & security** tab → copy the **Endpoint** (e.g., `knottyyoga.xxxxxx.us-west-2.rds.amazonaws.com`). Save it — you'll use it as `KNOTTYYOGA_DB_HOST` in the consolidated `server.env` step at the end of this phase.
