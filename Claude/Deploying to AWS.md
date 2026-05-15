@@ -536,7 +536,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 
 ## 4.4 Database: RDS Postgres
 
-- [ ] **Create the RDS subnet group.**
+- [x] **Create the RDS subnet group.** ✅ 2026-05-15
 	- Region: **us-west-2**.
 	- Top search → **RDS** → RDS console → left sidebar → **Subnet groups** → **Create DB subnet group**.
 	- **Name:** `knottyyoga-db-subnet-group`
