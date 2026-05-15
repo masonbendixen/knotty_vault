@@ -673,7 +673,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 
 `knottyyoga.com` is registered at a non-AWS provider. We're keeping the registrar there but moving DNS *hosting* to Route 53 so CloudFront alias records work cleanly. The registrar just needs its NS records updated.
 
-- [ ] **Create the Route 53 hosted zone.**
+- [x] **Create the Route 53 hosted zone.** ✅ 2026-05-15
 	- Top search → **Route 53** → Route 53 console (region-agnostic — no picker needed).
 	- Left sidebar → **Hosted zones** → **Create hosted zone**.
 	- **Domain name:** `knottyyoga.com`
