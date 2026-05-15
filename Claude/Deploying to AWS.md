@@ -680,6 +680,10 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Type:** Public hosted zone
 	- **Create hosted zone**. Cost: $0.50/mo per zone.
 	- On the new zone's page, note the four values in the `NS` record (e.g., `ns-123.awsdns-12.com`, `ns-456.awsdns-34.net`, ...). You'll paste these at your registrar in the next step.
+		- ns-1258.awsdns-29.org
+		- ns-1637.awsdns-12.co.uk
+		- ns-786.awsdns-34.net 
+		- ns-148.awsdns-18.com
 - [ ] **Repoint your current registrar's nameservers at Route 53.**
 	- Log in to your existing DNS provider (where you registered the domain).
 	- Find **Nameservers** or **DNS Management → Custom Nameservers**.
