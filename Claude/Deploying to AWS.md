@@ -709,7 +709,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- arn:aws:acm:us-west-2:957014951609:certificate/d34e2161-5bdb-417d-9a1d-60a8e8f197b1
 	- **Remember to flip the region picker back to `us-west-2` before any later step.**
 - [ ] **Do NOT create production `A` records yet.** Soft-launch / friends-and-family testers can hit the site via the `dXXXXXX.cloudfront.net` URL CloudFront gives you. Skipping the `A` records means there's no live production DNS to break while you're shaking things out.
-- [ ] **At go-live: create the alias records.**
+- [ ] **At go-live: create the alias records.** **DEPENDS ON PHASE 4.6 — do not attempt during 4.5.** The "Choose distribution" dropdown is a fixed auto-populated picker (you cannot type or search a name into it). It stays **empty until** (a) the CloudFront distribution exists (created in 4.6) **and** (b) that distribution has `knottyyoga.com` + `www.knottyyoga.com` set as **Alternate domain names (CNAMEs)** with the ACM cert attached. Until both are true the dropdown shows nothing — that is expected, not a bug. Come back here only at actual go-live, after 4.6 is fully done and tested via the `dXXXXXX.cloudfront.net` URL.
 	- Route 53 → Hosted zones → `knottyyoga.com` → **Create record**.
 	- Record 1 (apex):
 		- Record name: (leave blank — apex)
