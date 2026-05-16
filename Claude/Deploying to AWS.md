@@ -691,7 +691,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Do not** delete the domain registration itself — you're only changing who hosts the DNS records.
 	- Propagation is usually <1 hour but can take up to 48 hours. Monitor with `dig +short NS knottyyoga.com` (or https://www.whatsmydns.net/#NS/knottyyoga.com) — when both show the four `*.awsdns-*` values, propagation is done.
 - [ ] **(Optional, later)** Migrate the registrar itself to Route 53 (Route 53 → **Registered domains → Transfer in**). Costs roughly the same per year; consolidates billing. Non-urgent — can be done any time without disturbing anything.
-- [ ] **Request the ACM certificate in `us-east-1`.**
+- [x] **Request the ACM certificate in `us-east-1`.** ✅ 2026-05-15
 	- AWS console region picker → **flip to us-east-1 (N. Virginia)**. CloudFront only reads certs from `us-east-1`, regardless of where your app runs. This is the #1 ACM gotcha.
 	- Top search → **Certificate Manager** → ACM console.
 	- **Request certificate** → **Request a public certificate** → **Next**.
