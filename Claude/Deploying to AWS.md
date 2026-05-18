@@ -732,7 +732,9 @@ The default VPC plus two security groups is all we need. The default VPC already
 - [ ] **Create the bucket.**
 	- Region: **us-west-2** (same as EC2 — keeps the API ↔ bucket latency low if anything ever needs cross-talk).
 	- Top search → **S3** → S3 console → **Create bucket**.
-	- **Bucket name:** `knottyyoga-ui-prod` (S3 names are globally unique — if taken, append a random suffix like `knottyyoga-ui-prod-7k2j`).
+	- **Bucket type: General purpose** (NOT Directory). Directory = S3 Express One Zone: single-AZ, ultra-low-latency, different API — reduced durability and zero benefit for a CloudFront-cached SPA origin.
+	- **Bucket namespace: Global namespace** (auto-pairs with General purpose; "Account regional namespace" goes with Directory buckets).
+	- **Bucket name:** `knottyyoga-ui-prod` (General-purpose names are globally unique across all AWS accounts — if taken, append a random suffix like `knottyyoga-ui-prod-7k2j`).
 	- **Object Ownership:** ACLs disabled (recommended).
 	- **Block Public Access settings:** leave **all four** blocks **ON**. CloudFront will reach the bucket via Origin Access Control (OAC) — far more secure than making the bucket public.
 	- **Bucket Versioning:** **Enable** (cheap insurance if a bad deploy overwrites files).
