@@ -729,7 +729,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 
 ### S3 bucket for the frontend
 
-- [ ] **Create the bucket.**
+- [x] **Create the bucket.** ✅ 2026-05-18
 	- Region: **us-west-2** (same as EC2 — keeps the API ↔ bucket latency low if anything ever needs cross-talk).
 	- Top search → **S3** → S3 console → **Create bucket**.
 	- **Bucket type: General purpose** (NOT Directory). Directory = S3 Express One Zone: single-AZ, ultra-low-latency, different API — reduced durability and zero benefit for a CloudFront-cached SPA origin.
@@ -740,7 +740,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Bucket Versioning:** **Enable** (cheap insurance if a bad deploy overwrites files).
 	- **Default encryption:** SSE-S3 (default, free).
 	- **Create bucket**.
-- [ ] **Confirm static website hosting is OFF.** Bucket → **Properties** tab → "Static website hosting" should say **Disabled**. CloudFront serves the content, not S3's website endpoint.
+- [x] **Confirm static website hosting is OFF.** Bucket → **Properties** tab → "Static website hosting" should say **Disabled**. CloudFront serves the content, not S3's website endpoint. ✅ 2026-05-18
 - [ ] **Create the `ci-deploy` IAM user (for GitLab CI to push builds).**
 	- Top search → **IAM** → IAM console → left sidebar → **Users → Create user**.
 	- **User name:** `ci-deploy`
