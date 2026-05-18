@@ -520,9 +520,9 @@ The default VPC plus two security groups is all we need. The default VPC already
 	```
 	Record both values in your password manager — you'll paste them into `/etc/knottyyoga/server.env` at the **end of Phase 4.4**, once the RDS endpoint and DB password are also known. (Writing the file in one shot after 4.4 is cleaner than the two-pass approach where you create it here with placeholders and fill in DB fields later.)
 	- KNOTTYYOGA_ORIGIN_SECRET
-		- Rpxpk23whEtmToEMmEZpuFk0+KwK/ukpTZD3AQauoDQ=
+		- See AWS Secrets
 	- SCHEDULER_SERVICE_ACCOUNT_PASSWORD
-		- d5jLtv36Ng8mi/O7nKLW/JztPZR3St9/1HUkBH9x2Nw=
+		- See AWS Secrets
 - [ ] **Enable `ufw` (host firewall, defense in depth with the SG).** On the EC2:
 	```bash
 	sudo ufw default deny incoming
@@ -556,7 +556,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- DB instance identifier: `knottyyoga`
 		- Master username: `postgres`
 		- Master password: generate with `openssl rand -base64 24`, save to password manager
-			- My84dSDdpIBwXgIKb4yi1doef2JoJA+T
+			- AWS Secrets
 	- **Instance configuration → Instance type** (the console renamed "DB instance class" → "Instance type"):
 		- The list defaults to a class-family filter. If you only see `db.m*`/`db.r*` classes at `.large` and up, the filter is on **Standard** or **Memory optimized** — switch the family selector to **Burstable classes (includes t classes)** to expose the `t` family.
 		- Pick **`db.t3.micro`**. If it doesn't appear even under the Burstable filter, use **`db.t4g.micro`** (Graviton/ARM burstable — ~10% cheaper, and the managed DB host's architecture is independent of our x86 app, so this is a no-downside swap). `db.t3.small` is the fallback if more RAM is wanted.
@@ -706,7 +706,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- On the new certificate's page (status `Pending validation`), expand **each** domain row and click **Create records in Route 53** → confirm. ACM writes the validation `CNAME`s into your hosted zone for you. Both names must validate before the cert issues, so don't skip either row.
 	- The ARN is assigned at request time and never changes — you can copy it now (during `Pending validation`); it's stable through to `Issued`. **But** CloudFront (4.6) only accepts the cert once status shows `Issued`, so the real gate for 4.6 is the status flip, not having the ARN.
 	- Wait 5–30 minutes for status `Pending validation` → `Issued`. Save the ARN — CloudFront needs it in 4.6.
-		- arn:aws:acm:us-west-2:957014951609:certificate/d34e2161-5bdb-417d-9a1d-60a8e8f197b1
+		- AWS Secrets
 	- **Remember to flip the region picker back to `us-west-2` before any later step.**
 - [ ] **Do NOT create production `A` records yet.** Soft-launch / friends-and-family testers can hit the site via the `dXXXXXX.cloudfront.net` URL CloudFront gives you. Skipping the `A` records means there's no live production DNS to break while you're shaking things out.
 - [ ] **At go-live: create the alias records.** **DEPENDS ON PHASE 4.6 — do not attempt during 4.5.** The "Choose distribution" dropdown is a fixed auto-populated picker (you cannot type or search a name into it). It stays **empty until** (a) the CloudFront distribution exists (created in 4.6) **and** (b) that distribution has `knottyyoga.com` + `www.knottyyoga.com` set as **Alternate domain names (CNAMEs)** with the ACM cert attached. Until both are true the dropdown shows nothing — that is expected, not a bug. Come back here only at actual go-live, after 4.6 is fully done and tested via the `dXXXXXX.cloudfront.net` URL.
@@ -774,35 +774,46 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- Open the new user → **Security credentials** tab → **Create access key** → use case **Application running outside AWS** → **Next → Create access key**.
 	- Copy the **Access key ID** and **Secret access key** — secret is shown **only once**. Save both to your password manager *and* to GitLab CI (Project → Settings → CI/CD → Variables) as:
 		- `AWS_ACCESS_KEY_ID` — **Masked**, **Protected**
+			- AWS Secrets
 		- `AWS_SECRET_ACCESS_KEY` — **Masked**, **Protected**
+			- AWS Secrets
 
 ### CloudFront distribution
 
-- [ ] **Create the distribution with the S3 origin and default behavior.**
+- [x] **Create the distribution with the S3 origin and default behavior.** ✅ 2026-05-18
 	- CloudFront is a global service; the region picker doesn't matter for the distribution itself, but the **ACM cert dropdown only shows certs from `us-east-1`** — that's the constraint, not the picker setting.
 	- Top search → **CloudFront** → CloudFront console → **Create distribution**.
-	- **Origin:**
-		- **Origin domain:** click the dropdown → pick your S3 bucket (`knottyyoga-ui-prod.s3.us-west-2.amazonaws.com`).
-		- **Origin access:** **Origin access control settings (recommended)**. Click **Create new OAC** → keep defaults (Sign requests, S3 origin type) → **Create**. Select the new OAC in the dropdown.
-		- A yellow banner appears with a **bucket policy** for the S3 bucket — copy it to your clipboard; you'll paste it into S3 in the next step.
-	- **Default cache behavior:**
+	- **Plan selector (Free / Pro $15 / Business $200): choose Free.** The Free plan's usage allowance is **1,000,000 requests/month + 100 GB egress/month** (it is *not* a per-object size cap — CloudFront serves multi-MB/GB objects on any plan, so the app's large studio images in `business_logic/images/` are fine, cached at edge after first fetch). Soft-launch studio traffic is nowhere near either ceiling: even ~5k visits/mo with image browsing is ~250–400k requests and well under 100 GB. Exceeding the allowance does not throttle or break anything — CloudFront just bills the overage at standard rates (see the CloudFront cost section below, which already concluded "effectively free at this scale"). Upgrading Free → Pro later is non-destructive (no distribution rebuild), so there is no reason to pre-pay for a soft launch.
+	- **"Get started" page (redesigned wizard) field choices:**
+		- **Distribution name:** `knottyyoga-prod` (just a tag, changeable later — keep consistent with `knottyyoga-server`/`knottyyoga-ui-prod`/`knottyyoga-db`).
+		- **Description:** optional — e.g., `Knotty Yoga production CDN — S3 frontend + /api proxy to EC2`, or leave blank.
+		- **Distribution type: Single website or app.** NOT "Multi-tenant architecture" (that's CloudFront's SaaS feature for serving many customer domains from one shared template — wrong model for a single studio site).
+		- **Domain (Route 53 managed domain - optional): LEAVE BLANK / skip.** Deliberate: the plan does not point `knottyyoga.com` at CloudFront until go-live — soft-launch testers use the `dXXXXXX.cloudfront.net` URL so there's no live production DNS to break (see "Do NOT create production A records yet" in 4.5). Using this field now would create the production alias records prematurely. It also avoids the unresolved **us-east-1 cert** requirement (the saved cert ARN at line ~709 is `us-west-2`, which CloudFront cannot use) — a custom domain here would demand a valid us-east-1 Issued cert. Build with the default `*.cloudfront.net` domain + default cert, soft-launch-test against that URL, then add alternate domain names + cert + Route 53 records at go-live (non-destructive edit; Phase 4.5 alias step).
+	- **Origin (redesigned wizard — this is the S3 frontend origin; the EC2 `/api/*` origin is a separate one added later):**
+		- **Origin type: Amazon S3.** (The later `/api/*` origin targets the EC2 — none of the offered types, S3 / ELB / API Gateway, is a plain custom HTTP server; handle the EC2 origin when adding the second origin/behavior.)
+		- **S3 origin:** pick `knottyyoga-ui-prod` from the bucket picker.
+		- **Origin path:** leave blank (Angular bundle is at bucket root).
+		- **"Allow private S3 bucket access to CloudFront": CHECK it.** This is the new wizard's one-click replacement for manually creating an OAC + pasting a bucket policy: it creates the OAC and wires the bucket policy so the bucket stays fully private (Block Public Access stays ON) and only CloudFront can read it. **After the distribution is created, verify** S3 → bucket → Permissions → Bucket policy actually received the OAC grant. If the wizard shows a "copy this policy" banner instead of auto-applying, paste it into the S3 bucket policy — otherwise CloudFront 403s every object.
+		- **Origin settings: Use recommended origin settings** (default timeouts/attempts are fine for a static S3 origin).
+		- **Cache settings: Use recommended cache settings tailored to serving S3 content** (≈ `Managed-CachingOptimized`: long TTLs + compression — correct for the static bundle). This is the **default behavior only**. The `/api/*` path needs the opposite (caching disabled, all headers/query/cookies forwarded) — a separate cache behavior added with the EC2 origin later. Do not let the S3-recommended caching apply to `/api/*`.
+	- **Default cache behavior — NOT a separate wizard page in the redesigned flow.** The streamlined wizard collapses it into the "Use recommended cache settings for S3" choice you made under Origin. The detailed knobs below are applied/verified **post-creation** via **Distribution → Behaviors → (default) → Edit** (see the post-creation checklist after "Create distribution"). Target state for the default behavior:
 		- Viewer protocol policy: **Redirect HTTP to HTTPS**
 		- Allowed HTTP methods: GET, HEAD
-		- Cache key and origin requests:
-			- Cache policy: `Managed-CachingOptimized`
-			- Origin request policy: (none)
-			- Response headers policy: `Managed-SecurityHeadersPolicy`
+		- Cache policy: `Managed-CachingOptimized`; Origin request policy: (none); Response headers policy: `Managed-SecurityHeadersPolicy`
 		- Compress objects automatically: **Yes**
-	- **Web Application Firewall (WAF):** Do **not** enable security protections (skip WAF for v1 — it has a per-month base cost).
-	- **Settings:**
-		- Price class: **Use only North America and Europe** (cheaper than worldwide; fine for our audience)
-		- Alternate domain name (CNAME): `knottyyoga.com`, `www.knottyyoga.com`
-		- Custom SSL certificate: pick the ACM cert you issued in `us-east-1` (the dropdown filters to that region automatically)
-		- Supported HTTP versions: HTTP/2, HTTP/3
-		- Default root object: `index.html`
-		- Standard logging: optional (off for v1)
-	- **Create distribution**.
+	- **Web Application Firewall (WAF) / Enable security:** Do **not** enable security protections for v1 — it has a per-month base cost (~$5/mo Web ACL + $1/mo per rule + $0.60 per M requests). The redesigned wizard offers a **"Use monitor mode"** checkbox (unchecked by default) — leave it unchecked and skip the whole security section. Monitor mode is NOT a free WAF: it still creates a billed Web ACL, it only makes rules *count* instead of *block*. WAF is a non-destructive post-launch attach if real abuse/bot traffic appears; when that day comes, enabling monitor mode *first* (count rules, watch CloudWatch for false positives, then flip to blocking) is the right rollout — but it's not a v1 expense.
+	- **Settings — also NOT inline in the redesigned wizard.** The streamlined "Get started" flow does not ask for price class / domain / cert / root object / HTTP versions / logging. It creates the distribution with defaults; you apply these **after creation** (see post-creation checklist below). At creation there is nothing to enter for these.
+	- **Create distribution.**
 	- Wait ~5–10 minutes for status `Deployed`. Note the distribution's domain name (`dXXXXXX.cloudfront.net`) and its **Distribution ID** (e.g., `E1234567890ABC`) — you'll need the ID for cache invalidations.
+		- dv1tgxa9ok30f.cloudfront.net
+- [ ] **Post-creation settings (the redesigned wizard defers all of these — apply them now via the distribution's tabs).**
+	- **Distribution → Settings → Edit:**
+		- **Default root object: `index.html`** ← **CRITICAL and easy to miss.** The streamlined wizard does NOT set this; without it, the distribution root returns S3 XML/error instead of the Angular app.
+		- **Price class: Use only North America and Europe** (cheaper than worldwide; fine for this audience).
+		- Supported HTTP versions: ensure **HTTP/2 + HTTP/3**.
+		- Standard logging: **off** for v1.
+		- Alternate domain names + Custom SSL certificate: **leave at defaults (no CNAME, default CloudFront cert).** Deferred to go-live (Phase 4.5 alias step), and still gated on resolving the **us-east-1 cert** issue (saved ARN at line ~709 is `us-west-2`, which CloudFront cannot use). Attaching a CNAME without a matching us-east-1 cert is blocked anyway.
+	- **Distribution → Behaviors → (default) → Edit:** confirm Viewer protocol policy = **Redirect HTTP to HTTPS**, Compress objects automatically = **Yes**, Cache policy = `Managed-CachingOptimized`, Response headers policy = `Managed-SecurityHeadersPolicy`. (The "recommended S3 cache settings" should already match most of this — verify, don't assume.)
 - [ ] **Paste the OAC bucket policy into S3.**
 	- S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy → Edit** → paste the JSON CloudFront gave you → **Save changes**.
 	- Without this step, CloudFront gets `403 Forbidden` from S3 on every request.
