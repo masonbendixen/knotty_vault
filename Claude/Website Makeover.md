@@ -33,6 +33,47 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan
 
+## Designer Instructions
+
+> **If you're the designer, read this section first.** It's a punch list of what to do. The rest of this document is engineering planning you don't need to dig into. You have two companion documents in this Obsidian vault that you'll work from:
+>
+> 1. **[[Component Inventory for Designer]]** — the list of every reusable Figma component to build (Button, Card, Badge, Bottom Sheet, etc.) and every screen to design (Public / Home, Shop / Checkout, Account / Profile, etc.). Each item has a suggested Figma name and a plain-English description of where it lives in the app.
+> 2. **Phase 1.1 of this document** (just below the next two sections) — the structured guide to setting up your Figma file: design tokens as Variables, component library structure, per-screen discipline, brand assets, and file access. You've agreed to do all five of those (A–E).
+
+### Decisions Mason has already made
+
+- ✅ **Use Figma Variables for every colour, font size, spacing, and radius — not Styles.** If your current file is on Styles, please convert it. (Closes Open Question 2.)
+- ✅ **Two-layer token scheme** — primitive tokens (e.g. `color/red/500`) plus semantic tokens (e.g. `color/brand`) that reference them. All component frames should reference the semantic layer, never the primitive layer directly. (Closes Open Question 6.)
+- ✅ **Material Icons stay** — please design with Google Material Icons (the same set used today via `<mat-icon>`). Don't introduce a new icon family. (Closes Open Question 7.)
+- ✅ **Dark mode is in scope** — add a `Dark` mode to your Colors Variable collection, with the same semantic token names mapping to different primitive values. (Closes Open Question 9. Requires multi-mode Variables, which needs Figma Pro — see Open Question 3 for cost.)
+- ✅ **Breakpoints** — design at 375 (mobile, the primary canvas), 1280 (desktop), and optionally 768 (tablet) for dense screens. (Closes Open Question 10.)
+- ✅ **Mobile is the primary canvas.** Start every screen at the 375-wide mobile frame and expand outward — never the other way around. Most of this app's traffic is mobile.
+- ✅ **Mobile navigation stays as a hamburger menu** — no bottom tab bar. (Closes Open Question 15.)
+
+### What to do, in order
+
+1. **Read [[Component Inventory for Designer]]** end-to-end. It tells you the names to use and the patterns to follow.
+2. **Read Phase 1.1 of this document** (sections A–E below) for the technical structure of the Figma file.
+3. **Set up your Figma file:**
+    - Sort out the Figma plan question (see Open Question 3 for pricing) — you need multi-mode Variables for dark mode, which requires Professional.
+    - Create a `Foundations` page + a `Screens` page (or two separate files).
+    - Build the token Variables: Colors (with Light + Dark modes), Typography, Spacing, Radius.
+    - Build the components listed in Part 1 of the Inventory, naming them **verbatim** from the inventory (this is the single highest-leverage thing for fast engineer-side mapping).
+4. **Design the screens** listed in Part 2 of the Inventory, mobile-first.
+5. **When ready:** enable Dev Mode on the file, generate a read-only personal-access token, and send the file URL + token to Mason so the engineering side can pull the tokens straight into code.
+
+### Questions for you (please answer here while you're with Mason)
+
+For each, drop a `- Designer- ...` bullet under the corresponding Open Question further down this document.
+
+- **Open Question 19 (Calendar on mobile).** Default to day view with swipe-between-days, or do you have a different vision?
+- **Open Question 20 (Tablet support).** Willing to design tablet (768px) frames for the calendar and admin tables specifically, or skip tablet entirely?
+- **Open Question 21 (Pages without mockups).** Of the existing pages listed in [[Component Inventory for Designer]] Part 2, which specific ones are you *not* redesigning?
+- **Open Question 24 (Animation / motion).** Are you planning any motion — transitions, micro-interactions, animated empty states, loading skeletons? If yes, please annotate in Dev Mode.
+- **Figma plan decision.** Are you upgrading to Pro yourself, would you like Mason to cover it, or should we defer dark mode (Open Question 9) to keep you on the free tier?
+
+---
+
 ## Current State (snapshot, 2026-05-19)
 
 A quick read of the repo before the plan so the phases below have grounding:
@@ -71,12 +112,10 @@ These are concrete deliverables; each is also listed under its host phase below 
 - [ ] **Phase 2 — mobile-aware tokens:** `--touch-target-min`, mobile-floor type ramp, safe-area inset utility, container-padding tokens that step down on mobile.
 - [ ] **Phase 2 — `bottom-sheet` and `full-screen-modal` primitives** to replace centred dialogs on mobile.
 - [ ] **Phase 2 — `sticky-action-bar` primitive** for bottom CTAs.
-- [ ] **Phase 2 — `bottom-tab-bar` primitive** for logged-in customer navigation (Home / Schedule / My Bookings / Account).
-- [ ] **Phase 2 — `responsive-data-table` strategy.** Three rendering modes, picked per-page: (a) horizontal-scroll with sticky first column, (b) collapse-to-cards below `md`, (c) collapse-columns-with-tap-to-expand. (b) is the right default for customer-facing tables (`my-events`, `purchase-history`); (a) for admin/manage tables; (c) is rarely the right answer.
+- [ ] **Phase 2 — `responsive-data-table` strategy.** Three rendering modes, picked per-page (confirmed by Mason in Open Question 18): (a) horizontal-scroll with sticky first column for all `/manage/*` and `/admin/*` tables; (b) collapse-to-cards below `md` for `my-events`, `purchase-history`, `my-vouchers`, `cart`, and dashboard alert lists; (c) collapse-columns-with-tap-to-expand is rarely the right answer.
 - [ ] **Phase 3 — calendar mobile defaults:** default to day-view below `md`, swipe-between-days, "jump to month" opens a month-picker bottom sheet. Week view is borderline on phones — punt to tablet.
 - [ ] **Phase 3 — checkout mobile polish:** sticky Pay button at the bottom of the viewport, one column layout, large input fields, native form behaviours.
 - [ ] **Phase 3 — Staff Check-In mobile-first redesign.** This screen is *primarily* used on a phone in-studio; design it for one-handed thumb use, bottom action area, swipe-friendly attendee list.
-- [ ] **Phase 3 — bottom tab bar for logged-in customer routes.** Replaces (or supplements) the hamburger for `/my/*` and `/shop/*` paths. Header stays for branding + cart icon + account dropdown; bottom tabs handle the navigation.
 - [ ] **Phase 3 — Apple Pay / Google Pay** via the Square Web SDK. The SDK already supports both; today only the card form is wired in `SquarePaymentService`. Native payment buttons on the checkout page can dramatically lift mobile checkout conversion. **Backend impact: minimal** — Square treats the resulting payment tokens identically; the existing `/api/purchase_pay_card` endpoint already accepts whatever token the SDK produces. Mostly an Angular wiring change plus a feature-flag secret to toggle availability.
 - [ ] **Phase 3 — responsive images.** `<img srcset>` + `sizes` for hero carousel, instructor portraits, product photos. Avoid serving the 2000×1200 desktop hero to a 375-wide phone.
 - [ ] **Phase 6 — PWA-ification.** `manifest.json` (install-to-home-screen, theme colour, icons at multiple resolutions), service worker (offline catalogue browse, asset cache), and eventually push notifications for class reminders / waitlist promotions / schedule changes. This is a genuinely high-value addition for a fitness studio app — recurring engagement is the use case PWAs were designed for.
@@ -104,7 +143,7 @@ Figma Variables (the design-tokens feature introduced in 2023) are the cleanly-e
 - [ ] **Create a `Colors` Variable Collection** organised in two layers:
     - **Primitive layer** — the raw palette: `color/red/50…900`, `color/orange/50…900`, `color/gray/50…900`, `color/green/…`, `color/yellow/…`. These are the only values that hold raw hexes.
     - **Semantic layer** — references to the primitive layer: `color/brand`, `color/brand-on` (text colour to use on brand backgrounds), `color/accent`, `color/surface`, `color/surface-muted`, `color/border`, `color/border-strong`, `color/text`, `color/text-muted`, `color/text-inverse`, `color/success`, `color/success-bg`, `color/warn`, `color/warn-bg`, `color/danger`, `color/danger-bg`, `color/info`, `color/info-bg`. **All component frames reference the semantic layer**, never the primitive layer directly. This is the pattern that makes runtime theming (Phase 5) and dark mode (Phase 6.2) trivial.
-    - If dark mode is in scope (Open Question 4), add a `Dark` mode to the Colors collection — same semantic names, different primitive values per mode.
+    - **Dark mode IS in scope (Open Question 9 confirmed).** Add a `Dark` mode to the Colors Variable collection with the same semantic names mapping to different primitive values. (Multi-mode Variables require Figma Professional — see Open Question 3 for cost.)
 - [ ] **Create a `Typography` Variable Collection** — font sizes, line heights, letter spacing, font weights, font families. Pair with **Text Styles** named semantically (`Display/Large`, `Display/Small`, `Heading/H1…H4`, `Body/Large`, `Body/Default`, `Body/Small`, `Label/Default`, `Caption`). Text Styles compose the typography Variables together so applying a style is one click.
 - [ ] **Create a `Spacing` Variable Collection** — `space/0…12` on a strict 4px grid (4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96). All paddings and gaps reference these; nothing on the screens should ever be `padding: 13px`.
 - [ ] **Create a `Radius` Variable Collection** — `radius/none`, `radius/sm` (4), `radius/md` (8), `radius/lg` (12), `radius/full` (9999). Today the codebase has buttons at `9999px` and login card at `8px` — pick a small ramp and stick to it.
@@ -366,9 +405,12 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 
 - [ ] Add a Playwright job that renders the Phase 2.9 style-guide page plus a handful of representative real pages and screenshots them. Diff against committed baselines on PRs. Catches accidental token regressions that no unit test can.
 
-### 6.2 Dark-mode option (deferred; flag for the open-questions section)
+### 6.2 Dark mode (in scope per Open Question 9)
 
-- [ ] If desired, add `:root[data-theme="dark"]` overrides for all colour tokens and a theme-toggle in the header. Possible only because of Phase 2 — if there were 857 hex literals it would be infeasible.
+- [ ] Wire `:root[data-theme="dark"]` overrides for every colour token defined in Phase 2.1, mirroring the dark-mode Variables that the designer set up in Phase 1.1.A.
+- [ ] Add a theme-toggle to the header (the persistent component) + persist the user's choice in `localStorage`. Default to `prefers-color-scheme` on first visit.
+- [ ] In Phase 5.3, the `ThemeService.applyTokens` flow needs to know which mode (light / dark) to apply when both sets are loaded from the server, so the DB-driven theming and the user dark-mode toggle compose cleanly.
+- [ ] Tests: extend the `tokens.spec.ts` from Phase 2.1 to assert that toggling `data-theme="dark"` on `<html>` produces a different computed `--color-bg` than the light default. Component spec for the header toggle.
 
 ### 6.3 Performance / payload
 
@@ -389,20 +431,27 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 
 1. **How much of Phase 1.1 is your friend willing to do?** Sections A (Variables) and E (Dev Mode + token) are the high-leverage ones; B (component library) is hugely helpful but the largest time investment; C and D are polish. It's totally OK to come back with "he'll do A and E only" — we'll plan around it (manual JSON export, hand-extracted component palette). I just need to know what to expect so Phase 1.2 isn't blocked.
 	- Mason- He's willing to do all of it. He is enlisted in this vault so please add an instruction section to this document for him.
+	- Claude- ✅ Added the "Designer Instructions" section at the top of the Plan, with a punch list and pointers to the two reference docs. Plan now assumes full A–E participation.
 2. **Is your friend already using Figma Variables, or the older Color/Text Styles?** If the file pre-dates Variables and is purely Styles-based, that's a migration step on his side. Styles can still be exported via plugins (e.g., "Design Tokens") but the cleanliness gap is significant.
 	- Mason- He is going to move everything to Figma variables. He is enlisted in this vault so please add this as a work item.
+	- Claude- ✅ Added to the Designer Instructions as the first decision ("Use Figma Variables for every colour, font size, spacing, and radius — not Styles. If your current file is on Styles, please convert it.").
 3. **Does his Figma plan include Dev Mode?** Dev Mode is in Figma's paid tiers (Pro/Org/Enterprise) plus free Dev seats. Without Dev Mode we lose the MCP server path and the inline measurement/CSS-snippet inspect — the manual JSON export still works, but it's a slower loop. Worth checking before Phase 1.1.E.
 	- Mason- He is using the free version. How much would it cost to do dev mode?
+	- Claude- (Caveat: please verify on figma.com/pricing — Figma adjusts pricing periodically.) Free Starter *has* Variables and a limited Dev Mode, but caps Variables at **one mode per collection** — which means **no light + dark**. For multi-mode Variables he needs **Professional**, which is approximately **$15/editor/month billed annually (~$180/year)** or ~$20/month billed monthly. If he upgrades just for the duration of the makeover (3–6 months active design) and pays monthly, the cost is roughly **$60–$120 total**. If he stays on free we'd have to defer dark mode (Open Question 9) — but since Mason already said yes to dark mode, Pro is the cleaner answer. There's also a "Dev seats" SKU for engineers-only that doesn't apply here (the designer needs full Editor). Worth a quick check whether Figma's student / non-profit / referral discounts apply before paying.
+	- ❓ **Decision needed:** Does the designer upgrade himself, does Mason cover it, or do we drop dark mode and stay on free?
 4. **Component-naming convention** — happy with the "Figma component name == Angular component name" rule from 1.1.B? If your friend already named components differently, we'll need a mapping table; tell me which way is easier.
 	- Mason- Is everything that he would need to do in [[Component Inventory for Designer]]? If so, he basically just needs to give the things the names in that document and then you can map them over?
+	- Claude- **Yes — that's exactly the design.** The naming is the linchpin: when I see a Figma frame called `Event Session Card`, I know to apply the `.event-session-card` class in code; when I see `Surface Card`, I know it's the shared `.surface-card` primitive. Without that mapping I'd be eyeballing screenshots and guessing. With it, the component identification step in Phase 3 is mechanical. ⚠️ **Caveat: the names handle *which* component, not *how it looks*.** Colours, spacing, type sizes, and shadows still need to come from Figma Variables (Phase 1.1.A) — names alone don't carry visual values. And the layout structure (gaps, padding, alignment) comes from Auto Layout (Phase 1.1.B). So the three stack: **names = mechanical component mapping**, **+ Variables = mechanical colour/type/spacing values**, **+ Auto Layout = mechanical Flexbox translation**. Since he's willing to do all three, we get the fastest path end-to-end. After he hands over the file I'll spot-check it and flag any frames whose names don't match the inventory — small drift is fine (we'll add a rename map), large drift means we regroup before I write code.
 
 ### Need answers before Phase 4 (Figma → tokens)
 
 5. **Figma access.** Once Phase 1.1.E is done, share the Figma file URL + a read-only personal-access token so I can set up the MCP server. If you'd prefer not to expose a token, the manual JSON-export fallback works too — just say which you'd rather do.
 6. **Token granularity for swap-ability.** Do you want the full two-layer token scheme (primitive `color/red/500` + semantic `color/brand`), or just the semantic layer? Two layers is more work for the designer but makes per-tenant rebranding much easier later (you can swap the brand primary by swapping one reference, vs. find-and-replacing across all semantic tokens).
 	- Mason- He's okay with doing the full two-layer token scheme.
+	- Claude- ✅ Locked in. Phase 1.1.A and Phase 2.1 already assume two-layer. Per-tenant theming in Phase 5 will swap semantic references, not primitives.
 7. **Iconography decision** — keep `<mat-icon>` (Material Icons), or move to Lucide / Phosphor / Heroicons / Material Symbols / bespoke SVGs? Affects what your friend designs against and whether Phase 3 has to replace every icon as it goes.
 	- Mason- Let's keep the material icons please.
+	- Claude- ✅ Locked in. Designer should use Google Material Icons in his Figma designs (the same set Angular Material currently exposes via `<mat-icon>`). No icon-replacement work in Phase 3.
 
 ### Need answers before Phase 2 (foundation work)
 
