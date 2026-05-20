@@ -394,19 +394,23 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 3. **Does his Figma plan include Dev Mode?** Dev Mode is in Figma's paid tiers (Pro/Org/Enterprise) plus free Dev seats. Without Dev Mode we lose the MCP server path and the inline measurement/CSS-snippet inspect — the manual JSON export still works, but it's a slower loop. Worth checking before Phase 1.1.E.
 	- Mason- He is using the free version. How much would it cost to do dev mode?
 4. **Component-naming convention** — happy with the "Figma component name == Angular component name" rule from 1.1.B? If your friend already named components differently, we'll need a mapping table; tell me which way is easier.
-	- Mason- Is everything that he would need to do in
+	- Mason- Is everything that he would need to do in [[Component Inventory for Designer]]? If so, he basically just needs to give the things the names in that document and then you can map them over?
 
 ### Need answers before Phase 4 (Figma → tokens)
 
 5. **Figma access.** Once Phase 1.1.E is done, share the Figma file URL + a read-only personal-access token so I can set up the MCP server. If you'd prefer not to expose a token, the manual JSON-export fallback works too — just say which you'd rather do.
 6. **Token granularity for swap-ability.** Do you want the full two-layer token scheme (primitive `color/red/500` + semantic `color/brand`), or just the semantic layer? Two layers is more work for the designer but makes per-tenant rebranding much easier later (you can swap the brand primary by swapping one reference, vs. find-and-replacing across all semantic tokens).
+	- Mason- He's okay with doing the full two-layer token scheme.
 7. **Iconography decision** — keep `<mat-icon>` (Material Icons), or move to Lucide / Phosphor / Heroicons / Material Symbols / bespoke SVGs? Affects what your friend designs against and whether Phase 3 has to replace every icon as it goes.
+	- Mason- Let's keep the material icons please.
 
 ### Need answers before Phase 2 (foundation work)
 
 8. **Material M3 migration.** Phase 1.4 recommends moving from M2 to M3 before Phase 5 because M3's CSS-token model makes runtime theming dramatically cleaner. M3 will cause small visual nudges (density, ripple, default radii). OK to do that migration as part of Phase 2.3, or do you want it kept as a separate, later step?
 9. **Dark mode.** In scope for this initiative or deferred? It's cheap if we plan the tokens for it now (and Phase 1.1.A asks the designer to add a Dark mode to the Colors collection); expensive to retrofit later.
+	- Mason- He is willing to do dark mode so let's do it.
 10. **Breakpoints.** Pick the canonical set so the designer and Tailwind agree. Recommend three: 375 (mobile), 768 (tablet), 1280 (desktop). The existing Tailwind config uses defaults (sm:640, md:768, lg:1024, xl:1280) — should we shift Tailwind to match or shift design to match?
+	- Mason- Let's go with your recommendation.
 
 ### Need answers before Phase 5 (DB-driven theming)
 
@@ -418,6 +422,7 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 ### Mobile-related questions (need answers as we approach Phase 2/3)
 
 15. **Bottom tab bar vs. hamburger for logged-in users.** Recommended: add a bottom tab bar (Home / Schedule / My Bookings / Account) on mobile for `/my/*` and `/shop/*`, keep the hamburger as the secondary menu, and keep the header for branding + cart + account dropdown. Confirm? Or do you want to keep the hamburger as the only mobile navigation?
+	- Mason- Let's keep the hamburger.
 16. **Apple Pay / Google Pay.** Recommended: add as part of Phase 3 — Square's Web SDK supports both, the backend already accepts whatever token the SDK produces, and the conversion-rate impact on mobile is substantial. Any reason not to? (Note: Apple Pay specifically requires domain verification with Apple via Square's dashboard — a one-time setup step that should happen before launch.)
 17. **PWA scope.** Phase 6 proposes install-to-home-screen + offline catalogue + push notifications. Push notifications in particular are powerful for a fitness studio (booking reminders, waitlist promotion, schedule changes) but add a privacy / consent surface and require backend work (web-push server keys, subscription storage). Three options: (a) full PWA with push, (b) PWA without push (install + offline only), (c) skip PWA entirely. Recommend (b) as Phase 6, (a) as a Phase 7 follow-up only if there's appetite.
 18. **Mobile table strategy per page.** Three rendering modes available (horizontal-scroll / cards / collapse-and-tap). I'd pick: `my-events`, `purchase-history`, `my-vouchers`, `cart` → cards. All `/manage/*` and `/admin/*` tables → horizontal-scroll. The dashboard alert lists → cards. Does that match your intuition, or do you want a different cut?
