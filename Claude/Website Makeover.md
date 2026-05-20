@@ -388,6 +388,7 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 ### Need answers before Phase 1.1 hand-off to the designer
 
 1. **How much of Phase 1.1 is your friend willing to do?** Sections A (Variables) and E (Dev Mode + token) are the high-leverage ones; B (component library) is hugely helpful but the largest time investment; C and D are polish. It's totally OK to come back with "he'll do A and E only" — we'll plan around it (manual JSON export, hand-extracted component palette). I just need to know what to expect so Phase 1.2 isn't blocked.
+2
 2. **Is your friend already using Figma Variables, or the older Color/Text Styles?** If the file pre-dates Variables and is purely Styles-based, that's a migration step on his side. Styles can still be exported via plugins (e.g., "Design Tokens") but the cleanliness gap is significant.
 3. **Does his Figma plan include Dev Mode?** Dev Mode is in Figma's paid tiers (Pro/Org/Enterprise) plus free Dev seats. Without Dev Mode we lose the MCP server path and the inline measurement/CSS-snippet inspect — the manual JSON export still works, but it's a slower loop. Worth checking before Phase 1.1.E.
 4. **Component-naming convention** — happy with the "Figma component name == Angular component name" rule from 1.1.B? If your friend already named components differently, we'll need a mapping table; tell me which way is easier.
