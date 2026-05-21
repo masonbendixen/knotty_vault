@@ -806,7 +806,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Create distribution.**
 	- Wait ~5–10 minutes for status `Deployed`. Note the distribution's domain name (`dXXXXXX.cloudfront.net`) and its **Distribution ID** (e.g., `E1234567890ABC`) — you'll need the ID for cache invalidations.
 		- dv1tgxa9ok30f.cloudfront.net
-- [ ] **Post-creation settings (the redesigned wizard defers all of these — apply them now via the distribution's tabs).**
+- [x] **Post-creation settings (the redesigned wizard defers all of these — apply them now via the distribution's tabs).** ✅ 2026-05-21
 	- **Distribution → Settings → Edit:**
 		- **Default root object: `index.html`** ← **CRITICAL and easy to miss.** The streamlined wizard does NOT set this; without it, the distribution root returns S3 XML/error instead of the Angular app.
 		- **Price class: Use only North America and Europe** (cheaper than worldwide; fine for this audience).
