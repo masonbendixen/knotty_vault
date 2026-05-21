@@ -815,7 +815,15 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Standard logging: **off** for v1.
 		- **Custom SSL certificate: leave as "Default CloudFront certificate" — nothing to attach now.** A custom cert is only meaningful once you add Alternate domain names; both are deferred to go-live (Phase 4.5 alias step). Also still gated on resolving the **us-east-1 cert** issue (saved ARN at line ~709 is `us-west-2`, which CloudFront cannot use — re-request in us-east-1 before go-live). Until then, the default cert handles TLS for the `*.cloudfront.net` URL the soft launch runs on.
 		- **Alternate domain names (CNAME): leave blank.** Same go-live deferral. Adding a CNAME without a matching us-east-1 Issued cert is blocked anyway.
-	- **Distribution → Behaviors → (default) → Edit:** confirm Viewer protocol policy = **Redirect HTTP to HTTPS**, Compress objects automatically = **Yes**, Cache policy = `Managed-CachingOptimized`, Response headers policy = `Managed-SecurityHeadersPolicy`. (The "recommended S3 cache settings" should already match most of this — verify, don't assume.)
+	- **Distribution → Behaviors → (default) → Edit.** This is the S3 static frontend behavior — **not** the webserver. Webserver methods/forwarding go on the separate `/api/*` behavior added further below; do not conflate the two.
+		- **Viewer protocol policy:** Redirect HTTP to HTTPS.
+		- **Allowed HTTP methods: GET, HEAD** (keep default). Do NOT allow POST/PUT/PATCH/DELETE here — those belong on `/api/*`. S3 wouldn't accept them for static hosting anyway; widening this field at the default behavior buys nothing and just widens attack surface against the bucket.
+		- **Restrict viewer access: No.** That option enforces CloudFront signed URLs/cookies (paywall use case). The Angular bundle is public; everyone needs it. Auth happens in-band via session cookies handled by the app, not at the CloudFront edge.
+		- **Cache policy:** `Managed-CachingOptimized`.
+		- **Origin request policy: None.** S3 serves a static object by URL — viewer headers/cookies/queries are irrelevant to S3 and only pollute the cache key. Best practice for an S3 static origin.
+		- **Response headers policy:** `Managed-SecurityHeadersPolicy` (HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.).
+		- **Compress objects automatically:** Yes.
+		- The "recommended S3 cache settings" picked at creation should already match most of this — verify, don't assume.
 - [ ] **Paste the OAC bucket policy into S3.**
 	- S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy → Edit** → paste the JSON CloudFront gave you → **Save changes**.
 	- Without this step, CloudFront gets `403 Forbidden` from S3 on every request.
@@ -833,11 +841,12 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- CloudFront → your distribution → **Behaviors** tab → **Create behavior**.
 	- **Path pattern:** `api/*`
 	- **Origin and origin groups:** the API origin you just created
-	- **Viewer protocol policy:** Redirect HTTP to HTTPS
-	- **Allowed HTTP methods:** GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE (the "all methods" option)
-	- **Cache key and origin requests:**
-		- Cache policy: `Managed-CachingDisabled`
-		- Origin request policy: `Managed-AllViewerExceptHostHeader` (forwards all cookies, query strings, and most headers — the Host header is stripped so the EC2 sees the right one)
+	- **Viewer protocol policy:** Redirect HTTP to HTTPS.
+	- **Allowed HTTP methods:** GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE (the "all methods" option). The API uses all of them — login is POST, updates PUT/PATCH, deletes DELETE, CORS preflights OPTIONS.
+	- **Restrict viewer access: No.** Auth is enforced in-band by the Crow app via session cookies; CloudFront-edge signed URLs/cookies aren't part of the auth model.
+	- **Cache policy:** `Managed-CachingDisabled` (every API response is dynamic; never cache).
+	- **Origin request policy:** `Managed-AllViewerExceptHostHeader`. Forwards all viewer cookies, query strings, and headers — except `Host`, which is stripped so the EC2 sees its own Host (avoids collisions with the origin guard / Crow routing).
+	- **Response headers policy:** `Managed-SecurityHeadersPolicy` (consistent with the default behavior; adds HSTS/`X-Content-Type-Options`/etc. to API JSON responses too).
 	- **Create behavior**.
 - [ ] **Add SPA fallback error responses.** Without this, refreshing on `/calendar` or any deep link returns 403/404 from S3 (the bucket doesn't actually contain `/calendar/index.html`).
 	- CloudFront → your distribution → **Error pages** tab → **Create custom error response**.
