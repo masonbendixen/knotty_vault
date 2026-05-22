@@ -284,13 +284,21 @@ These came up while reading the Overview and surveying the system. Flagged with 
 - **S-4 Late cancellation fee / no-show fee.** Independent of refund-windows: a flat dollar punitive charge for cancelling inside a tight window, beyond just lower refund %. Per-product configurable.
 	- Mason- My plan is to not do refunds at all for missed classes. I feel like I can do a voucher if need be on a case by case bases.
 - **S-5 Class change-of-mind during the day.** User books AM class, decides to switch to PM class same day — single endpoint that atomically cancels one + books the other so they don't lose their slot during the gap.
+	- Mason- this isn't particularly compelling to me.
 - **S-6 Self-service waitlist auto-confirm cap.** "Auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist."
+	- Mason- I could see supporting this but it is low priority.
 - **S-7 Instructor pinning / favoriting.** User marks favorite instructors → notification when a favorite is teaching a new class / subbing.
+	- Mason- Can list this but should be extremely low priority.
 - **S-8 Class category / tag taxonomy.** "vinyasa", "aerial", "handstand", "kids" — for filter, color-coding the calendar, and routing skill-level requirements.
+	- Mason- This sounds like a good idea.
 - **S-9 Class prerequisites by completion (not just skill).** "Must have attended Intro to Aerial at least 3 times" before signing up for Aerial 2. Beyond skill levels — quantitative gating off the attendance history table.
+	- Mason- Sure, I do have a plan to base ability to attend certain classes based on attendance the previous month. For instance, I have many beginner / intermediate classes for partner acro that are back to back and attending the second hour requires both attending the first hour and a certain number of partner acro classes the previous month.
 - **S-10 Drop-in price overrides per session.** A single instance has a higher / lower price than the schedule default (special guest teacher week, holiday discount).
+	- Mason- This seems like an okay idea but low priority.
 - **S-11 Self check-in via QR / kiosk mode.** A facility tablet shows a check-in screen the user taps themselves into. Reduces staff load.
+	- Mason- This let's people mark friends as attending to hit attendance requirements. I want staff to control this.
 - **S-12 Wait-list preference per user.** Some users always want waitlist if full; others never. Express as preference rather than asking each booking.
+	- Mason- this doesn't seem worth the effort.
 - **S-13 Bulk booking ("book me into every Tuesday for 4 weeks").** Adjacent to attendance templates but for paid drop-ins.
 - **S-14 Family / household sharing of class packs.** Today, gift permissions exist person-to-person. Add a "household" abstraction so multi-seat class packs can be assigned across a small group with less ceremony.
 - **S-15 Instructor compensation rules at the schedule-entry level.** Specialty instructor cost can attach to a specific schedule entry, not just per-instance, so admin doesn't re-enter every week.
@@ -553,9 +561,11 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ---
 
-## Phase 4 — iCal Generator + Email Wiring (Should Have, foundation)
+## Phase 4 — iCal Generator Extensions (Should Have, foundation)
 
-**Goal:** all booking-related emails carry an `.ics` attachment; the weekly digest can build a multi-VEVENT bundle.
+**Starting point:** `util/ical_generator.h/cpp` already exists — `ICalGenerator::GenerateICalendar(const ICalEvent&)` is wired into `book_event`, `book_service`, `cart_checkout`, `payment_helper`, `staff_upgrade_session`.
+
+**Goal:** add the RFC 5545 features the current generator is missing — `UID`, `RRULE`, multi-VEVENT bundles, `STATUS:CANCELLED`, `ORGANIZER`/`ATTENDEE`, `VTIMEZONE`, line folding — to unblock attendance templates (Phase 5), the weekly digest (Phase 6), and cancellation-syncs-to-calendar.
 
 ### 4.1 Business logic
 - [ ] `util/ical/ical_generator.h/cpp` — pure function `GenerateICal(const ICalEvent& event)` and `GenerateICal(const std::vector<ICalEvent>&)` returning RFC 5545 text.
