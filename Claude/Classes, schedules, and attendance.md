@@ -300,13 +300,21 @@ These came up while reading the Overview and surveying the system. Flagged with 
 - **S-12 Wait-list preference per user.** Some users always want waitlist if full; others never. Express as preference rather than asking each booking.
 	- Mason- this doesn't seem worth the effort.
 - **S-13 Bulk booking ("book me into every Tuesday for 4 weeks").** Adjacent to attendance templates but for paid drop-ins.
+	- Mason- I don't do drop-ins.
 - **S-14 Family / household sharing of class packs.** Today, gift permissions exist person-to-person. Add a "household" abstraction so multi-seat class packs can be assigned across a small group with less ceremony.
+	- Mason- I want couple / family memberships. I have no interest in dropins.
 - **S-15 Instructor compensation rules at the schedule-entry level.** Specialty instructor cost can attach to a specific schedule entry, not just per-instance, so admin doesn't re-enter every week.
+	- Mason- Yes, I didn't plan on having this priced per instance. It should be tied to the price schedule though.
 - **S-16 Instructor profile page (already partially exists — extend).** Show classes a specific instructor teaches with upcoming sessions, link from class instances and calendar.
+	- Mason- This sounds good to do.
 - **S-17 Series partial refund on mid-series cancel.** User joined a 6-week series, attended 2, cancels — what's the refund logic? Probably pro-rated remaining instances minus a cancellation fee per the cancellation policy.
+	- Mason- Staff needs to grant this. The user has no ability to get a refund on their own. The policy is officially non refundable.
 - **S-18 Auto-template-suggest after first attendance.** "You attended Vinyasa Flow last Tuesday. Add to your weekly template?" — engagement nudge.
+	- Mason- I don't think that this is needed.
 - **S-19 Studio-event vs class taxonomy clarity.** Per Overview the existing `events` model is being repurposed. Be explicit: is a "workshop" a one-off `class_schedule`? a `series` of length 1? a standalone product without a parent class? Pick one and document it.
+	- Mason- I generally think of events as instances of a template like intro workshop. If we can make a more general purpose case to consolidate and simplify the implementation, I'm not opposed.
 - **S-20 Room conflict detection on schedule authoring.** When admin creates a schedule entry, server checks no other class / event / service session conflicts in the same room. Already implicit but should be a hard guard in the schedule materializer.
+	- I could see possibly doing multiple things in the same room 
 - **S-21 Effective-dated price changes.** Admin can set "starting July 1, drop-in price is $25" without rewriting current bookings. Uses `price_schedules` (already in place) but UI must expose effective dates.
 - **S-22 Bookable from-anyone capability.** Today gift permissions are per-pair. Could a member book a guest into a single class without a gift permission, with the guest auto-created? Maps to S-1.
 - **S-23 Class-level cap on consecutive no-shows.** Auto-suspend booking for users with 3 no-shows in a row until they email staff.
@@ -567,13 +575,28 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 **Goal:** add the RFC 5545 features the current generator is missing — `UID`, `RRULE`, multi-VEVENT bundles, `STATUS:CANCELLED`, `ORGANIZER`/`ATTENDEE`, `VTIMEZONE`, line folding — to unblock attendance templates (Phase 5), the weekly digest (Phase 6), and cancellation-syncs-to-calendar.
 
-### 4.1 Business logic
-- [ ] `util/ical/ical_generator.h/cpp` — pure function `GenerateICal(const ICalEvent& event)` and `GenerateICal(const std::vector<ICalEvent>&)` returning RFC 5545 text.
-- [ ] `ICalEvent` struct: uid, summary, description, location, dtStart, dtEnd, timezone, recurrenceRule (`RRULE` for templates), organizer, attendee, status.
-- [ ] Use UTC `Z` suffix for `DTSTART` / `DTEND` (simpler than VTIMEZONE blocks) unless local-time semantics matter for an `RRULE` — in that case generate a small inline `VTIMEZONE` for the facility's IANA TZ.
-- [ ] Tests: golden-text comparison against fixtures; round-trip via a parser if a header-only one is convenient.
+### 4.1 Extend the existing `ICalEvent` / `GenerateICalendar` in `util/ical_generator.h/cpp` — extend in place, do not create a parallel module
+- [ ] Add `std::string uid` field (RFC 5545 mandatory). UID convention: `booking-<bookingId>@knottyyoga.com`, `schedule-<scheduleId>-person-<personId>@knottyyoga.com`, or `session-<eventSessionId>@knottyyoga.com`.
+- [ ] Add `std::string status` — `""` / `"CONFIRMED"` / `"CANCELLED"`. `"CANCELLED"` emits `STATUS:CANCELLED`.
+- [ ] Add `std::string rrule` — emitted verbatim as `RRULE:<value>` when set. Built by helpers in 4.3.
+- [ ] Add `std::string organizerEmail` / `organizerName` → `ORGANIZER;CN=...:mailto:...`.
+- [ ] Add `std::string attendeeEmail` / `attendeeName` → `ATTENDEE;CN=...;RSVP=FALSE:mailto:...`.
+- [ ] Add `std::string sequence` (default `"0"`) — increments on each update.
+- [ ] Existing fields (`title`, `startTimeUs`, `endTimeUs`, `timezone`, `location`, `description`) stay; existing callers keep working with new fields unset.
 
-### 4.2 Wire into existing emails
+### 4.2 Extend `GenerateICalendar` + add multi-event overload in `util/ical_generator.cpp`
+- [ ] Update single-event `GenerateICalendar` to emit `UID`, `DTSTAMP`, `SEQUENCE`, plus conditional `STATUS`, `RRULE`, `ORGANIZER`, `ATTENDEE`.
+- [ ] Add overload `GenerateICalendar(const std::vector<ICalEvent>&)` — one VCALENDAR wrapping multiple VEVENTs (for the weekly digest).
+- [ ] Emit `VTIMEZONE` block when `timezone` is set AND an `RRULE` is present; use existing `date` library for DST transitions. Non-recurring entries continue with `DTSTART:...Z` UTC.
+- [ ] Add long-line folding per RFC 5545 §3.1 (75 octets + CRLF + space continuation).
+
+### 4.3 Helper functions for common patterns
+- [ ] `BuildBookingUid(int64_t bookingId)` / `BuildSessionUid(int64_t sessionId)` / `BuildTemplateUid(int64_t scheduleId, int64_t personId)` — centralize UID format.
+- [ ] `BuildWeeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → `FREQ=WEEKLY;BYDAY=...;UNTIL=...`. Used by attendance template emails (Phase 5).
+- [ ] `BuildBiweeklyRRule(...)`, `BuildCustomRRule(int intervalDays, int64_t untilUs)` — match `class_schedules.recurrence_pattern`.
+- [ ] Extend `util/ical_generator_test.cpp`: golden-text fixtures for UID, RRULE, STATUS:CANCELLED, multi-VEVENT, VTIMEZONE, line folding.
+
+### 4.4 Update existing email paths to use the new fields (.ics is already attached today)
 - [ ] `BookingConfirmationMail` — attach `.ics` for the single session.
 - [ ] `WaitlistPromotionMail` — attach `.ics`.
 - [ ] `BookingCancellationMail` — attach `.ics` with `STATUS:CANCELLED` so user's calendar removes the entry.
