@@ -314,14 +314,21 @@ These came up while reading the Overview and surveying the system. Flagged with 
 - **S-19 Studio-event vs class taxonomy clarity.** Per Overview the existing `events` model is being repurposed. Be explicit: is a "workshop" a one-off `class_schedule`? a `series` of length 1? a standalone product without a parent class? Pick one and document it.
 	- Mason- I generally think of events as instances of a template like intro workshop. If we can make a more general purpose case to consolidate and simplify the implementation, I'm not opposed.
 - **S-20 Room conflict detection on schedule authoring.** When admin creates a schedule entry, server checks no other class / event / service session conflicts in the same room. Already implicit but should be a hard guard in the schedule materializer.
-	- I could see possibly doing multiple things in the same room 
+	- Mason- I could see possibly doing multiple things in the same room like open gym and some skill development thing or rock climbing.
 - **S-21 Effective-dated price changes.** Admin can set "starting July 1, drop-in price is $25" without rewriting current bookings. Uses `price_schedules` (already in place) but UI must expose effective dates.
+	- Mason- All of this definitely should use the existing price schedule infrastructure. This is important. Please update the document to factor this in everywhere including for paying specialty instructors.
 - **S-22 Bookable from-anyone capability.** Today gift permissions are per-pair. Could a member book a guest into a single class without a gift permission, with the guest auto-created? Maps to S-1.
+	- Mason- I don't understand the question. Can you be more explicit?
 - **S-23 Class-level cap on consecutive no-shows.** Auto-suspend booking for users with 3 no-shows in a row until they email staff.
+	- Mason- let's list this as a low priority possibility. I don't see attendance max being a big issue for a while.
 - **S-24 Substitute instructor pool.** When an instructor reports unavailable, system queries who's qualified to substitute (has taught this class before / has the skill), surfaces a ranked list to admin.
+	- Mason- I think it will be easier for the admin to just reach out to people in this case.
 - **S-25 Per-instance description override.** A given Tuesday's Vinyasa Flow is themed "yin-style restorative" — admin overrides the description for just that instance, shown in calendar tooltip and digest email.
+	- Mason- I like the ability to have a per instance description that gets surfaced to the user. It would be nice if that shows up on the user's home page as a way to entice them to show up.
 - **S-26 Per-user iCal feed URL.** A personal subscribable URL the user can paste into Google Calendar / Apple Calendar, auto-updating. Beyond per-booking attachments.
+	- Mason- Yeah, I like this.
 - **S-27 Cancellation policy display on the booking screen.** Surface the refund breakdown (e.g. "48h: 100%, 24h: 50%, then no refund") so user knows before clicking book.
+	- Mason- Yes, that's a good idea. Especially if there is no refund.
 - **S-28 Multi-attendee booking (parent books for child / partner).** Reuse multi-seat entitlement flow. Useful for kids' classes.
 
 ---
@@ -348,7 +355,7 @@ Buckets express priority + sequencing constraint, not just nice-ness. "Must have
 - SL-1, SL-2, SL-3, SL-4, SL-5, SL-6, SL-7, SL-8  *(skill levels end-to-end)*
 - AT-1 through AT-10  *(attendance templates — core engagement feature)*
 - WD-1, WD-2, WD-3, WD-5  *(weekly Sunday digest + iCal attachments)*
-- iCal generator (foundation for AT-4, WD-3, N-1)
+- iCal generator extensions — UID + RRULE + multi-VEVENT + STATUS:CANCELLED + VTIMEZONE on top of existing `util/ical_generator` (foundation for AT-4, WD-3, N-1)
 - AW-3, AW-4, AW-5  *(sign-up open reminders)*
 - ST-1, ST-2, ST-3, ST-4, ST-5, ST-6  *(instructor shift trades)*
 - CSer-1 through CSer-10  *(series + workshops with min/max + pro-rating + auto-cancel)*
@@ -597,13 +604,15 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 - [ ] Extend `util/ical_generator_test.cpp`: golden-text fixtures for UID, RRULE, STATUS:CANCELLED, multi-VEVENT, VTIMEZONE, line folding.
 
 ### 4.4 Update existing email paths to use the new fields (.ics is already attached today)
-- [ ] `BookingConfirmationMail` — attach `.ics` for the single session.
-- [ ] `WaitlistPromotionMail` — attach `.ics`.
-- [ ] `BookingCancellationMail` — attach `.ics` with `STATUS:CANCELLED` so user's calendar removes the entry.
-- [ ] `SessionCancellationMail` — same.
-- [ ] Tests update to assert attachment presence + filename + content type `text/calendar`.
+**Note:** confirmation / cancellation mails already attach `.ics` today. This is about feeding them the new struct fields.
+- [ ] In `book_event`, `book_service`, `cart_checkout`, `payment_helper`, `staff_upgrade_session` — populate `uid = BuildBookingUid(bookingId)`.
+- [ ] `BookingCancellationMail` — set `status = "CANCELLED"`, same UID as original confirmation, `sequence = "1"`.
+- [ ] `SessionCancellationMail` — same treatment per attendee.
+- [ ] `WaitlistPromotionMail` — fresh `BuildBookingUid(newBookingId)` + `status = "CONFIRMED"`.
+- [ ] `ProviderCancelledSessionMail` / `ProviderChangeClientMail` — `STATUS:CANCELLED` where original booking is torn down.
+- [ ] Update existing email tests to assert UID; add tests for cancellation-with-`STATUS:CANCELLED`.
 
-### 4.3 Frontend
+### 4.5 Frontend (no change today)
 - [ ] No UI change, but verify the user portal shows email-receipt history correctly (out-of-scope for content of email, just confirming attachments don't break existing displays).
 
 ---
@@ -953,7 +962,7 @@ Each of these will be its own `.md` in `C:\Users\mason\Documents\Obsidian\Knotty
 - [ ] `Classes Phase 1 - Catalog and Schedule Authoring.md`
 - [ ] `Classes Phase 2 - Membership-Gated Drop-In.md`
 - [ ] `Classes Phase 3 - Skill Levels.md`
-- [ ] `Classes Phase 4 - iCal Generator.md`
+- [ ] `Classes Phase 4 - iCal Generator Extensions.md`
 - [ ] `Classes Phase 5 - Attendance Templates.md`
 - [ ] `Classes Phase 6 - Weekly Digest.md`
 - [ ] `Classes Phase 7 - Class Series and Workshops.md`
