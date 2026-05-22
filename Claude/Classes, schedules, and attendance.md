@@ -31,7 +31,25 @@ Long term, it would be nice to see people who routinely indicate that they are c
 
 Long term, we will also need to keep track of specialty instructors and note their rate for teaching a class as well as possibly bonuses per student or possibly bonuses per student past a certain attendance target. They might also have personal minimum / maximum numbers that would be nice to be able to configure per class type (for instance someone might be willing to take more people in a handstand class than an aerial class).
 
-I would like to build a docum
+I would like to build a document with a list of use cases, group the use cases by category, suggest other use cases, and then work towards bucketing them into must have, should have, nice to have, could have, and stretch. From these buckets, I'll create separate implementation documents to complete individual buckets.
+
+Please do outside research and the code base to build your plan as well as these documents:
+
+- [[Payment Design Document]]
+- [[Product browsing and quoting endpoints]]
+- [[Purchase creation with server-side pricing]]
+- [[Scheduling thin slice]]
+- [[Square credentials and Sandbox setup]]
+- [[Subscriptions- Recurring billing and card management]]
+- [[Support for scheduled purchases]]
+- [[Payment Should Have- Multi Seat and Bundled Pricing]]
+- [[Event Polish- Scheduling Should Have Items]]
+- [[Multi seat and bundled products]]
+- [[Payment Should Have- Multi Seat and Bundled Pricing]]
+- [[Product, Event, and Subscription Admin Portal]]
+- [[Provider Portal]]
+- [[Scheduled Jobs]]
+- 
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
