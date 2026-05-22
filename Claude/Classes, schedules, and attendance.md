@@ -330,6 +330,7 @@ These came up while reading the Overview and surveying the system. Flagged with 
 - **S-27 Cancellation policy display on the booking screen.** Surface the refund breakdown (e.g. "48h: 100%, 24h: 50%, then no refund") so user knows before clicking book.
 	- Mason- Yes, that's a good idea. Especially if there is no refund.
 - **S-28 Multi-attendee booking (parent books for child / partner).** Reuse multi-seat entitlement flow. Useful for kids' classes.
+	- Mason- We will never have kids classes. But booking for a partner / friend is probably not a bad idea but low priority.
 
 ---
 
