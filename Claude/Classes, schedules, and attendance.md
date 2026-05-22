@@ -84,7 +84,8 @@ Before listing use cases, here is what the codebase already provides — the pla
 
 **Cross-cutting:**
 - Photo infrastructure (`photo_support_tables` whitelist, `table_item_photos`, scaled photo cache + reaper, `photo-upload` Angular component, admin console thumbnail support) — `classes` is already in the photo whitelist
-- `Mail::MailAttachment` (filename + content + contentType) — ready for `.ics` but no iCal generator exists yet
+- `Mail::MailAttachment` (filename + content + contentType) — already used for `.ics` attachments
+- **iCal generator** (`util/ical_generator.h/cpp`) — `ICalGenerator::GenerateICalendar(const ICalEvent&)` returns RFC 5545 `VCALENDAR` text for a single event. Struct fields: `title`, `startTimeUs`, `endTimeUs`, `timezone`, `location`, `description`. Text escaping per RFC 5545 (commas, semicolons, newlines), CRLF line endings, UTC `Z` form for `DTSTART`/`DTEND`. Already wired into `book_event`, `book_service`, `cart_checkout`, `payment_helper`, `staff_upgrade_session` to attach `.ics` to confirmation emails. Tests in `util/ical_generator_test.cpp`. **What it does NOT yet have (extensions required for templates / digest / cancellations):** `UID` field (RFC 5545 requires it; calendar apps de-dupe and update by UID), `RRULE` for recurring entries, multi-VEVENT bundle in a single VCALENDAR, `STATUS:CANCELLED` flag, `ORGANIZER` / `ATTENDEE` fields, and `VTIMEZONE` block (the `timezone` struct field is currently unused — output is always UTC, which is fine for one-offs but lossy for recurring entries that cross DST boundaries).
 - `ThreadPool::QueuePeriodic` (Phase I in progress) and `knottyyoga_helper` (scheduled jobs daemon) — both available for the Sunday-noon weekly digest email
 - Permissions / roles / `ActiveUserHasPermission` (RBAC) and entitlement-derived permissions
 - `admin_top_level_tables` / `admin_nested_tables` / `admin_table_permissions` / friendly names / display templates infrastructure for generic CRUD
@@ -96,7 +97,7 @@ Before listing use cases, here is what the codebase already provides — the pla
 - No "drop-in price varies by membership tier" wired in for class instances (the table machinery exists; class instances need to know to use it)
 - No "min attendees by date → auto cancel + refund" policy
 - No "email me when sign-ups open" reminder system
-- No iCal generator
+- iCal generator exists but lacks `UID`, `RRULE`, multi-VEVENT, `STATUS:CANCELLED`, `VTIMEZONE` — extensions needed for attendance templates (recurring), weekly digest (bundle of events), and cancellation-syncs-to-calendar
 - No "no-show penalty / reliability score" infrastructure
 - No specialty-instructor cost tracking / payroll model
 
@@ -275,9 +276,13 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 These came up while reading the Overview and surveying the system. Flagged with reasons so you can pick / reject.
 
 - **S-1 Bring-a-friend / guest pass for a class.** Member brings a non-member with them for one class. Reuse the deferred `guest_passes` infrastructure from Customer Scenarios doc.
+	- Mason- This is a great suggestion. Let's add it.
 - **S-2 Trial / first-class-free.** A non-member's first eligible class is free, controlled by a `trial_eligible` flag on the user. Lightweight on top of the entitlement model.
+	- Mason- I'd actually rather just have people go through the new member intro workshop thing. My classes are high skill and randos showing up is distracting.
 - **S-3 Class packs (5-pack, 10-pack, 20-pack).** Already supported by `entitlements.seats_total` + a specific class-pack product. Just need UI + a "consume an entitlement seat to book this class" path.
+	- Mason- I really have no interest in drop in pricing. It makes people less likely to come to class.
 - **S-4 Late cancellation fee / no-show fee.** Independent of refund-windows: a flat dollar punitive charge for cancelling inside a tight window, beyond just lower refund %. Per-product configurable.
+	- Mason- My plan is to not do refunds at all for missed classes. I feel like I can do a voucher if need be on a case by case bases.
 - **S-5 Class change-of-mind during the day.** User books AM class, decides to switch to PM class same day — single endpoint that atomically cancels one + books the other so they don't lose their slot during the gap.
 - **S-6 Self-service waitlist auto-confirm cap.** "Auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist."
 - **S-7 Instructor pinning / favoriting.** User marks favorite instructors → notification when a favorite is teaching a new class / subbing.
