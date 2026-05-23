@@ -114,6 +114,8 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **C-4** Logged-in member sees which classes are included in their membership and which require additional payment
 - **C-5** Public class detail page (description, photo, sample times, instructors who typically teach it, skill-level requirements)
 - **C-6** Filter / search class catalog by category, skill level, instructor
+- **C-7** Class category / tag taxonomy ("vinyasa", "aerial", "handstand", "partner-acro") — drives catalog filter, calendar color-coding, and the rolling-attendance-count prerequisites in §2.6 (SL-10)
+- **C-8** Extended instructor profile pages: upcoming sessions, bio, photo; linked from each class and from calendar instances
 
 ## 2.2 Class Schedule Authoring
 - **CS-1** Admin creates a class schedule entry: class + facility + room + instructor + recurrence (day-of-week + start time + duration) + effective date range
@@ -122,6 +124,8 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CS-4** Admin deactivates a schedule entry; choose whether to cancel materialized future sessions
 - **CS-5** Admin views the master class schedule grid (week or month view) per facility
 - **CS-6** Schedule materializer is idempotent (running twice doesn't double-create sessions) and respects existing bookings (won't blow away a session that has confirmed attendees)
+- **CS-7** Per-instance description override: admin (or assigned instructor) replaces the default description for a specific session ("this Tuesday's Vinyasa is yin-style restorative"). Override is surfaced on the user homepage's today-classes feed as a teaser to drive attendance, not just in a calendar tooltip
+- **CS-8** Multi-occupancy rooms: materializer permits parallel schedule entries / sessions in the same room as long as combined occupancy ≤ `location_rooms.concurrent_capacity` (e.g. open gym + skill-development workshop running simultaneously). Hard block only when capacity would overflow
 
 ## 2.3 Class Series & Workshops (paid bundle of instances)
 - **CSer-1** Admin creates a series: parent class, start date, end date, recurrence (day(s) + time), max attendees, optional min attendees, min-by date, min-not-met policy (auto-cancel + refund | proceed | admin decides)
@@ -136,17 +140,24 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CSer-10** Series booking is one purchase; cancelling the series cancels all child instance bookings together
 
 ## 2.4 Membership-Gated Access & Pricing
-- **M-1** Admin marks a class instance / schedule entry as "included in memberships X, Y, Z" — members with those permissions can mark template / drop in for free
-- **M-2** Admin sets per-permission drop-in price for non-included flavor (per-class instance pricing — e.g. drop-in tier prices)
-- **M-3** Admin sets per-permission visibility (e.g. private events visible only to platinum members)
-- **M-4** User browses catalog and sees both included-free classes and pay-per-class options at their tier
+- **M-1** Admin marks a class instance / schedule entry as "included in memberships X, Y, Z" — members with those permissions can mark template and attend for free
+- **M-2** Per-tier pricing applies to workshops and series only (NOT individual recurring class instances — per P-1 there is no drop-in pricing for recurring classes); admin sets per-permission price including the non-member tier where the offering is open to non-members
+- **M-3** Admin sets per-permission visibility (e.g. private classes visible only to platinum members)
+- **M-4** User browses catalog and sees included classes (their tier) plus workshop / series offerings at their tier price
 - **M-5** User with multiple permissions gets the best (lowest) price they qualify for, automatically server-side
-- **M-6** Non-members see allowed classes at non-member price (or are blocked from gated classes entirely)
-- **M-7** Membership-included class booking creates a booking but no purchase (or a $0 purchase tied to the membership entitlement)
+- **M-6** Non-members see only the offerings open to non-members (workshops, series, the intro workshop — M-12) at the non-member price; recurring classes are not browsable / bookable until membership is active or M-12 unlocks them
+- **M-7** Membership-included class booking creates a booking with a $0 purchase tied to the user's active membership entitlement (keeps the `booking → purchase` invariant intact for audit; no Square call)
 - **M-8** Membership tier upgrade unlocks newly-eligible classes in real time (no manual rebooking)
+- **M-9** Guest pass: an active member can book one non-member friend into a single class. Redemption may auto-create a minimal guest account on the spot, no pre-existing `gift_permissions` relationship required. Per-tier configurable cap on guest-pass frequency (see OQ-26)
+- **M-10** Effective-dated price changes via `price_schedules`: admin sets "starting July 1 the gold-tier workshop price becomes $X" without disrupting in-flight series purchases or subscription periods. All tiered pricing — class series, workshops, couple/family memberships, specialty-instructor rates (SI-6) — flows through this same mechanism
+- **M-11** Couple / family membership tier: a single subscription covers 2–N specified people via multi-seat entitlement (`seats_total > 1`). Presented in the UI as one product, not "buy two memberships". Per-tier pricing via `product_prices`
+- **M-12** New-member intro workshop as the non-member on-ramp: recurring class access requires *either* an active membership *or* a recent intro-workshop attendance entitlement. The intro workshop itself is sold to non-members and is a `class_schedule` of length 1 (per P-3). Validity window of the post-intro-workshop entitlement is configurable (OQ-30)
+- **M-13** Per-session price override: admin sets a higher or lower price for a single class series / workshop instance (special guest teacher week, holiday discount, sliding scale). Override is tied to the specific session, not the schedule
+- **M-14** Partner / friend booking: an active member books an additional adult attendee (partner, friend) for a session using a multi-seat entitlement. Explicitly NOT for children — no kids classes will ever be offered
 
 ## 2.5 Specialty Instructor Cost Recoupment
-- **SI-1** Admin records a specialty-instructor cost for a class instance / series (flat rate, per-student bonus, per-student-past-target bonus)
+- **SI-1** Admin records a specialty-instructor cost at the class-schedule / series level (NOT per-instance) — flat rate, per-student bonus, per-student-past-target bonus
+- **SI-6** Specialty-instructor compensation rates flow through the same `price_schedules` infrastructure as everything else (per P-2): a rate change rolls forward via a new `price_schedule` row without rewriting in-flight series sessions
 - **SI-2** Admin runs a pricing assistant that suggests per-tier prices to (a) cover specialty cost on a break-even count and (b) profit above that count for non-members / lower tiers
 - **SI-3** Specialty instructor has personal min / max per class type (handstand max 8, aerial max 6)
 - **SI-4** Admin report: per-class / per-series cost vs. revenue (instructor pay + bonus thresholds vs. attendee revenue split by tier)
@@ -162,6 +173,9 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **SL-7** Class detail page shows skill-level requirements prominently with "you have / don't have"
 - **SL-8** Staff portal: search a person, view their current skill levels, assign new ones, revoke existing ones
 - **SL-9** History of skill-level changes per person (audit trail)
+- **SL-10** Attendance-count prerequisite: a class can require ≥ N attended sessions of a related class or tag within a rolling window (e.g. ≥ 4 partner-acro classes in the previous calendar month) before the user can book
+- **SL-11** Same-day sequencing prerequisite: a class can require the user to also be booked for a specific earlier-same-day class — e.g. partner-acro hour-2 can only be booked if the user is also booked for hour-1 the same day
+- **SL-12** Prerequisite expressions compose skill levels (SL-5), attendance counts (SL-10), and same-day sequencing (SL-11). Staff override available with logged reason. P-5 makes this enforceable because users cannot self-attribute attendance
 
 ## 2.7 Capacity, Waitlist, and Min Attendees
 - **CAP-1** Each class instance has a max capacity from the class default or schedule override
@@ -170,7 +184,8 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CAP-4** Series / workshop has optional min attendees + min-by date + min-not-met policy
 - **CAP-5** Auto-cancellation job runs daily, scans series/workshops past their min-by date, cancels if under min, refunds 100%, emails all
 - **CAP-6** Admin can override (e.g. "we're at 4/5, run anyway")
-- **CAP-7** Capacity is enforced against the room's `concurrent_capacity` AND the session's `capacity` (the more restrictive wins)
+- **CAP-7** Capacity is enforced against the room's `concurrent_capacity` AND the session's `capacity` (the more restrictive wins); per CS-8, multiple sessions in the same room share the room's `concurrent_capacity` budget
+- **CAP-8** Waitlist auto-confirm cap (user preference): "auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist". Lets users avoid last-minute scrambles to a class they no longer plan to attend
 
 ## 2.8 Attendance Templates (Planned Recurring Attendance)
 - **AT-1** User views a weekly grid of classes they are eligible to attend, marks the ones they normally attend → that becomes their attendance template
@@ -190,6 +205,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **WD-3** Each row has an `.ics` attachment (or one combined `.ics` with multiple `VEVENT`s)
 - **WD-4** User can disable weekly digest in notification preferences (new minimal preference table)
 - **WD-5** Digest respects per-instance exceptions (skipped weeks don't appear)
+- **WD-6** Per-user subscribable iCal feed URL: a personal `webcal://` URL the user adds to their calendar app once and it auto-updates as bookings change. Separate channel from the per-booking attachments — eliminates the "I missed the email" failure mode
 
 ## 2.10 Check-in (Attendance Marking)
 - **CI-1** Staff opens check-in screen for a session; configurable window (default −1h, +3h) controls when it's accessible
@@ -232,10 +248,12 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **ST-6** Admin view of "who is teaching what when" across the studio
 
 ## 2.15 Booking & Cancellation Mechanics
-- **BC-1** User books a single class instance (drop-in flow) — purchases at their tier price, immediate confirmation, included-with-membership = $0 purchase + entitlement debit (or no-purchase, see Open Q)
-- **BC-2** User cancels a single instance — refund per cancellation policy windows (existing); for free / membership-included bookings, just free the capacity
-- **BC-3** Admin cancels a class instance — see SE-5
-- **BC-4** Refund mechanism uses existing `cancellation_policies` + `cancellation_policy_windows` + `RefundHelper`
+- **BC-1** User books a class instance — server verifies their tier includes the class (per P-1, no drop-in pricing); creates a $0 purchase + booking tied to their active membership entitlement; immediate confirmation
+- **BC-2** User cancels a class / series / workshop booking — capacity is freed and the waitlist is advanced; no money is refunded automatically (per P-6, all class bookings are officially non-refundable from the user side)
+- **BC-3** Admin cancels a class instance — studio-initiated cancellation; full refund issued for any paid bookings (workshops, series instances), capacity freed for membership-included bookings, email sent to all attendees
+- **BC-4** Refund mechanism for admin-initiated cancellations uses existing `cancellation_policies` + `cancellation_policy_windows` + `RefundHelper`
+- **BC-5** Cancellation policy displayed on the booking screen before the user clicks book — surfaces the refund breakdown ("48h: 100%, 24h: 50%, then no refund") OR an explicit "no refund" notice (per P-6 this is the default for classes), so users are not surprised
+- **BC-6** Staff-issued voucher tool: staff issues a partial-credit voucher tied to (person, product / series, amount) as a discretionary alternative to a refund (reuses voucher infrastructure from `Vouchers and Refunds.md`). Used for mid-series cancellations, legitimate emergencies, and other case-by-case grants under P-6
 
 ## 2.16 Notifications & Communication (cross-cutting)
 - **N-1** Booking confirmation email with iCal attachment for the session
@@ -248,12 +266,14 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **N-8** Reminder email N hours before class (existing `EventReminderHelper`)
 - **N-9** "Sign-up window opens" reminder (§2.13)
 - **N-10** Minimal user notification preferences table for opt-outs
+- **N-11** Favorite-instructor notifications (very low priority): user marks favorite instructors; system notifies on new classes / subs by a favorite
 
 ## 2.17 Reliability Tracking (Long-term)
 - **R-1** Track per-user "indicated attending but didn't attend" rate over rolling window
 - **R-2** Surface this in admin user-detail page
 - **R-3** Configurable threshold above which user gets a soft email warning
 - **R-4** Above harder threshold, optionally restrict ability to template-claim future capacity (Open Q on policy)
+- **R-5** Class-level cap on consecutive no-shows: auto-suspend booking after N consecutive no-shows until the user contacts staff (low priority; only relevant once attendance caps actually bite)
 
 ## 2.18 Specialty Instructor Payroll (Long-term)
 - **PR-1** `specialty_instructor_rates` table per (instructor, class type) with base rate + per-student bonus + per-student-past-target bonus + personal min / max attendance overrides
