@@ -145,8 +145,8 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **M-3** Admin sets per-permission visibility (e.g. private classes visible only to platinum members)
 - **M-4** User browses catalog and sees included classes (their tier) plus workshop / series offerings at their tier price
 - **M-5** User with multiple permissions gets the best (lowest) price they qualify for, automatically server-side
-- **M-6** Non-members see only the offerings open to non-members (workshops, series, the intro workshop — M-12) at the non-member price; recurring classes are not browsable / bookable until membership is active or M-12 unlocks them
-- **M-7** Membership-included class booking creates a booking with a $0 purchase tied to the user's active membership entitlement (keeps the `booking → purchase` invariant intact for audit; no Square call)
+- **M-6** Non-members see only the offerings open to non-members (workshops, series, the intro workshop — M-12) at the non-member price; recurring classes are not browsable / bookable to non-members at all
+- **M-7** Membership-included class attendance is recorded via a `booking` row only — NO purchase row, no `purchase_id` tied to the booking. Bookings are an attendance / metrics record, not a money trail. The `bookings.purchase_id` column is nullable for class bookings under an active membership entitlement
 - **M-8** Membership tier upgrade unlocks newly-eligible classes in real time (no manual rebooking)
 - **M-9** Guest pass: an active member can book one non-member friend into a single class. Redemption may auto-create a minimal guest account on the spot, no pre-existing `gift_permissions` relationship required. Per-tier configurable cap on guest-pass frequency (see OQ-26)
 - **M-10** Effective-dated price changes via `price_schedules`: admin sets "starting July 1 the gold-tier workshop price becomes $X" without disrupting in-flight series purchases or subscription periods. All tiered pricing — class series, workshops, couple/family memberships, specialty-instructor rates (SI-6) — flows through this same mechanism
@@ -1090,10 +1090,11 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.22 Per-session price override (M-13)
 - **OQ-41.** When admin sets a per-session price override after some users have already booked the session at the schedule-default price, do existing bookings get re-priced or grandfathered? Recommended: grandfathered (no retroactive adjustment); the override applies to future bookings only.
-	- Mason
+	- Mason- I'll go with your recommendation.
 
 ### 8.23 Specialty-instructor pay via price schedules (SI-6)
 - **OQ-42.** When rate roll-forward happens via a new `price_schedule` row, do already-materialized sessions snapshot the rate at materialization time, or recompute at payroll time? Recommended: snapshot at materialization to insulate from later edits — matches how `purchase_items` snapshot prices.
+	- Mason- I'll go with your recommendation.
 
 ---
 
