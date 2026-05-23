@@ -1066,23 +1066,31 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.18 Per-instance description override (CS-7 / D-4)
 - **OQ-33.** Who can override the description for a single instance — admin only, or the assigned instructor for their own sessions? Recommended: instructor for own sessions + admin overall (instructor uses the override to advertise the session's theme without admin involvement).
-	- Mason- I don't think that we should necessarily override the description for a class but we can have instance class notes. Like if a class is acrobatics conditioning and there is a generic
+	- Mason- I don't think that we should necessarily override the description for a class but we can have instance class notes. Like if a class is acrobatics conditioning and there is a generic description of that but the instructor wants to note that we will be working on forward compression and abdominals, that would be nice to be visible to the user. I think the instructor should be able to do this for a given instance that they are teaching but staff with the right permission can do it for any class.
 - **OQ-34.** Where on the user homepage does the override appear — only when the user is eligible / has the class on their template, or always for browsable visibility? Recommended: only for eligible classes (the homepage feed is already tier-filtered).
+	- Mason- only for eligible classes and classes on their template.
 
 ### 8.19 Intro workshop on-ramp (M-12)
 - **OQ-35.** How long does an intro-workshop attendance entitlement grant "non-member class access" before requiring membership? Recommended: 14 days (encourages signup without being draconian). Configurable secret.
+	- Mason- Can you explain what this is in reference to? Please give an example.
 - **OQ-36.** Which recurring classes does the intro-workshop entitlement unlock — all, or admin opts in per-class? Recommended: admin opts in per-class (`classes.intro_workshop_unlocks` flag) so the studio can keep advanced classes membership-only.
+	- Mason- I'm confused... an intro workshop is just a one time event the user comes to do a sample class and hear a sales pitch. It grants nothing beyond just coming to that event.
 
 ### 8.20 Staff-issued vouchers (BC-6 / D-3)
 - **OQ-37.** Default expiration window for staff-issued vouchers — 6 months, 12 months, or none? Recommended: 12 months default, per-issuance overridable.
+	- Mason- I'm fine with the recommendation.
 - **OQ-38.** Voucher scope — must be tied to a specific product / series, or can it be a generic dollar credit usable on anything? Recommended: generic dollar credit usable on any product; simpler model and reuses existing voucher infrastructure.
+	- Mason- I'll go with the recommendation but I think the existing voucher infrastructure does grant the ability to tie vouchers to a particular product.
 
 ### 8.21 Per-user iCal feed URL (WD-6)
 - **OQ-39.** Authentication for the personal iCal URL — unguessable random token in the URL, or signed JWT with revocation? Recommended: random token (sufficient for a low-stakes calendar feed); store hash, allow user to regenerate via portal.
+	- Mason- I'll go with your recommendation.
 - **OQ-40.** Refresh frequency — what's the minimum interval the feed asserts via `X-PUBLISHED-TTL`? Recommended: 1 hour.
+	- Mason- I don't really understand what you are talking about.
 
 ### 8.22 Per-session price override (M-13)
 - **OQ-41.** When admin sets a per-session price override after some users have already booked the session at the schedule-default price, do existing bookings get re-priced or grandfathered? Recommended: grandfathered (no retroactive adjustment); the override applies to future bookings only.
+	- Mason
 
 ### 8.23 Specialty-instructor pay via price schedules (SI-6)
 - **OQ-42.** When rate roll-forward happens via a new `price_schedule` row, do already-materialized sessions snapshot the rate at materialization time, or recompute at payroll time? Recommended: snapshot at materialization to insulate from later edits — matches how `purchase_items` snapshot prices.
