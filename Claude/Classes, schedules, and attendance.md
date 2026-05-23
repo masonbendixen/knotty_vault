@@ -114,7 +114,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **C-4** Logged-in member sees which classes are included in their membership and which require additional payment
 - **C-5** Public class detail page (description, photo, sample times, instructors who typically teach it, skill-level requirements)
 - **C-6** Filter / search class catalog by category, skill level, instructor
-- **C-7** Class category / tag taxonomy ("vinyasa", "aerial", "handstand", "partner-acro") — drives catalog filter, calendar color-coding, and the rolling-attendance-count prerequisites in §2.6 (SL-10)
+- **C-7** Class category / tag taxonomy stored as a controlled vocabulary — admin CRUDs a `class_tags` table (one row per tag: id, name, optional color); classes link to tags via a `class_tag_assignments` join table referencing the tag's primary key. No free-form tag strings on classes. Examples: "vinyasa", "aerial", "handstand", "partner-acro". Drives catalog filter, calendar color-coding, and the monthly-attendance prerequisite in §2.6 (SL-10)
 - **C-8** Extended instructor profile pages: upcoming sessions, bio, photo; linked from each class and from calendar instances
 
 ## 2.2 Class Schedule Authoring
@@ -150,7 +150,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **M-8** Membership tier upgrade unlocks newly-eligible classes in real time (no manual rebooking)
 - **M-9** Guest pass: an active member can book a non-member friend into a single class designated by admin as guest-pass eligible (allow-list per `classes` row, default off). Redemption may auto-create a minimal guest account on the spot, no pre-existing `gift_permissions` relationship required. Guest-pass frequency is configured per membership tier — different tiers can have different guest-pass allowances (fitness memberships typically frequent / marketing-oriented; spa memberships sparse / luxury perk). Per-tier configuration also includes an optional "guest must be a new person" flag that prevents repeatedly using the same friend
 - **M-10** Effective-dated price changes via `price_schedules`: admin sets "starting July 1 the gold-tier workshop price becomes $X" without disrupting in-flight series purchases or subscription periods. All tiered pricing — class series, workshops, couple/family memberships, specialty-instructor rates (SI-6) — flows through this same mechanism
-- **M-11** Couple / family membership tier: a single subscription covers 2–N specified people via multi-seat entitlement (`seats_total > 1`). Presented in the UI as one product, not "buy two memberships". Per-tier pricing via `product_prices`
+- **M-11** Couple / family membership tier: a single subscription covers multiple specified people via multi-seat entitlement (`seats_total > 1`). The studio already offers a **couple membership** (`seats_total = 2`) and a **family membership** for three (`seats_total = 3`) — these are existing products that must fit the model cleanly. No need to support `seats_total ≥ 4` (fifteen years of operation with no demand for it, and kids classes are explicitly out of scope). Presented in the UI as one product, not "buy two memberships". Per-tier pricing via `product_prices`
 - **M-12** Intro workshop as the non-member discovery event: a `class_schedule` of length 1 (per P-3) sold to non-members. Functions as a one-time sample class + sales pitch; attending the intro workshop grants no entitlement, no class access, no permission. Non-members who want to attend recurring classes must purchase a membership afterward. The intro workshop is the only recurring-class-like offering visible to non-members beyond workshops and series
 - **M-13** Per-session price override: admin sets a higher or lower price for a single class series / workshop instance (special guest teacher week, holiday discount, sliding scale). Override is tied to the specific session, not the schedule
 - **M-14** Partner / friend booking: an active member books an additional adult attendee (partner, friend) for a session using a multi-seat entitlement. Explicitly NOT for children — no kids classes will ever be offered
@@ -194,7 +194,7 @@ The template is a **personal fitness-planning tool**, not a booking. It captures
 - **AT-1** User views a weekly grid of classes they are eligible to attend, marks the ones they normally attend → that becomes their attendance template
 - **AT-2** Template is per-schedule-entry (recurring) and forward-looking — it applies to all future materialized sessions of the marked schedule, without creating any booking rows
 - **AT-3** User edits / removes template entries freely — no bookings to sync, no cancellation cascade, just an update to the template entry table
-- **AT-4** Adding a template entry sends a confirmation email with a recurring iCal attachment covering the future occurrences of the schedule, so the user can see the plan in their calendar app
+- **AT-4** Adding a template entry sends a confirmation email with a recurring iCal attachment — a single `VEVENT` with an `RRULE` covering the future occurrences of the schedule (e.g. `FREQ=WEEKLY;BYDAY=TU;UNTIL=...`), so the user's calendar app expands the recurrence locally. Per-instance exceptions (AT-5) are emitted as `EXDATE` lines, not separate events
 - **AT-5** Per-instance exception: user marks "won't attend this Tuesday" with an optional note to the instructor (e.g. "on vacation") — affects what shows on the homepage and weekly digest, does not affect any booking (none exist)
 - **AT-6** Per-instance addition: user marks "will attend this Thursday in addition to my template" — same model as AT-5, just inverted (an extra-this-week marker)
 - **AT-7** User homepage shows today's eligible classes with checkmarks for those on their template (and for one-off additions) and unchecked rows for eligible classes they haven't claimed; one click flips state
@@ -205,10 +205,10 @@ The template is a **personal fitness-planning tool**, not a booking. It captures
 ## 2.9 Weekly Digest Email
 - **WD-1** Sunday at noon (configurable wall clock + timezone per facility), a cron job sends each user a "this week" email
 - **WD-2** Email lists each scheduled session (template-attended classes, one-off additions, paid bookings, services, events) for the upcoming week
-- **WD-3** Each row has an `.ics` attachment (or one combined `.ics` with multiple `VEVENT`s)
+- **WD-3** Email carries one combined `.ics` attachment with a separate `VEVENT` per session (NOT a single `RRULE`) — the digest is already filtered for this week's exceptions, so per-occurrence VEVENTs are simpler and exception-accurate
 - **WD-4** User can disable weekly digest in notification preferences (new minimal preference table)
 - **WD-5** Digest respects per-instance exceptions (skipped weeks don't appear)
-- **WD-6** Per-user subscribable iCal feed URL: a personal `webcal://` URL the user adds to their calendar app once and it auto-updates as bookings change. Separate channel from the per-booking attachments — eliminates the "I missed the email" failure mode
+- **WD-6** Per-user subscribable iCal feed URL: a personal `webcal://` URL the user adds to their calendar app once and it auto-updates as bookings change. Separate channel from the per-booking attachments — eliminates the "I missed the email" failure mode. URL is authenticated by an unguessable random token (hashed at rest; user can regenerate via portal). The feed sets `X-PUBLISHED-TTL:PT1H` to hint a 1-hour refresh cadence to subscribing calendar apps
 
 ## 2.10 Check-in (Attendance Marking)
 - **CI-1** Staff opens check-in screen for a session; configurable window (default −1h, +3h) controls when it's accessible
@@ -968,104 +968,7 @@ Each of these will be its own `.md` in `C:\Users\mason\Documents\Obsidian\Knotty
 
 ---
 
-# 9. Open Questions
-
-The following four items need more discussion before the phases that depend on them can be planned. Everything from the prior open-question list (OQ-1 through OQ-42) has been resolved — decisions are now reflected in §2 / §3 / §4 / §5 / §6.
-
-## 9.1 iCal terms (was OQ-20) — `VEVENT`, `RRULE`, multi-event bundles
-
-**What these terms mean:**
-
-When the system emails you an `.ics` calendar attachment, the file contains one or more `VEVENT` blocks. Each `VEVENT` is one calendar entry — date, time, title, location, description. Your calendar app (Google Calendar, Apple Calendar, Outlook) parses the file and renders each `VEVENT` as one event.
-
-If we want to express a *recurring* entry (e.g. "Vinyasa every Tuesday at 6pm until June 1"), iCal gives us two ways:
-
-**Option A — single `VEVENT` + `RRULE`** (one entry with a "recurrence rule"):
-```
-BEGIN:VEVENT
-UID:schedule-42-person-123@knottyyoga.com
-SUMMARY:Vinyasa Flow
-DTSTART:20260106T180000Z
-DTEND:20260106T190000Z
-RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20260601T000000Z
-END:VEVENT
-```
-The calendar app expands this locally into ~26 visible Tuesday entries. If the user marks a per-instance exception ("won't go Jan 27"), we add an `EXDATE` line to skip that one — standard iCal mechanism.
-
-**Option B — one `VEVENT` per occurrence:**
-```
-BEGIN:VEVENT
-UID:booking-001@knottyyoga.com
-SUMMARY:Vinyasa Flow
-DTSTART:20260106T180000Z
-DTEND:20260106T190000Z
-END:VEVENT
-BEGIN:VEVENT
-UID:booking-002@knottyyoga.com
-SUMMARY:Vinyasa Flow
-DTSTART:20260113T180000Z
-DTEND:20260113T190000Z
-END:VEVENT
-[... 24 more VEVENT blocks ...]
-```
-
-**Trade-offs:** both render identically in the user's calendar. Option A produces a smaller attachment and is cleaner; Option B is more verbose but lets each occurrence be addressed independently.
-
-**Question for you:** my recommendation is **Option A** (single `VEVENT` + `RRULE`) for the email sent when a user *adds* a template entry — it matches "appropriate recurrence" wording in the Overview, smaller email, clean exception handling via `EXDATE`. And **Option B** (per-instance `VEVENT`s) for the weekly Sunday digest — that email already filters for this week's exceptions, so listing each session separately is simpler. Confirm or pick a different split.
-
-- Mason- I'll go with your recommendation.
-
-## 9.2 Couple / family membership seat count (was OQ-25)
-
-**What I was asking:** every membership product has a `seats_total` field — 1 for a solo membership, 2 for a couple, 4 for a family of four, etc. The system supports any positive integer.
-
-The question is purely about which products *you want to offer*:
-- Just a "couple membership" (one new product, `seats_total = 2`)?
-- Couple + family ("couple membership" with `seats_total = 2` and a separate "family membership" with `seats_total = 4`)?
-- More tiers?
-
-**My recommendation:** start with just a "couple membership" (`seats_total = 2`) as a single product. If a family use case ever comes up, adding a "family membership" product later is trivial — just a new row in `products` + `product_prices`. The underlying tables support arbitrary N.
-
-**You decide:** which membership-tier products do you want to offer at launch? Couple only, or also family?
-
-- Mason- Memberships are already supported. We have a couple membership and a family membership for three people. If I need to, I could add a four person one later but I've been doing this fifteen years and never hit a need for that especially since we don't support kids so we have only had a couple with a college age kid and a couple of thruples.
-
-## 9.3 Class tags / controlled vocabulary (was OQ-32)
-
-**What a tag is:** a label admin attaches to a class to group similar classes. Examples in your studio:
-- The "Vinyasa Flow" class is tagged `yoga`, `vinyasa`
-- The "Aerial 101" class is tagged `aerial`
-- The "Partner Acro - All Levels" class is tagged `partner-acro`, `acrobatics`
-
-**What tags are used for:**
-1. **Filter / search the catalog:** "show me all aerial classes this month"
-2. **Color-code the calendar:** yoga = green, aerial = purple, etc.
-3. **Monthly attendance threshold prerequisite (SL-10):** "≥ 4 classes tagged `partner-acro` last calendar month → grants the `acro_club` permission for next month"
-
-**Why the storage choice matters:** if tags are *free-form text* (admin types whatever into a tag field on each class), the same concept can end up spelled different ways — `vinyasa` vs `Vinyasa` vs `vinyasa-flow` — and that breaks the attendance threshold rule in SL-10 because the count "≥ 4 classes tagged `partner-acro`" would miss the classes tagged `partneracro`.
-
-If tags are a *controlled vocabulary* (admin maintains a small `class_tags` table — one row per tag — and classes are linked via a `class_tag_assignments` join), the admin has to *create* a tag before applying it. No drift. Tags are first-class entities admin can edit (rename, recolor, retire).
-
-**My recommendation:** controlled vocabulary. Because SL-10 prerequisites depend on accurate tag-based counts, drift would be a real bug.
-
-**Confirm the recommendation or push back if you prefer free-form.**
-
-## 9.4 iCal feed refresh hint (was OQ-40)
-
-**Background:** WD-6 is the "per-user subscribable iCal feed URL" — a `webcal://...` URL the user adds to Google Calendar / Apple Calendar / Outlook once. After that, the calendar app periodically re-fetches the URL on its own and updates the user's calendar.
-
-**How often does the calendar app re-fetch?** It looks at the `X-PUBLISHED-TTL` header in our `.ics` response (TTL = "time to live"). That header is a *hint* from us to the calendar app saying "you don't need to re-check more often than this." The calendar app may follow the hint or not — most do.
-
-- TTL too short (1 minute): every calendar app pings our server constantly, wastes resources.
-- TTL too long (1 day): a user makes a booking change at 9am, doesn't see it in their calendar until 9am the next day.
-
-**My recommendation:** 1 hour (`X-PUBLISHED-TTL:PT1H` in ISO-duration format). Standard for calendar feeds, good middle ground.
-
-**Confirm 1 hour or pick something else.**
-
----
-
-# 10. Notes on Process
+# 9. Notes on Process
 
 - Plan is intentionally heavy on phase boundaries so each phase can ship and be tested in isolation.
 - Layering rule per phase: schema → table helpers → business logic → endpoints → frontend → admin metadata → tests at every layer (tests are not a separate phase).
