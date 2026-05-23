@@ -965,10 +965,13 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.1 Taxonomy
 - **OQ-1.** Confirm taxonomy: workshops = `class_schedules` with `is_series=true` and length 1 (one materialized session)? Recommended: yes — single code path for series + workshop. Or do workshops stay as standalone one-off `event` Products outside the class system?
+	- Mason- I'm fine going with the recommendation.
 - **OQ-2.** Are "events" in the existing system going away in favor of all-classes, or do one-off non-class events (e.g. studio anniversary party) keep using the existing `event` product kind? Recommended: keep events for non-class one-offs.
+	- Mason- I'm fine going with the recommendation.
 
 ### 8.2 Attendance template semantics (blocks Phase 5)
 - **OQ-3.** Does adding a class to your attendance template create a confirmed `booking` row (consuming capacity) at materialization time, or is it a soft hold? Recommended: confirmed `booking` row (simpler, fewer code paths, capacity is accurate). Implications: a popular class with many templating members may run out of capacity for drop-ins; drop-ins land on waitlist. That's by design.
+	- Mason- The template is more a fitness goals kind of thing ()
 - **OQ-4.** What's the policy when a template entry cannot be auto-booked because capacity is full at materialization? Recommended: waitlist by default; user can opt out of "auto-waitlist if full" in preferences.
 
 ### 8.3 Included-with-membership accounting
