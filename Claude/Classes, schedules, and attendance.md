@@ -985,21 +985,29 @@ These are decisions I need from you before implementation begins on the affected
 - **OQ-7.** Pro-rated price formula: `(per_instance_base_price[tier]) × remaining_sessions`. Confirm this is the right formula (vs. e.g. `(series_total_price[tier]) × (remaining / total)` which can differ because of any series-bundle discount). Recommended: per-instance × remaining, since you explicitly mention "per-instance base price... used for pro-rating".
 	- Mason- I'll go with the recommendation.
 - **OQ-8.** Mid-series cancellation refund policy (S-17): default to cancellation-policy-windows applied per-remaining-instance, or no refund after series starts? Recommend the former.
-	- Mason- I want to go with non cancellation available on the user end and require an admin to grant it and choose to offer a partial refund or voucher on a case by case basis. Like I said, there is a fixed cost to bring in an 
+	- Mason- I want to go with non cancellation available on the user end and require an admin to grant it and choose to offer a partial refund or voucher on a case by case basis. Like I said, there is a fixed cost to bring in an outside instructor so signing up for a session is a commitment.
 - **OQ-9.** If `series_min_not_met_policy = 'admin_decides'`, who gets notified and what's the surface? Recommended: an `admin_alerts` digest row + email to all addresses in `admin_alert_recipients`.
+	- Mason- That sounds fine to me.
 
 ### 8.5 Skill levels
 - **OQ-10.** Can a person have a skill level revoked? Recommended: yes, captured in `skill_level_assignments` with `removed_us` + reason. (Helpful for "we re-evaluated, this person isn't actually inverting safely yet".)
+	- Mason- yes. As people's fitness levels change, sometime people regress and are no longer capable of what they used to be able to do.
 - **OQ-11.** When skill requirements fail at booking, can staff override? Recommended: yes, admin or `manage_classes` permission bypasses the check with a logged reason.
+	- Mason- Yes, that sounds like a good idea.
 - **OQ-12.** Do skill levels gate template-add too (not just drop-in booking)? Recommended: yes — eligible classes for templates already filter by skill requirements.
+	- Mason- I'll go with the recommendation.
 
 ### 8.6 Sign-up windows
 - **OQ-13.** Do you want a single global default per permission, or per-product overrides via `product_booking_windows`? Recommended: per-product (existing model), with a class product picking up defaults at class creation if not specified.
+	- Mason- I'll go with the recommendation.
 - **OQ-14.** When does a user's "best window" recompute? At booking time (live), or cached? Recommended: live — permission set is small and this is cheap.
+	- Mason- I'll go with the recommendation.
 
 ### 8.7 Notifications
 - **OQ-15.** Should per-instance exception notes be email-pushed to instructors, or staff-portal-only? Recommended: staff-portal only with daily digest email of fresh notes (don't spam the instructor with per-note emails).
+	- Mason- I like this suggestion.
 - **OQ-16.** Should the weekly digest include classes the user is *eligible* for but hasn't templated? Could nudge engagement but lengthens email. Recommended: no by default, opt-in toggle "include suggestions".
+	- Mason- Let's just go with what they have signed up for or put in a template.
 
 ### 8.8 Check-in & no-show
 - **OQ-17.** What's "no-show"? Recommended: confirmed booking + not checked in by `class_checkin_window_after_minutes` after class end → status flips to `no_show` automatically by hourly job. Manual override possible.
