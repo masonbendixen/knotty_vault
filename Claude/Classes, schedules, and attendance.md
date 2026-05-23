@@ -124,7 +124,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CS-4** Admin deactivates a schedule entry; choose whether to cancel materialized future sessions
 - **CS-5** Admin views the master class schedule grid (week or month view) per facility
 - **CS-6** Schedule materializer is idempotent (running twice doesn't double-create sessions) and respects existing bookings (won't blow away a session that has confirmed attendees)
-- **CS-7** Per-instance description override: admin (or assigned instructor) replaces the default description for a specific session ("this Tuesday's Vinyasa is yin-style restorative"). Override is surfaced on the user homepage's today-classes feed as a teaser to drive attendance, not just in a calendar tooltip
+- **CS-7** Per-instance class notes: the class's default description is preserved; in addition to it, the assigned instructor can attach a per-session note for sessions they teach ("today we'll work on forward compression and abdominals"), and staff with the right permission can attach a per-session note for any session. Notes are surfaced on the user homepage's today-classes feed (alongside the default description) as a teaser to drive attendance — but only for classes the user has on their attendance template or has booked, NOT for browsable-but-unclaimed eligible classes
 - **CS-8** Multi-occupancy rooms: materializer permits parallel schedule entries / sessions in the same room as long as combined occupancy ≤ `location_rooms.concurrent_capacity` (e.g. open gym + skill-development workshop running simultaneously). Hard block only when capacity would overflow
 
 ## 2.3 Class Series & Workshops (paid bundle of instances)
@@ -148,10 +148,10 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **M-6** Non-members see only the offerings open to non-members (workshops, series, the intro workshop — M-12) at the non-member price; recurring classes are not browsable / bookable to non-members at all
 - **M-7** Membership-included class attendance is recorded via a `booking` row only — NO purchase row, no `purchase_id` tied to the booking. Bookings are an attendance / metrics record, not a money trail. The `bookings.purchase_id` column is nullable for class bookings under an active membership entitlement
 - **M-8** Membership tier upgrade unlocks newly-eligible classes in real time (no manual rebooking)
-- **M-9** Guest pass: an active member can book one non-member friend into a single class. Redemption may auto-create a minimal guest account on the spot, no pre-existing `gift_permissions` relationship required. Per-tier configurable cap on guest-pass frequency (see OQ-26)
+- **M-9** Guest pass: an active member can book a non-member friend into a single class designated by admin as guest-pass eligible (allow-list per `classes` row, default off). Redemption may auto-create a minimal guest account on the spot, no pre-existing `gift_permissions` relationship required. Guest-pass frequency is configured per membership tier — different tiers can have different guest-pass allowances (fitness memberships typically frequent / marketing-oriented; spa memberships sparse / luxury perk). Per-tier configuration also includes an optional "guest must be a new person" flag that prevents repeatedly using the same friend
 - **M-10** Effective-dated price changes via `price_schedules`: admin sets "starting July 1 the gold-tier workshop price becomes $X" without disrupting in-flight series purchases or subscription periods. All tiered pricing — class series, workshops, couple/family memberships, specialty-instructor rates (SI-6) — flows through this same mechanism
 - **M-11** Couple / family membership tier: a single subscription covers 2–N specified people via multi-seat entitlement (`seats_total > 1`). Presented in the UI as one product, not "buy two memberships". Per-tier pricing via `product_prices`
-- **M-12** New-member intro workshop as the non-member on-ramp: recurring class access requires *either* an active membership *or* a recent intro-workshop attendance entitlement. The intro workshop itself is sold to non-members and is a `class_schedule` of length 1 (per P-3). Validity window of the post-intro-workshop entitlement is configurable (OQ-30)
+- **M-12** Intro workshop as the non-member discovery event: a `class_schedule` of length 1 (per P-3) sold to non-members. Functions as a one-time sample class + sales pitch; attending the intro workshop grants no entitlement, no class access, no permission. Non-members who want to attend recurring classes must purchase a membership afterward. The intro workshop is the only recurring-class-like offering visible to non-members beyond workshops and series
 - **M-13** Per-session price override: admin sets a higher or lower price for a single class series / workshop instance (special guest teacher week, holiday discount, sliding scale). Override is tied to the specific session, not the schedule
 - **M-14** Partner / friend booking: an active member books an additional adult attendee (partner, friend) for a session using a multi-seat entitlement. Explicitly NOT for children — no kids classes will ever be offered
 
@@ -173,9 +173,9 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **SL-7** Class detail page shows skill-level requirements prominently with "you have / don't have"
 - **SL-8** Staff portal: search a person, view their current skill levels, assign new ones, revoke existing ones
 - **SL-9** History of skill-level changes per person (audit trail)
-- **SL-10** Attendance-count prerequisite: a class can require ≥ N attended sessions of a related class or tag within a rolling window (e.g. ≥ 4 partner-acro classes in the previous calendar month) before the user can book
-- **SL-11** Same-day sequencing prerequisite: a class can require the user to also be booked for a specific earlier-same-day class — e.g. partner-acro hour-2 can only be booked if the user is also booked for hour-1 the same day
-- **SL-12** Prerequisite expressions compose skill levels (SL-5), attendance counts (SL-10), and same-day sequencing (SL-11). Staff override available with logged reason. P-5 makes this enforceable because users cannot self-attribute attendance
+- **SL-10** Calendar-month attendance threshold → auto-granted permission. A class can require a specific permission (e.g. `acro_club`) that is granted by a scheduled job: at the end of each calendar month, the job counts attendances against a configured set of source classes (e.g. all `partner-acro`-tagged classes); if the count meets the configured threshold for a user, the job grants that user the destination permission for the *current and next* calendar month. If the user doesn't meet the threshold again the following month, the permission auto-expires. Implementation = `attendance_threshold_rules` table (source-class-set, threshold, granted_permission_id) + monthly scheduled job + standard permission gate at booking time. No rule-engine DSL needed — pure SQL plus the job
+- **SL-11** Same-day sequencing prerequisite via a `predecessor_class_schedule_id` field on `class_schedules`. When the user attempts to book a class with `predecessor_class_schedule_id` set, the server verifies the user is also booked for that predecessor on the same day. If the user cancels the predecessor booking, the dependent booking is auto-cancelled atomically in `BookingHelper::CancelBooking` (NO email — silent cascade)
+- **SL-12** The three prerequisite mechanisms — skill mastery (SL-5/6), monthly-attendance permissions (SL-10), and same-day predecessor (SL-11) — all compose at the standard booking-permission gate. There is no separate "rule engine"; each mechanism is just a SQL check (skill check / permission check / same-day-booking check) wired into `BookingHelper`. Staff with `manage_classes` permission can override any of them with a logged reason. P-5 ensures the attendance counts that feed SL-10 are trustworthy because users cannot self-attribute attendance
 
 ## 2.7 Capacity, Waitlist, and Min Attendees
 - **CAP-1** Each class instance has a max capacity from the class default or schedule override
@@ -188,16 +188,19 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CAP-8** Waitlist auto-confirm cap (user preference): "auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist". Lets users avoid last-minute scrambles to a class they no longer plan to attend
 
 ## 2.8 Attendance Templates (Planned Recurring Attendance)
+
+The template is a **personal fitness-planning tool**, not a booking. It captures the user's aspirational weekly routine ("I plan to work out Monday / Thursday / Saturday on a good week"). It does NOT create `booking` rows, does NOT consume `event_sessions.capacity`, and does NOT participate in the waitlist. The studio is membership-based — the goal is that people just show up when they can. If capacity issues ever force template entries to translate into hard bookings, that's a future "good problem to have" — punt until then.
+
 - **AT-1** User views a weekly grid of classes they are eligible to attend, marks the ones they normally attend → that becomes their attendance template
-- **AT-2** Template is per-schedule-entry (recurring), not per-instance, so it auto-applies to all future generated sessions
-- **AT-3** User edits / removes template entries; system re-syncs forward-looking bookings
-- **AT-4** Adding a template entry sends a confirmation email with a recurring iCal attachment (`RRULE` covering future instances) for the schedule entry
-- **AT-5** Per-instance exception: user marks "won't attend this Tuesday" with an optional note to instructor (e.g. "on vacation")
-- **AT-6** Per-instance addition: user marks "will attend this Thursday in addition to my template" (one-off)
-- **AT-7** User homepage shows today's eligible classes with checkmarks for those on their template (and for one-off adds) and unchecked rows for eligible classes they haven't claimed; one click to flip state
-- **AT-8** Template attendance does NOT create a purchase or consume capacity yet for membership-included classes — see §2.10 for capacity model debate (Open Question)
+- **AT-2** Template is per-schedule-entry (recurring) and forward-looking — it applies to all future materialized sessions of the marked schedule, without creating any booking rows
+- **AT-3** User edits / removes template entries freely — no bookings to sync, no cancellation cascade, just an update to the template entry table
+- **AT-4** Adding a template entry sends a confirmation email with a recurring iCal attachment covering the future occurrences of the schedule, so the user can see the plan in their calendar app
+- **AT-5** Per-instance exception: user marks "won't attend this Tuesday" with an optional note to the instructor (e.g. "on vacation") — affects what shows on the homepage and weekly digest, does not affect any booking (none exist)
+- **AT-6** Per-instance addition: user marks "will attend this Thursday in addition to my template" — same model as AT-5, just inverted (an extra-this-week marker)
+- **AT-7** User homepage shows today's eligible classes with checkmarks for those on their template (and for one-off additions) and unchecked rows for eligible classes they haven't claimed; one click flips state
+- **AT-8** Capacity accounting under M-7: bookings only get created at staff check-in (the user is actually present). Template entries never block capacity for anyone else
 - **AT-9** Calendar view shows template attendance overlaid on the studio schedule
-- **AT-10** Per-instance exception note is visible to the assigned instructor in their staff portal
+- **AT-10** Per-instance exception note is visible to the assigned instructor in their staff portal (per N-7, also delivered as a daily digest email of fresh exception notes)
 
 ## 2.9 Weekly Digest Email
 - **WD-1** Sunday at noon (configurable wall clock + timezone per facility), a cron job sends each user a "this week" email
@@ -211,10 +214,9 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CI-1** Staff opens check-in screen for a session; configurable window (default −1h, +3h) controls when it's accessible
 - **CI-2** Check-in screen shows pre-populated list: template attendees + paid bookings + people who attended this class instance over the last 4 weeks
 - **CI-3** Staff types a name to autocomplete and add an attendee not in the pre-populated list
-- **CI-4** Staff marks attendance with one click; record stored in `bookings.checked_in_us`
+- **CI-4** Staff marks attendance with one click. For membership-included recurring classes there is no advance booking (AT-8), so the check-in *creates* the `booking` row with `checked_in_us` set and `purchase_id IS NULL`. For paid bookings (workshops, series, intro, guest passes), the booking already exists and check-in just sets `checked_in_us` on it
 - **CI-5** Walk-in flow: type a name → if no person, create on the spot (existing pattern); record as `is_walkin = true`
-- **CI-6** Check-in within the configured pre-window shows on the user's homepage as "checked in" confirmation
-- **CI-7** Staff can mark `attended` / `no_show` after class has ended; defaults to no_show if not checked in within window
+- **CI-7** Staff can mark `attended` / `no_show` after class has ended; for paid bookings, defaults to `no_show` if not checked in within window (existing `EventReminderHelper`-style hourly job)
 - **CI-8** Staff can undo a check-in within the configurable post-window
 - **CI-9** Configurable secrets: `class_checkin_window_before_minutes` (60), `class_checkin_window_after_minutes` (180)
 
@@ -243,7 +245,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **ST-1** Instructor opens "request transfer" or "request trade" for one of their assigned class instances (reuse Provider Portal `shift_change_requests`)
 - **ST-2** Target instructor accepts / rejects; admin reviews if bookings present (existing flow)
 - **ST-3** Approval reassigns the instructor on the `event_session_staffing` row (NOT `provider_person_id` on a service session — class instances use the staffing table)
-- **ST-4** Attendees of affected classes are notified via email of the new instructor — **no refund** (per Overview, instructor change ≠ refundable, unlike services)
+- **ST-4** Attendees of affected classes are NOT emailed about the instructor change (avoid excessive email). The new instructor is shown on the user's homepage today-classes feed and on the calendar — that's the channel of communication. **No refund** either (per Overview, instructor change ≠ refundable, unlike services)
 - **ST-5** No `free_cancel_until_us` extension for class instructor changes (different from services)
 - **ST-6** Admin view of "who is teaching what when" across the studio
 
@@ -260,9 +262,9 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **N-2** Cancellation email with refund details
 - **N-3** Waitlist promotion email
 - **N-4** Series auto-cancellation email (min not met)
-- **N-5** Instructor substitution email
+- **N-5** Instructor substitution is NOT emailed — surfaced on the user's homepage / calendar only (ST-4)
 - **N-6** Weekly Sunday digest (§2.9)
-- **N-7** Per-instance exception note routed to instructor (visible in their staff portal, not necessarily email)
+- **N-7** Per-instance exception notes are visible to the assigned instructor in their staff portal, AND delivered as a daily digest email of fresh notes received in the last 24h (avoids per-note emails which would spam, but ensures instructors see the notes without having to log in)
 - **N-8** Reminder email N hours before class (existing `EventReminderHelper`)
 - **N-9** "Sign-up window opens" reminder (§2.13)
 - **N-10** Minimal user notification preferences table for opt-outs
@@ -317,6 +319,13 @@ Options that surfaced during planning and were rejected. Rationale recorded here
 - **Class-pack household sharing across multiple people.** Replaced by the couple / family membership tier (M-11), modeled at the membership level rather than the pack level.
 - **Auto-template-suggest engagement nudge** ("you attended X last Tuesday — add to your template?"). User-initiated template is sufficient; no auto-nudging.
 - **Substitute-instructor matching / qualified-pool ranking.** Admin reaches out directly when an instructor is unavailable. Not enough volume to warrant automation.
+- **$0 purchase rows for membership-included class bookings.** Originally proposed to keep the `booking → purchase` invariant intact for audit, but rejected: class bookings are an *attendance / metrics* record, not a money trail. `bookings.purchase_id` is nullable for membership-included recurring class attendance. Money trails live on paid bookings (workshops, series, intro, guest pass).
+- **Attendance templates as confirmed bookings.** Originally proposed to auto-create `booking` rows at session-materialization time, which would consume capacity and trigger the waitlist. Rejected: the template is a personal fitness-planning tool, not a reservation. No bookings are created from templates; bookings exist only when (a) staff checks the user in, or (b) the user has paid (workshops / series / intro / guest pass). Revisit if capacity issues ever force the studio to hard-reserve template entries — "good problem to have" territory.
+- **Intro-workshop attendance grants temporary access to recurring classes.** Originally proposed as a non-member on-ramp ("attend intro workshop → 14 days of class access"). Rejected: the intro workshop is just a one-time sample event + sales pitch. It does NOT grant any entitlement or permission. Non-members who want recurring class access must buy a membership.
+- **Email on instructor substitution.** Originally proposed as a >24h-in-advance email to affected attendees. Rejected to avoid email overload — the new instructor is shown on the user's homepage today-classes feed and on the calendar instead.
+- **Pre-window check-in badge on user homepage.** Originally proposed as a "checked in" confirmation visible on the home page once staff has checked the user in. Rejected as too complicated for the value.
+- **Weekly digest including eligible-but-untemplated suggestions.** Originally proposed as an engagement nudge ("classes you're eligible for this week — want to add to your template?"). Rejected: the digest only lists items the user has signed up for or marked on their template.
+- **Email when same-day predecessor (SL-11) auto-cancels its dependent booking.** Originally proposed as a courtesy explanation. Rejected: the cascade is silent (no email). Documented in the use case (SL-11).
 
 ### Consolidated (not rejected, but not standalone)
 - **Bookable-from-anyone (member books a guest with no prior gift-permission setup).** Folded into M-9 as the "auto-create a minimal guest account on guest-pass redemption" implementation note.
@@ -961,7 +970,94 @@ Each of these will be its own `.md` in `C:\Users\mason\Documents\Obsidian\Knotty
 
 # 9. Open Questions
 
-These are decisions I need from you before implementation begins on the affected phases. Please answer inline (✅ / chosen option / freeform). I have a recommendation for each — say "default" and I'll take the recommended path.
+The following four items need more discussion before the phases that depend on them can be planned. Everything from the prior open-question list (OQ-1 through OQ-42) has been resolved — decisions are now reflected in §2 / §3 / §4 / §5 / §6.
+
+## 9.1 iCal terms (was OQ-20) — `VEVENT`, `RRULE`, multi-event bundles
+
+**What these terms mean:**
+
+When the system emails you an `.ics` calendar attachment, the file contains one or more `VEVENT` blocks. Each `VEVENT` is one calendar entry — date, time, title, location, description. Your calendar app (Google Calendar, Apple Calendar, Outlook) parses the file and renders each `VEVENT` as one event.
+
+If we want to express a *recurring* entry (e.g. "Vinyasa every Tuesday at 6pm until June 1"), iCal gives us two ways:
+
+**Option A — single `VEVENT` + `RRULE`** (one entry with a "recurrence rule"):
+```
+BEGIN:VEVENT
+UID:schedule-42-person-123@knottyyoga.com
+SUMMARY:Vinyasa Flow
+DTSTART:20260106T180000Z
+DTEND:20260106T190000Z
+RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20260601T000000Z
+END:VEVENT
+```
+The calendar app expands this locally into ~26 visible Tuesday entries. If the user marks a per-instance exception ("won't go Jan 27"), we add an `EXDATE` line to skip that one — standard iCal mechanism.
+
+**Option B — one `VEVENT` per occurrence:**
+```
+BEGIN:VEVENT
+UID:booking-001@knottyyoga.com
+SUMMARY:Vinyasa Flow
+DTSTART:20260106T180000Z
+DTEND:20260106T190000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:booking-002@knottyyoga.com
+SUMMARY:Vinyasa Flow
+DTSTART:20260113T180000Z
+DTEND:20260113T190000Z
+END:VEVENT
+[... 24 more VEVENT blocks ...]
+```
+
+**Trade-offs:** both render identically in the user's calendar. Option A produces a smaller attachment and is cleaner; Option B is more verbose but lets each occurrence be addressed independently.
+
+**Question for you:** my recommendation is **Option A** (single `VEVENT` + `RRULE`) for the email sent when a user *adds* a template entry — it matches "appropriate recurrence" wording in the Overview, smaller email, clean exception handling via `EXDATE`. And **Option B** (per-instance `VEVENT`s) for the weekly Sunday digest — that email already filters for this week's exceptions, so listing each session separately is simpler. Confirm or pick a different split.
+
+## 9.2 Couple / family membership seat count (was OQ-25)
+
+**What I was asking:** every membership product has a `seats_total` field — 1 for a solo membership, 2 for a couple, 4 for a family of four, etc. The system supports any positive integer.
+
+The question is purely about which products *you want to offer*:
+- Just a "couple membership" (one new product, `seats_total = 2`)?
+- Couple + family ("couple membership" with `seats_total = 2` and a separate "family membership" with `seats_total = 4`)?
+- More tiers?
+
+**My recommendation:** start with just a "couple membership" (`seats_total = 2`) as a single product. If a family use case ever comes up, adding a "family membership" product later is trivial — just a new row in `products` + `product_prices`. The underlying tables support arbitrary N.
+
+**You decide:** which membership-tier products do you want to offer at launch? Couple only, or also family?
+
+## 9.3 Class tags / controlled vocabulary (was OQ-32)
+
+**What a tag is:** a label admin attaches to a class to group similar classes. Examples in your studio:
+- The "Vinyasa Flow" class is tagged `yoga`, `vinyasa`
+- The "Aerial 101" class is tagged `aerial`
+- The "Partner Acro - All Levels" class is tagged `partner-acro`, `acrobatics`
+
+**What tags are used for:**
+1. **Filter / search the catalog:** "show me all aerial classes this month"
+2. **Color-code the calendar:** yoga = green, aerial = purple, etc.
+3. **Monthly attendance threshold prerequisite (SL-10):** "≥ 4 classes tagged `partner-acro` last calendar month → grants the `acro_club` permission for next month"
+
+**Why the storage choice matters:** if tags are *free-form text* (admin types whatever into a tag field on each class), the same concept can end up spelled different ways — `vinyasa` vs `Vinyasa` vs `vinyasa-flow` — and that breaks the attendance threshold rule in SL-10 because the count "≥ 4 classes tagged `partner-acro`" would miss the classes tagged `partneracro`.
+
+If tags are a *controlled vocabulary* (admin maintains a small `class_tags` table — one row per tag — and classes are linked via a `class_tag_assignments` join), the admin has to *create* a tag before applying it. No drift. Tags are first-class entities admin can edit (rename, recolor, retire).
+
+**My recommendation:** controlled vocabulary. Because SL-10 prerequisites depend on accurate tag-based counts, drift would be a real bug.
+
+**Confirm the recommendation or push back if you prefer free-form.**
+
+## 9.4 iCal feed refresh hint (was OQ-40)
+
+**Background:** WD-6 is the "per-user subscribable iCal feed URL" — a `webcal://...` URL the user adds to Google Calendar / Apple Calendar / Outlook once. After that, the calendar app periodically re-fetches the URL on its own and updates the user's calendar.
+
+**How often does the calendar app re-fetch?** It looks at the `X-PUBLISHED-TTL` header in our `.ics` response (TTL = "time to live"). That header is a *hint* from us to the calendar app saying "you don't need to re-check more often than this." The calendar app may follow the hint or not — most do.
+
+- TTL too short (1 minute): every calendar app pings our server constantly, wastes resources.
+- TTL too long (1 day): a user makes a booking change at 9am, doesn't see it in their calendar until 9am the next day.
+
+**My recommendation:** 1 hour (`X-PUBLISHED-TTL:PT1H` in ISO-duration format). Standard for calendar feeds, good middle ground.
+
+**Confirm 1 hour or pick something else.**
 
 ### 8.1 Taxonomy
 - **OQ-1.** Confirm taxonomy: workshops = `class_schedules` with `is_series=true` and length 1 (one materialized session)? Recommended: yes — single code path for series + workshop. Or do workshops stay as standalone one-off `event` Products outside the class system?
