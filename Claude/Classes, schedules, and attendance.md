@@ -971,16 +971,21 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.2 Attendance template semantics (blocks Phase 5)
 - **OQ-3.** Does adding a class to your attendance template create a confirmed `booking` row (consuming capacity) at materialization time, or is it a soft hold? Recommended: confirmed `booking` row (simpler, fewer code paths, capacity is accurate). Implications: a popular class with many templating members may run out of capacity for drop-ins; drop-ins land on waitlist. That's by design.
-	- Mason- The template is more a fitness goals kind of thing ()
+	- Mason- The template is more a fitness goals kind of thing (like I plan on working out Monday, Thursday, Saturday on a good week). My studio is membership based with the goal that people can just show up when they can. If we start having capacity issues and need to have this translate into hard booking at some point, I'll put that in the good problem to have territory and will deal with it then. Please document this.
 - **OQ-4.** What's the policy when a template entry cannot be auto-booked because capacity is full at materialization? Recommended: waitlist by default; user can opt out of "auto-waitlist if full" in preferences.
+	- Mason- Like I said, the template is more of a planning thing for the user than a hard limit for a wait list.
 
 ### 8.3 Included-with-membership accounting
 - **OQ-5.** Should an included-with-membership booking create a $0 `purchase` row (recommended for audit consistency) or a `booking` with `purchase_id IS NULL`?
+	- Mason- no no no. I want to track attendance for metrics but this isn't for purchases.
 - **OQ-6.** For class-pack entitlements (S-3 / class packs), does each class booking consume one `entitlement_assignment` seat, with a `consumed_us` column on the assignment? Or is the entitlement just a permission grant and the count is tracked elsewhere? Recommended: a seat-consume model that maps onto multi-seat assignment cleanly.
+	- Mason- I'll go with the recommendation.
 
 ### 8.4 Series & pro-rating
 - **OQ-7.** Pro-rated price formula: `(per_instance_base_price[tier]) × remaining_sessions`. Confirm this is the right formula (vs. e.g. `(series_total_price[tier]) × (remaining / total)` which can differ because of any series-bundle discount). Recommended: per-instance × remaining, since you explicitly mention "per-instance base price... used for pro-rating".
+	- Mason- I'll go with the recommendation.
 - **OQ-8.** Mid-series cancellation refund policy (S-17): default to cancellation-policy-windows applied per-remaining-instance, or no refund after series starts? Recommend the former.
+	- Mason- I want to go with non cancellation available on the user end and require an admin to grant it and choose to offer a partial refund or voucher on a case by case basis. Like I said, there is a fixed cost to bring in an 
 - **OQ-9.** If `series_min_not_met_policy = 'admin_decides'`, who gets notified and what's the surface? Recommended: an `admin_alerts` digest row + email to all addresses in `admin_alert_recipients`.
 
 ### 8.5 Skill levels
