@@ -1011,23 +1011,31 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.8 Check-in & no-show
 - **OQ-17.** What's "no-show"? Recommended: confirmed booking + not checked in by `class_checkin_window_after_minutes` after class end → status flips to `no_show` automatically by hourly job. Manual override possible.
+	- Mason- This is a good idea.
 - **OQ-18.** Does check-in within the pre-window create a record visible to the user on home page (CI-6)? Recommended: yes — a "Checked in" badge with QR / instructions to find the room.
+	- Mason- I don't think we need something this complicated.
 
 ### 8.9 Shift trades for classes
 - **OQ-19.** When an instructor change happens for a class instance, do we email each attendee, or include it in the next-class reminder? Recommended: send a notification email if change is > 24h before class; otherwise rely on existing reminder email content to update.
+	- Mason- I don't want to excessively email users. I don't think that this is needed. I think we show the classes on their home page with the instructor.
 
 ### 8.10 iCal
 - **OQ-20.** For recurring template entries, use a single `RRULE` per template entry, or one VEVENT per materialized instance? Recommended: single `RRULE` for the email-on-add confirmation (matches "appropriate recurrence" wording); but per-instance VEVENTs in the weekly digest for exception accuracy.
+	- Mason- I have no idea with RRULE or VEVENT is. Can you define these terms and explain this more clearly? Maybe with an example?
 - **OQ-21.** UID format for iCal — recommend `<scheduleId>-<sessionId>@<facility-domain>` or `<bookingId>@<facility-domain>`. Pick one before generating ICS so calendar apps de-dupe correctly. Recommended: booking-id-based UIDs to handle cancellations cleanly (matching `STATUS:CANCELLED`).
+	- Mason- I'll go with the recommendation.
 
 ### 8.11 Reliability (long-term, OK to defer)
 - **OQ-22.** Penalty for repeat no-show: soft warning email, restricted template-claim, restricted future booking, or staff-discretion only? Recommended: soft-warning + admin-visible reliability score; harsher penalties stay manual.
+	- Mason- I'll go with the recommendation.
 
 ### 8.12 Specialty instructor cost (Phase 12)
 - **OQ-23.** Per-class-type max attendees per instructor (Overview mentions "someone might be willing to take more people in handstand than aerial") — store as `specialty_instructor_costs.instructor_max_attendees` per (instructor × class), or as a separate `instructor_class_preferences` table? Recommended: separate table to allow defaults that aren't tied to a specific session's cost record.
+	- Mason- let's go with the separate table.
 
 ### 8.13 Data backfill
 - **OQ-24.** Are there existing classes / event sessions in the prod DB that need to be migrated to the new schema, or is this all greenfield (per `feedback_no_premature_defensive_code.md` memory)? Recommended treatment: greenfield — no backfill code, only seed data.
+	- Mason- we haven't deployed yer
 
 ### 8.14 Couple / family membership (M-11)
 - **OQ-25.** Upper bound on N (seats)? Couples-only (2) or families up to 4 or N? Recommended: configurable per-product with a soft cap of 4 to start.
