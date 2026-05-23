@@ -329,74 +329,63 @@ Options that surfaced during planning and were rejected. Rationale recorded here
 
 Buckets express priority + sequencing constraint, not just nice-ness. "Must have" = required for first useful version of class scheduling; "Should have" = needed before broad rollout; "Nice to have" = improves engagement / retention; "Could have" = useful but not differentiated; "Stretch" = long-term / nontrivial.
 
-## 4.1 Must Have (MVP — "we can run classes")
+## 5.1 Must Have (MVP — "we can run classes")
 - C-1, C-2, C-3, C-4, C-5  *(class catalog + display)*
-- CS-1, CS-2, CS-3, CS-4, CS-5, CS-6  *(schedule authoring + materialization)*
-- M-1, M-2, M-3, M-4, M-5, M-6, M-7  *(membership-gated pricing and access — the central business model)*
+- CS-1 .. CS-6  *(schedule authoring + idempotent materialization)*
+- CS-8  *(multi-occupancy rooms per P-4 — required from day 1 because rooms are shared)*
+- M-1, M-3, M-4, M-5, M-6, M-7  *(membership-gated access and pricing — the central business model under P-1)*
+- M-12  *(intro workshop as the non-member on-ramp — required so the gate has a way in)*
 - CAP-1, CAP-2, CAP-3, CAP-7  *(capacity + waitlist for class instances)*
-- BC-1, BC-2, BC-3, BC-4  *(book, cancel, admin cancel, refund)*
+- BC-1, BC-2, BC-3, BC-4, BC-5  *(book, cancel-with-no-refund per P-6, admin cancel with refund, policy display)*
 - SE-1, SE-2, SE-3, SE-5  *(closures, instance cancellation, substitution, refund-on-cancel)*
 - AW-1, AW-2  *(per-permission advance booking days)*
 - CI-1, CI-2, CI-4, CI-9  *(staff check-in with window, pre-pop from bookings + history)*
 - N-1, N-2, N-3, N-5  *(confirmation, cancellation, waitlist promotion, substitution emails — existing)*
 - PA-1, PA-2, PA-3  *(attendance history with filters)*
-- S-19  *(taxonomy clarity — design decision)*
-- S-20  *(room conflict detection on schedule authoring)*
 
-## 4.2 Should Have (Before Public Launch)
-- SL-1, SL-2, SL-3, SL-4, SL-5, SL-6, SL-7, SL-8  *(skill levels end-to-end)*
+## 5.2 Should Have (Before Public Launch)
+- C-7  *(class category / tag taxonomy — drives filter and prerequisites)*
+- CS-7  *(per-instance description override + homepage surfacing — drives engagement)*
+- SL-1 .. SL-8  *(skill levels end-to-end)*
+- SL-10, SL-11, SL-12  *(attendance-count + same-day sequencing prerequisites — concrete near-term need from the partner-acro back-to-back pattern)*
 - AT-1 through AT-10  *(attendance templates — core engagement feature)*
 - WD-1, WD-2, WD-3, WD-5  *(weekly Sunday digest + iCal attachments)*
 - iCal generator extensions — UID + RRULE + multi-VEVENT + STATUS:CANCELLED + VTIMEZONE on top of existing `util/ical_generator` (foundation for AT-4, WD-3, N-1)
 - AW-3, AW-4, AW-5  *(sign-up open reminders)*
-- ST-1, ST-2, ST-3, ST-4, ST-5, ST-6  *(instructor shift trades)*
-- CSer-1 through CSer-10  *(series + workshops with min/max + pro-rating + auto-cancel)*
+- ST-1 .. ST-6  *(instructor shift trades)*
+- CSer-1 .. CSer-10  *(series + workshops, both materialized via `class_schedules` per P-3, with min/max + pro-rating + auto-cancel)*
 - CAP-4, CAP-5, CAP-6  *(min-attendees, auto-cancel cron)*
 - CI-3, CI-5, CI-6, CI-7, CI-8  *(check-in autocomplete, walk-in, post-window edits)*
-- S-27  *(cancellation policy display)*
+- BC-6  *(staff-issued voucher tool — operational lever under P-6)*
+- M-10  *(effective-dated price changes — gates how rate edits roll out for workshops + series)*
 - N-4, N-7, N-10  *(min-not-met emails, exception notes routed to instructor, notification preferences)*
 
-## 4.3 Nice to Have
-- SI-1, SI-2, SI-3  *(specialty instructor cost recoupment + pricing assistant)*
+## 5.3 Nice to Have
+- C-8  *(extended instructor profile pages)*
+- M-9  *(guest pass — bring-a-friend with auto-create of guest account)*
+- M-11  *(couple / family membership tier)*
+- SI-1, SI-2, SI-3, SI-6  *(specialty instructor cost recoupment + pricing assistant; rates flow through `price_schedules` per P-2)*
 - SI-4  *(per-class cost vs. revenue report)*
-- S-1, S-2  *(guest pass, first class free)*
-- S-3  *(class packs — table machinery exists, needs UI + flow)*
-- S-7  *(favorite instructor)*
-- S-8  *(class category / tag taxonomy)*
-- S-16  *(extend instructor profile pages with class lists)*
-- S-21  *(effective-dated price changes in admin UI)*
-- S-25  *(per-instance description override)*
+- WD-6  *(per-user subscribable iCal feed URL)*
 - AR-1, AR-2, AR-3  *(scheduling reports)*
 - PA-4  *(CSV export of attendance history)*
 - M-8  *(membership-upgrade unlocks classes in real time — depends on permission cache invalidation)*
 - C-6  *(catalog filter / search)*
 
-## 4.4 Could Have
-- S-4  *(late cancel / no-show fees)*
-- S-5  *(same-day swap endpoint)*
-- S-6  *(self-service waitlist auto-confirm cap)*
-- S-10  *(per-session price overrides)*
-- S-11  *(kiosk self check-in)*
-- S-12  *(waitlist-preference per user)*
-- S-13  *(bulk booking)*
-- S-18  *(template-suggest engagement nudge)*
+## 5.4 Could Have
+- M-13  *(per-session price override)*
+- M-14  *(partner / friend multi-attendee booking — NOT for kids)*
+- CAP-8  *(waitlist auto-confirm cap)*
 - AR-4, AR-5  *(open-seat heatmap, refund effectiveness)*
-- SL-9  *(skill assignment history audit trail surface in UI — table can capture from day 1)*
+- SL-9  *(skill assignment history audit trail in the UI — the table can capture from day 1)*
 
-## 4.5 Stretch (Long-Term)
+## 5.5 Stretch (Long-Term)
+- N-11  *(favorite-instructor notifications — very low priority)*
 - R-1, R-2, R-3, R-4  *(reliability tracking + soft / hard penalties)*
-- S-23  *(consecutive no-show auto-suspend)*
+- R-5  *(consecutive no-show cap — only matters once attendance caps bite)*
 - PR-1, PR-2, PR-3, PR-4  *(specialty instructor payroll)*
 - SI-5  *(payroll export — subset of PR)*
 - AR-6  *(series min-attendees risk dashboard)*
-- S-9  *(quantitative completion prerequisites)*
-- S-14  *(household / family sharing)*
-- S-15  *(per-schedule-entry instructor pay)*
-- S-17  *(mid-series cancel pro-rated refund — could be Should Have if popular)*
-- S-22  *(book a guest without a gift permission)*
-- S-24  *(substitute instructor matching)*
-- S-26  *(per-user subscribable iCal feed URL)*
-- S-28  *(multi-attendee booking for child / partner — flag as Should Have if kids' classes are imminent)*
 
 ---
 
@@ -1023,6 +1012,44 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.13 Data backfill
 - **OQ-24.** Are there existing classes / event sessions in the prod DB that need to be migrated to the new schema, or is this all greenfield (per `feedback_no_premature_defensive_code.md` memory)? Recommended treatment: greenfield — no backfill code, only seed data.
+
+### 8.14 Couple / family membership (M-11)
+- **OQ-25.** Upper bound on N (seats)? Couples-only (2) or families up to 4 or N? Recommended: configurable per-product with a soft cap of 4 to start.
+- **OQ-26.** Household composition changes — what happens when one party leaves the household mid-subscription? Recommended: admin tool to reassign the freed seat to a new person (does NOT issue a refund); the leaving party loses class access immediately. Reuse `entitlement_assignments.removed_us` pattern.
+
+### 8.15 Guest pass (M-9)
+- **OQ-27.** Frequency cap on guest-pass redemption — once per month per member? Unlimited? Limited to N distinct guests per year (so a member can't repeatedly bring the same person without them becoming a member)? Recommended: configurable per-tier secret with defaults of 1/month and a "same person ≤ 2 lifetime guest visits" rule.
+- **OQ-28.** What classes are eligible for guest-pass redemption? All? Member-tier-included only? Specific opted-in classes? Recommended: admin-configurable allow-list per `classes` row, default off (admin must opt a class in).
+
+### 8.16 Attendance-count + sequencing prerequisites (SL-10 / SL-11 / SL-12)
+- **OQ-29.** Where do prerequisite rules live — per-class fixed expressions, or an admin-editable DSL? Recommended: hand-coded expressions on `classes` rows (small JSON blob of AND-ed conditions) for now; promote to a DSL only after the rule library exceeds ~5 distinct shapes.
+- **OQ-30.** Rolling-window unit for SL-10 — calendar month, trailing 30 days, or admin-configurable per rule? Recommended: trailing 30 days, hard-coded; revisit if admin asks.
+- **OQ-31.** Same-day sequencing (SL-11) — does the second-hour booking auto-cancel if the user cancels the first-hour booking? Recommended: yes (atomic transaction in `BookingHelper::CancelBooking`); email the user explaining why both were cancelled.
+
+### 8.17 Class tags / taxonomy (C-7)
+- **OQ-32.** Free-form admin-entered tags, or a controlled vocabulary with admin CRUD? Recommended: controlled vocabulary stored in `class_tags` table; prevents drift like "vinyasa" vs "Vinyasa" vs "Vinyasa Flow" breaking SL-10 counts.
+
+### 8.18 Per-instance description override (CS-7 / D-4)
+- **OQ-33.** Who can override the description for a single instance — admin only, or the assigned instructor for their own sessions? Recommended: instructor for own sessions + admin overall (instructor uses the override to advertise the session's theme without admin involvement).
+- **OQ-34.** Where on the user homepage does the override appear — only when the user is eligible / has the class on their template, or always for browsable visibility? Recommended: only for eligible classes (the homepage feed is already tier-filtered).
+
+### 8.19 Intro workshop on-ramp (M-12)
+- **OQ-35.** How long does an intro-workshop attendance entitlement grant "non-member class access" before requiring membership? Recommended: 14 days (encourages signup without being draconian). Configurable secret.
+- **OQ-36.** Which recurring classes does the intro-workshop entitlement unlock — all, or admin opts in per-class? Recommended: admin opts in per-class (`classes.intro_workshop_unlocks` flag) so the studio can keep advanced classes membership-only.
+
+### 8.20 Staff-issued vouchers (BC-6 / D-3)
+- **OQ-37.** Default expiration window for staff-issued vouchers — 6 months, 12 months, or none? Recommended: 12 months default, per-issuance overridable.
+- **OQ-38.** Voucher scope — must be tied to a specific product / series, or can it be a generic dollar credit usable on anything? Recommended: generic dollar credit usable on any product; simpler model and reuses existing voucher infrastructure.
+
+### 8.21 Per-user iCal feed URL (WD-6)
+- **OQ-39.** Authentication for the personal iCal URL — unguessable random token in the URL, or signed JWT with revocation? Recommended: random token (sufficient for a low-stakes calendar feed); store hash, allow user to regenerate via portal.
+- **OQ-40.** Refresh frequency — what's the minimum interval the feed asserts via `X-PUBLISHED-TTL`? Recommended: 1 hour.
+
+### 8.22 Per-session price override (M-13)
+- **OQ-41.** When admin sets a per-session price override after some users have already booked the session at the schedule-default price, do existing bookings get re-priced or grandfathered? Recommended: grandfathered (no retroactive adjustment); the override applies to future bookings only.
+
+### 8.23 Specialty-instructor pay via price schedules (SI-6)
+- **OQ-42.** When rate roll-forward happens via a new `price_schedule` row, do already-materialized sessions snapshot the rate at materialization time, or recompute at payroll time? Recommended: snapshot at materialization to insulate from later edits — matches how `purchase_items` snapshot prices.
 
 ---
 
