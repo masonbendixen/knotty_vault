@@ -1054,16 +1054,19 @@ These are decisions I need from you before implementation begins on the affected
 	- Mason- I think that there are three things here:
 		- A class requires a certain set of skills. The skills are listed in a table, there is a table marking which skills a user has mastered. There is another table mapping which skills a class requires to be able to sign up. This is all SQL.
 		- A class requires attending another class. For instance the 7pm-8pm intermediate partner acrobatics class requires attending the 6-7pm all levels partner acrobatics class. I feel like a given class time slot can have a field referencing another class time slot. This still just feels like an entry in a SQL table.
-		- For requiring a certain amount of attendance the previous month, I think that we can list a set of classes that we track attendance for a given month for all those instances and then grant a permission for the next month. For instance, attending a configurable number of instances of the all levels acro class this month grants the acro_club permission the next month. We can have a scheduled job that runs and computes this and records the permission for the given user. Completing the number of class
+		- For requiring a certain amount of attendance the previous month, I think that we can list a set of classes that we track attendance for a given month for all those instances and then grant a permission for the next month. For instance, attending a configurable number of instances of the all levels acro class this month grants the acro_club permission the next month. We can have a scheduled job that runs and computes this and records the permission for the given user. Completing the number of classes should grant the permission for the remainder of this month and the next month. This still feels like SQL plus the scheduled job to me. The main issue is setting the expiration date for the permission that the scheduled job clears it if the conditions no longer hold and it is past that time (for instance, you attended the amount of classes last month so you have the permission this month but you don't maintain that and lose it next month)
 - **OQ-30.** Rolling-window unit for SL-10 — calendar month, trailing 30 days, or admin-configurable per rule? Recommended: trailing 30 days, hard-coded; revisit if admin asks.
-	- Mason- I'm confused on this. What is this in reference to?
+	- Mason- This should be calendar month based. It's just simpler to keep track of.
 - **OQ-31.** Same-day sequencing (SL-11) — does the second-hour booking auto-cancel if the user cancels the first-hour booking? Recommended: yes (atomic transaction in `BookingHelper::CancelBooking`); email the user explaining why both were cancelled.
+	- Mason- Yes, we cancel it but no we should not email the user.
 
 ### 8.17 Class tags / taxonomy (C-7)
 - **OQ-32.** Free-form admin-entered tags, or a controlled vocabulary with admin CRUD? Recommended: controlled vocabulary stored in `class_tags` table; prevents drift like "vinyasa" vs "Vinyasa" vs "Vinyasa Flow" breaking SL-10 counts.
+	- Mason- Can you explain what this is for? I'm confused. Please give examples.
 
 ### 8.18 Per-instance description override (CS-7 / D-4)
 - **OQ-33.** Who can override the description for a single instance — admin only, or the assigned instructor for their own sessions? Recommended: instructor for own sessions + admin overall (instructor uses the override to advertise the session's theme without admin involvement).
+	- Mason- I don't think that we should necessarily override the description for a class but we can have instance class notes. Like if a class is acrobatics conditioning and there is a generic
 - **OQ-34.** Where on the user homepage does the override appear — only when the user is eligible / has the class on their template, or always for browsable visibility? Recommended: only for eligible classes (the homepage feed is already tier-filtered).
 
 ### 8.19 Intro workshop on-ramp (M-12)
