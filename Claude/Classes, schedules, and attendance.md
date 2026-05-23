@@ -1035,15 +1035,19 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.13 Data backfill
 - **OQ-24.** Are there existing classes / event sessions in the prod DB that need to be migrated to the new schema, or is this all greenfield (per `feedback_no_premature_defensive_code.md` memory)? Recommended treatment: greenfield — no backfill code, only seed data.
-	- Mason- we haven't deployed yer
+	- Mason- we haven't deployed yet so this is all greenfield.
 
 ### 8.14 Couple / family membership (M-11)
 - **OQ-25.** Upper bound on N (seats)? Couples-only (2) or families up to 4 or N? Recommended: configurable per-product with a soft cap of 4 to start.
+	- Mason- I don't understand this questions.
 - **OQ-26.** Household composition changes — what happens when one party leaves the household mid-subscription? Recommended: admin tool to reassign the freed seat to a new person (does NOT issue a refund); the leaving party loses class access immediately. Reuse `entitlement_assignments.removed_us` pattern.
+	- Mason- I think that this is a pretty weird use case. I don't really want to do much work to support it.
 
 ### 8.15 Guest pass (M-9)
 - **OQ-27.** Frequency cap on guest-pass redemption — once per month per member? Unlimited? Limited to N distinct guests per year (so a member can't repeatedly bring the same person without them becoming a member)? Recommended: configurable per-tier secret with defaults of 1/month and a "same person ≤ 2 lifetime guest visits" rule.
+	- Mason- I think that we should have it be per membership tier and have an option to specify that the guest pass has to be a new person. For instance, for fitness guest passes, it would be nice if this is more of a marketing tool. For spa memberships, this is going to be part of more expensive memberships to be a benefit to occasionally bring a friend.
 - **OQ-28.** What classes are eligible for guest-pass redemption? All? Member-tier-included only? Specific opted-in classes? Recommended: admin-configurable allow-list per `classes` row, default off (admin must opt a class in).
+	- Mason- It should be only classes designated by an admin.
 
 ### 8.16 Attendance-count + sequencing prerequisites (SL-10 / SL-11 / SL-12)
 - **OQ-29.** Where do prerequisite rules live — per-class fixed expressions, or an admin-editable DSL? Recommended: hand-coded expressions on `classes` rows (small JSON blob of AND-ed conditions) for now; promote to a DSL only after the rule library exceeds ~5 distinct shapes.
