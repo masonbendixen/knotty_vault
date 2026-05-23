@@ -1051,7 +1051,10 @@ These are decisions I need from you before implementation begins on the affected
 
 ### 8.16 Attendance-count + sequencing prerequisites (SL-10 / SL-11 / SL-12)
 - **OQ-29.** Where do prerequisite rules live — per-class fixed expressions, or an admin-editable DSL? Recommended: hand-coded expressions on `classes` rows (small JSON blob of AND-ed conditions) for now; promote to a DSL only after the rule library exceeds ~5 distinct shapes.
+	- Mason- I think that there are three things here:
+		- A class requires a certain set of skills. The skills are listed in a table, there is a table marking which skills a user has mastered. There is another table mapping which s
 - **OQ-30.** Rolling-window unit for SL-10 — calendar month, trailing 30 days, or admin-configurable per rule? Recommended: trailing 30 days, hard-coded; revisit if admin asks.
+	- Mason- I'm confused on this. What is this in reference to?
 - **OQ-31.** Same-day sequencing (SL-11) — does the second-hour booking auto-cancel if the user cancels the first-hour booking? Recommended: yes (atomic transaction in `BookingHelper::CancelBooking`); email the user explaining why both were cancelled.
 
 ### 8.17 Class tags / taxonomy (C-7)
