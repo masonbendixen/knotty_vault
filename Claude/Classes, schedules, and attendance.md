@@ -291,129 +291,41 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 
 ---
 
-# 3. Additional Use Cases Worth Considering (Suggestions)
+# 3. Design Principles
 
-These came up while reading the Overview and surveying the system. Flagged with reasons so you can pick / reject.
+Foundational decisions that constrain the rest of the plan. Use cases and phases that conflict with them are out of scope (see §4 Alternatives Considered).
 
-- **S-1 Bring-a-friend / guest pass for a class.** Member brings a non-member with them for one class. Reuse the deferred `guest_passes` infrastructure from Customer Scenarios doc.
-	- Mason- This is a great suggestion. Let's add it.
-- **S-2 Trial / first-class-free.** A non-member's first eligible class is free, controlled by a `trial_eligible` flag on the user. Lightweight on top of the entitlement model.
-	- Mason- I'd actually rather just have people go through the new member intro workshop thing. My classes are high skill and randos showing up is distracting.
-- **S-3 Class packs (5-pack, 10-pack, 20-pack).** Already supported by `entitlements.seats_total` + a specific class-pack product. Just need UI + a "consume an entitlement seat to book this class" path.
-	- Mason- I really have no interest in drop in pricing. It makes people less likely to come to class.
-- **S-4 Late cancellation fee / no-show fee.** Independent of refund-windows: a flat dollar punitive charge for cancelling inside a tight window, beyond just lower refund %. Per-product configurable.
-	- Mason- My plan is to not do refunds at all for missed classes. I feel like I can do a voucher if need be on a case by case bases.
-- **S-5 Class change-of-mind during the day.** User books AM class, decides to switch to PM class same day — single endpoint that atomically cancels one + books the other so they don't lose their slot during the gap.
-	- Mason- this isn't particularly compelling to me.
-- **S-6 Self-service waitlist auto-confirm cap.** "Auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist."
-	- Mason- I could see supporting this but it is low priority.
-- **S-7 Instructor pinning / favoriting.** User marks favorite instructors → notification when a favorite is teaching a new class / subbing.
-	- Mason- Can list this but should be extremely low priority.
-- **S-8 Class category / tag taxonomy.** "vinyasa", "aerial", "handstand", "kids" — for filter, color-coding the calendar, and routing skill-level requirements.
-	- Mason- This sounds like a good idea.
-- **S-9 Class prerequisites by completion (not just skill).** "Must have attended Intro to Aerial at least 3 times" before signing up for Aerial 2. Beyond skill levels — quantitative gating off the attendance history table.
-	- Mason- Sure, I do have a plan to base ability to attend certain classes based on attendance the previous month. For instance, I have many beginner / intermediate classes for partner acro that are back to back and attending the second hour requires both attending the first hour and a certain number of partner acro classes the previous month.
-- **S-10 Drop-in price overrides per session.** A single instance has a higher / lower price than the schedule default (special guest teacher week, holiday discount).
-	- Mason- This seems like an okay idea but low priority.
-- **S-11 Self check-in via QR / kiosk mode.** A facility tablet shows a check-in screen the user taps themselves into. Reduces staff load.
-	- Mason- This let's people mark friends as attending to hit attendance requirements. I want staff to control this.
-- **S-12 Wait-list preference per user.** Some users always want waitlist if full; others never. Express as preference rather than asking each booking.
-	- Mason- this doesn't seem worth the effort.
-- **S-13 Bulk booking ("book me into every Tuesday for 4 weeks").** Adjacent to attendance templates but for paid drop-ins.
-	- Mason- I don't do drop-ins.
-- **S-14 Family / household sharing of class packs.** Today, gift permissions exist person-to-person. Add a "household" abstraction so multi-seat class packs can be assigned across a small group with less ceremony.
-	- Mason- I want couple / family memberships. I have no interest in dropins.
-- **S-15 Instructor compensation rules at the schedule-entry level.** Specialty instructor cost can attach to a specific schedule entry, not just per-instance, so admin doesn't re-enter every week.
-	- Mason- Yes, I didn't plan on having this priced per instance. It should be tied to the price schedule though.
-- **S-16 Instructor profile page (already partially exists — extend).** Show classes a specific instructor teaches with upcoming sessions, link from class instances and calendar.
-	- Mason- This sounds good to do.
-- **S-17 Series partial refund on mid-series cancel.** User joined a 6-week series, attended 2, cancels — what's the refund logic? Probably pro-rated remaining instances minus a cancellation fee per the cancellation policy.
-	- Mason- Staff needs to grant this. The user has no ability to get a refund on their own. The policy is officially non refundable.
-- **S-18 Auto-template-suggest after first attendance.** "You attended Vinyasa Flow last Tuesday. Add to your weekly template?" — engagement nudge.
-	- Mason- I don't think that this is needed.
-- **S-19 Studio-event vs class taxonomy clarity.** Per Overview the existing `events` model is being repurposed. Be explicit: is a "workshop" a one-off `class_schedule`? a `series` of length 1? a standalone product without a parent class? Pick one and document it.
-	- Mason- I generally think of events as instances of a template like intro workshop. If we can make a more general purpose case to consolidate and simplify the implementation, I'm not opposed.
-- **S-20 Room conflict detection on schedule authoring.** When admin creates a schedule entry, server checks no other class / event / service session conflicts in the same room. Already implicit but should be a hard guard in the schedule materializer.
-	- Mason- I could see possibly doing multiple things in the same room like open gym and some skill development thing or rock climbing.
-- **S-21 Effective-dated price changes.** Admin can set "starting July 1, drop-in price is $25" without rewriting current bookings. Uses `price_schedules` (already in place) but UI must expose effective dates.
-	- Mason- All of this definitely should use the existing price schedule infrastructure. This is important. Please update the document to factor this in everywhere including for paying specialty instructors.
-- **S-22 Bookable from-anyone capability.** Today gift permissions are per-pair. Could a member book a guest into a single class without a gift permission, with the guest auto-created? Maps to S-1.
-	- Mason- I don't understand the question. Can you be more explicit?
-- **S-23 Class-level cap on consecutive no-shows.** Auto-suspend booking for users with 3 no-shows in a row until they email staff.
-	- Mason- let's list this as a low priority possibility. I don't see attendance max being a big issue for a while.
-- **S-24 Substitute instructor pool.** When an instructor reports unavailable, system queries who's qualified to substitute (has taught this class before / has the skill), surfaces a ranked list to admin.
-	- Mason- I think it will be easier for the admin to just reach out to people in this case.
-- **S-25 Per-instance description override.** A given Tuesday's Vinyasa Flow is themed "yin-style restorative" — admin overrides the description for just that instance, shown in calendar tooltip and digest email.
-	- Mason- I like the ability to have a per instance description that gets surfaced to the user. It would be nice if that shows up on the user's home page as a way to entice them to show up.
-- **S-26 Per-user iCal feed URL.** A personal subscribable URL the user can paste into Google Calendar / Apple Calendar, auto-updating. Beyond per-booking attachments.
-	- Mason- Yeah, I like this.
-- **S-27 Cancellation policy display on the booking screen.** Surface the refund breakdown (e.g. "48h: 100%, 24h: 50%, then no refund") so user knows before clicking book.
-	- Mason- Yes, that's a good idea. Especially if there is no refund.
-- **S-28 Multi-attendee booking (parent books for child / partner).** Reuse multi-seat entitlement flow. Useful for kids' classes.
-	- Mason- We will never have kids classes. But booking for a partner / friend is probably not a bad idea but low priority.
+- **P-1 No per-class drop-in pricing.** Recurring class instance access is gated by membership tier only — your tier either includes a class or you need to upgrade. There is no "pay $X to attend this one class as a member-of-the-wrong-tier" flow. Workshops and series remain pay-per-attendee with per-tier pricing (including a non-member tier where the offering is open to non-members).
+- **P-2 Price-schedule infrastructure for all tiered pricing.** All per-tier pricing — class series, workshops, couple/family memberships, AND specialty-instructor compensation — flows through the existing `product_prices` + `price_schedules` infrastructure. Rate changes roll forward via a new `price_schedule` row without disrupting in-flight series purchases or active subscription periods.
+- **P-3 Workshop = `class_schedule` of length 1.** Workshops-as-a-feature collapse into `class_schedules` with `is_series=true` + one materialized session. The existing standalone "event" Product kind survives for non-class one-offs (parties, anniversary). No new code path for workshops.
+- **P-4 Multi-occupancy rooms.** The schedule materializer permits parallel sessions in the same room as long as combined occupancy ≤ `location_rooms.concurrent_capacity` (open gym + skill-development workshop sharing a room is fine). Hard block only when capacity would overflow.
+- **P-5 Staff-only attendance attribution.** Users mark *planned* attendance (template + per-instance exceptions); staff is the only role that records *actual* attendance. No kiosk / self-check-in — would allow users to mark friends present to game prerequisite gates (SL-10 / SL-11).
+- **P-6 No user self-serve refunds.** Classes, series, and workshops are officially non-refundable from the user side. Staff may issue a voucher (BC-6) at their discretion as a case-by-case alternative. Admin-initiated cancellations (studio cancels a session) still issue automatic refunds — that's distinct from user-initiated cancels.
 
-## 3.29 Resolutions (summary of decisions on S-1 .. S-28)
+# 4. Alternatives Considered
 
-### Accepted
-- S-1 Bring-a-friend / guest pass (absorbs S-22 — see clarification below)
-- S-8 Class category / tag taxonomy
-- S-15 Specialty instructor compensation tied to the price schedule (NOT per-instance — see P-2)
-- S-16 Extended instructor profile pages
-- S-21 Effective-dated price changes via `price_schedules` — architectural priority (see P-2)
-- S-25 Per-instance description override (with homepage surfacing — see D-4)
-- S-26 Per-user subscribable iCal feed URL
-- S-27 Cancellation policy display on the booking screen
-
-### Accepted, low priority (Could Have)
-- S-6 Self-service waitlist auto-confirm cap
-- S-10 Per-session price overrides
-- S-23 Class-level cap on consecutive no-shows
-- S-28 Multi-attendee booking (partner / friend ONLY — never kids)
-
-### Accepted, very low priority (Stretch)
-- S-7 Instructor pinning / favoriting
+Options that surfaced during planning and were rejected. Rationale recorded here so future readers don't re-litigate.
 
 ### Rejected
-- S-2 Trial / first-class-free → replaced by the new-member intro-workshop on-ramp (see D-5)
-- S-3 Class packs / drop-in pricing → see P-1, no drop-in model
-- S-5 Same-day class swap endpoint
-- S-11 Self check-in / kiosk → staff must control attendance (D-2 prerequisite gaming risk)
-- S-12 Per-user waitlist preference
-- S-13 Bulk booking for drop-ins → no drop-ins
-- S-14 Class-pack household sharing → replaced by couple/family membership tier (see D-1)
-- S-18 Auto-template-suggest engagement nudge
-- S-24 Substitute-instructor matching → admin reaches out directly
+- **Free trial / first-class-free for non-members.** Classes are high-skill and ad-hoc drop-ins are disruptive. Non-members instead route through the new-member intro workshop (M-12).
+- **Class packs (5 / 10 / 20-pack punch cards).** Conflicts with P-1 (no drop-in pricing). Pay-per-class models reduce commitment and total attendance. Access lives at the membership tier, not in pre-purchased class counts.
+- **Late-cancellation / no-show fees.** Classes are officially non-refundable per P-6. The studio prefers a discretionary staff-issued voucher (BC-6) over a punitive fee schedule.
+- **Same-day class swap endpoint** (cancel-one-and-book-another atomically). Sequential cancel + rebook is sufficient given typical class capacity.
+- **Self check-in via kiosk or QR code.** Violates P-5. Users could mark friends as attending to satisfy attendance-count prerequisites (SL-10) and game the gate.
+- **Per-user waitlist-default preference.** Default behavior (always offer waitlist when full) is good enough; per-user preferences add UI without a clear win.
+- **Bulk booking ("book me into every Tuesday for 4 weeks") for paid drop-ins.** No drop-in pricing exists (P-1). For recurring attendance, users set an attendance template (§2.8).
+- **Class-pack household sharing across multiple people.** Replaced by the couple / family membership tier (M-11), modeled at the membership level rather than the pack level.
+- **Auto-template-suggest engagement nudge** ("you attended X last Tuesday — add to your template?"). User-initiated template is sufficient; no auto-nudging.
+- **Substitute-instructor matching / qualified-pool ranking.** Admin reaches out directly when an instructor is unavailable. Not enough volume to warrant automation.
 
-### Repurposed
-- **S-17** No user self-serve refund; staff-issued voucher on a case-by-case basis. See D-3 and P-6.
-- **S-19** You're open to consolidation — recommend workshop = `class_schedule` of length 1. Standalone `event` Product kind stays for non-class one-offs (anniversary, party). See P-3.
-- **S-20** Hard block is wrong — your rooms can host parallel things (open gym + skill development, climbing-wall sessions overlapping floor work). Materializer honors `location_rooms.concurrent_capacity` instead. See P-4.
-
-### S-22 — clarification (you said you didn't understand the question)
-What I was asking: today's `gift_permissions` flow needs grantor and grantee both to have accounts and a permission relationship to be set up *before* sharing. The question was whether a member should be able to book a *guest* (someone with no account yet) directly into a class — the system would auto-create a minimal guest account on the spot and link the booking to it, no gift-permission ceremony. **Now that you've accepted S-1 (bring-a-friend / guest pass), the two collapse together.** I'll fold S-22 into S-1 as the implementation note "guest-pass redemption may auto-create a minimal account on the spot." Dropping S-22 as a standalone item.
-
-## 3.30 Derived Use Cases (from your responses)
-
-- **D-1 Couple / family membership tier.** From S-14. Single membership covers 2–N specified people (one billing account, multiple entitled attendees). Maps onto existing multi-seat entitlement (`seats_total > 1`) bound to a subscription, with a couple/family-membership product flag so the UI presents it as one product instead of "buy two memberships". Pricing per-tier via `product_prices` (P-2).
-- **D-2 Class prerequisites by attendance count + sequencing.** From S-9. Worked example: partner-acro second-hour is bookable only if the user (a) is also booked for the first hour the same day AND (b) attended ≥ N partner-acro classes the previous calendar month. Generalizes to a small rule engine — prerequisite expressions can reference (i) attendance in a related schedule on the same day, (ii) attendance count for a given class / tag over a rolling window, (iii) skill-level holdings (extends Phase 3). **Promotes to Should Have** because you have a concrete near-term need.
-- **D-3 Staff-issued voucher for cancellations.** From S-17 + P-6. No user self-serve refund; staff has a "issue voucher" tool tied to (person, product/series, amount). Reuses voucher infrastructure from `Vouchers and Refunds.md`. Used for both series mid-cancels and one-off "the user has a good reason" cases.
-- **D-4 Per-instance description on the user homepage.** From S-25. When admin overrides the description for a specific session ("this Tuesday Vinyasa is yin-style restorative"), that copy surfaces on the user's *homepage* today-classes feed as a teaser to drive attendance — not just hidden in a calendar tooltip. Affects Phase 5 home-feed layout.
-- **D-5 New-member intro workshop as the on-ramp.** From S-2. New non-members cannot just attend a recurring class; the path to becoming a student is to attend the intro workshop. Implementation: regular class permissions require *either* (a) an active membership, *or* (b) a recent intro-workshop attendance entitlement. The intro workshop itself is a `class_schedule` of length 1 (per P-3) sold to non-members.
-
-## 3.31 Cross-Cutting Principles (from your responses)
-
-These need to thread through §2 (Use Cases), §4 (Bucketing), §5 (Phases) — flagging them here so they're explicit before the implementation plan gets touched.
-
-- **P-1 No per-class drop-in pricing.** Class instance access is gated by membership tier only — your tier either includes the class or you need to upgrade. There is no "pay $X to attend this one class as a member-of-the-wrong-tier" flow. Workshops + series are still pay-per-attendee with per-tier pricing (including non-members where allowed). **Affects:** §2.4 M-2 (drop-in price for non-included) is removed for recurring classes; lives on for workshops + series + intro workshop. §2.15 BC-1 is rewritten as "books via membership inclusion or is rejected".
-- **P-2 Price-schedule infrastructure everywhere.** All tiered pricing flows through `product_prices` + `price_schedules`. Specialty-instructor compensation gets the same treatment — `specialty_instructor_costs` is modeled with a `price_schedule_id` so admin can roll a rate change forward without rewriting current sessions. Same for series per-tier prices, workshop per-tier prices, couple/family membership tiers. **Affects:** Phase 7 (series) — no parallel pricing system, reuse `product_prices`; Phase 12 (specialty instructor) — restructure to use `price_schedules`; D-1.
-- **P-3 Workshop = `class_schedule` of length 1.** Workshops-as-a-feature collapse into `class_schedules` with `is_series=true` + one materialized session. Standalone "event" Product kind survives for non-class one-offs (parties, anniversary). **Affects:** §1.1 taxonomy / OQ-1 / OQ-2 are resolved; Phase 7 absorbs workshop materialization with no separate code path.
-- **P-4 Multi-occupancy rooms.** Materializer honors `location_rooms.concurrent_capacity`: two parallel things in the same room are OK as long as combined occupancy ≤ capacity. Hard block only when capacity would overflow at materialization or booking time. **Affects:** S-20 implementation; `ClassScheduleHelper.MaterializeFutureSessions`; the room-conflict guard becomes a capacity check.
-- **P-5 Staff-only attendance attribution.** Users mark *planned* attendance (template + per-instance exception); staff is the only role that records *actual* attendance. Self check-in is explicitly OUT (S-11 rejection — would let users mark friends as attending and game D-2 prerequisite gates). **Affects:** Phase 8 (check-in) — no kiosk; D-2 prerequisite enforcement is trustworthy because attendance records cannot be self-edited.
-- **P-6 No user self-serve refunds.** Classes + series + workshops are officially non-refundable from the user side. Staff can issue a voucher (D-3) at their discretion. **Affects:** §2.15 BC-2 / BC-4 collapse to "free the capacity, no money back" for user-initiated cancellations; Phase 7 series cancel — no automatic prorated refund, just capacity release + staff voucher option; Phase 12 admin-cancellation flow stays full-refund because that's studio-initiated, not user-initiated.
+### Consolidated (not rejected, but not standalone)
+- **Bookable-from-anyone (member books a guest with no prior gift-permission setup).** Folded into M-9 as the "auto-create a minimal guest account on guest-pass redemption" implementation note.
+- **Workshop vs class-vs-event taxonomy.** Resolved by P-3 (workshop = `class_schedule` of length 1).
+- **Hard room-conflict block on the schedule materializer.** Softened to P-4 (honor `location_rooms.concurrent_capacity`; allow parallel things in the same room when total occupancy fits).
 
 ---
 
-# 4. Bucketing
+# 5. Bucketing
 
 Buckets express priority + sequencing constraint, not just nice-ness. "Must have" = required for first useful version of class scheduling; "Should have" = needed before broad rollout; "Nice to have" = improves engagement / retention; "Could have" = useful but not differentiated; "Stretch" = long-term / nontrivial.
 
@@ -488,7 +400,7 @@ Buckets express priority + sequencing constraint, not just nice-ness. "Must have
 
 ---
 
-# 5. Implementation Phases
+# 6. Implementation Phases
 
 Each phase is intended to land independently and be releasable. Within a phase, work is ordered lowest-layer-first: DB schema → table helpers → business logic → endpoints → frontend → admin metadata. Each phase will eventually have its own implementation document; this is the road map.
 
@@ -999,7 +911,7 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ---
 
-# 6. Cross-Cutting Concerns
+# 7. Implementation Cross-Cutting Concerns
 
 ### 6.1 Permissions to add
 - [ ] `manage_class_schedule` — separate from `manage_products` so studio managers can edit schedules without product-edit rights.
@@ -1035,7 +947,7 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ---
 
-# 7. Suggested Per-Phase Implementation Documents
+# 8. Suggested Per-Phase Implementation Documents
 
 Each of these will be its own `.md` in `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Claude\` when work begins:
 
@@ -1058,7 +970,7 @@ Each of these will be its own `.md` in `C:\Users\mason\Documents\Obsidian\Knotty
 
 ---
 
-# 8. Open Questions
+# 9. Open Questions
 
 These are decisions I need from you before implementation begins on the affected phases. Please answer inline (✅ / chosen option / freeform). I have a recommendation for each — say "default" and I'll take the recommended path.
 
@@ -1114,7 +1026,7 @@ These are decisions I need from you before implementation begins on the affected
 
 ---
 
-# 9. Notes on Process
+# 10. Notes on Process
 
 - Plan is intentionally heavy on phase boundaries so each phase can ship and be tested in isolation.
 - Layering rule per phase: schema → table helpers → business logic → endpoints → frontend → admin metadata → tests at every layer (tests are not a separate phase).
