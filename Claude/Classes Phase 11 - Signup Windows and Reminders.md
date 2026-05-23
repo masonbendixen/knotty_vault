@@ -1,0 +1,200 @@
+---
+fileClass: Project
+Category: Claude
+Status: Active
+Authors: Mason Bendixen
+Last Updated: 5/23/2026
+Version: 0.1
+tags: 
+---
+# Overview
+
+Go into plan mode and use this document for your planning. Don't ask for permission to modify it or work in .claude/plans. This is your plan file. Please use your built in tools for read only operations on the filesystem or just say yes but do NOT prompt me when performing work that only reads the filesystem. I want you to run to completion (putting questions to be answered) but DO NOT FUCKING PROMPT ME. Please leave this Overview alone and build the plan in the following sections.
+
+Classes Phase 11 - Signup Windows and Reminders
+
+Please use the code base and the document Classes, schedules, and attendance.md. Please use these documents and the code base for context as well:
+
+- [[Payment Design Document]]
+- [[Product browsing and quoting endpoints]]
+- [[Purchase creation with server-side pricing]]
+- [[Scheduling thin slice]]
+- [[Square credentials and Sandbox setup]]
+- [[Subscriptions- Recurring billing and card management]]
+- [[Support for scheduled purchases]]
+- [[Payment Should Have- Multi Seat and Bundled Pricing]]
+- [[Event Polish- Scheduling Should Have Items]]
+- [[Multi seat and bundled products]]
+- [[Payment Should Have- Multi Seat and Bundled Pricing]]
+- [[Product, Event, and Subscription Admin Portal]]
+- [[Provider Portal]]
+- [[Scheduled Jobs]]
+- [[Vouchers and Refunds]]
+
+For each document, please extract the corresponding section from [[Classes, schedules, and attendance]] and place the information from that section of the document here as well as expanded details for the implementation as well as checkboxes to mark off as we complete them. For each piece, please start with the lowest layer of the system moving to higher layers on the server (db schema, table helpers, other helpers, business logic, and endpoints) and then client side work. Make sure to test everything that you can possibly test especially changes to existing files with tests.
+
+Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
+
+# Place plan here
+
+## Phase Summary
+
+**Should-have.** Per-permission advance-booking days at the product level (uses existing `product_booking_windows`). Users see future class series / workshops / intro / guest-pass-eligible sessions outside their booking window with a "Sign-ups open on <date>" hint. Users can click "Remind me when sign-ups open" → row added to `signup_open_reminders` → daily cron picks up and emails the user on the open date.
+
+**Important scope note:** signup windows mostly apply to **paid** offerings (workshops, series, intro). Recurring class attendance is membership-included with no advance booking (Phase 5 + Phase 8), so windows are irrelevant there.
+
+**Prerequisites:**
+- Phase 1 (class_schedules linked to products).
+- Phase 2 (visibility / pricing surface).
+- Phase 7 (series flow uses booking windows).
+- Existing `product_booking_windows` infra ([[Event Polish- Scheduling Should Have Items]]).
+- Scheduled jobs daemon ([[Scheduled Jobs]]).
+
+**Outcome:**
+- Catalog / calendar shows "Sign-ups open on Jul 15" for sessions outside the user's window.
+- "Remind me" button creates a reminder row.
+- Daily cron emails users on the open date.
+- On booking, pending reminders for that session auto-cancel.
+
+## Layering & Conventions
+
+Lowest layer first:
+
+1. `db_schema/` — `signup_open_reminders` table.
+2. `sql_util/table_helpers/` — new helper.
+3. `business_logic/scheduling/` — `SignupReminderHelper`.
+4. `endpoints/` — three new endpoints.
+5. Scheduled jobs.
+6. Angular: catalog / calendar future-session chip + Remind-me action.
+7. Tests.
+
+## 1. Pre-Coding Design Decisions
+
+### 1.1 Locked-in
+- [x] Per-product overrides via existing `product_booking_windows` table (parent OQ-13).
+- [x] "Best window" recomputed live at booking time (parent OQ-14).
+- [x] Reminder de-dup: when a user successfully books a session, mark pending reminders for that session cancelled (parent AW-5).
+
+## 2. Database Schema
+
+### 2.1 `signup_open_reminders` table
+- [ ] `db_schema/signup_open_reminders.h/.cpp`:
+  - `id BIGSERIAL PK`
+  - `person_id BIGINT NOT NULL REFERENCES people(id)`
+  - `event_session_id BIGINT NOT NULL REFERENCES event_sessions(id)`
+  - `notify_at_us BIGINT NOT NULL` — moment when user's window opens (session start − their best `advance_days` × 86400_000_000)
+  - `notified_us BIGINT NULL`
+  - `cancelled_us BIGINT NULL`
+  - `created_us BIGINT NOT NULL`
+- [ ] Partial unique index `UNIQUE (person_id, event_session_id) WHERE notified_us IS NULL AND cancelled_us IS NULL` — one pending reminder at a time.
+- [ ] Index on `notify_at_us` for the daily cron scan.
+
+### 2.2 Wire into DB init
+- [ ] `make_database_info.cpp` + `create_database.cpp`.
+
+## 3. Table Helpers
+
+### 3.1 `TableHelpers::SignupOpenReminders`
+- [ ] `AddReminder(Transaction&, KeyValueTable&)` — idempotent on the partial unique index.
+- [ ] `CancelReminder(Transaction&, personId, eventSessionId)` — sets `cancelled_us=now`.
+- [ ] `GetPendingReadyToSend(Transaction&, nowUs)` → list of pending reminders where `notify_at_us <= nowUs` AND `notified_us IS NULL` AND `cancelled_us IS NULL`.
+- [ ] `MarkNotified(Transaction&, id, nowUs)`.
+- [ ] Tests.
+
+## 4. Business Logic — `SignupReminderHelper`
+
+Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
+
+### 4.1 Best-window computation
+- [ ] `int64_t ResolveBestAdvanceDaysForPerson(Transaction&, int64_t productId, int64_t personId, int64_t asOfUs)`:
+  1. Load all `product_booking_windows` rows for the product.
+  2. Filter to rows where `permission_id IS NULL` OR `permission_id` ∈ user's permission set.
+  3. Return `max(advance_days)` across the filtered set. If no matches → 0 (booking always open today, or never open — caller distinguishes).
+
+### 4.2 Request-reminder flow
+- [ ] `struct RequestReminderResult { bool ok; int64_t reminderId; int64_t notifyAtUs; std::string errorCode; }`.
+- [ ] `RequestReminder(Transaction&, personId, eventSessionId)`:
+  1. Load `event_sessions` → product_id, start_time_us.
+  2. Compute `advanceDays = ResolveBestAdvanceDaysForPerson(productId, personId, now)`.
+  3. Compute `notifyAtUs = start_time_us - advanceDays * 86400_000_000`.
+  4. If `notifyAtUs <= now` → return `WINDOW_ALREADY_OPEN` (the user can book right now; no reminder needed).
+  5. Insert `signup_open_reminders` row.
+- [ ] Tests.
+
+### 4.3 Sending pending reminders
+- [ ] `int SendPendingReminders(Transaction&, MailHelper*, int64_t nowUs)`:
+  1. `GetPendingReadyToSend(nowUs)`.
+  2. For each: format email "Sign-ups are open for {className} on {date}". Queue via MailHelper.
+  3. `MarkNotified`.
+  4. Return count.
+- [ ] Tests with `TestMailHelper`.
+
+### 4.4 Booking-side dedupe
+- [ ] In `BookingHelper::BookEvent` (and the series-booking flow), after creating the booking, call `SignupOpenReminders::CancelReminder(personId, eventSessionId)` — no-op if no pending reminder.
+- [ ] Test the dedupe: request a reminder, then book the same session, then run `SendPendingReminders` → zero sent.
+
+### 4.5 KeyValueTable conversions
+- [ ] `SignupReminderInfoToKeyValueTable(...)`.
+
+## 5. Endpoints
+
+- [ ] `POST /api/me/signup_reminder/<eventSessionId>` — calls `RequestReminder`. Returns reminderId + notifyAtUs. Endpoint test (success + window-already-open + duplicate-no-op).
+- [ ] `DELETE /api/me/signup_reminder/<eventSessionId>` — cancel a pending reminder.
+- [ ] `POST /api/admin/send_signup_open_reminders` — cron-callable, idempotent. Permission `admin`. Endpoint test.
+
+## 6. Scheduled job integration
+
+- [ ] Add hourly job to `knottyyoga_helper`: `POST /api/admin/send_signup_open_reminders`. Idempotent.
+
+## 7. Frontend
+
+### 7.1 Catalog / calendar future-session hint
+- [ ] In the existing class / series / workshop card render, if the user's window is closed for this session, show "Sign-ups open <local-date>" chip + a "🔔 Remind me" button.
+- [ ] Clicking the button calls `requestSignupReminder(eventSessionId)`. If `WINDOW_ALREADY_OPEN`, surface a toast "Sign-ups are already open for this session".
+- [ ] Spec.
+
+### 7.2 My signup-reminders panel (optional)
+- [ ] On `/my/account/notification-preferences` (created in Phase 6), add a section listing the user's pending reminders with a "Cancel" action each.
+- [ ] Spec.
+
+### 7.3 `ServerAccess` extensions
+- [ ] `requestSignupReminder(eventSessionId)`, `cancelSignupReminder(eventSessionId)`, `getMyPendingSignupReminders()`.
+- [ ] Update `ServerAccess.mock.spec.ts`.
+
+### 7.4 Types
+- [ ] `signup-reminder.types.ts`: `SignupReminderInfo`.
+
+## 8. Admin Metadata
+
+- [ ] `signup_open_reminders` → `admin_nested_tables` under `people` keyed by `person_id`. Permission `admin`. Generally not user-facing.
+
+## 9. Tests-Required Summary
+
+- [ ] Table helper tests (CRUD + partial-unique-index + ready-to-send filter).
+- [ ] `signup_reminder_helper_test.cpp`:
+  - Request creates reminder at correct notifyAtUs.
+  - Request rejects when window already open.
+  - SendPendingReminders sends + marks notified.
+  - Booking the same session cancels pending reminder.
+- [ ] Endpoint tests.
+- [ ] Frontend specs.
+
+## 10. Cross-Layer Acceptance Criteria
+
+A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 60 days:
+- [ ] Catalog shows "Sign-ups open <today + 18 days>" with a Remind-me button.
+- [ ] Click → reminder row created with `notify_at_us = session_start - 42 days`.
+- [ ] On day 18, the hourly cron emails: "Sign-ups are open for 6-Week Aerial 101 starting <date>".
+- [ ] If user books before day 18, the reminder is cancelled and no email goes out.
+
+## 11. Open Questions
+
+- **OQ-P11-1.** What does the reminder email look like for a series with N upcoming instances — list each, or just the series start date? Recommended: list the series as a single line with start + end + per-instance schedule summary; one email per series, not per instance.
+- **OQ-P11-2.** Should we also send reminders for non-class events / services that have advance windows? Recommended: out of scope for Phase 11 — extend opportunistically later.
+
+## 12. Cross-References
+
+- Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 11.
+- Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 7 - Class Series and Workshops]].
+- Scheduler: [[Scheduled Jobs]].
+- Booking window source: [[Event Polish- Scheduling Should Have Items]].
