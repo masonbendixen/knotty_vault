@@ -1013,6 +1013,8 @@ END:VEVENT
 
 **Question for you:** my recommendation is **Option A** (single `VEVENT` + `RRULE`) for the email sent when a user *adds* a template entry — it matches "appropriate recurrence" wording in the Overview, smaller email, clean exception handling via `EXDATE`. And **Option B** (per-instance `VEVENT`s) for the weekly Sunday digest — that email already filters for this week's exceptions, so listing each session separately is simpler. Confirm or pick a different split.
 
+- Mason- I'll go with your recommendation.
+
 ## 9.2 Couple / family membership seat count (was OQ-25)
 
 **What I was asking:** every membership product has a `seats_total` field — 1 for a solo membership, 2 for a couple, 4 for a family of four, etc. The system supports any positive integer.
@@ -1025,6 +1027,8 @@ The question is purely about which products *you want to offer*:
 **My recommendation:** start with just a "couple membership" (`seats_total = 2`) as a single product. If a family use case ever comes up, adding a "family membership" product later is trivial — just a new row in `products` + `product_prices`. The underlying tables support arbitrary N.
 
 **You decide:** which membership-tier products do you want to offer at launch? Couple only, or also family?
+
+- Mason- Memberships are already supported. We have a couple membership and a family membership for three people. If I need to, I could add a four person one later but I've been doing this fifteen years and never hit a need for that especially since we don't support kids so we have only had a couple with a college age kid and a couple of thruples.
 
 ## 9.3 Class tags / controlled vocabulary (was OQ-32)
 
