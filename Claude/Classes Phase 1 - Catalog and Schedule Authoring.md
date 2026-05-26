@@ -267,34 +267,40 @@ Lowest layer first per CLAUDE.md:
 ## 5. Endpoints (`endpoints/`)
 
 ### 5.1 Public catalog endpoints
-- [ ] `endpoints/get_classes.h/cpp` + test:
-  - `GET /api/classes` — query params: `page`, `limit`. Returns array of `ClassCatalogEntry` JSON. Uses `ClassCatalogHelper::GetActiveClasses` for anonymous, `GetClassesVisibleToPerson(personId)` for logged-in.
-- [ ] `endpoints/get_class_detail.h/cpp` + test:
-  - `GET /api/classes/<id>` — public. Returns `ClassDetail` JSON. Returns 404 (`ErrorResponse::NotFound`) if class is missing or `is_active=false`.
+- [x] `endpoints/get_classes.h/cpp` + `get_classes_test.cpp`:
+  - `GET /api/classes`. Anonymous → `ClassCatalogHelper::GetActiveClasses`; logged-in → `GetClassesVisibleToPerson(personId)`. Returns `{ "items": [ ClassCatalogEntry, ... ] }`. Page/limit query params dropped from the plan — `ClassCatalogHelper` is unpaginated and there is no current need for it; can be added later without breaking the response shape.
+  - Tests: `EmptyReturnsEmptyArray`, `AnonymousVisitorSeesActiveClasses` (asserts inactive classes are excluded).
+- [x] `endpoints/get_class_detail.h/cpp` + `get_class_detail_test.cpp`:
+  - `GET /api/classes/<int>`. Returns `ClassDetail` JSON with `upcoming_sessions` and `required_skills` spliced in as nested JSON arrays. 404 when class is missing or `is_active = false`.
+  - Tests: `ReturnsDetailWithSessionsAndInstructor` (verifies pipe-joined instructor names round-trip, facility/room names populated, empty `required_skills` array), `Returns404ForUnknownClass`, `Returns404ForInactiveClass`.
 
 ### 5.2 Admin schedule CRUD endpoints
-- [ ] `endpoints/admin_class_schedule_create.h/cpp` + test:
-  - `POST /api/admin/class_schedule`
-  - Permission gate: new `manage_class_schedule` (Phase 1 introduces this; Phase 12 will refine). Fallback: `manage_products`.
-  - Body: JSON matching `CreateClassScheduleRequest`. Validates, calls `ClassScheduleHelper::CreateClassSchedule`. Returns 200 + scheduleId, or 400 with `errorCode`.
-- [ ] `endpoints/admin_class_schedule_update.h/cpp` + test:
-  - `PUT /api/admin/class_schedule/<id>`. Body: KVT updates + `regenerateFuture` bool. Calls `EditClassSchedule`.
-- [ ] `endpoints/admin_class_schedule_deactivate.h/cpp` + test:
-  - `DELETE /api/admin/class_schedule/<id>?cancel_future=true|false`. Calls `DeactivateClassSchedule`.
-- [ ] `endpoints/admin_class_schedule_materialize.h/cpp` + test:
-  - `POST /api/admin/class_schedule/<id>/materialize`. Body: `{ "through_date_us": <int64> }`. Calls `MaterializeFutureSessions`. Returns `MaterializeResult` JSON (createdSessionIds + skippedDates + alreadyMaterializedCount).
-- [ ] `endpoints/admin_class_schedules_list.h/cpp` + test:
-  - `GET /api/admin/class_schedules?facility_id=<id>`. Calls `GetActiveSchedulesByFacility`.
+- [x] Permission seeding: added `DbSchema::kPermissionManageClassSchedule = "manage_class_schedule"` constant, plus `PopulatePermissions` row and `PopulateRolePermissions` grant to admin role (id=9 in the seed order). No `manage_products` fallback — admin already inherits `manage_class_schedule`, and Phase 12 will refine fine-grained delegation.
+- [x] `endpoints/admin_class_schedule_create.h/cpp` + `_test.cpp`:
+  - `POST /api/admin/class_schedule`. Permission-gated. Parses request body into `CreateClassScheduleRequest`, calls `ClassScheduleHelper::CreateClassSchedule`. Returns 200 + `schedule_id` on success; 400 with `error_code` body on validation failure.
+  - Tests: `Returns401WhenAnonymous`, `Returns403WhenMissingPermission`, `Returns400WhenRequiredFieldMissing`, `Returns400WhenValidationFails` (asserts `error_code` body is `INVALID_PRODUCT` for a non-class product), `Returns200OnSuccessAndPersistsRow`.
+- [x] `endpoints/admin_class_schedule_update.h/cpp` + `_test.cpp`:
+  - `PUT /api/admin/class_schedule/<int>`. Body: `{ "updates": { col → primitive, ... }, "regenerate_future": bool }`. Walks the updates object and turns each primitive into the `KeyValueTable` string form (`true`/`false`, `std::to_string` for numerics, raw string for strings). Nested arrays/objects skipped since `class_schedules` has no nested columns.
+  - Tests: `Returns403WhenMissingPermission`, `Returns404WhenScheduleMissing`, `Returns200AndAppliesUpdate`.
+- [x] `endpoints/admin_class_schedule_deactivate.h/cpp` + `_test.cpp`:
+  - `DELETE /api/admin/class_schedule/<int>?cancel_future=true|false`. Parses `cancel_future` from query string (accepts "true" or "1"). Constructs the helper with the injected SquareClient + MailHelper so the cancel-future path can delegate to `SessionCancellationHelper`.
+  - Tests: `Returns403WhenMissingPermission`, `Returns404WhenScheduleMissing`, `Returns200AndFlipsIsActive`, `Returns200WithCancelFutureQueryParam` (verifies the query-string is parsed and the response surfaces `future_sessions_cancelled`).
+- [x] `endpoints/admin_class_schedule_materialize.h/cpp` + `_test.cpp`:
+  - `POST /api/admin/class_schedule/<int>/materialize`. Body: `{ "through_date_us": <int64> }`. Returns the `MaterializeResult` KVT with `skipped_dates` spliced in as a nested JSON array.
+  - Tests: `Returns403WhenMissingPermission`, `Returns400WhenThroughDateMissing`, `Returns404WhenScheduleMissing`, `Returns200AndCreatesSessions` (asserts `created_session_count` and verifies the row landed in `event_sessions` via `GetEventSessionsByClassSchedule`).
+- [x] `endpoints/admin_class_schedules_list.h/cpp` + `_test.cpp`:
+  - `GET /api/admin/class_schedules?facility_id=<id>`. Permission-gated. Returns `{ "items": [ class_schedules row KVTs ] }`.
+  - Tests: `Returns401WhenAnonymous`, `Returns403WhenLoggedInWithoutPermission`, `Returns400WhenFacilityIdMissing`, `Returns200WithSchedulesForFacility` (asserts only the requested facility's schedules show).
 
 ### 5.3 Routing registration
-- [ ] Register all six endpoints in `endpoints/web_app.cpp`.
+- [x] Registered all seven endpoints in `endpoints/web_app.cpp` — both the include + the anonymous-namespace pointer holder. Added to `endpoints/CMakeLists.txt` sources and test lists.
 
 ### 5.4 Endpoint testing patterns
-- [ ] All endpoint tests use `EndpointTestHelper` + `TestDatabaseUtil::RunInTransaction`.
-- [ ] Use `crow::query_string` for query params (per memory `feedback_crow_query_params_test.md`).
-- [ ] Verify permission-denied paths return 403 / `ErrorResponse::NotAuthorized` for non-admin callers.
-- [ ] Verify ValidationError → 400 (per memory `error_response_status_codes.md`).
-- [ ] No `ThreadPool::Queue` is invoked from any of these endpoints in Phase 1 → no `Shutdown()` dance required (verify by reading helper code).
+- [x] All endpoint tests use `EndpointTestHelper` + `TestDatabaseUtil::RunInTransaction`.
+- [x] `crow::query_string` is used for query params in `admin_class_schedules_list_test.cpp` and `admin_class_schedule_deactivate_test.cpp` (per memory `feedback_crow_query_params_test.md`).
+- [x] Permission-denied paths verified: 401 for anonymous (`Returns401WhenAnonymous`) and 403 for logged-in-without-permission (`Returns403WhenMissingPermission`). `EndpointAuthHelper::RequirePermission` is the two-step gate that produces both codes.
+- [x] `ValidationError → 400` confirmed (`Returns400WhenValidationFails` exercises this path and asserts `error_code` shape).
+- [x] No `ThreadPool::Queue` is invoked from any Phase 1 endpoint — verified by inspection of `ClassScheduleHelper` and `ClassCatalogHelper`; no `ThreadPool::Shutdown()` dance is needed in tests.
 
 ## 6. Frontend (Angular)
 
