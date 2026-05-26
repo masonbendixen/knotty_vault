@@ -92,52 +92,52 @@ Lowest layer first per CLAUDE.md:
 ## 2. Database Schema
 
 ### 2.1 Extend `classes` table
-- [ ] In `db_schema/classes.h`, add column-name constants:
+- [x] In `db_schema/classes.h`, add column-name constants:
   - `kClassesDefaultCapacity`
   - `kClassesDefaultCancellationPolicyId`
   - `kClassesDefaultRoomTypeId`
   - `kClassesIsActive`
   - `kClassesCreatedUs`
   - `kClassesUpdatedUs`
-- [ ] In `db_schema/classes.cpp`, extend `MakeClassesTable` DDL to add the columns as: `BIGINT NOT NULL DEFAULT 0`, `BIGINT NULL`, `BIGINT NULL`, `BOOLEAN NOT NULL DEFAULT TRUE`, `BIGINT NOT NULL DEFAULT 0`, `BIGINT NOT NULL DEFAULT 0` respectively.
-- [ ] Index on `is_active` for the active-catalog query.
+- [x] In `db_schema/classes.cpp`, extend `MakeClassesTable` DDL to add the columns. `default_capacity` is `BIGINT NOT NULL DEFAULT 0`, `default_cancellation_policy_id` and `default_room_type_id` are nullable `BIGINT` (kept plain so they don't have to be added after their would-be parent tables in the builder; validation lives at the application layer), `is_active` is `BOOLEAN NOT NULL DEFAULT TRUE`, `created_us` and `updated_us` are `BIGINT NOT NULL DEFAULT now_us()`.
+- [x] Index on `is_active` for the active-catalog query. Added via `DbSchema::CreateClassesIndexes(transaction)` (raw `CREATE INDEX IF NOT EXISTS`) since the metadata schema builder does not model indexes.
 
 ### 2.2 New `class_schedules` table
-- [ ] New files `db_schema/class_schedules.h/.cpp` with:
+- [x] New files `db_schema/class_schedules.h/.cpp` with the full column set:
   - `id BIGSERIAL PRIMARY KEY`
-  - `class_id BIGINT NOT NULL REFERENCES classes(id)`
-  - `facility_id BIGINT NOT NULL REFERENCES facilities(id)`
-  - `location_room_id BIGINT NOT NULL REFERENCES location_rooms(id)`
-  - `product_id BIGINT NOT NULL REFERENCES products(id)` — drives pricing / visibility / booking permission / cancellation policy
-  - `recurrence_pattern TEXT NOT NULL CHECK (recurrence_pattern IN ('weekly','biweekly','custom'))`
+  - `class_id BIGINT NOT NULL` (FK → `classes(id)` via `AddColumnForeignKeyRef`)
+  - `facility_id BIGINT NOT NULL` (FK → `facilities(id)`)
+  - `location_room_id BIGINT NOT NULL` (FK → `location_rooms(id)`)
+  - `product_id BIGINT NOT NULL` (FK → `products(id)`) — drives pricing / visibility / booking permission / cancellation policy
+  - `recurrence_pattern TEXT NOT NULL` (CHECK constraint enforced in business logic; metadata builder does not expose CHECK)
   - `days_of_week TEXT NOT NULL` (comma-separated 0..6; e.g. "1,3" for Mon+Wed)
   - `start_time_minutes BIGINT NOT NULL` (minutes-after-local-midnight in facility TZ)
   - `duration_minutes BIGINT NOT NULL`
   - `effective_from_us BIGINT NOT NULL`
   - `effective_to_us BIGINT` NULL
   - `capacity BIGINT` NULL — overrides `classes.default_capacity` when set
-  - `predecessor_class_schedule_id BIGINT` NULL — for SL-11 same-day sequencing (Phase 3 wires the check; column lives here from day 1)
+  - `predecessor_class_schedule_id BIGINT` NULL — plain nullable BIGINT (no self-FK so deletes don't cascade through chains); Phase 3 validates the reference at write time
   - `is_series BOOLEAN NOT NULL DEFAULT FALSE`
   - `series_start_date_us BIGINT` NULL
   - `series_end_date_us BIGINT` NULL
   - `series_min_attendees BIGINT` NULL
   - `series_min_by_us BIGINT` NULL
-  - `series_min_not_met_policy TEXT` NULL `CHECK (... IN ('auto_cancel_refund','proceed','admin_decides'))`
+  - `series_min_not_met_policy TEXT` NULL (CHECK enforced in business logic)
   - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
-  - `created_us BIGINT NOT NULL`
-  - `updated_us BIGINT NOT NULL`
-- [ ] Indexes on (`facility_id`, `is_active`), (`class_id`), (`product_id`).
+  - `created_us BIGINT NOT NULL DEFAULT now_us()`
+  - `updated_us BIGINT NOT NULL DEFAULT now_us()`
+- [x] Indexes on (`facility_id`, `is_active`), (`class_id`), (`product_id`) added via `DbSchema::CreateClassSchedulesIndexes(transaction)`.
 
 ### 2.3 Extend `event_sessions` table
-- [ ] Add `class_schedule_id BIGINT` NULL `REFERENCES class_schedules(id)`.
-- [ ] Add `class_id BIGINT` NULL `REFERENCES classes(id)` (denormalized convenience — saves a join in calendar query).
-- [ ] Index on `class_schedule_id` for "all sessions for schedule X" lookups.
-- [ ] Existing event / service session rows have both NULL — backwards-compatible.
+- [x] Add `class_schedule_id BIGINT` NULL `REFERENCES class_schedules(id)` via `AddColumnForeignKeyRefNullable`.
+- [x] Add `class_id BIGINT` NULL `REFERENCES classes(id)` via `AddColumnForeignKeyRefNullable` (denormalized convenience — saves a join in calendar query).
+- [x] Index on `class_schedule_id` for "all sessions for schedule X" lookups, added via `DbSchema::CreateEventSessionsIndexes(transaction)`.
+- [x] Existing event / service session rows have both NULL — backwards-compatible.
 
 ### 2.4 Wire schema into the database init pipeline
-- [ ] Update `make_database_info.cpp`: add `MakeClassSchedulesTable(databaseInfo)` after the `classes`, `facilities`, `location_rooms`, `products` table makers (FK order).
-- [ ] Update `database_helper/create_database.cpp` `CreateTables()`: add `CreateTable(transaction, kClassSchedulesTable, ...)` in FK-respecting order.
-- [ ] Update `db_schema/CMakeLists.txt` and `sql_util/table_helpers/CMakeLists.txt` for the new sources.
+- [x] Update `make_database_info.cpp`: added `MakeClassSchedulesTable(databaseInfo)` right after `MakeCancellationPolicyWindowsTable` and just before `MakeEventSessionsTable` — at that point `classes`, `facilities`, `location_rooms`, and `products` are all already in the builder.
+- [x] Update `database_helper/create_database.cpp` `CreateTables()`: added `CreateTable(DbSchema::kClassSchedulesTable)` immediately before `kEventSessionsTable`, plus `CreateClassesIndexes`, `CreateClassSchedulesIndexes`, and `CreateEventSessionsIndexes` calls.
+- [x] Update `db_schema/CMakeLists.txt` with `class_schedules.h/.cpp`. `sql_util/table_helpers/CMakeLists.txt` is unchanged for this phase — no table helpers added yet (those land in Phase 3 of the plan).
 
 ## 3. Table Helpers
 
