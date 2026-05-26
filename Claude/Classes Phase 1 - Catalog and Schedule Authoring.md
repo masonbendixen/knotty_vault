@@ -381,8 +381,11 @@ A new admin user, starting from a fresh DB built by the `knottyyoga_database_hel
 ## 12. Open Questions
 
 - **OQ-P1-1.** For the `days_of_week` column, use comma-separated string ("1,3,5") or a Postgres `INTEGER[]`? Recommended: comma-separated TEXT for portability and to match how other small enum-set columns are stored in the codebase (verify by grep). Pure storage choice; no behavior impact.
+	- Mason- I'll go with your recommendation.
 - **OQ-P1-2.** Should `predecessor_class_schedule_id` validation reject same-day chains longer than 2 (so we can't accidentally build "hour 1 → hour 2 → hour 3 → hour 4")? Recommended: no cap for now; if it becomes a hygiene issue, revisit.
+	- Mason- I'll go with your recommentation.
 - **OQ-P1-3.** When `EditClassSchedule(regenerateFuture=true)` encounters future sessions that have bookings (Phase 7+), should the editor (a) reject the edit, (b) accept the edit but leave the bookable sessions untouched, or (c) cascade-cancel-and-refund? Recommended (b): leave touched sessions as-is, surface them in the response; admin can manually reconcile.
+	- Mason- I'll go with your recommendation.
 
 ## 13. Cross-References
 
