@@ -177,8 +177,8 @@ Lowest layer first per CLAUDE.md:
 ## 4. Business Logic (`business_logic/scheduling/`)
 
 ### 4.1 New `ClassScheduleHelper`
-- [ ] Files: `class_schedule_helper.h`, `class_schedule_helper.cpp`, `class_schedule_helper_test.cpp`.
-- [ ] Public methods:
+- [x] Files: `class_schedule_helper.h`, `class_schedule_helper.cpp`, `class_schedule_helper_test.cpp`.
+- [x] Public methods — landed as documented below, with `kClassScheduleError*` `string_view` constants exported from `class_schedule_helper.h` so endpoints and tests share the error vocabulary instead of stringly-typing. `Materialize*` and `Edit*` result structs gained `ok` + `errorCode` fields so callers can branch off a single status value:
   ```cpp
   struct CreateClassScheduleRequest {
       int64_t classId = 0;
@@ -215,59 +215,54 @@ Lowest layer first per CLAUDE.md:
   bool DeactivateClassSchedule(Transaction&, int64_t scheduleId, bool cancelFutureSessions);
   bool EditClassSchedule(Transaction&, int64_t scheduleId, const KeyValueTable& updates, bool regenerateFuture);
   ```
-- [ ] `CreateClassSchedule` validations (return descriptive `errorCode` strings):
-  - `INVALID_CLASS` — class not active
-  - `INVALID_FACILITY` / `INVALID_ROOM` — room must belong to the facility
-  - `INVALID_PRODUCT` — product must exist and be of `class` kind
-  - `INVALID_RECURRENCE` — pattern + days-of-week make sense (weekly requires ≥1 day; custom requires `interval_days` in a future enhancement)
-  - `INVALID_TIME_BOUNDS` — duration > 0, start time within [0, 1440), effective_to > effective_from
-  - `INVALID_SERIES_FIELDS` — when `is_series=true`, all series fields must be present and consistent
-- [ ] `MaterializeFutureSessions` is the heart of the phase:
+- [x] `CreateClassSchedule` validations all return descriptive `errorCode` strings, covered by dedicated tests:
+  - `INVALID_CLASS` — class not active or unknown (tests: `CreateRejectsInactiveClass`, `CreateRejectsUnknownClass`)
+  - `INVALID_FACILITY` — facility unknown (test: `CreateRejectsUnknownFacility`)
+  - `INVALID_ROOM` — room unknown or belongs to a different facility (test: `CreateRejectsRoomFromWrongFacility`)
+  - `INVALID_PRODUCT` — product missing or `kind != "class"` (test: `CreateRejectsNonClassProduct`)
+  - `INVALID_RECURRENCE` — pattern not one of `weekly`/`biweekly`/`custom`, or weekly/biweekly without ≥1 day, or any day not in 0..6 (tests: `CreateRejectsInvalidRecurrencePattern`, `CreateRejectsWeeklyWithNoDays`, `CreateRejectsOutOfRangeDayOfWeek`). `custom` does not require `interval_days` yet — future enhancement, materializer is a no-op for now.
+  - `INVALID_TIME_BOUNDS` — duration ≤ 0, start time not in `[0, 1440)`, or `effective_to <= effective_from` (tests: `CreateRejectsZeroDuration`, `CreateRejectsStartTimeOutOfRange`, `CreateRejectsEffectiveToBeforeFrom`)
+  - `INVALID_SERIES_FIELDS` — when `is_series=true`, all series fields must be present, `series_end >= series_start`, `series_min_attendees >= 0`, and `series_min_not_met_policy` must be a valid enum value (tests: `CreateRejectsSeriesMissingFields`, `CreateAcceptsValidSeries`, `CreateRejectsInvalidSeriesPolicy`)
+  - `INVALID_PREDECESSOR` — added beyond the original plan since the predecessor column exists from day 1; rejects unknown / inactive references (tests: `CreateRejectsInvalidPredecessor`, `CreateAcceptsValidPredecessor`)
+- [x] `MaterializeFutureSessions` is the heart of the phase. Tests: `MaterializeCreatesExpectedSessions`, `MaterializeIsIdempotent`, `MaterializeSkipsWhenRoomOversubscribed`, `MaterializeAllowsParallelWhenRoomHasCapacity`, `MaterializeRespectsCapacityOverride`, `MaterializeRejectsUnknownSchedule`, `MaterializeRejectsDeactivatedSchedule`, `MaterializeStopsAtEffectiveTo`. The room-conflict check sums `event_sessions.capacity` of overlapping rows plus 1 per overlapping `bookable_service_sessions` row (those represent single-customer slots). Effective capacity = `class_schedules.capacity` override, else `classes.default_capacity`. `ROOM_OVERSUBSCRIBED` skip reason is returned via `MaterializeSkippedDate` rows. New helpers added to support the check: `EventSessions::GetOverlappingSessionsInRoom`, `BookableServiceSessions::GetOverlappingSessionsInRoom`, `Facilities`, `LocationRooms` (table helpers were missing). Implementation flow:
   - Load schedule; verify still active.
   - Compute the set of (date, start_us, end_us) tuples between `effective_from_us` and `min(throughDateUs, effective_to_us)` from `recurrence_pattern` + `days_of_week` + `start_time_minutes` + `duration_minutes`. Wrap existing `RecurringSessionHelper::GenerateSessionDates`.
   - For each (start_us, end_us): check `event_sessions` for an existing row with `class_schedule_id = scheduleId AND start_time_us = start_us AND status != 'cancelled'`. If present → `alreadyMaterializedCount++`, skip.
   - For each new candidate, run the **room concurrent-capacity check** (per P-4): query `event_sessions` + `bookable_service_sessions` overlapping that time window in the same room. If `Σ capacity` of overlapping sessions + this session's effective capacity > `location_rooms.concurrent_capacity`, append to `skippedDates` with reason `ROOM_OVERSUBSCRIBED` and continue.
   - Otherwise create the `event_sessions` row with `class_id`, `class_schedule_id`, `capacity = scheduleCapacityOverride.value_or(classDefault.capacity)`, `status = "scheduled"`, etc.
   - Returns `MaterializeResult` so admin UI can show created + skipped + already-materialized counts.
-- [ ] `DeactivateClassSchedule` flips `is_active=false`; if `cancelFutureSessions`, iterates future-dated `event_sessions` and calls `SessionCancellationHelper::CancelSession` with reason "class schedule deactivated".
-- [ ] `EditClassSchedule`: applies updates, then if `regenerateFuture`, deletes uncancelled future un-booked `event_sessions` and re-runs `MaterializeFutureSessions` from now through the previous materialization horizon. Bookings (when Phase 7+ adds them) are NEVER blown away — sessions with attached bookings are kept as-is and surfaced in the result so admin can manually reconcile. (Policy chosen per resolved OQ-P1-3.)
+- [x] `DeactivateClassSchedule` flips `is_active=false` and, when `cancelFutureSessions=true`, walks future-dated `event_sessions` via `eventSessions_.GetEventSessionsByClassSchedule` and forwards each to `SessionCancellationHelper::CancelSession` with reason `"class schedule deactivated"`. Requires the SquareClient + MailHelper-flavored constructor for the cancellation handoff. Tests: `DeactivateFlipsIsActive`, `DeactivateUnknownScheduleErrorCode`.
+- [x] `EditClassSchedule`: applies updates via `UpdateClassSchedule`, then if `regenerateFuture`, deletes uncancelled future un-booked `event_sessions` and re-runs `MaterializeFutureSessions` from now through the previous materialization horizon (max start_time across the surviving future rows). Bookings are NEVER blown away — sessions with `booked_count > 0` are kept as-is and surfaced in `result.sessionsKeptDueToBookings` per resolved OQ-P1-3. Tests: `EditWithoutRegenerateAppliesUpdate`, `EditRegenerateDeletesUnbookedAndKeepsBooked`, `EditUnknownScheduleErrorCode`.
 
 ### 4.2 New `ClassCatalogHelper`
-- [ ] Files: `class_catalog_helper.h/.cpp` + test.
-- [ ] Methods:
-  - `std::vector<ClassCatalogEntry> GetActiveClasses(Transaction&)` — all active classes; no per-user filtering (public).
-  - `std::vector<ClassCatalogEntry> GetClassesVisibleToPerson(Transaction&, int64_t personId)` — joins `classes` × at-least-one-active `class_schedule` × `products` × `product_prices`, resolves user's best tier price and inclusion status (M-4 / M-5 / M-7). Used by the public catalog when the visitor is logged in.
-  - `std::optional<ClassDetail> GetClassDetail(Transaction&, int64_t classId, int64_t personId /*0 for anonymous*/)` — class info + photo URL + upcoming sessions (next N from `event_sessions` JOIN `class_schedule_id` IN `(active schedules of this class)`) + the assigned instructors per session via `event_session_staffing`.
-- [ ] `ClassCatalogEntry` struct fields: classId, name, description, photoUrl, defaultCapacity, tags (empty until Phase 13), upcomingSessionCount.
-- [ ] `ClassDetail` adds: full description, list of UpcomingSessionInfo (sessionId, startUs, endUs, facilityName, roomName, instructorName(s)), required-skill-list placeholder (empty until Phase 3), price-info (resolved tier price OR "included in your membership" / "non-member only sees workshop offerings").
-- [ ] Tests cover anonymous, logged-in-with-membership-included, and logged-in-non-member cases.
+- [x] Files: `class_catalog_helper.h/.cpp` + `class_catalog_helper_test.cpp`.
+- [x] Methods:
+  - `std::vector<ClassCatalogEntry> GetActiveClasses(Transaction&)` — all active classes; no per-user filter; powers the public `/api/classes` route for logged-out visitors.
+  - `std::vector<ClassCatalogEntry> GetClassesVisibleToPerson(Transaction&, int64_t personId)` — active classes that have at least one `is_active = true` class_schedule attached. Phase 2 will layer real member-vs-non-member inclusion logic on top; for Phase 1 the personId parameter is reserved (the helper signature is stable so Phase 2 doesn't need a ServerAccess API break).
+  - `std::optional<ClassDetail> GetClassDetail(Transaction&, int64_t classId, int64_t personId, int64_t upcomingSessionLimit = 16)` — class info + upcoming sessions (`EventSessions::GetEventSessionsByClass` from `now_us()` forward) + facility/room names + instructor names per session via `event_session_staffing → people`. Returns `nullopt` for missing or `is_active = false` classes. Price comes from the first active `class_schedule`'s product via `Payment::CatalogHelper::GetProduct(productId, personId)`.
+- [x] `ClassCatalogEntry` struct fields: classId, name, description, photoUrl (empty in Phase 1; image wiring lands later), defaultCapacity, tags (empty until Phase 13), upcomingSessionCount (cancelled rows excluded from the count).
+- [x] `ClassDetail` adds: upcomingSessions, requiredSkills (empty until Phase 3), priceInfo (currency, amountCents, isIncludedInMembership=false until Phase 2).
+- [x] Tests: `GetActiveClassesExcludesInactive`, `GetActiveClassesCountsUpcomingSessions`, `GetActiveClassesExcludesCancelledFromCount`, `GetClassesVisibleToPersonExcludesClassesWithoutSchedule`, `GetClassesVisibleToPersonExcludesClassesWithOnlyInactiveSchedule`, `GetClassDetailReturnsNulloptForUnknown`, `GetClassDetailReturnsNulloptForInactive`, `GetClassDetailHasUpcomingSessionsWithInstructor`, `GetClassDetailUpcomingSessionsExcludeCancelled`, `GetClassDetailRespectsUpcomingLimit`. The "non-member sees no recurring classes" branch is deferred to Phase 2 where membership-gating actually exists.
 
 ### 4.3 Integration with existing `RecurringSessionHelper`
-- [ ] No changes to `RecurringSessionHelper` core — wrap it.
-- [ ] In `ClassScheduleHelper::MaterializeFutureSessions`, build a `RecurringSessionRequest` from the schedule row, but include the new `class_id` / `class_schedule_id` fields on each emitted session.
-- [ ] Add `class_id` / `class_schedule_id` parameters to `RecurringSessionHelper::CreateRecurringSessions` (optional, default 0/NULL) so we don't fork the helper.
+- [x] No changes to `RecurringSessionHelper`'s `GenerateSessionDates` core — `ClassScheduleHelper` wraps it.
+- [x] `ClassScheduleHelper::MaterializeFutureSessions` builds an anchored `RecurringSessionRequest` (`anchorStartUs = effective_from_us + start_time_minutes * 60us/min`) and reuses `GenerateSessionDates` for the recurrence math, then writes each session itself so it can apply idempotency + room-conflict gating before insertion.
+- [x] `RecurringSessionRequest` gained optional `classId` / `classScheduleId` fields with default `0`. `RecurringSessionHelper::CreateRecurringSessions` now propagates those onto every emitted `event_sessions` row when set. Two new tests in `recurring_session_helper_test.cpp` cover both the populated and unpopulated paths: `CreatePropagatesClassIdAndClassScheduleId`, `CreateLeavesClassFieldsNullWhenUnset`.
 
 ### 4.4 KeyValueTable conversions
-- [ ] In `business_logic/scheduling/scheduling_key_value_table.h/cpp` (existing): add
-  - `ClassScheduleToKeyValueTable(const ClassScheduleInfo&)`
-  - `ClassCatalogEntryToKeyValueTable(...)`
-  - `ClassDetailToKeyValueTable(...)`
-  - `MaterializeResultToKeyValueTable(...)`
-- [ ] Unit tests in `scheduling_key_value_table_test.cpp`.
+- [x] Added to `business_logic/scheduling/scheduling_key_value_table.h/cpp`:
+  - `ClassCatalogEntryToKeyValueTable` + `ClassCatalogEntriesToKeyValueTableArray`
+  - `UpcomingSessionInfoToKeyValueTable` + `UpcomingSessionsToKeyValueTableArray`
+  - `ClassDetailToKeyValueTable`
+  - `MaterializeSkippedDateToKeyValueTable` + `MaterializeResultToKeyValueTable`
+  - `CreateClassScheduleResultToKeyValueTable` / `EditClassScheduleResultToKeyValueTable` / `DeactivateClassScheduleResultToKeyValueTable`
+  Note: there is no `ClassScheduleToKeyValueTable` because `class_schedules` rows are already `KeyValueTable` (they come out of `TableHelpers::ClassSchedules::GetClassSchedule` as such — endpoints flow them through `SqlUtil::KeyValueTableToJson` directly).
+- [x] Unit tests in `scheduling_key_value_table_test.cpp` — 12 new cases covering each converter and both "ok" and "error" shapes of the result converters.
 
 ### 4.5 Tests for business logic
-- [ ] `class_schedule_helper_test.cpp`:
-  - Create + materialize 4 weeks → expected number of sessions, expected day-of-week distribution
-  - Re-materialize same range is idempotent (alreadyMaterializedCount equals first run's createdSessionIds.size, nothing new created)
-  - Room-conflict check skips a session if a parallel session would push the room over `concurrent_capacity`
-  - Room-conflict check ALLOWS parallel sessions when combined occupancy fits
-  - `DeactivateClassSchedule(cancelFutureSessions=true)` cancels future sessions
-  - `EditClassSchedule(regenerateFuture=true)` rebuilds only sessions without bookings (Phase 7+ test)
-- [ ] `class_catalog_helper_test.cpp`:
-  - Anonymous visitor sees only public-visibility classes
-  - Logged-in member sees included classes flagged correctly
-  - Non-member sees no recurring classes (only intro workshop / series / workshops — Phase 2/7 wiring)
-- [ ] Remember `ThreadPool::Shutdown()` if any path queues async work (none in Phase 1; verify).
+- [x] `class_schedule_helper_test.cpp` — 22 tests covering every validation error code, materialize 4 weeks Monday-only, materialize idempotency, both directions of the room concurrent-capacity check (skip + allow), capacity override propagation, schedule-not-found and schedule-inactive paths, `effective_to` window cap, edit-without-regenerate, edit-regenerate keeping booked sessions, and unknown-id error paths on Edit/Deactivate. The Deactivate-with-cancel-future test is deferred to integration / endpoint coverage because the path requires a fully-wired SquareClient / MailHelper; the unit-level test asserts the `is_active=false` flip and the unknown-schedule error code.
+- [x] `class_catalog_helper_test.cpp` — 10 tests covering catalog filter on `is_active`, upcoming-session counting (including cancelled exclusion), the "no active schedule attached" filter for logged-in users, the inactive-schedule edge case, detail fetch missing/inactive paths, instructor surfacing via `event_session_staffing → people`, cancelled-session exclusion from detail, and `upcomingSessionLimit` honouring.
+- [x] No path in Phase 1 invokes `ThreadPool::Queue` — confirmed by inspection of `ClassScheduleHelper` and `ClassCatalogHelper`; the only async-write entry points in the codebase (`/api/login`, `/api/verify`, `/api/remember`, `PersonHelper::SessionUsed`) are untouched here.
 
 ## 5. Endpoints (`endpoints/`)
 
