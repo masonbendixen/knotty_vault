@@ -110,13 +110,13 @@ Lowest layer first per CLAUDE.md:
   - `location_room_id BIGINT NOT NULL` (FK → `location_rooms(id)`)
   - `product_id BIGINT NOT NULL` (FK → `products(id)`) — drives pricing / visibility / booking permission / cancellation policy
   - `recurrence_pattern TEXT NOT NULL` (CHECK constraint enforced in business logic; metadata builder does not expose CHECK)
-  - `days_of_week TEXT NOT NULL` (comma-separated 0..6; e.g. "1,3" for Mon+Wed)
+  - `days_of_week TEXT NOT NULL` (comma-separated 0..6; e.g. "1,3" for Mon+Wed) — see resolved OQ-P1-1
   - `start_time_minutes BIGINT NOT NULL` (minutes-after-local-midnight in facility TZ)
   - `duration_minutes BIGINT NOT NULL`
   - `effective_from_us BIGINT NOT NULL`
   - `effective_to_us BIGINT` NULL
   - `capacity BIGINT` NULL — overrides `classes.default_capacity` when set
-  - `predecessor_class_schedule_id BIGINT` NULL — plain nullable BIGINT (no self-FK so deletes don't cascade through chains); Phase 3 validates the reference at write time
+  - `predecessor_class_schedule_id BIGINT` NULL — plain nullable BIGINT (no self-FK so deletes don't cascade through chains); Phase 3 validates the reference at write time. No chain-length cap — see resolved OQ-P1-2
   - `is_series BOOLEAN NOT NULL DEFAULT FALSE`
   - `series_start_date_us BIGINT` NULL
   - `series_end_date_us BIGINT` NULL
@@ -142,31 +142,37 @@ Lowest layer first per CLAUDE.md:
 ## 3. Table Helpers
 
 ### 3.1 New `TableHelpers::ClassSchedules`
-- [ ] `sql_util/table_helpers/class_schedules.h/.cpp` and `class_schedules_test.cpp`.
-- [ ] Methods built on top of `DbCrud`:
+- [x] `sql_util/table_helpers/class_schedules.h/.cpp` and `class_schedules_test.cpp`.
+- [x] Methods built on top of `DbCrud`:
   - `int64_t AddClassSchedule(Transaction&, const KeyValueTable&)`
   - `KeyValueTable GetClassSchedule(Transaction&, int64_t id)`
-  - `void UpdateClassSchedule(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `void DeleteClassSchedule(Transaction&, int64_t id)`  ← soft (set `is_active=false`)
-  - `KeyValueTableArray GetActiveSchedulesByFacility(Transaction&, int64_t facilityId)` — ORDER BY `start_time_minutes`, day-of-week
-  - `std::optional<KeyValueTable> GetScheduleByEventSession(Transaction&, int64_t eventSessionId)` — join through `event_sessions.class_schedule_id`
-  - `KeyValueTableArray GetSchedulesByClass(Transaction&, int64_t classId)`
-  - `KeyValueTableArray GetSchedulesPotentiallyConflictingInRoom(Transaction&, int64_t roomId, int64_t startTimeMinutes, int64_t durationMinutes, days)` — used by the materializer's room-conflict check
-- [ ] Tests (no fixtures, self-contained, transaction-aborted):
-  - Insert + Get round-trip
-  - Update soft-delete sets `is_active=false`
-  - `GetActiveSchedulesByFacility` filters by facility AND `is_active`
-  - `GetSchedulesPotentiallyConflictingInRoom` returns expected rows
+  - `KeyValueTableArray GetClassSchedules(Transaction&)` (added for symmetry with other helpers)
+  - `void UpdateClassSchedule(Transaction&, int64_t id, const KeyValueTable& updates)` — bumps `updated_us` automatically
+  - `void SetIsActive(Transaction&, int64_t id, bool isActive)`
+  - `void SoftDeleteClassSchedule(Transaction&, int64_t id)` — sets `is_active=false` (the plan's intended "Delete")
+  - `void DeleteClassSchedule(Transaction&, int64_t id)` — hard delete; retained for the rare admin "really delete this empty schedule" path and test cleanup
+  - `KeyValueTableArray GetActiveSchedulesByFacility(Transaction&, int64_t facilityId)` — `WHERE facility_id = $1 AND is_active = true ORDER BY start_time_minutes ASC, days_of_week ASC, id ASC`
+  - `std::optional<KeyValueTable> GetScheduleByEventSession(Transaction&, int64_t eventSessionId)` — INNER JOIN through `event_sessions.class_schedule_id`; `nullopt` when unlinked or unknown
+  - `KeyValueTableArray GetSchedulesByClass(Transaction&, int64_t classId)` — returns active + inactive, sorted `is_active DESC, start_time_minutes ASC, id ASC`
+  - `KeyValueTableArray GetSchedulesPotentiallyConflictingInRoom(Transaction&, int64_t roomId, int64_t startTimeMinutes, int64_t durationMinutes, const std::vector<int>& daysOfWeek)` — narrows by `location_room_id = $1 AND is_active = true`; when `daysOfWeek` is non-empty it adds a Postgres regex match against the comma-wrapped `days_of_week` column (`",(1|3),"`) so "1" cannot substring-match "10" or "11". Time-window overlap math is left to the materializer where it has the per-day start/end.
+- [x] Tests (no fixtures, self-contained, transaction-aborted) covering:
+  - Insert + Get round-trip (`AddAndGet`, `AddWithSeriesFields`, `GetClassScheduleNotFound`)
+  - Update bumps `updated_us` (`UpdateUpdatesUpdatedUs`)
+  - Soft + hard delete (`SoftDeleteSetsIsActiveFalse`, `HardDeleteRemovesRow`)
+  - Facility filter + is_active filter + sort by `start_time_minutes` (`GetActiveSchedulesByFacilityFiltersOnFacility`, `GetActiveSchedulesByFacilityExcludesInactive`, `GetActiveSchedulesByFacilityOrderedByStartTime`)
+  - `GetSchedulesByClass` returns active + inactive, sorted active-first (`GetSchedulesByClassReturnsActiveAndInactive`)
+  - `GetScheduleByEventSession` join + nullopt for unlinked / unknown (`GetScheduleByEventSessionJoinsThrough`, `GetScheduleByEventSessionReturnsNulloptForUnlinked`, `GetScheduleByEventSessionReturnsNulloptForUnknown`)
+  - `GetSchedulesPotentiallyConflictingInRoom` with empty filter, with day filter, substring-trap defense (1 vs 11), and `is_active=false` excluded (`ConflictsInRoomEmptyDaysReturnsAllActiveInRoom`, `ConflictsInRoomDayFilterMatchesAsWholeToken`, `ConflictsInRoomDayFilterRejectsSubstringMatch`, `ConflictsInRoomExcludesInactive`)
+  - `SetIsActive` round-trips (`SetIsActiveToggles`)
 
 ### 3.2 Extend `TableHelpers::Classes`
-- [ ] Surface new columns in reads and accept them in writes. Add a `GetActiveClasses(Transaction&)` query.
-- [ ] Add tests for the new column round-trips.
+- [x] New `sql_util/table_helpers/classes.h/.cpp` (no prior helper existed). Surfaces the new columns on read via `GetClass`/`GetClasses` (`SELECT *`), accepts them on write via the full-KVT `AddClass(Transaction&, const KeyValueTable&)` overload, and adds `GetActiveClasses` (`WHERE is_active = true ORDER BY name ASC, id ASC`). Targeted setters: `SetName`, `SetDescription`, `SetDefaultCapacity`, `SetIsActive`. `UpdateClass` bumps `updated_us`.
+- [x] `classes_test.cpp` round-trips every new column (`AddWithAllNewColumns`), covers `GetActiveClasses` filtering (`GetActiveClassesFiltersInactive`, `SetIsActiveFalseExcludesFromActive`), targeted setters, and not-found / delete-not-found paths.
 
 ### 3.3 Extend `TableHelpers::EventSessions`
-- [ ] Surface `class_schedule_id` + `class_id` in `GetEventSession` / `GetEventSessionsByFacility` etc.
-- [ ] Add `GetEventSessionsByClassSchedule(Transaction&, int64_t scheduleId)` — used by `ClassScheduleHelper.DeactivateClassSchedule` and by Phase 5 template auto-cancel sweep.
-- [ ] Add `GetEventSessionsByClass(Transaction&, int64_t classId, int64_t fromUs, int64_t toUs)` — used by Phase 9 attendance history.
-- [ ] Tests for new methods.
+- [x] `class_schedule_id` and `class_id` come back from `GetEventSession` / `GetEventSessions` automatically because those queries are `SELECT *` and the new DDL columns sit on the row. Test `GetEventSessionExposesClassScheduleId` verifies they round-trip and `ClassFieldsNullForClassicEventSession` verifies they come back empty for non-class rows.
+- [x] Added `GetEventSessionsByClassSchedule(Transaction&, int64_t scheduleId)` — `WHERE class_schedule_id = $1 ORDER BY start_time_us ASC, id ASC`. Tests: `GetEventSessionsByClassScheduleReturnsLinkedRows`, `GetEventSessionsByClassScheduleOrderedByStartTime`, `GetEventSessionsByClassScheduleEmptyWhenNoLinkedRows`.
+- [x] Added `GetEventSessionsByClass(Transaction&, int64_t classId, int64_t fromUs, int64_t toUs)` — half-open `[fromUs, toUs)` window, `ORDER BY start_time_us ASC, id ASC`. Tests: `GetEventSessionsByClassFiltersByWindow`, `GetEventSessionsByClassExcludesOtherClassesAndUnlinked`.
 
 ## 4. Business Logic (`business_logic/scheduling/`)
 
@@ -224,7 +230,7 @@ Lowest layer first per CLAUDE.md:
   - Otherwise create the `event_sessions` row with `class_id`, `class_schedule_id`, `capacity = scheduleCapacityOverride.value_or(classDefault.capacity)`, `status = "scheduled"`, etc.
   - Returns `MaterializeResult` so admin UI can show created + skipped + already-materialized counts.
 - [ ] `DeactivateClassSchedule` flips `is_active=false`; if `cancelFutureSessions`, iterates future-dated `event_sessions` and calls `SessionCancellationHelper::CancelSession` with reason "class schedule deactivated".
-- [ ] `EditClassSchedule`: applies updates, then if `regenerateFuture`, deletes uncancelled future un-booked `event_sessions` and re-runs `MaterializeFutureSessions` from now through the previous materialization horizon. Bookings (when Phase 7+ adds them) are NEVER blown away — sessions with attached bookings are kept as-is and surfaced in the result so admin can manually reconcile.
+- [ ] `EditClassSchedule`: applies updates, then if `regenerateFuture`, deletes uncancelled future un-booked `event_sessions` and re-runs `MaterializeFutureSessions` from now through the previous materialization horizon. Bookings (when Phase 7+ adds them) are NEVER blown away — sessions with attached bookings are kept as-is and surfaced in the result so admin can manually reconcile. (Policy chosen per resolved OQ-P1-3.)
 
 ### 4.2 New `ClassCatalogHelper`
 - [ ] Files: `class_catalog_helper.h/.cpp` + test.
@@ -378,14 +384,13 @@ A new admin user, starting from a fresh DB built by the `knottyyoga_database_hel
 - [ ] Open the public `/classes` route as a logged-out visitor and see "Vinyasa Flow" with photo.
 - [ ] Click into class detail and see eight Mondays + eight Wednesdays of upcoming sessions.
 
-## 12. Open Questions
+## 12. Resolved Questions
 
-- **OQ-P1-1.** For the `days_of_week` column, use comma-separated string ("1,3,5") or a Postgres `INTEGER[]`? Recommended: comma-separated TEXT for portability and to match how other small enum-set columns are stored in the codebase (verify by grep). Pure storage choice; no behavior impact.
-	- Mason- I'll go with your recommendation.
-- **OQ-P1-2.** Should `predecessor_class_schedule_id` validation reject same-day chains longer than 2 (so we can't accidentally build "hour 1 → hour 2 → hour 3 → hour 4")? Recommended: no cap for now; if it becomes a hygiene issue, revisit.
-	- Mason- I'll go with your recommentation.
-- **OQ-P1-3.** When `EditClassSchedule(regenerateFuture=true)` encounters future sessions that have bookings (Phase 7+), should the editor (a) reject the edit, (b) accept the edit but leave the bookable sessions untouched, or (c) cascade-cancel-and-refund? Recommended (b): leave touched sessions as-is, surface them in the response; admin can manually reconcile.
-	- Mason- I'll go with your recommendation.
+All Phase 1 open questions are resolved. Mason accepted the recommendation on each; decisions are folded into the relevant sections above and recorded here for the project history.
+
+- [x] **OQ-P1-1 — `days_of_week` storage format.** *Question:* comma-separated TEXT (`"1,3,5"`) or Postgres `INTEGER[]`? **Decision:** comma-separated TEXT, for portability and to match the existing convention for small enum-set columns in this codebase. *Applied in:* §2.2 (DDL) and §3.1 (`GetSchedulesPotentiallyConflictingInRoom` regex uses comma-wrapped tokens to avoid substring traps like "1" matching "10").
+- [x] **OQ-P1-2 — `predecessor_class_schedule_id` chain length cap.** *Question:* reject same-day chains longer than 2 to prevent accidental "hour 1 → 2 → 3 → 4" stacks? **Decision:** no cap for now; if it becomes a hygiene issue, revisit. *Applied in:* §2.2 (DDL note) and the Phase 3 validator (it will only check that the referenced row exists, not how long the chain is).
+- [x] **OQ-P1-3 — `EditClassSchedule(regenerateFuture=true)` with booked future sessions (Phase 7+).** *Question:* (a) reject the edit, (b) accept but leave bookable sessions untouched, or (c) cascade-cancel-and-refund? **Decision:** (b) — leave touched sessions as-is and surface them in the response so admin can manually reconcile. *Applied in:* §4.1 `EditClassSchedule` description.
 
 ## 13. Cross-References
 
