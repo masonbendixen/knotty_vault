@@ -321,9 +321,11 @@ Tag each with a decision before Section 3 (doc updates) kicks off.
 - [ ] **OQ-CSI-12 (Lazy instantiation vs materialization)** — *new, prompted by Mason's note on §123.* Adopt the lazy-instantiation model described in §1.4 (recommendation) or keep an explicit pre-materialization step? The recommendation is **lazy** because it (a) eliminates an entire job + admin button, (b) makes implementation changes correctly take effect with no cleanup cascade, and (c) faithfully mirrors how `price_schedules` work today. Costs: more complex calendar query, "orphaned session" handling (covered in §1.4 "Discussion"). Confirm.
 - [ ] **OQ-CSI-13 (Table strategy under lazy model)** — *new.* Per §1.4 "Table-naming wrinkle": (A) keep `event_sessions` for everything and just stop pre-populating class rows (recommendation, minimum churn); (B) split out a separate `class_session_instances` table for lazy class rows; (C) rename `event_sessions` → `session_instances` and adopt lazy as the default for services / events too. Recommendation: **A**.
 - [ ] **OQ-CSI-14 (Instructor scheduling at slot vs per-session)** — *new, prompted by Mason's note on §77.* Adding `instructor_person_id` to the slot row means "this is the regularly-scheduled instructor for this time slot". Per-session substitutions still ride on `event_session_staffing` (which gets populated when a sub is recorded — under the lazy model, that creates the `event_sessions` row at the same time). Confirm this two-tier model (slot = default instructor, persisted session = override) matches Mason's intent, vs. always sourcing the instructor from `event_session_staffing` even for the default case.
-- [ ] **OQ-CSI-15 (Separate `classes` rows for workshops and series)** — *new, prompted by Mason's §185 note.* Per §1.5a, a workshop / series gets its own `classes` row distinct from any recurring class it might thematically descend from. This means "Inversion Workshop Aug 15" and "Vinyasa Fall Series Sept–Oct 2026" each have their own row in `classes` with their own name / description / photo. Alternative: share a `classes` row with the related recurring class. Recommendation: **separate rows** because marketing identity differs and the same activity might spawn multiple bounded offerings per year. Confirm.
-- [ ] **OQ-CSI-16 (Where the series bundle machinery lives)** — *new, prompted by Mason's §185 note.* Per §1.5a, the series-purchase mechanics (`min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`, `per_session_base_cents` per tier) belong in a new `class_series_offerings` table introduced in Phase 7, NOT on `class_schedules` in Phase 1. Confirm that Phase 1 ships purely scheduling and Phase 7 owns the bundle product. Open follow-up: does the series's session set derive from the *same* `class_schedules` impls the recurring class uses, or does the series have its OWN impls under its own `classes` row? Recommendation: **own impls under its own `classes` row** so admin can independently shape the series schedule without disturbing the recurring class (e.g., add the Labor Day empty-Monday impl to the series's class without affecting the regular Vinyasa Flow recurring schedule). Confirm.
+- [ ] **OQ-CSI-15 (Shared `classes` row across runs — REVISED)** — *Reframed per Mason's §209 note.* The original "each workshop run / series instance gets its own `classes` row" was walked back. Per §1.5a's revised recommendation, **a workshop or series shares one `classes` row across all its runs** (so "Intro to Partner Acro" has a single page with upcoming Fall 2026 / Spring 2027 / Summer 2027 runs listed underneath). Each run is a separate bounded `class_schedules` impl under the shared class. Confirm.
+- [ ] **OQ-CSI-16 (Where the series bundle machinery lives)** — *new, prompted by Mason's §185 note.* Per §1.5a, the series-purchase mechanics (`min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`, `per_session_base_cents` per tier) belong in a new `class_series_offerings` table introduced in Phase 7, NOT on `class_schedules` in Phase 1. The table is 1:1 with `class_schedules` rows that are series instances (one offering row per impl that's a series instance, keyed by `class_schedule_id`). Confirm that Phase 1 ships purely scheduling and Phase 7 owns the bundle product.
 - [ ] **OQ-CSI-17 (Closure scope confirmation)** — *new, prompted by Mason's §205 note.* Per §1.7's reframe, there is no global "studio closure" lever; closures are per-class empty high-priority impls and workshops happening on the closure date are unaffected. The Phase 10 batch UI is therefore a class-multiselect ("close these N recurring classes for this window"). Confirm there's no scenario where Mason wants a truly global suppress-everything closure.
+- [ ] **OQ-CSI-18 (Add `classes.kind` enum)** — *new, prompted by Mason's §209 note and §1.5a's revised model.* Add a `classes.kind` enum (`recurring` | `workshop` | `series`) so the catalog / admin UI knows how to render a class. Recurring class detail shows "upcoming sessions from the active impl"; workshop / series detail shows "list of upcoming runs (bounded impls)". Default `recurring`. Confirm.
+- [ ] **OQ-CSI-19 (Impl-save sweep semantics)** — *new, prompted by Mason's §175 note.* Per §1.4, the impl-save flow auto-deletes orphaned future-date `event_sessions` rows that hold only admin actions (notes, manual instructor subs) — no UI cleanup step required. Any row that carries a `purchase_id` blocks the save with a "cancel-and-refund first" message. Confirm this sweep-on-save model rather than a standalone orphan-recovery view.
 
 ---
 
@@ -349,7 +351,7 @@ This is the biggest rewrite — most §2..§7 needs touching.
 
 - [ ] §1 Pre-Coding Design Decisions — add the resolved OQ-CSI-1..10 entries. Keep §1.1 / §1.3 (taxonomy + room conflict policy still apply).
 - [ ] §2 Database Schema — full rewrite:
-  - §2.1 `classes` table — unchanged. Note that workshops and series get their own `classes` rows per §1.5a / OQ-CSI-15.
+  - §2.1 `classes` table — **add a `kind` enum (`recurring` | `workshop` | `series`) defaulting to `recurring`** per §1.5a's revised model + OQ-CSI-18. Note that workshops + series share their `classes` row across runs per OQ-CSI-15-reframed.
   - §2.2 `class_schedules` — strip down to implementation columns (per §1.2 above); drop `predecessor_class_schedule_id`; **drop `is_series` and all `series_*` columns** (per §1.5a / OQ-CSI-9 reframe — series bundle machinery moves to `class_series_offerings` in Phase 7).
   - §2.2a (new) `class_schedule_slots` table including `instructor_person_id` and `predecessor_class_schedule_slot_id`.
   - §2.3 `event_sessions` extensions — change `class_schedule_id` column to be `class_schedule_slot_id` (slot identity, not impl identity), and add an `occurrence_date_us` (date-truncated for the day this row pins). Keep `class_id` as a denormalized convenience. The composite (`class_schedule_slot_id`, `occurrence_date_us`) becomes the natural key for derived-vs-persisted lookups under §1.4's lazy model.
@@ -360,32 +362,33 @@ This is the biggest rewrite — most §2..§7 needs touching.
   - `TableHelpers::EventSessions` — add `LookupBySlotAndDate(slotId, occurrenceDateUs)` for the lazy lookup path; add `GetOrphanedClassSessions(classId, fromUs, toUs)` for the orphaned-session admin view.
   - Tests for all three with the new sort orders + conflict-detection semantics.
 - [ ] §4 Business Logic — rewrite `ClassScheduleHelper`:
-  - `CreateImplementation(req)` / `UpdateImplementation(...)` (validates overlap + priority + same-priority-no-overlap rule).
-  - `AddSlot(scheduleId, slot)` / `UpdateSlot(slotId, ...)` / `DeleteSlot(slotId)` (slot CRUD).
+  - `CreateImplementation(req)` / `UpdateImplementation(...)` (validates overlap + priority + same-priority-no-overlap rule). `UpdateImplementation` triggers the impl-save sweep (delete future-date orphaned `event_sessions` rows for the affected class; refuse the save if any orphan carries a `purchase_id`).
+  - `AddSlot(scheduleId, slot)` / `UpdateSlot(slotId, ...)` / `DeleteSlot(slotId)` (slot CRUD). Slot deletion also triggers the sweep.
   - **No `MaterializeFutureSessions`** under the lazy model. Replaced by `EnsureSessionExists(slotId, occurrenceDateUs)` — idempotent, called by the booking / check-in / cancel / sub paths in §1.4's trigger list.
   - `GetDerivedSessionsForRange(classId, fromUs, toUs)` — walks dates, resolves active impl per day, expands slots, left-joins persisted `event_sessions` rows. The single helper that calendar / catalog queries call into.
   - `GetActiveImplementationView(classId, dateUs)` — backs the "preview on date X" UI.
-  - `GetOrphanedSessionsForRange(classId, fromUs, toUs)` — finds persisted rows whose `class_schedule_slot_id` no longer derives from the active impl for that date.
+  - `SweepOrphanedFutureSessions(classId, asOfUs)` — internal helper called by `UpdateImplementation` / `AddSlot` / `DeleteSlot`. Returns (deletedCount, blockedRows) so the endpoint can surface the count or the refusal.
   - Drop `recurrence_pattern` validation entirely.
-  - Test updates: all of `class_schedule_helper_test.cpp` needs re-casting. New tests for priority-resolution, overlap rejection, no-slot (closure) impls, multi-slot per day, per-day different times, lazy ensure-session idempotency, orphan detection, derived-vs-persisted left-join.
+  - Test updates: all of `class_schedule_helper_test.cpp` needs re-casting. New tests for priority-resolution, overlap rejection, no-slot (closure) impls, multi-slot per day, per-day different times, lazy ensure-session idempotency, sweep-on-save deletes admin actions, sweep-on-save refuses when purchase row exists, derived-vs-persisted left-join.
 - [ ] §5 Endpoints — re-cast:
   - `POST /api/admin/class_schedule` (implementation create) — body shape changes.
   - `POST /api/admin/class_schedule/<id>/slot` (add slot), `PUT /api/admin/class_schedule_slot/<slotId>`, `DELETE /api/admin/class_schedule_slot/<slotId>`.
   - `GET /api/admin/class_schedules?class_id=<id>` — list implementations for a class.
   - `GET /api/admin/class_schedule_preview?class_id=<id>&date_us=<t>` — resolved active impl + slot list.
-  - `GET /api/admin/orphaned_class_sessions?class_id=<id>&from_us=&to_us=` — backs the orphaned-session admin view.
   - **Remove** `POST /api/admin/class_schedule/<id>/materialize` — no longer applicable under lazy instantiation.
+  - **No standalone orphan-listing endpoint** — sweep is part of the impl-save / slot-mutation responses (they return `{deletedOrphanCount, blockedRows}`).
 - [ ] §6 Frontend — significant rewrite of the admin UI:
-  - Implementation list per class with priority + window indicators (currently-active highlighted).
+  - Class detail (admin): page per `classes` row showing kind (recurring / workshop / series) + impl list.
+  - Implementation list per class with priority + window indicators (currently-active highlighted). For workshop / series this is the "upcoming and past runs" view; "Add new run" creates a new bounded impl under the same class.
   - Slot editor: sorted list, day-of-week dropdown, time picker (per OQ-CSI-7), duration input, facility / room / instructor autocomplete dropdowns, optional predecessor-slot picker.
   - "Schedule on date X" preview view.
-  - Orphaned-session admin view + per-row "cancel + refund" action (delegates to `SessionCancellationHelper`).
+  - Impl-save confirmation modal: when the save will trigger a non-zero orphan sweep, show "X future admin notes/subs will be removed by this change" with a confirm button. If the sweep is blocked by `purchase_id` rows, surface those with "cancel and refund first" actions.
   - Remove the materialize dialog component entirely.
   - All component specs updated.
 - [ ] §7 Admin Metadata — add `class_schedule_slots` registration (all eleven steps).
-- [ ] §10 Tests Summary — expand to call out the new slot tests + priority tests + lazy-instantiation tests + orphan-detection tests; remove materialize tests.
-- [ ] §11 Cross-Layer Acceptance Criteria — rewrite around: "admin creates default impl with three slots, adds one holiday-week empty-impl override, calendar shows holiday-week behavior during the window, reverts after, and no admin click-to-materialize is required at any point."
-- [ ] §12 Resolved Questions — append OQ-CSI-1..14 resolutions.
+- [ ] §10 Tests Summary — expand to call out the new slot tests + priority tests + lazy-instantiation tests + sweep-on-save tests; remove materialize tests.
+- [ ] §11 Cross-Layer Acceptance Criteria — rewrite around: "admin creates default impl with three slots under a `kind='recurring'` class, adds one holiday-week empty-impl override, calendar shows holiday-week behavior during the window, reverts after, and no admin click-to-materialize is required at any point. Separately, admin creates a `kind='workshop'` class with one bounded impl, then adds a second bounded impl under the same class for a future re-run — the catalog detail page shows both runs."
+- [ ] §12 Resolved Questions — append OQ-CSI-1..19 resolutions.
 - [ ] Mason-note in §357 — replaced by the rewritten body; can become a "Design Pivot Notes" appendix linking to this doc as the design source.
 
 ## 3.3 Sibling phase doc updates
