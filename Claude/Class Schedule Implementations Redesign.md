@@ -72,6 +72,8 @@ Removed from the current Phase 1 design: `facility_id`, `location_room_id`, `rec
 
 No unique constraint on (`class_schedule_id`, `day_of_week`, `start_time_minutes`) — Mason explicitly called out "multiple time slots for the same class on the same day" (morning + evening) — so the same day-of-week appears multiple times.
 
+Mason- I think that class schedule slots should also have an instructor associated with each slot to note who is scheduled to teach a given class on the schedule. We should also have some kind of class instance override to note that a given slot on a given date was either cancelled or has another instructor lined up to s
+
 ## 1.3 Active-implementation resolution
 
 For a given `class_id` at moment `t`:
@@ -116,7 +118,7 @@ Two UX options:
 
 Recommendation: **B** for production UX, but keep an admin "materialize now" button for ops + the test helper. The Phase 1 doc currently has the materialize button as a first-class feature — this can stay but become an "advance the horizon now" operation.
 
-Mason- why do we want materialization? I think that the advantage of doing with 
+Mason- why do we want materialization? I think that the advantage of doing class schedules with active times and priority with only one active at a time is that we shouldn't need to "materialize" anything. I think that we should probably just have a window 
 
 ## 1.5 Booked-session preservation
 
