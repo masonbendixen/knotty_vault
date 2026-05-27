@@ -362,8 +362,8 @@ Forgetting steps 4 or 5 below is the most common mistake (per CLAUDE.md). All el
 	- It should be easy to see what the active class schedule will be on a given day.
 	- The binding of classes to class schedule implementations needs to have better UI than the current schedule instance UI.
 		- Class ID / Room ID / Product ID make no sense. Use the friendly name for each column and create an auto complete dropdown.
-		- What does recurrence pattern mean? I get weekly but biweekly and custom are complicated. For biweekly, can I have different days for odd and even weeks? When does odd or even start? Which comes first and does this start with the start date of the implementation be the first day of the week and which comes first? It would be kind of confusing if Sunday or Monday isn't the day where this transition happens.
-		- Classes aren't just at the same time on every day that they are held. I need to be able to add f
+		- What does recurrence pattern mean? I get weekly but biweekly and custom are complicated. For biweekly, can I have different days for odd and even weeks? When does odd or even start? Which comes first and does this start with the start date of the implementation be the first day of the week and which comes first? It would be kind of confusing if Sunday or Monday isn't the day where this transition happens. Is it worth doing biwekly? What does custom mean?
+		- Classes aren't just at the same time on every day that they are held. I need to be able to add different start times and durations for different days and the possibility of having multiple time slots for the same class on the same day (like morning and evening classes). I basically need to have a day of the week, start time, duration tuple of edit boxes that cause entries to be added to a sorted list of class times (including the ability to delete items from this scrollable list). If we do biweekly or custom, we need a way of having this specified differently for odd or even weeks. I have no idea how this applies to custom recurrence. Also, the day of the week should be a drop down but the start time should be a time pi
 
 ## 8. Permissions
 
