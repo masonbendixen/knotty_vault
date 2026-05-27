@@ -206,6 +206,8 @@ All three use `class_schedules` + `class_schedule_slots`. The difference is in t
 - **Workshop** = its OWN `classes` row ("Inversion Workshop Aug 15") + a `kind='workshop'` product + a single `class_schedules` impl with narrow `[valid_from, valid_to]` + one slot. No other impl coexists. No overrides needed. (P-3 from the parent doc already says workshops use this same machinery.)
 - **Series** = its OWN `classes` row ("Vinyasa Fall Series Sept–Oct 2026") + a `kind='class_series'` product + one or more `class_schedules` impls with bounded `[valid_from, valid_to]` covering the series window + slots for the default pattern. **A higher-priority impl can carve out the Labor Day Monday** — that empty-Monday impl reduces the derived-occurrence count, which feeds the price calculation.
 
+Mason- I don't mind an "instance" of a series having its own class row but I think it would be nice to have a series have separate notion with a name, description, and picture. For instance, intro to partner acro could be a series we run repeatedly. It would be nice to have a series page and then see upcoming instances of the se
+
 This lets us drop `is_series` + `series_*` fields from `class_schedules` entirely. The "this is a paid bundle" semantics live on the *product*, not on the schedule impl. Schedule impls are pure scheduling.
 
 ### Why separate `classes` rows for workshop / series rather than reusing a recurring class
