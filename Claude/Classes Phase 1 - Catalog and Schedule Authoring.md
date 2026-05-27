@@ -345,26 +345,27 @@ Forgetting steps 4 or 5 below is the most common mistake (per CLAUDE.md). All el
 - [ ] **Step 1** — Confirm `db_schema/class_schedules.h` constants are referenced.
 - [ ] **Step 2** — `make_database_info.cpp` already updated in 2.4.
 - [ ] **Step 3** — `CreateTables()` already updated in 2.4.
-- [ ] **Step 4** — `PopulateAdminTopLevelTables()`: NOT in the top-level list — `class_schedules` is nested under `classes`.
-- [ ] **Step 5** — `PopulateAdminNestedTables()`: add `class_schedules` as a nested child of `classes` keyed by `class_id`. Without this, the generic CRUD endpoints reject the table with "Table is not an allowed table".
-- [ ] **Step 6** — `PopulateAdminTablePermissions()`: `class_schedules` requires `manage_class_schedule`. Also: ensure the existing `classes` row uses `manage_class_schedule` (NOT just `manage_products`) so studio managers can edit class definitions.
-- [ ] **Step 7** — `PopulateAdminColumnDataInfo()`: column edit types for the new columns (FKs for `class_id`/`facility_id`/`location_room_id`/`product_id`, time-of-day editor for `start_time_minutes`, JSON multi-select for `days_of_week`, etc.).
-- [ ] **Step 8** — `PopulateAdminColumnFriendlyNames()`: friendly headers (e.g. "Class", "Facility", "Room", "Recurrence", "Days of Week", "Start Time", "Duration (min)").
-- [ ] **Step 9** — `PopulateAdminTableFriendlyNames()`: "Class Schedules".
-- [ ] **Step 10** — `PopulateAdminTableDisplayTemplates()`: FK picker for `class_schedules` shows "{class_name} @ {facility_name} {start_time}" format.
-- [ ] **Step 11** — `CMakeLists.txt` for `db_schema/` and `sql_util/table_helpers/`.
+- [x] **Step 4** — `PopulateAdminTopLevelTables()`: intentionally NOT added — `class_schedules` is nested under `classes`. Inline comment in `PopulateAdminNestedTables` documents the skip so a future reader doesn't "fix" it.
+- [x] **Step 5** — `PopulateAdminNestedTables()`: added `class_schedules` so the generic CRUD endpoints accept it. Also added to `PopulateAllowedTables` (upstream gate that the original plan didn't call out).
+- [x] **Step 6** — `PopulateAdminTablePermissions()`: added `class_schedules → manage_class_schedule (id=9)`. Also added an ADDITIONAL `classes → manage_class_schedule` row alongside the existing `classes → manage_products`. The table has any-of semantics (verified by reading `endpoint_auth_helper.cpp`), so admins keep the manage_products path while Studio Managers also gain access.
+- [x] **Step 7** — `PopulateAdminColumnDataInfo()`: 20 column rows for `class_schedules` (every column except `id`) plus 6 new rows on `classes` for the §2.1 columns.
+- [x] **Step 8** — `PopulateAdminColumnFriendlyNames()`: 20 friendly column headers for `class_schedules` + 4 new rows on `classes`.
+- [x] **Step 9** — `PopulateAdminTableFriendlyNames()`: added "Class Schedules".
+- [x] **Step 10** — `PopulateAdminTableDisplayTemplates()`: added FK picker template: `"Class {class_id} @ facility {facility_id}, room {location_room_id}, {recurrence_pattern} {days_of_week} {start_time_minutes}min"`. (The plan called for joining through `classes.name` / `facilities.name`, but the existing display-template resolver pulls values from the row itself; cross-table joins aren't supported. Friendly enough until the resolver gets join support — Phase 13 candidate.)
+- [x] **Step 11** — `CMakeLists.txt` for `db_schema/` and `sql_util/table_helpers/` already updated in §2.4 and §3.
 
 ## 8. Permissions
 
-- [ ] Add `manage_class_schedule` permission seed in `create_database.cpp`.
-- [ ] Add a `Studio Manager` role (or extend existing) to have `manage_class_schedule`.
-- [ ] Admin role already has the master permission set; no change.
+- [x] `manage_class_schedule` permission seeded in `PopulatePermissions` (Phase 5 work).
+- [x] Granted to admin role in `PopulateRolePermissions` (Phase 5 work).
+- [x] Added `Studio Manager` role to `PopulateRoles` (id=6, after Provider). Granted `manage_class_schedule` in `PopulateRolePermissions`. No `RoleAssignments` row — no person is auto-assigned the role; admin can grant it via the people admin page.
 
 ## 9. Seed Data
 
-- [ ] In `create_database.cpp`, seed two demo classes (e.g., "Vinyasa Flow" + "Aerial 101") with photos to be uploaded later.
-- [ ] Seed one demo `class_schedule` for "Vinyasa Flow" so a fresh DB shows something on the calendar.
-- [ ] Seed a default cancellation policy (if not present already from earlier phases).
+- [x] Existing 6 classes (Knotty Yoga, Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling, Handstands, Aerial Fabric) already seeded by `PopulateClasses`. The plan's "Vinyasa Flow + Aerial 101" names were placeholders; the existing names are kept since they're already wired into other parts of the seed data.
+- [x] Added a `kind='class'` product `class-dropin` ("Class Drop-In", $20 capacity, 60 min duration) in `PopulateProducts`. Added `'class'` as a valid product-kind admin enum value so the admin UI dropdown lists it.
+- [x] New `PopulateClassSchedules` function seeds one schedule (Knotty Yoga, Main Gym at Knotty Yoga Studio, weekly Mon+Wed at 18:00 for 60 min, effective from `now_us()`). Calls `ClassScheduleHelper::MaterializeFutureSessions` for 8 weeks so a fresh DB has live `event_sessions` rows for the catalog detail page to render.
+- [x] Cancellation policies (Full Refund / Tiered / No Refund) already seeded by `PopulateCancellationPolicies` from earlier phases. The seeded `class_schedule` doesn't reference one (Phase 1 doesn't gate on it; Phase 2/7 will).
 
 ## 10. Tests Summary
 
