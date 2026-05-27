@@ -396,22 +396,32 @@ Tag each with a decision before Section 3 (doc updates) kicks off.
 - [ ] **OQ-CSI-7 (Time entry UX)**: Existing memory `feedback_date_time_pickers.md` says "times must use hour pickers" and Phase 1 §6.3 ships separated hour + minute inputs. Slot start times often have minute precision (5:45 PM yoga) — do we need a full time picker (HH:MM) for slot entry, overriding the hour-only convention here? Recommendation: **yes, full time picker** because class start times in the wild are not hour-aligned (e.g. 5:45, 6:15).
 	- Mason- yes this things don't need to start on hour boundaries.
 - [ ] **OQ-CSI-8 (Slot uniqueness)**: Allow duplicate (`class_schedule_id`, `day_of_week`, `start_time_minutes`, `location_room_id`) tuples or reject? Recommendation: **reject identical full tuples** because that's almost certainly a data-entry mistake — different rooms at the same time are different rows, and different start times are different rows. The same room + same start_time + same day = duplicate.
+	- Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-9 (Drop `is_series` / `series_*` from `class_schedules`)** — **RESOLVED in L-5 / L-6.** Drops happen in Phase 1; Phase 7 owns the `class_series_instances` augmentation table. Listed here for backward reference.
 - [ ] **OQ-CSI-10 (Phase 1 already merged?)**: Phase 1 is marked done end-to-end (most checkboxes are checked). Is this a "redesign before Phase 2 lands" plan (rewrite migrations, re-do tests) or a "Phase 1.5 migration" plan (new tables alongside, deprecation)? Recommendation: **rewrite Phase 1 in place** — pre-deploy, no production state to defend against per `feedback_no_premature_defensive_code.md`. But Mason should confirm there's no deployed environment that needs a migration path.
+	- Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-11 (Skill-level requirements per-class or per-slot)**: Today's Phase 3 design keys skill prerequisites off `class_id` via `class_skill_requirements`. With per-slot skill requirements, "Beginner Acro" Saturday morning and "Advanced Acro" Tuesday night could share a class row but have different prerequisites. Recommendation: **per-class (no change to Phase 3)** because (a) prerequisites are a property of "what the class is", and (b) genuinely different skill levels of the same activity should be different classes. Confirm.
+	- Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-12 (Lazy instantiation vs materialization)**: Adopt the lazy-instantiation model described in §1.4 (recommendation) or keep an explicit pre-materialization step? Recommendation: **lazy** — eliminates a job + admin button, makes impl changes correctly take effect with no cleanup cascade, mirrors how `price_schedules` work today. Costs covered in §1.4. Confirm.
+	- Mason- Lazy all the way
 - [ ] **OQ-CSI-13 (Table strategy under lazy model)**: Per §1.4 "Table-naming wrinkle": (A) keep `event_sessions` for everything and just stop pre-populating class rows (recommendation, minimum churn); (B) split out a separate `class_session_instances` table for lazy class rows; (C) rename `event_sessions` → `session_instances` and adopt lazy as the default for services / events too. Recommendation: **A**.
+	- Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-14 (Instructor scheduling at slot vs per-session)**: Adding `instructor_person_id` to the slot row means "this is the regularly-scheduled instructor for this time slot". Per-session substitutions still ride on `event_session_staffing` (the sub action creates the `event_sessions` row at the same time under the lazy model). Confirm this two-tier model (slot = default, persisted session = override) vs always sourcing instructor from `event_session_staffing` even for the default.
+	- Mason- confirmed
 - [ ] **OQ-CSI-15 (Shared `classes` row across runs)** — **RESOLVED in L-7.** One `classes` row per offering identity; per-run distinction on `class_instances.name`. Listed here for backward reference.
 - [ ] **OQ-CSI-16 (Series bundle table)** — **RESOLVED in L-5.** Phase 7 ships `class_series_instances` as a 1:1 augmentation of `class_instances`. Listed here for backward reference.
 - [ ] **OQ-CSI-17 (Closure scope)** — **RESOLVED in L-9.** No global closure lever; per-class only. Listed here for backward reference.
 - [ ] **OQ-CSI-18 (Add `classes.kind` enum)**: Add a `classes.kind` enum (`recurring` | `workshop` | `series`) defaulting to `recurring` so catalog / admin UI can discriminate rendering paths. Confirm.
+	- Mason- sounds good
 - [ ] **OQ-CSI-19 (Impl-save sweep semantics)**: Per §1.4, the impl-save flow auto-deletes orphaned future-date `event_sessions` rows scoped to the impl's parent instance that hold only admin actions (notes, manual instructor subs). Any row with a `purchase_id` blocks the save with a "cancel-and-refund first" message. Confirm this sweep-on-save model rather than a standalone orphan-recovery view.
+	- Mason- confirmed
 - [ ] **OQ-CSI-20 (Recurring-class instance migration UX)** — *new, follow-up from Mason's Q5.* When admin needs to migrate a recurring class to a new product (membership permission rule change, etc.) — what's the UX? Options:
   - (a) "Edit class" form has a "migrate to new product effective DATE" action that closes the current perpetual instance with `valid_to_us=DATE` and opens a new one with `valid_from_us=DATE` and the new `product_id`. Admin picks the new product from a dropdown. Slots default to copying from the closing instance's latest impl (admin can edit).
   - (b) Admin manually closes the old instance and creates the new one through generic CRUD. No special "migration" affordance.
   - Recommendation: **(a)** because the migration is a real concept worth surfacing — admin shouldn't have to remember to copy slots forward.
+  - Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-21 (Slot copy-forward on impl create)** — *new, follow-up.* When admin creates a new impl under an existing instance (e.g. a holiday override), should the impl start empty, or pre-populated with the slots of the previous active impl (so admin only edits the differences)? Recommendation: **start with a "copy from existing impl" picker** — admin chooses to copy from the default impl and then edits, or to start empty (for a closure). Speeds up the common case (Memorial Day override = copy default + delete Monday slot).
+	- Mason- I'll go with your recommendation.
 
 ---
 
