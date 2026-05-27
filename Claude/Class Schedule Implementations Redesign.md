@@ -172,6 +172,8 @@ So the only real "orphan" scenario is:
 - **Per-instance admin actions against a recurring class** (cancellation notes from CS-7, per-session instructor subs that admin set up manually before the high-priority impl landed). Those write a persisted `event_sessions` row pointing at the original slot. When the higher-priority impl wins for that date, the persisted row is "orphaned" — its slot_id no longer derives from the active impl.
 - Resolution: small admin "orphaned sessions" view; admin decides keep / delete. This is rare enough to not need automation.
 
+Mason- As I've indicated elsewhere, a recurring class included in a membership the "bookings" are just informational to let know planned attendance. There really is no need for leaving / creating orphans here. We can just delete these.
+
 **Workshops and one-off events do NOT participate in this orphan story.** I'll remove the misleading "Holiday week pre-booked workshop" example from the prior draft.
 
 ## 1.5 Booked-session preservation (under the lazy model)
