@@ -361,7 +361,9 @@ Forgetting steps 4 or 5 below is the most common mistake (per CLAUDE.md). All el
 	- For a given class, there needs to be a way to edit the scheduled instances of the given class for a specific implementation.
 	- It should be easy to see what the active class schedule will be on a given day.
 	- The binding of classes to class schedule implementations needs to have better UI than the current schedule instance UI.
-		- Class ID / Room ID / Product ID make no sense. Use the friendly name for each column and create an auto complete dropdown. What does 
+		- Class ID / Room ID / Product ID make no sense. Use the friendly name for each column and create an auto complete dropdown.
+		- What does recurrence pattern mean? I get weekly but biweekly and custom are complicated. For biweekly, can I have different days for odd and even weeks? When does odd or even start? Which comes first and does this start with the start date of the implementation be the first day of the week and which comes first? It would be kind of confusing if Sunday or Monday isn't the day where this transition happens.
+		- Classes aren't just at the same time on every day that they are held. I need to be able to add f
 
 ## 8. Permissions
 
