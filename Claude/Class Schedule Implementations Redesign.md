@@ -116,6 +116,8 @@ Two UX options:
 
 Recommendation: **B** for production UX, but keep an admin "materialize now" button for ops + the test helper. The Phase 1 doc currently has the materialize button as a first-class feature — this can stay but become an "advance the horizon now" operation.
 
+Mason- why do we want materialization? I think that the advantage of doing with 
+
 ## 1.5 Booked-session preservation
 
 When a new high-priority implementation lands and overrides slots that already materialized as `event_sessions`:
