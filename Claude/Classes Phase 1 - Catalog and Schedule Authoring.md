@@ -305,39 +305,38 @@ Lowest layer first per CLAUDE.md:
 ## 6. Frontend (Angular)
 
 ### 6.1 Public class catalog page
-- [ ] `ui/src/app/pages/classes/class-catalog/class-catalog.component.ts` + `.html` + `.scss` + `.spec.ts`. Already partially wired per public routes.
-- [ ] Loads from `ServerAccess.getClasses()`.
-- [ ] Grid layout: photo card, name, description-preview, "View details" CTA.
-- [ ] Empty state for "no classes yet".
-- [ ] Component spec verifies the rendering of a populated grid + empty state + click navigation.
+- [x] `ClassInfoComponent` at `ui/src/app/pages/public/class-info/` (existing path; route stays `/classes`).
+- [x] Loads from `ServerAccess.getClasses()` (now returns `ClassCatalogEntry[]`).
+- [x] Grid layout: photo card, name, description, upcoming session count badge ("3 upcoming sessions" / "1 upcoming session" singular).
+- [x] Empty state "No classes to display." when the response is empty; error path stops the spinner and leaves the list empty.
+- [x] Component spec (`class-info.component.spec.ts`) — 13 tests: create + spinner + grid rendering + class names/descriptions + upcoming-count rendering + singular/plural copy + routerLink to `/classes/{class_id}` + photo-URL fallback + server-supplied `photo_url` honored + empty state + error stops loading + getPhotoUrl helper.
 
 ### 6.2 Public class detail page
-- [ ] `class-detail/class-detail.component.*` + spec.
-- [ ] Loads from `ServerAccess.getClassDetail(id)`. Returns 404 routes to a "class not found" view.
-- [ ] Sections: hero photo, name, description, upcoming sessions list, instructors-who-teach, required-skills placeholder (Phase 3 wires it), pricing-tier display.
-- [ ] Spec verifies all sections render with mock data.
+- [x] `ClassDetailComponent` at `ui/src/app/pages/public/class-detail/` (existing path; route stays `/classes/:id`).
+- [x] Loads from `ServerAccess.getClassDetail(id)`. 404 → "Class not found." panel.
+- [x] Sections: hero photo (with placeholder fallback), name + description divider, pricing block (when `price_has_value`; "Included in your membership" copy when the flag is set — Phase 2 flips that flag for real), required-skills section (rendered when populated; Phase 3 wires real skills), upcoming sessions list with facility, room, instructor names (split from pipe-joined string).
+- [x] Component spec (`class-detail.component.spec.ts`) — 14 tests covering create, spinner, name+description render, photo-URL fallback + cdn override, upcoming sessions rendering, instructor pipe-split helper, price block + included-in-membership copy + price-block omission, skills section gating, empty-upcoming-state, 404, back link, formatPrice helper.
 
 ### 6.3 Admin Class Schedule page
-- [ ] `ui/src/app/pages/portal/manage/class-schedules/` directory.
-- [ ] `class-schedules-list.component.*` + spec: table view, filter by facility, "Edit", "Deactivate", "Materialize" actions per row.
-- [ ] `class-schedule-edit.component.*` + spec: create + edit form. Fields: class (FK picker), facility, room (filtered by facility), product, recurrence pattern (radio: weekly/biweekly/custom), day-of-week toggles, start time picker, duration picker, effective date range, capacity override, optional series fields (collapsed unless `is_series` toggled). Reactive form with validation. Use the date-picker + hour-picker per memory `feedback_date_time_pickers.md`. Mat-card border per memory `feedback_mat_card_border.md`.
-- [ ] "Materialize" dialog: date picker for `through_date_us`, calls `ServerAccess.materializeClassSchedule(id, throughDateUs)`. Displays result counts (created / skipped / already-materialized).
-- [ ] Routing entry under `portal/manage` lazy-loaded.
-- [ ] Specs include RouterTestingModule (per memory `feedback_account_page_layout.md`).
+- [x] `ui/src/app/pages/manage/class-schedules/` directory with three components, route `/manage/class-schedules` (gated by `ManageProductsGuard` at the area level; the backend independently enforces `manage_class_schedule`). Discoverable from the manage dashboard via a new "Class Schedules" tile.
+- [x] `class-schedules-list.component.*` + spec — facility dropdown, table view of active schedules (Class ID, Room, Recurrence, Days, Start, Duration, Capacity, Actions), per-row Edit / Materialize / Deactivate buttons. Deactivate confirms whether to cancel future sessions. Refreshes after each action. 13 tests cover load-facilities + auto-select, schedule render, empty state, facility switch, error banner, day-of-week formatting (CSV → "Mon, Wed"), zero-padded HH:MM time formatting, confirm()-driven cancelFuture wiring, edit + materialize toggle state.
+- [x] `class-schedule-edit.component.*` + spec — reactive form, modal-style overlay, mat-card with explicit border per `feedback_mat_card_border.md`. Fields: class/room/product ids, recurrence radio (weekly/biweekly/custom), day-of-week toggle pills, start hour + minute (per `feedback_date_time_pickers.md` — separated hour/minute inputs let admins pick exact times), duration, effective-from + effective-to date pickers, capacity override, and the series-only block gated behind `is_series` (start/end dates, min attendees, min-by date, not-met policy). Edit mode adds a `regenerate_future` checkbox. 10 tests cover form build, day toggle helper, cancel-emits-false, invalid-form short-circuit, weekly-with-no-days validation, full create round-trip with day toggles, error_code surfaced from server, update path with `regenerate_future` flag, series fields propagated, server-error path.
+- [x] `class-schedule-materialize-dialog.component.*` + spec — date picker defaults to 8 weeks from today (per §11 acceptance criteria). Submits `materializeClassSchedule(id, throughDateUs)`, then renders the MaterializeResult counts inline (`created_session_count`, `already_materialized_count`, `skipped_count`) and lists `skipped_dates` with reasons. 8 tests cover default date offset, empty-date refusal, ISO→us conversion, result counts rendering, skipped-dates list rendering, server-side error code rendering, throw path, close emit.
+- [x] Routing entry: added under `manage.routes.ts`. RouterTestingModule used in every spec per `feedback_account_page_layout.md`.
 
 ### 6.4 `ServerAccess` extensions
-- [ ] Add to `ServerAccess` interface, `ServerAccessNetwork`, AND `ServerAccessMock`:
-  - `getClasses(page?: number, limit?: number): Observable<ClassCatalogEntry[]>`
-  - `getClassDetail(id: number): Observable<ClassDetail>`
-  - `createClassSchedule(req): Observable<{ scheduleId: number }>`
-  - `updateClassSchedule(id, updates): Observable<void>`
-  - `deactivateClassSchedule(id, cancelFuture: boolean): Observable<void>`
-  - `materializeClassSchedule(id, throughDateUs): Observable<MaterializeResult>`
-  - `listClassSchedules(facilityId): Observable<ClassScheduleInfo[]>`
-- [ ] Update `ServerAccess.mock.spec.ts` per memory `feedback_always_test.md`.
+- [x] Added to `ServerAccess` interface, `ServerAccess` proxy, `ServerAccessNetwork`, `ServerAccessMock`:
+  - `getClasses(): Observable<ClassCatalogEntry[]>` — replaces the legacy `ClassData`-returning method. Hits `/api/classes`.
+  - `getClassDetail(id: number): Observable<ClassDetail>` — replaces legacy `getClass(id)`. Hits `/api/classes/<id>`.
+  - `listClassSchedules(facilityId)` → `/api/admin/class_schedules?facility_id=<id>`.
+  - `createClassSchedule(req): Observable<CreateClassScheduleResponse>` (object with `{ok, schedule_id?, error_code?}` to expose validation errors without forcing exceptions).
+  - `updateClassSchedule(id, body): Observable<EditClassScheduleResponse>` with `{updates, regenerate_future}` body.
+  - `deactivateClassSchedule(id, cancelFuture): Observable<DeactivateClassScheduleResponse>` (cancel_future flows via query string).
+  - `materializeClassSchedule(id, throughDateUs): Observable<MaterializeResult>`.
+- [x] `ServerAccess.mock.spec.ts` updated with a 16-test block covering all of the new mock methods — catalog returns expected entries; detail-not-found 404; create happy path + INVALID_TIME_BOUNDS rejection; list filter by facility + active-only; update applies updates + bumps `updated_us`, returns SCHEDULE_NOT_FOUND for unknown id; deactivate flips `is_active` + excludes from list; materialize returns sentinel "1 created" result + SCHEDULE_NOT_FOUND for unknown id.
 
 ### 6.5 Type definitions
-- [ ] `ui/src/app/shared/types/class.types.ts`: `ClassCatalogEntry`, `ClassDetail`, `UpcomingSessionInfo`, `ClassScheduleInfo`, `MaterializeResult`.
+- [x] `ui/src/app/shared/types/class.types.ts` — added `ClassCatalogEntry`, `ClassDetail`, `UpcomingSessionInfo`, `ClassScheduleInfo`, `CreateClassScheduleRequest`, `CreateClassScheduleResponse`, `MaterializeSkippedDate`, `MaterializeResult`, `UpdateClassScheduleBody`, `EditClassScheduleResponse`, `DeactivateClassScheduleResponse`. Legacy `ClassData` retained for any callers still on the generic CRUD admin path. All re-exported from `ServerAccess.ts` for callers that import from that barrel.
 
 ## 7. Admin Metadata (`database_helper/create_database.cpp`)
 
