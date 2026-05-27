@@ -118,7 +118,11 @@ Two UX options:
 
 Recommendation: **B** for production UX, but keep an admin "materialize now" button for ops + the test helper. The Phase 1 doc currently has the materialize button as a first-class feature — this can stay but become an "advance the horizon now" operation.
 
-Mason- why do we want materialization? I think that the advantage of doing class schedules with active times and priority with only one active at a time is that we shouldn't need to "materialize" anything. I think that we should have a class slot instance that binds a given 
+Mason- why do we want materialization? I think that the advantage of doing class schedules with active times and priority with only one active at a time is that we shouldn't need to "materialize" anything. I think that we should have a class slot instance that associates a given slot with a certain day and instantiates it "just in time" in response to one of these operations:
+- Noting the class has been cancelled
+- Noting a change in the instructor
+- A student noting their intention to attend a specific class instance beyond their schedule template
+- A student being signed in as attending a given class
 
 ## 1.5 Booked-session preservation
 
