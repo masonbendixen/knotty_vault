@@ -167,24 +167,25 @@ Mason flagged confusion on §173: workshops and one-off events don't "extend int
 - **Series**: same — a series has its own bounded impl. Holiday overrides during a series window are a separate question (see §1.5a below for Mason's "Labor Day skipped during a Fall Series" use case) but they apply *within* the series's own impl management, not by an external holiday-week impl reaching in.
 - **Recurring membership-included classes**: this is where impl overrides actually matter. The "default Monday 6pm Knotty Yoga" recurring class has a default impl, and a higher-priority "Holiday Week" impl can replace it for a date range. Since membership-included attendance creates no persisted rows (per Mason's §140 note), there's almost nothing to preserve on impl change — the next week just derives from the new impl.
 
-So the only real "orphan" scenario is:
+So the orphan story shrinks to almost nothing:
 
-- **Per-instance admin actions against a recurring class** (cancellation notes from CS-7, per-session instructor subs that admin set up manually before the high-priority impl landed). Those write a persisted `event_sessions` row pointing at the original slot. When the higher-priority impl wins for that date, the persisted row is "orphaned" — its slot_id no longer derives from the active impl.
-- Resolution: small admin "orphaned sessions" view; admin decides keep / delete. This is rare enough to not need automation.
+- **Recurring membership-included classes**: no bookings exist (template intent only, no persisted booking rows). The only persisted rows for future dates would be admin-attached notes (CS-7) or manual instructor subs against a specific date — and per Mason's §175 note, those are ephemeral; the appropriate response when an impl change supersedes them is to **just delete the stale future-date rows on impl save**. No admin orphan-recovery UI needed. The new impl owns the future from the moment it's saved.
+- **Workshops / series**: their impls don't overlap with anything (they're bounded one-off impls under their own `classes` rows per §1.5a). There's no "higher-priority impl reaches in and orphans my paid workshop" scenario because no other impl coexists with the workshop's impl for that class.
+- **Past sessions** (already attended / checked in): impl changes never reach backward in time. Past rows are untouched.
 
-Mason- As I've indicated elsewhere, a recurring class included in a membership the "bookings" are just informational to let know planned attendance. There really is no need for leaving / creating orphans here. We can just delete these.
+**Net design**: on impl save, sweep persisted future-date `event_sessions` rows for that class where `class_schedule_slot_id` is no longer in the new active impl. For rows whose only content is admin actions (notes, manual subs) and which carry no `purchase_id` / `booking`, delete. For rows that DO carry a `purchase_id` (which shouldn't happen for recurring classes by design, since membership-included classes don't create bookings — but defensive check), refuse the impl save and surface those rows to admin for explicit cancel-and-refund first. Mason's "we don't need orphans" applies because the membership-class case generates only deletable rows.
 
-**Workshops and one-off events do NOT participate in this orphan story.** I'll remove the misleading "Holiday week pre-booked workshop" example from the prior draft.
+The "orphaned sessions admin view" from the prior draft is dropped. The sweep is automatic.
 
 ## 1.5 Booked-session preservation (under the lazy model)
 
-Most of the old §1.5 disappears. With lazy session creation:
+Most of the old §1.5 disappears. With lazy session creation + §1.4's automatic orphan sweep:
 
-- Membership-included recurring class attendance: no rows to preserve — there's nothing to clean up when an impl changes (per Mason's §140 note).
-- Paid bookings (workshops, series, intro, guest pass): the persisted `event_sessions` rows from the purchase are unaffected by impl changes. They stay where they were booked.
-- Per-instance admin actions (cancellation notes, instructor subs against recurring classes): those rows persist and stay correct against their original slot, with orphan-detection if their slot no longer derives.
+- **Membership-included recurring class attendance**: no bookings exist (template intent only). Any stale future-date admin actions (notes, manual subs) are auto-deleted on impl save per Mason's §175 note. Nothing to preserve.
+- **Paid bookings (workshops, series, intro, guest pass)**: workshops and series live under their own `classes` rows with their own bounded impls — no other impl coexists with them, so the "orphan a paid booking via impl change" path doesn't exist in practice. Their persisted `event_sessions` rows are simply unaffected by impl edits to OTHER classes.
+- **Defensive guard**: the impl-save sweep refuses to delete any row carrying a `purchase_id` and instead asks admin to cancel-and-refund first via `SessionCancellationHelper`. This catches any accidental cross-wired case (e.g., a recurring-class row that somehow ended up with a paid booking — shouldn't happen, but worth a guard).
 
-The only "blow away" action is when admin explicitly deletes an orphaned row. That's a deliberate cancellation, handled by the existing `SessionCancellationHelper` (refund-on-cancel for paid bookings).
+No standing admin "orphan recovery" UI is needed. Cancel-and-refund of a specific paid offering remains the existing `SessionCancellationHelper` flow.
 
 ## 1.5a Recurring class vs workshop vs series — how each uses this infrastructure
 
@@ -198,52 +199,65 @@ Mason's §185 note flagged that recurring membership classes and paid bundle off
 | **Workshop** | Single date, single slot, narrow window | Per-tier ticket; non-members allowed (M-12 intro is a workshop) | Persisted at purchase | Pay once, attend once |
 | **Series** | Bounded date range, multiple slots/occurrences within range | Per-tier lump sum, derived from per-session base × occurrence count | Persisted at purchase across all session occurrences | Pay once, attend all (or pro-rated subset) |
 
-### Recommendation: shared schedule infrastructure, different product kinds, separate `classes` rows
+### Recommendation: shared schedule infrastructure; the `classes` row is the marketing identity, and each impl is a single run
 
-All three use `class_schedules` + `class_schedule_slots`. The difference is in the *product* attached and in the `classes` row's identity:
+Per Mason's §209 note: a series like "Intro to Partner Acro" runs repeatedly (Fall 2026, Spring 2027, Summer 2027), and the marketing identity (name, description, photo) is shared across all runs. The series catalog should have a page for "Intro to Partner Acro" with upcoming instances listed underneath. Same logic applies to workshops that get repeated — "Inversion Workshop" run in March and again in October share marketing identity. So:
 
-- **Recurring class** = `classes` row "Knotty Yoga" + a `kind='class'` product + a `class_schedules` impl with `valid_to_us = NULL` (open-ended) + slots like Mon/Wed 6pm. Multiple impls over time (default + holiday overrides via priority).
-- **Workshop** = its OWN `classes` row ("Inversion Workshop Aug 15") + a `kind='workshop'` product + a single `class_schedules` impl with narrow `[valid_from, valid_to]` + one slot. No other impl coexists. No overrides needed. (P-3 from the parent doc already says workshops use this same machinery.)
-- **Series** = its OWN `classes` row ("Vinyasa Fall Series Sept–Oct 2026") + a `kind='class_series'` product + one or more `class_schedules` impls with bounded `[valid_from, valid_to]` covering the series window + slots for the default pattern. **A higher-priority impl can carve out the Labor Day Monday** — that empty-Monday impl reduces the derived-occurrence count, which feeds the price calculation.
+> **The `classes` row is the offering's marketing identity. Each run is a separate bounded `class_schedules` impl under that same class.**
 
-Mason- I don't mind an "instance" of a series having its own class row but I think it would be nice to have a series have separate notion with a name, description, and picture. For instance, intro to partner acro could be a series we run repeatedly. It would be nice to have a series page and then see upcoming instances of the se
+This unifies the three shapes:
 
-This lets us drop `is_series` + `series_*` fields from `class_schedules` entirely. The "this is a paid bundle" semantics live on the *product*, not on the schedule impl. Schedule impls are pure scheduling.
+- **Recurring membership class** = `classes` row "Knotty Yoga" + `kind='class'` product + open-ended `class_schedules` impl (`valid_to_us = NULL`) + slots like Mon/Wed 6pm. Multiple impls over time express the schedule's evolution + holiday overrides via priority.
+- **Workshop** = `classes` row "Inversion Workshop" + `kind='workshop'` product + one bounded `class_schedules` impl per run (single slot, narrow window). Repeated runs are additional impls under the same `classes` row, each with its own bounded window. The catalog shows the workshop's marketing page with a list of upcoming runs.
+- **Series** = `classes` row "Intro to Partner Acro" + `kind='class_series'` product + one bounded `class_schedules` impl per instance (with the instance's day/time pattern) + one `class_series_offerings` row per impl (Phase 7). Repeated runnings ("Fall 2026", "Spring 2027") are additional impl + offering pairs under the same `classes` row. Holiday overrides for a specific instance (Mason's Labor Day case) are extra higher-priority impls layered on top of that instance's default impl.
 
-### Why separate `classes` rows for workshop / series rather than reusing a recurring class
+### How the catalog renders each kind
 
-- A workshop and a recurring class have different *marketing identities*: name, photo, description, target audience. Sharing a `classes` row forces them to share these.
-- A series might run multiple instances per year ("Fall Series 2026", "Winter Series 2027") — each gets its own `classes` row with its own description and photo, even though the underlying activity is the same as the recurring Vinyasa Flow class.
-- The lazy-session model is per-class — sessions derive from the active impl on a given (class, date). Separating classes lets the recurring schedule and the series schedule co-exist without one leaking into the other.
+- The recurring class detail page renders upcoming sessions derived from the active impl, no list of "runs".
+- The workshop / series catalog detail page renders the marketing copy + a list of **upcoming runs** (the bounded impls). Each run links to its own detail page or expanded panel showing its slot schedule + (for series) the per-tier price for that instance.
+- A `classes.kind` enum (`recurring` | `workshop` | `series`) discriminates the rendering path. Phase 1 introduces the enum; Phase 7 fills in the series-instance UI.
 
-### Where series pricing lives
+### Why a single `classes` row across runs (and walk-back of the prior "separate row per run" recommendation)
 
-A new `class_series_offerings` table (introduced in Phase 7, not Phase 1) captures the per-series machinery that doesn't fit on the schedule impl:
+The original §1.5a draft said each workshop run / series instance got its own `classes` row. Mason's §209 note correctly pushes back: that forces marketing copy to be duplicated across runs, which both wastes admin effort and means edits to the description don't propagate. Sharing the `classes` row across runs:
+
+- Lets admin write "Intro to Partner Acro" copy once and have it apply to every upcoming run.
+- Lets the catalog naturally surface a list of upcoming runs under one page.
+- Keeps the recurring class vs workshop vs series distinction implicit in the impl pattern (open-ended vs bounded) and the product kind, NOT in the `classes` row.
+
+The only thing that varies per run is the impl's `[valid_from, valid_to]` window, the slot pattern (if it differs across runs), and the per-instance series pricing in `class_series_offerings` (Phase 7). Marketing identity stays shared.
+
+If a particular run of a series legitimately needs distinct copy ("this run includes a guest instructor"), the impl gets a `name` field (which it already has — "Fall 2026 with Guest Mary") that the catalog renders as a sub-title under the parent class's marketing copy. No need to fork the `classes` row.
+
+This affects OQ-CSI-15, which is reframed below.
+
+### Where series-instance pricing lives
+
+A new `class_series_offerings` table (introduced in Phase 7, not Phase 1) holds the per-instance bundle machinery. One row per impl that's a series instance:
 
 | Column | Purpose |
 |--------|---------|
 | `id` | PK |
-| `class_id` | The series's own `classes` row |
-| `valid_from_us` / `valid_to_us` | Series window (matches the impl window) |
-| `product_id` | `kind='class_series'` |
-| `per_session_base_cents` | Per-tier; flows through `product_prices` + `price_schedules` |
-| `min_attendees` / `min_by_us` / `min_not_met_policy` | The min-cancel mechanism |
-| `prorated_signups_allowed` | Boolean |
+| `class_schedule_id` | The impl this offering corresponds to (1:1). The parent `classes` row reaches back through `class_schedules.class_id`. |
+| `product_id` | `kind='class_series'`. Per-tier pricing on the product is the **per-session base** (not the lump-sum total — see below). |
+| `min_attendees` / `min_by_us` / `min_not_met_policy` | The min-cancel mechanism. |
+| `prorated_signups_allowed` | Boolean. |
 | `created_us` / `updated_us` | |
 
-Price at purchase = (count of derived session occurrences in window from active impls) × (per-tier base). Mason's Labor Day case naturally falls out: admin creates a high-priority empty-Monday impl over Labor Day → that Monday's slot doesn't derive → occurrence count drops by one → price drops by one base.
+Price at purchase = (count of derived session occurrences in this impl's window from the active impls for this class) × (per-tier base from `product_prices`). Mason's Labor Day case naturally falls out: admin creates a high-priority empty-Monday impl over Labor Day → that Monday's slot doesn't derive → occurrence count drops by one → price drops by one base.
 
 ### What this changes in Phase 1
 
 Phase 1 owns recurring-class scheduling. Workshops and series are *enabled* by this infrastructure (their schedule impls use the same table), but their *product machinery* (series purchasing, min-attendee policy, prorating) is Phase 7's job. Phase 1 doesn't need to ship the `class_series_offerings` table or the series-purchase flow.
 
-Concretely:
+Concretely for Phase 1:
 
+- **Add `classes.kind` enum** (`recurring` | `workshop` | `series`) to discriminate catalog rendering. Defaults to `recurring`. Workshops + series detail pages list their upcoming runs (bounded impls); recurring class pages render the active impl's slot schedule.
 - **Drop `is_series` + all `series_*` columns from the Phase 1 `class_schedules` table** — they were leftovers from the original plan that conflated "the schedule" with "the bundle product". Phase 7 introduces `class_series_offerings` separately.
-- **Keep workshops in Phase 1 only insofar as the impl table supports a single-slot bounded impl** — the workshop ticket-purchase flow itself is also Phase 7 (or Phase 2 for the M-12 intro workshop, since that's MVP gate-in for non-members).
-- **The intro workshop (M-12)** is a workshop in this framing: its own `classes` row, single slot, narrow window. Treated identically to any other workshop, just with different product permissions (non-member allowed).
+- **Workshops + series share the `classes` row across runs**, per Mason's §209 note. Each run is a separate bounded `class_schedules` impl. Phase 1's admin UI must support creating multiple bounded impls under one `classes` row.
+- **The intro workshop (M-12)** is a workshop in this framing: a `classes` row of `kind='workshop'`, with one or more bounded impls (one per run), and a `kind='workshop'` product. Non-member-allowed product permissions distinguish it from other workshops.
 
-See OQ-CSI-9 (now reframed) and the new OQ-CSI-15 / OQ-CSI-16 for confirmation points.
+See OQ-CSI-9 (now reframed), the new OQ-CSI-15 (reframed), OQ-CSI-16, and OQ-CSI-18 (new — the `classes.kind` enum) for confirmation points.
 
 ## 1.6 Recurrence-pattern collapse
 
@@ -271,13 +285,14 @@ OQ-CSI-4 is reframed: do we ship the "close-these-classes" batch action in Phase
 
 ## 1.8 Admin UI changes
 
-Per Mason's note:
+Per Mason's notes:
 
 - Drop raw IDs. Class / Facility / Room / Product / Instructor → autocomplete dropdowns showing friendly names with the ID hidden.
 - Slot row UI: day-of-week dropdown (Sun..Sat), time picker for start (NOT separated hour/minute inputs), duration input defaulting to 60min, instructor autocomplete (nullable / "TBD" allowed), optional predecessor-slot picker (slot autocomplete scoped to other slots on the same `day_of_week` within the same implementation — that's how same-day chaining is expressed). Sorted list with add / remove buttons.
+- Class detail (admin): the page for a single `classes` row shows its kind (recurring / workshop / series), its impls list, and per-class metadata. For workshops + series, "impls" reads as "upcoming and past runs". For recurring, "impls" reads as "schedule versions over time".
+- Implementation list view: per-class, sortable by `valid_from_us` and `priority`, with visual highlighting of which implementation is currently active. "Add new impl" supports both "new run" (for workshop / series — bounded) and "schedule replacement / override" (for recurring — open-ended or higher-priority bounded).
 - Calendar-day preview: pick a date → show which implementation is active that day for which classes, with its resolved slot list (priority-resolved). This is the "easy to see what the active class schedule will be on a given day" view from Mason's note.
-- Implementation list view: per-class, sortable by `valid_from_us` and `priority`, with visual highlighting of which implementation is currently active.
-- Orphaned-sessions admin view (per §1.4 wrinkle): list of persisted `event_sessions` rows whose `class_schedule_slot_id` is no longer present in the currently-active implementation for that date. Lets admin spot the "I edited the impl and a paid booking is now stranded" case and decide cancel-and-refund vs leave-as-is.
+- Impl-save sweep notice: when saving an impl that orphans future-date persisted rows on the affected class, the save action surfaces a confirmation ("X future admin notes / subs will be removed by this change") before proceeding. No standalone orphan-recovery UI per §1.4 / Mason's §175 note — the sweep is part of the impl-save flow itself.
 
 This is a meaningful UI surface area — likely a multi-component redesign of the Phase 1 admin page.
 
