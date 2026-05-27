@@ -123,6 +123,8 @@ Mason- why do we want materialization? I think that the advantage of doing class
 - Noting a change in the instructor
 - A student noting their intention to attend a specific class instance beyond their schedule template
 - A student being signed in as attending a given class
+- Noting a no show for a class that a student marked themselves as planning to attend that they did not attend
+What do you think about this versus materialization?
 
 ## 1.5 Booked-session preservation
 
