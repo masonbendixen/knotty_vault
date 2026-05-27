@@ -118,39 +118,67 @@ std::vector<KeyValueTable> GetActiveImplementationSlotsForDay(
     Transaction&, int64_t classId, int64_t dateUs);  // returns slots for the class's active impl on that day
 ```
 
-## 1.4 Materialization
+## 1.4 Lazy session instantiation (replaces materialization)
 
-The current Phase 1 design pre-materializes `event_sessions` via an admin "Materialize through date" button. With implementations + slot tuples, the rule changes:
+Mason's note on §123: "why do we want materialization? … we shouldn't need to 'materialize' anything." Agreed — the materialization model is a holdover from the flat-schedule design. With implementations + slots, the schedule IS the source of truth and persisted session rows are *deltas*, not the schedule itself.
 
-> **For each day D in `[from_us, through_us)` and each class C, look up the active implementation for (C, D). For each slot in that implementation matching `EXTRACT(DOW FROM D)`, create an `event_sessions` row if no equivalent row exists.**
+**New model — derived sessions with lazy persistence:**
 
-Two UX options:
+- A **derived session instance** is identified by the tuple (`class_schedule_slot_id`, `occurrence_date`). Walking days in `[from, to)`, the calendar/catalog computes derived instances by looking up the active implementation per (class, day) and expanding its matching slots.
+- A row exists in `event_sessions` (or its replacement — see "table-naming wrinkle" below) ONLY when one of these triggers fires:
+  1. Admin / instructor cancels the specific class instance (status='cancelled', reason, etc.)
+  2. Admin / approved-trade changes the instructor for that one instance (writes to `event_session_staffing`)
+  3. Admin / instructor attaches a per-session note (CS-7)
+  4. A student books a paid offering (workshop / series instance / intro / guest pass)
+  5. A student marks attendance-template intent that the system needs to persist (only for paid offerings — see Mason's note on §140 about no-muss-no-fuss for membership-included)
+  6. Staff checks a student in (creates a `bookings` row + an `event_sessions` row if one didn't exist)
+  7. Staff marks a no-show on a student who'd indicated planned attendance for a paid offering
+- Absence of a row in `event_sessions` for `(class_schedule_slot_id, occurrence_date)` ⇒ "scheduled, nothing special, nothing recorded yet". Calendar / catalog render it using slot defaults from the active implementation.
 
-| Option | Description | Pros | Cons |
-|--------|-------------|------|------|
-| **A. Keep "Click to materialize"** | Admin runs the materializer per-class on demand. | Conservative — same UX as current Phase 1. | Easy to forget. Creating a holiday-week implementation requires a second click to apply it. |
-| **B. Auto-materialize on a rolling horizon** | Background job keeps N weeks of `event_sessions` materialized for every active implementation. Saving a new implementation also re-runs the materializer over its window. | "I create an implementation and the calendar updates" feels right. | New scheduled job + edge cases (booked sessions that fall out of the new active implementation). |
+**Why this is better than materialization:**
 
-Recommendation: **B** for production UX, but keep an admin "materialize now" button for ops + the test helper. The Phase 1 doc currently has the materialize button as a first-class feature — this can stay but become an "advance the horizon now" operation.
+- No "materialization horizon" to advance — calendar queries are always correct out to infinity (within the active impl's window).
+- No "blow away future sessions when implementation changes" cascade. New high-priority impl just *wins the lookup* for the dates it covers.
+- Mason's "soft bookings for membership-included classes can vanish without muss or fuss" (§140 note) becomes trivially true — there's no booking row to manage in the first place.
+- The implementation truly IS the source of truth, mirroring `price_schedules` (which we don't "materialize" — we look up the active price at query time).
 
-Mason- why do we want materialization? I think that the advantage of doing class schedules with active times and priority with only one active at a time is that we shouldn't need to "materialize" anything. I think that we should have a class slot instance that associates a given slot with a certain day and instantiates it "just in time" in response to one of these operations:
-- Noting the class has been cancelled
-- Noting a change in the instructor
-- A student noting their intention to attend a specific class instance beyond their schedule template
-- A student being signed in as attending a given class
-- Noting a no show for a class that a student marked themselves as planning to attend that they did not attend
-What do you think about this versus materialization?
+**Costs / things this introduces:**
 
-## 1.5 Booked-session preservation
+- Calendar / catalog queries are more complex: walk dates, look up active impl per day, expand slots, left-join persisted rows for cancellations / subs / notes. The query is a derived view rather than a simple `SELECT FROM event_sessions`. (Workable — encapsulate in a helper.)
+- Bookings need a target. When a student books a workshop session that doesn't have an `event_sessions` row yet, the booking flow creates the row first. Same for check-in.
+- Stable identity for "the Monday 6pm Knotty Yoga on 2026-06-15": the tuple (`class_schedule_slot_id`, `occurrence_date`). This is durable as long as the slot row isn't deleted from the implementation. If the slot IS deleted (admin re-edits the impl), persisted session rows that reference it become *abandoned* (their slot no longer derives them) — those rows still exist and represent real attendance / bookings, but the calendar wouldn't naturally surface them on the new impl. We need a small "orphaned sessions" admin view for that case.
+- Capacity / room-conflict checks at booking time must compute against *both* derived (other slot occurrences for that date+room) AND persisted (already-booked-into rows) sessions. A `RoomOccupancyHelper` that returns "all derived + persisted sessions overlapping this time window in this room" cleanly handles it.
 
-When a new high-priority implementation lands and overrides slots that already materialized as `event_sessions`:
+### Table-naming wrinkle
 
-- Sessions with `booked_count = 0` AND no attendance-template entries → safe to delete (and re-materialize from the new implementation).
-- Sessions with `booked_count > 0` OR with template entries → preserve them and surface in the response (`sessionsKeptDueToBookings`) so admin can manually cancel/reschedule. This matches the resolved OQ-P1-3 rule from Phase 1.
+Today's `event_sessions` is shared between classes, services, and one-off events. Three options:
 
-Cancellations triggered by an implementation change are still admin-initiated cancellations → full refunds for paid bookings (Phase 2 / Phase 10 rules apply).
+- **A. Keep `event_sessions` for everything**, but stop pre-populating class rows. Rows exist for class instances only after one of the seven triggers fires. Backwards-compatible with services / events; minimum churn. **Recommendation.**
+- **B. Split out a separate `class_session_instances` table** for the lazy class rows; keep `event_sessions` for services / events. Cleaner conceptually but doubles the rendering paths in calendar / my-bookings.
+- **C. Rename `event_sessions` → `session_instances`** and treat the lazy creation as the default semantics for ALL three (classes, services, events). Largest churn, but conceptually purest.
 
-Mason- I think that this same pattern moves to instantiations. Also, there are classes that are included in memberships that users don't pay extra to attend. These don't require any kind of cancellation or refund logic. We can just get rid of the "thanks for letting me know you plan on coming" soft bookings with no muss, no fuss.
+Recommend **A**. See OQ-CSI-12 if Mason wants to revisit.
+
+### Discussion: when the active implementation changes mid-window
+
+Open question worth its own discussion since it touches multiple paths:
+
+- **Holiday week pre-booked workshop**: a paid workshop sits on the default impl's Tuesday-6pm slot. Admin lands a high-priority "Holiday Week" impl whose Tuesday-6pm slot is *different* (different instructor, different room) OR is *missing entirely*. The pre-paid booking has a persisted `event_sessions` row pointing at the default impl's slot. With the lazy model:
+  - The booked row stays exactly where it is. The high-priority impl doesn't auto-overwrite it.
+  - The calendar derivation for that date picks the high-priority impl's view; the persisted booked row is "orphaned" relative to the new impl but still real.
+  - UI must decide which to show. Best answer: show the *persisted* row (it's what's actually happening), suppress the derived row, and flag both sides in the admin "orphaned" view so admin can reconcile manually.
+- **Membership-included drop-in template**: per Mason's §140 note, there's no booking row, so nothing to preserve. The next-week calendar just derives from the new impl. Clean.
+- **Cancellation of a slot via empty high-priority impl**: derivation for those dates returns no slots → calendar shows no class → existing persisted bookings for those dates (if any) become orphaned and must be cancelled+refunded by admin. The redesign doesn't auto-cancel; that's still an admin action because refunds need authorization.
+
+## 1.5 Booked-session preservation (under the lazy model)
+
+Most of the old §1.5 disappears. With lazy session creation:
+
+- Membership-included recurring class attendance: no rows to preserve — there's nothing to clean up when an impl changes (per Mason's §140 note).
+- Paid bookings (workshops, series, intro, guest pass): the persisted `event_sessions` rows are unaffected by impl changes. They stay where they were booked. If a new high-priority impl conceptually overrides them, the admin sees them in the "orphaned" view and decides whether to cancel-and-refund.
+- Per-instance admin actions (cancellation notes, instructor subs): same — those rows persist and stay correct.
+
+The only "blow away" action is when admin explicitly deletes the orphaned row. That's a deliberate cancellation, handled by the existing `SessionCancellationHelper` (refund-on-cancel for paid bookings).
 
 ## 1.6 Recurrence-pattern collapse
 
@@ -168,22 +196,21 @@ With this redesign, the **per-class schedule exception** path collapses entirely
 - "Memorial Day modified schedule" = same pattern, narrow window.
 - "Just kill this one session" = stays as a per-session `SessionCancellationHelper` call (per-instance is below the granularity of an implementation).
 
-The **studio-wide closure** path is harder — see OQ-CSI-4.
-
-Mason- Is studio wide closure harder with this model? I think we just create a high priority but empty class schedule for closure. Can you explain why this wouldn't handle that case?
+**Studio-wide closure** (re-examining Mason's pushback on §160): closures work the same way — a high-priority empty implementation closes a class for the date range. The only wrinkle is that closing the *whole studio* requires creating one empty high-priority impl per class. With ~6 classes today that's tolerable manually; longer-term, a "Close studio" admin action can batch-create the empty impls in one click. I was over-counting the cost in the original draft — the model genuinely handles closures the same as any other override. OQ-CSI-4 is downgraded to "Do you want the batch-create-on-close convenience UI in Phase 1 or defer to Phase 10?".
 
 ## 1.8 Admin UI changes
 
 Per Mason's note:
 
-- Drop raw IDs. Class / Facility / Room / Product → autocomplete dropdowns showing friendly names with the ID hidden.
-- Slot row UI: day-of-week dropdown (Sun..Sat), time picker for start (NOT separated hour/minute inputs), duration input defaulting to 60min. Sorted list with add / remove buttons.
+- Drop raw IDs. Class / Facility / Room / Product / Instructor → autocomplete dropdowns showing friendly names with the ID hidden.
+- Slot row UI: day-of-week dropdown (Sun..Sat), time picker for start (NOT separated hour/minute inputs), duration input defaulting to 60min, instructor autocomplete (nullable / "TBD" allowed), optional predecessor-slot picker (slot autocomplete scoped to other slots on the same `day_of_week` within the same implementation — that's how same-day chaining is expressed). Sorted list with add / remove buttons.
 - Calendar-day preview: pick a date → show which implementation is active that day for which classes, with its resolved slot list (priority-resolved). This is the "easy to see what the active class schedule will be on a given day" view from Mason's note.
 - Implementation list view: per-class, sortable by `valid_from_us` and `priority`, with visual highlighting of which implementation is currently active.
+- Orphaned-sessions admin view (per §1.4 wrinkle): list of persisted `event_sessions` rows whose `class_schedule_slot_id` is no longer present in the currently-active implementation for that date. Lets admin spot the "I edited the impl and a paid booking is now stranded" case and decide cancel-and-refund vs leave-as-is.
 
 This is a meaningful UI surface area — likely a multi-component redesign of the Phase 1 admin page.
 
-Mason- We also need to tackle the requires previous slot and skill level stuff (if we don't defer that to Classes Phase 3 - Skill Levels.md)
+**Skill-level requirement entry** (responding to Mason's note on §173): per the §1.2 recommendation, skill requirements stay per-class (Phase 3 design unchanged). The skill-requirement multiselect therefore lives on the *class* edit form, not the slot. The "requires previous slot" / predecessor entry is on the slot form, as covered above. See OQ-CSI-11 if Mason wants to revisit per-slot skill requirements.
 
 ---
 
@@ -192,19 +219,22 @@ Mason- We also need to tackle the requires previous slot and skill level stuff (
 Tag each with a decision before Section 3 (doc updates) kicks off.
 
 - [ ] **OQ-CSI-1 (Naming)**: Repurpose `class_schedules` to be the implementation-level + add `class_schedule_slots` (recommendation)? Or rename to `class_timetables` / `class_timetable_slots` for clarity? Or another name?
-- [ ] **OQ-CSI-2 (Where does `product_id` live)**: On the implementation (recommendation — one product per implementation, all slots inherit pricing) or per-slot (lets a class have different pricing for the morning vs evening slot under one implementation)?
+- [ ] **OQ-CSI-2 (Where does `product_id` live)**: On the implementation (recommendation — one product per implementation, all slots inherit pricing) or per-slot (lets a class have different pricing for the morning vs evening slot under one implementation)? See the "What `product_id` is for" subsection in §1.2 for what the column actually carries.
 - [ ] **OQ-CSI-3 (Where does `facility_id` live)**: On the slot (recommendation — lets a class run at different facilities within one implementation) or on the implementation (simpler — one facility per implementation)?
-- [ ] **OQ-CSI-4 (Studio-wide closures)**: Three choices:
-  - (a) Batch-create empty implementations per class when admin marks a date range closed (auto-fanout in business logic).
-  - (b) Keep a separate `facility_closures` mechanism (or reuse the existing `scheduling_exceptions` table) that operates above the implementation layer and short-circuits materialization.
-  - (c) Both — UI is "close studio" but implementation is (a).
-  - Recommendation: **(b)** because closures aren't really "schedule changes" — they apply across all classes and don't need per-class slot bookkeeping. Phase 10 still owns the cascade.
-- [ ] **OQ-CSI-5 (Pre-materialization UX)**: Auto-materialize on a rolling horizon (Option B in §1.4) or keep the admin button (Option A)? Recommendation: **B with the button kept as a manual nudge**.
+- [ ] **OQ-CSI-4 (Studio-wide closures — convenience UX)**: Per §1.7's re-examination, closures handle naturally via per-class empty high-priority impls. The remaining question is purely UX:
+  - (a) Ship a "Close studio for date range" admin action in Phase 1 that batch-creates empty impls across all classes in one click.
+  - (b) Defer the convenience action to Phase 10; in Phase 1 admin manually creates the per-class empty impl.
+  - Recommendation: **(b)** — Phase 1 is already big; the manual path works fine with 6 classes; ship the batch action with the other scheduling-exceptions work in Phase 10.
+- [ ] **OQ-CSI-5 (Materialization UX)** — *superseded by OQ-CSI-12*. The lazy-instantiation model in §1.4 removes the materialization concept entirely. Leaving this as a stub so the numbering doesn't shift.
 - [ ] **OQ-CSI-6 (Drop biweekly + custom)**: Confirm we're removing `recurrence_pattern` entirely?
 - [ ] **OQ-CSI-7 (Time entry UX)**: Mason's existing memory `feedback_date_time_pickers.md` says "times must use hour pickers" and Phase 1 §6.3 ships separated hour + minute inputs. Slot start times often have minute precision (5:45 PM yoga) — do we need a full time picker (HH:MM) for slot entry, overriding the hour-only convention here? Recommendation: **yes, full time picker** because class start times in the wild are not hour-aligned (e.g. 5:45, 6:15).
-- [ ] **OQ-CSI-8 (Slot uniqueness)**: Allow duplicate (`implementation_id`, `day_of_week`, `start_time_minutes`) rows or reject? Recommendation: **reject identical tuples** because that's almost certainly a data entry mistake — different facilities/rooms at the same time should be different `location_room_id` values, which makes the tuple unique anyway.
+- [ ] **OQ-CSI-8 (Slot uniqueness)**: Allow duplicate (`implementation_id`, `day_of_week`, `start_time_minutes`, `location_room_id`) tuples or reject? Recommendation: **reject identical full tuples** because that's almost certainly a data-entry mistake — different rooms at the same time are different rows, and different start times are different rows. The same room + same start_time + same day = duplicate.
 - [ ] **OQ-CSI-9 (Series + workshops)**: `is_series` + series_* fields stay on the implementation row (a single implementation IS the series window)? Or split series into a separate table? Recommendation: **keep on the implementation** — a series is just an implementation with `is_series=true`, `valid_from = series_start`, `valid_to = series_end + 1 day`, slots = the series's day/time pattern. The "implementation IS the series for that window" framing is clean.
 - [ ] **OQ-CSI-10 (Phase 1 already merged?)**: Phase 1 is marked done end-to-end (most checkboxes are checked). Is this a "redesign before Phase 2 lands" plan (rewrite migrations, re-do tests) or a "Phase 1.5 migration" plan (new tables alongside, deprecation)? Recommendation: **rewrite Phase 1 in place** — pre-deploy, no production state to defend against per `feedback_no_premature_defensive_code.md`. But Mason should confirm there's no deployed environment that needs a migration path.
+- [ ] **OQ-CSI-11 (Skill-level requirements per-class or per-slot)** — *new, prompted by Mason's note on §77.* Today's Phase 3 design keys skill prerequisites off `class_id` (a "class" includes its required skills). With per-slot skill requirements, "Beginner Acro" Saturday morning and "Advanced Acro" Tuesday night could share a class row but have different prerequisites. Recommendation: **per-class (no change to Phase 3)** because (a) prerequisites are a property of "what the class is", and (b) genuinely different skill levels of the same activity should be different classes (different products too — different pricing typically applies). Confirm with Mason that this matches his mental model.
+- [ ] **OQ-CSI-12 (Lazy instantiation vs materialization)** — *new, prompted by Mason's note on §123.* Adopt the lazy-instantiation model described in §1.4 (recommendation) or keep an explicit pre-materialization step? The recommendation is **lazy** because it (a) eliminates an entire job + admin button, (b) makes implementation changes correctly take effect with no cleanup cascade, and (c) faithfully mirrors how `price_schedules` work today. Costs: more complex calendar query, "orphaned session" handling (covered in §1.4 "Discussion"). Confirm.
+- [ ] **OQ-CSI-13 (Table strategy under lazy model)** — *new.* Per §1.4 "Table-naming wrinkle": (A) keep `event_sessions` for everything and just stop pre-populating class rows (recommendation, minimum churn); (B) split out a separate `class_session_instances` table for lazy class rows; (C) rename `event_sessions` → `session_instances` and adopt lazy as the default for services / events too. Recommendation: **A**.
+- [ ] **OQ-CSI-14 (Instructor scheduling at slot vs per-session)** — *new, prompted by Mason's note on §77.* Adding `instructor_person_id` to the slot row means "this is the regularly-scheduled instructor for this time slot". Per-session substitutions still ride on `event_session_staffing` (which gets populated when a sub is recorded — under the lazy model, that creates the `event_sessions` row at the same time). Confirm this two-tier model (slot = default instructor, persisted session = override) matches Mason's intent, vs. always sourcing the instructor from `event_session_staffing` even for the default case.
 
 ---
 
@@ -231,50 +261,56 @@ This is the biggest rewrite — most §2..§7 needs touching.
 - [ ] §1 Pre-Coding Design Decisions — add the resolved OQ-CSI-1..10 entries. Keep §1.1 / §1.3 (taxonomy + room conflict policy still apply).
 - [ ] §2 Database Schema — full rewrite:
   - §2.1 `classes` table — unchanged.
-  - §2.2 `class_schedules` — strip down to implementation columns (per §1.2 above).
-  - §2.2a (new) `class_schedule_slots` table.
-  - §2.3 `event_sessions` extensions — unchanged.
+  - §2.2 `class_schedules` — strip down to implementation columns (per §1.2 above); drop `predecessor_class_schedule_id`.
+  - §2.2a (new) `class_schedule_slots` table including `instructor_person_id` and `predecessor_class_schedule_slot_id`.
+  - §2.3 `event_sessions` extensions — change `class_schedule_id` column to be `class_schedule_slot_id` (slot identity, not impl identity), and add an `occurrence_date_us` (date-truncated for the day this row pins). Keep `class_id` as a denormalized convenience. The composite (`class_schedule_slot_id`, `occurrence_date_us`) becomes the natural key for derived-vs-persisted lookups under §1.4's lazy model.
   - §2.4 wire into init pipeline — add the new slots table to `make_database_info.cpp` + `CreateTables()` + `db_schema/CMakeLists.txt`.
 - [ ] §3 Table Helpers — rewrite:
   - `TableHelpers::ClassSchedules` — drop `GetSchedulesPotentiallyConflictingInRoom` (moved to the slot helper); add `GetActiveImplementation(classId, atUs)`, `GetImplementationsByClass(classId)`, `GetImplementationsOverlapping(classId, fromUs, toUs)`.
   - `TableHelpers::ClassScheduleSlots` (new) — full CRUD; `GetSlotsByImplementation(scheduleId)`, `GetSlotsByImplementationAndDay(scheduleId, dayOfWeek)`, `GetActiveSlotsForClassOnDay(classId, dateUs)`, `GetSlotsPotentiallyConflictingInRoom(roomId, dayOfWeek, startTimeMinutes, durationMinutes)`.
-  - Tests for both with the new sort orders + conflict-detection semantics.
+  - `TableHelpers::EventSessions` — add `LookupBySlotAndDate(slotId, occurrenceDateUs)` for the lazy lookup path; add `GetOrphanedClassSessions(classId, fromUs, toUs)` for the orphaned-session admin view.
+  - Tests for all three with the new sort orders + conflict-detection semantics.
 - [ ] §4 Business Logic — rewrite `ClassScheduleHelper`:
-  - `CreateImplementation(req)` / `UpdateImplementation(...)` (validates overlap + priority).
-  - `AddSlot(scheduleId, slot)` / `UpdateSlot(slotId, ...)` / `DeleteSlot(slotId)`.
-  - `MaterializeFutureSessions(classId, throughDateUs)` — now walks day-by-day, asks for the active impl per day, materializes slot tuples for that day.
+  - `CreateImplementation(req)` / `UpdateImplementation(...)` (validates overlap + priority + same-priority-no-overlap rule).
+  - `AddSlot(scheduleId, slot)` / `UpdateSlot(slotId, ...)` / `DeleteSlot(slotId)` (slot CRUD).
+  - **No `MaterializeFutureSessions`** under the lazy model. Replaced by `EnsureSessionExists(slotId, occurrenceDateUs)` — idempotent, called by the booking / check-in / cancel / sub paths in §1.4's trigger list.
+  - `GetDerivedSessionsForRange(classId, fromUs, toUs)` — walks dates, resolves active impl per day, expands slots, left-joins persisted `event_sessions` rows. The single helper that calendar / catalog queries call into.
   - `GetActiveImplementationView(classId, dateUs)` — backs the "preview on date X" UI.
+  - `GetOrphanedSessionsForRange(classId, fromUs, toUs)` — finds persisted rows whose `class_schedule_slot_id` no longer derives from the active impl for that date.
   - Drop `recurrence_pattern` validation entirely.
-  - Test updates: all of `class_schedule_helper_test.cpp` needs to be re-cast around the new shape. Add tests for priority-resolution, overlap rejection, no-slot (closure) impls, multi-slot per day, per-day different times.
+  - Test updates: all of `class_schedule_helper_test.cpp` needs re-casting. New tests for priority-resolution, overlap rejection, no-slot (closure) impls, multi-slot per day, per-day different times, lazy ensure-session idempotency, orphan detection, derived-vs-persisted left-join.
 - [ ] §5 Endpoints — re-cast:
   - `POST /api/admin/class_schedule` (implementation create) — body shape changes.
   - `POST /api/admin/class_schedule/<id>/slot` (add slot), `PUT /api/admin/class_schedule_slot/<slotId>`, `DELETE /api/admin/class_schedule_slot/<slotId>`.
   - `GET /api/admin/class_schedules?class_id=<id>` — list implementations for a class.
   - `GET /api/admin/class_schedule_preview?class_id=<id>&date_us=<t>` — resolved active impl + slot list.
-  - `POST /api/admin/class_schedule/<id>/materialize` — likely re-keys to `POST /api/admin/class/<classId>/materialize` since materialization is now per-class.
+  - `GET /api/admin/orphaned_class_sessions?class_id=<id>&from_us=&to_us=` — backs the orphaned-session admin view.
+  - **Remove** `POST /api/admin/class_schedule/<id>/materialize` — no longer applicable under lazy instantiation.
 - [ ] §6 Frontend — significant rewrite of the admin UI:
-  - Implementation list per class with priority + window indicators.
-  - Slot editor: sorted list, day-of-week dropdown, time picker (per OQ-CSI-7), duration input, facility / room autocomplete dropdowns.
+  - Implementation list per class with priority + window indicators (currently-active highlighted).
+  - Slot editor: sorted list, day-of-week dropdown, time picker (per OQ-CSI-7), duration input, facility / room / instructor autocomplete dropdowns, optional predecessor-slot picker.
   - "Schedule on date X" preview view.
+  - Orphaned-session admin view + per-row "cancel + refund" action (delegates to `SessionCancellationHelper`).
+  - Remove the materialize dialog component entirely.
   - All component specs updated.
 - [ ] §7 Admin Metadata — add `class_schedule_slots` registration (all eleven steps).
-- [ ] §10 Tests Summary — expand to call out the new slot tests + priority tests.
-- [ ] §11 Cross-Layer Acceptance Criteria — rewrite around: "admin creates default impl + one holiday-week impl; calendar shows holiday-week slots during that window; reverts after."
-- [ ] §12 Resolved Questions — append OQ-CSI-1..10 resolutions.
+- [ ] §10 Tests Summary — expand to call out the new slot tests + priority tests + lazy-instantiation tests + orphan-detection tests; remove materialize tests.
+- [ ] §11 Cross-Layer Acceptance Criteria — rewrite around: "admin creates default impl with three slots, adds one holiday-week empty-impl override, calendar shows holiday-week behavior during the window, reverts after, and no admin click-to-materialize is required at any point."
+- [ ] §12 Resolved Questions — append OQ-CSI-1..14 resolutions.
 - [ ] Mason-note in §357 — replaced by the rewritten body; can become a "Design Pivot Notes" appendix linking to this doc as the design source.
 
 ## 3.3 Sibling phase doc updates
 
-- [ ] **Phase 2 (Membership-Gated Drop-In)** — §2.4 references `EventSessionHelper::GetVisibleEventSessions` surfacing `class_id` / `class_name`. The session row still has those columns; only the materialization upstream changed. Expected impact: minor — a paragraph noting the materializer is now per-day implementation-aware.
+- [ ] **Phase 2 (Membership-Gated Drop-In)** — bigger impact than originally thought under the lazy model. `EventSessionHelper::GetVisibleEventSessions` now needs to return *derived* sessions (no row exists yet) alongside persisted ones. The booking flow under §1.4's trigger #4 must call `EnsureSessionExists` to materialize the row at booking time. Per-tier price resolution still flows through the implementation's `product_id`. Expected impact: moderate — Phase 2 doc needs a "lazy ensure on booking" subsection.
 - [ ] **Phase 4 (iCal Generator Extensions)** — no model touches. No update needed.
-- [ ] **Phase 5 (Attendance Templates)** — `attendance_template_entries.class_schedule_id` (§5.2) now references an implementation. Behavior should still work — a template entry binds to an implementation; if a higher-priority impl supersedes for some weeks, the materializer's slot resolution drives what gets booked. But: when the lower-priority impl resumes, the template entry is still bound to the original impl, and the user-facing semantics ("I'm signed up for Monday 6pm Knotty Yoga") need to follow the *class*, not the impl. Recommendation in Phase 5 update: bind template entries to (`person_id`, `class_id`, `slot_pattern`) rather than `class_schedule_id`. **Open question worth its own line in Phase 5's redesign**.
-- [ ] **Phase 6 (Weekly Digest)** — derives from session rows; no model touch.
-- [ ] **Phase 7 (Class Series and Workshops)** — series are implementations with `is_series=true`. The Phase 7 doc currently says "series uses `class_schedules.is_series=true`" — that still works since the implementation table is `class_schedules`. Expected impact: small. Verify the series-min-attendees auto-cancel job operates on the implementation's window.
-- [ ] **Phase 8 (Staff Check-in)** — operates on `event_sessions`; no model touch. The "people who attended this class in the last 4 weeks" lookup still joins via `class_schedule_id → class_id`. Verify the join still works under the new model (it does — `event_sessions.class_id` is the denormalized convenience column kept from Phase 1).
-- [ ] **Phase 9 (Attendance History)** — joins through `class_id`; no model touch.
-- [ ] **Phase 10 (Scheduling Exceptions and Shift Trades)** — major rewrite of §10.x scheduling-exceptions sections. The per-class exception path collapses (admin uses implementations instead); only studio-wide closures remain. Instructor substitution + shift-trade sections unchanged.
-- [ ] **Phase 11 (Signup Windows and Reminders)** — derives from session rows; no model touch.
-- [ ] **Phase 12 (Specialty Instructor Cost)** — costs are per-implementation or per-session; per-implementation makes more sense with the redesign. Update §12.1 schema to key off `class_schedule_id` (the implementation) instead of "schedule".
+- [ ] **Phase 5 (Attendance Templates)** — bigger impact. Per Mason's §140 note, membership-included template entries don't create any persisted rows at all (no booking, no `event_sessions`). The template entry becomes pure intent. Bind template entries to (`person_id`, `class_schedule_slot_id`) — if the slot is overridden by a higher-priority impl on a given week, the user simply gets nothing for that week (matches their experience: the class isn't running this week). Per-instance exceptions (AT-5 / AT-6) likewise stay as pure data without backing bookings. Phase 5's entire "auto-create bookings on materialization" subsection disappears. Open question for Phase 5: does the template entry follow the slot or follow the class? Recommendation: **follow the slot** — slots have stable identity; if admin deletes a slot, the template entry is orphaned and surfaced in the user's portal as "this slot no longer exists, want to pick a new one?".
+- [ ] **Phase 6 (Weekly Digest)** — bigger impact. The digest's "this week's classes" lookup must derive from impl + slots PLUS persisted rows, not just `SELECT FROM bookings`. For membership-included template attendance there are no booking rows; the digest must compute "today the user has a Monday 6pm Knotty Yoga via their template against the active impl's Monday 6pm slot". Add a `WeeklyDigestHelper::GetTemplateOccurrencesForWeek(personId, weekStartUs)` that walks the user's template entries against the active impls.
+- [ ] **Phase 7 (Class Series and Workshops)** — series are implementations with `is_series=true`. Phase 7 buys a whole series → ensures `event_sessions` rows for every occurrence in the series window (paid bookings can't be lazy — they're real money). So series buys remain materializing-at-purchase. Phase 7 doc adds a "series purchase = ensure all sessions at purchase time" rule. The series-min-attendees auto-cancel job runs against the persisted rows from that purchase.
+- [ ] **Phase 8 (Staff Check-in)** — small impact. Check-in is trigger #6 from §1.4 — staff check-in calls `EnsureSessionExists` if the row doesn't exist. The "people who attended this class in the last 4 weeks" lookup joins through `event_sessions.class_id` as before (denormalized column unchanged). Add a paragraph noting the ensure-on-checkin step.
+- [ ] **Phase 9 (Attendance History)** — small impact. History reads from persisted rows only (no derived view needed — attendance only exists for sessions that were checked in, which means they were ensured). No model touch beyond keying off `class_schedule_slot_id` instead of `class_schedule_id` if any join uses that column.
+- [ ] **Phase 10 (Scheduling Exceptions and Shift Trades)** — major rewrite. Per-class exceptions collapse to implementations. Studio-wide closure batch action is the OQ-CSI-4 deferred work — Phase 10 ships the convenience UI. Instructor substitution becomes trigger #2 from §1.4 — sub action calls `EnsureSessionExists` then writes `event_session_staffing`. Shift trades likewise. Document the ensure-on-action pattern as the Phase 10 invariant.
+- [ ] **Phase 11 (Signup Windows and Reminders)** — small impact. "Sessions available to book on date X" now derives from the active impl + slots. The reminder system queries derived sessions to figure out when a user can book.
+- [ ] **Phase 12 (Specialty Instructor Cost)** — costs are per-implementation or per-session; per-implementation makes more sense with the redesign. Update §12.1 schema to key off `class_schedule_id` (the implementation) instead of "schedule". Optionally also support per-slot cost overrides (different rates for the morning vs evening slot of a specialty instructor).
 - [ ] **Phases 13–16** — no expected model touches.
 
 ## 3.4 Misc
