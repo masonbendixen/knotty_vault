@@ -211,6 +211,8 @@ This unifies the three shapes:
 - **Workshop** = `classes` row "Inversion Workshop" + `kind='workshop'` product + one bounded `class_schedules` impl per run (single slot, narrow window). Repeated runs are additional impls under the same `classes` row, each with its own bounded window. The catalog shows the workshop's marketing page with a list of upcoming runs.
 - **Series** = `classes` row "Intro to Partner Acro" + `kind='class_series'` product + one bounded `class_schedules` impl per instance (with the instance's day/time pattern) + one `class_series_offerings` row per impl (Phase 7). Repeated runnings ("Fall 2026", "Spring 2027") are additional impl + offering pairs under the same `classes` row. Holiday overrides for a specific instance (Mason's Labor Day case) are extra higher-priority impls layered on top of that instance's default impl.
 
+Mason- I don't think this works for a series. For a series, I think we need a top level thing with name, description, photo, product, etc (think Intro to Partner Acrobatics). Then we have an instance that goes in the classes table like
+
 ### How the catalog renders each kind
 
 - The recurring class detail page renders upcoming sessions derived from the active impl, no list of "runs".
