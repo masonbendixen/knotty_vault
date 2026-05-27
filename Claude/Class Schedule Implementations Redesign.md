@@ -182,7 +182,7 @@ Most of the old §1.5 disappears. With lazy session creation:
 
 The only "blow away" action is when admin explicitly deletes the orphaned row. That's a deliberate cancellation, handled by the existing `SessionCancellationHelper` (refund-on-cancel for paid bookings).
 
-Mason- I think we are conflating things. I have a general class schedule for classes that are included as part of the membership that I want to have a schedule for. These schedules will evolve over time and need special cases like holidays or holiday weeks. Workshops, series, and other bespoke things are NOT part of the schedule. If we use the same infrastructure for these, we need some kind of enum differentiator to indicate that these operate independently (like if we use the class schedule infrastructure for a series, we need to mark this as a series and have an entry in the table just for this series)
+Mason- I think we are conflating things. I have a general class schedule for classes that are included as part of the membership that I want to have a schedule for. These schedules will evolve over time and need special cases like holidays or holiday weeks. Workshops, series, and other bespoke things are NOT part of the schedule. If we use the same infrastructure for these, we need some kind of enum differentiator to indicate that these operate independently (like if we use the class schedule infrastructure for a series, we need to mark this as a series and have an entry in the table just for this series). Where in the design are we handling paid class series? Is that something we are handling here or elsewhere?
 
 ## 1.6 Recurrence-pattern collapse
 
