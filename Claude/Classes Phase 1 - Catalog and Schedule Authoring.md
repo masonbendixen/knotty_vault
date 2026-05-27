@@ -354,6 +354,10 @@ Forgetting steps 4 or 5 below is the most common mistake (per CLAUDE.md). All el
 - [x] **Step 10** — `PopulateAdminTableDisplayTemplates()`: added FK picker template: `"Class {class_id} @ facility {facility_id}, room {location_room_id}, {recurrence_pattern} {days_of_week} {start_time_minutes}min"`. (The plan called for joining through `classes.name` / `facilities.name`, but the existing display-template resolver pulls values from the row itself; cross-table joins aren't supported. Friendly enough until the resolver gets join support — Phase 13 candidate.)
 - [x] **Step 11** — `CMakeLists.txt` for `db_schema/` and `sql_util/table_helpers/` already updated in §2.4 and §3.
 
+# Mason- issues with this class model
+- I don't like needing to create instances of classes for a given schedule and the model is too simplistic.
+	- Similarly to how prices are tied to a price schedule so I can have prices that start at a given date with an open ended end date that is unspecified until a replacement price schedule is created with a given start date (that is generally the old price models end date), I would like class schedules tied to a given class schedule implementation (I'm open to a suggestion on this name). I would like to have schedules for 
+
 ## 8. Permissions
 
 - [x] `manage_class_schedule` permission seeded in `PopulatePermissions` (Phase 5 work).
