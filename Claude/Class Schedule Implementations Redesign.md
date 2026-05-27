@@ -381,15 +381,20 @@ This is a meaningful UI surface area — likely a multi-component redesign of th
 Tag each with a decision before Section 3 (doc updates) kicks off.
 
 - [ ] **OQ-CSI-1 (Naming)**: Use `class_schedules` (impls) + `class_schedule_slots` + `class_instances` (recommendation)? Or rename the impl + slot pair to `class_timetables` / `class_timetable_slots` to avoid the slight noun overload now that "instance" is the headline middle layer? Recommendation: **keep `class_schedules` / `class_schedule_slots`** — the parallel to `price_schedules` is still the cleanest external naming, and "instance" reads as the unit-of-purchase layer, not the schedule layer.
+	- Mason- I'm confused. Can you list the two options for the three different entities?
 - [ ] **OQ-CSI-2 (Product location)** — **RESOLVED in L-3.** Product is on `class_instances`. Listed here for backward reference.
 - [ ] **OQ-CSI-3 (Where does `facility_id` live)**: On the slot (recommendation — lets a class run at different facilities within one implementation) or on the implementation (simpler — one facility per implementation)?
+	- Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-4 (Closure batch UX)**: Closures are per-class empty high-priority impls; there is no "studio is closed" global lever (workshops can still run, per L-9). Pure UX question:
   - (a) Ship a "Close these N classes for this date range" multiselect admin action in Phase 1 (creates an empty impl under each selected class's active instance).
   - (b) Defer the convenience UI to Phase 10; in Phase 1 admin manually creates per-class empty impls.
   - Recommendation: **(b)** — Phase 1 is already big; ship the batch action with the other scheduling-exception work in Phase 10.
+  - Mason- I'll go with your recommendation.
 - [ ] **OQ-CSI-5 (Materialization UX)** — *superseded by OQ-CSI-12*. Lazy-instantiation in §1.4 removes materialization entirely. Stub.
 - [ ] **OQ-CSI-6 (Drop biweekly + custom)**: Confirm we're removing `recurrence_pattern` entirely?
+	- Mason- Yes.
 - [ ] **OQ-CSI-7 (Time entry UX)**: Existing memory `feedback_date_time_pickers.md` says "times must use hour pickers" and Phase 1 §6.3 ships separated hour + minute inputs. Slot start times often have minute precision (5:45 PM yoga) — do we need a full time picker (HH:MM) for slot entry, overriding the hour-only convention here? Recommendation: **yes, full time picker** because class start times in the wild are not hour-aligned (e.g. 5:45, 6:15).
+	- Mason- yes this things don't need to start on hour boundaries.
 - [ ] **OQ-CSI-8 (Slot uniqueness)**: Allow duplicate (`class_schedule_id`, `day_of_week`, `start_time_minutes`, `location_room_id`) tuples or reject? Recommendation: **reject identical full tuples** because that's almost certainly a data-entry mistake — different rooms at the same time are different rows, and different start times are different rows. The same room + same start_time + same day = duplicate.
 - [ ] **OQ-CSI-9 (Drop `is_series` / `series_*` from `class_schedules`)** — **RESOLVED in L-5 / L-6.** Drops happen in Phase 1; Phase 7 owns the `class_series_instances` augmentation table. Listed here for backward reference.
 - [ ] **OQ-CSI-10 (Phase 1 already merged?)**: Phase 1 is marked done end-to-end (most checkboxes are checked). Is this a "redesign before Phase 2 lands" plan (rewrite migrations, re-do tests) or a "Phase 1.5 migration" plan (new tables alongside, deprecation)? Recommendation: **rewrite Phase 1 in place** — pre-deploy, no production state to defend against per `feedback_no_premature_defensive_code.md`. But Mason should confirm there's no deployed environment that needs a migration path.
