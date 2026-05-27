@@ -170,6 +170,8 @@ Open question worth its own discussion since it touches multiple paths:
 - **Membership-included drop-in template**: per Mason's §140 note, there's no booking row, so nothing to preserve. The next-week calendar just derives from the new impl. Clean.
 - **Cancellation of a slot via empty high-priority impl**: derivation for those dates returns no slots → calendar shows no class → existing persisted bookings for those dates (if any) become orphaned and must be cancelled+refunded by admin. The redesign doesn't auto-cancel; that's still an admin action because refunds need authorization.
 
+Mason- I don't think workshops / event sessions should be affected but class schedules. They are fulfilling kind of different needs. Events / workshops aren't part of a class schedule and shouldn'
+
 ## 1.5 Booked-session preservation (under the lazy model)
 
 Most of the old §1.5 disappears. With lazy session creation:
