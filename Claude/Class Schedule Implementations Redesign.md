@@ -170,7 +170,7 @@ Open question worth its own discussion since it touches multiple paths:
 - **Membership-included drop-in template**: per Mason's §140 note, there's no booking row, so nothing to preserve. The next-week calendar just derives from the new impl. Clean.
 - **Cancellation of a slot via empty high-priority impl**: derivation for those dates returns no slots → calendar shows no class → existing persisted bookings for those dates (if any) become orphaned and must be cancelled+refunded by admin. The redesign doesn't auto-cancel; that's still an admin action because refunds need authorization.
 
-Mason- I don't think workshops / event sessions should be affected but class schedules. They are fulfilling kind of different needs. Events / workshops aren't part of a class schedule and shouldn'
+Mason- I don't think workshops / event sessions should be affected but class schedules. They are fulfilling kind of different needs. Events / workshops aren't part of a class schedule and don't need / want the override priority semantics.
 
 ## 1.5 Booked-session preservation (under the lazy model)
 
@@ -181,6 +181,8 @@ Most of the old §1.5 disappears. With lazy session creation:
 - Per-instance admin actions (cancellation notes, instructor subs): same — those rows persist and stay correct.
 
 The only "blow away" action is when admin explicitly deletes the orphaned row. That's a deliberate cancellation, handled by the existing `SessionCancellationHelper` (refund-on-cancel for paid bookings).
+
+Mason- I think we are conflating things. I have a general class schedule for classes that are included as part of the membership that I want to have a schedule for. These schedules will evolve over time and need special cases like holidays or holiday weeks. Workshops, series, and other bespoke things are NOT part of the schedule. If we use the same infrastructure for these, we need some kind of enum differentiator to indicate that these operate independently (like if we use the class schedule infrastructure for a series, we need to mark this as a series and have an entry in the table just for this series)
 
 ## 1.6 Recurrence-pattern collapse
 
