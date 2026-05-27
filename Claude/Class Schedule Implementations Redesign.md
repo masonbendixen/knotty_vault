@@ -137,6 +137,8 @@ When a new high-priority implementation lands and overrides slots that already m
 
 Cancellations triggered by an implementation change are still admin-initiated cancellations → full refunds for paid bookings (Phase 2 / Phase 10 rules apply).
 
+Mason- I think that this same pattern moves to instantiations. Also, there are classes that are included in memberships that users don't pay extra to attend. These don't require any kind of cancellation or refund logic. We can just get rid of the "thanks for letting me know you plan on coming" soft bookings with no muss, no fuss.
+
 ## 1.6 Recurrence-pattern collapse
 
 Drop the `recurrence_pattern` column entirely. The implementation table is itself "weekly with these slot rows". No biweekly, no custom. Mason's concerns about biweekly are valid (odd/even week definition is ambiguous and depends on facility convention); there's no demonstrated user need for either pattern.
@@ -155,6 +157,8 @@ With this redesign, the **per-class schedule exception** path collapses entirely
 
 The **studio-wide closure** path is harder — see OQ-CSI-4.
 
+Mason- Is studio wide closure harder with this model? I think we just create a high priority but empty class schedule for closure. Can you explain why this wouldn't handle that case?
+
 ## 1.8 Admin UI changes
 
 Per Mason's note:
@@ -165,6 +169,8 @@ Per Mason's note:
 - Implementation list view: per-class, sortable by `valid_from_us` and `priority`, with visual highlighting of which implementation is currently active.
 
 This is a meaningful UI surface area — likely a multi-component redesign of the Phase 1 admin page.
+
+Mason- We also need to tackle the req
 
 ---
 
