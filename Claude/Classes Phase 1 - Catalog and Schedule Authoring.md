@@ -356,7 +356,7 @@ Forgetting steps 4 or 5 below is the most common mistake (per CLAUDE.md). All el
 
 # Mason- issues with this class model
 - I don't like needing to create instances of classes for a given schedule and the model is too simplistic.
-	- Similarly to how prices are tied to a price schedule so I can have prices that start at a given date with an open ended end date that is unspecified until a replacement price schedule is created with a given start date (that is generally the old price models end date), I would like class schedules tied to a given class schedule implementation (I'm open to a suggestion on this name). I would like to have schedules for 
+	- Similarly to how prices are tied to a price schedule so I can have prices that start at a given date with an open ended end date that is unspecified until a replacement price schedule is created with a given start date (that is generally the old price models end date), I would like class schedules tied to a given class schedule implementation (I'm open to a suggestion on this name). I would like to have all the scheduled times be able to vary based on implementation and have various implementations have start / end date(s) as well as a priority (with higher numbers taking precedence and 3 being the default). This way there would be an easy way to have a new class schedule take over at a given time as well as having a schedule that can briefly take over as the high priority template. There is only one active template at a given time and the p
 
 ## 8. Permissions
 
