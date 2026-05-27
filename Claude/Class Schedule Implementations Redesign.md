@@ -40,41 +40,54 @@ Pinning the name "implementation" only in conversation / docs is also fine — t
 
 **`class_schedules`** (REPURPOSED — the "implementation" / versioned container):
 
-| Column                          | Type                                    | Notes                                                                                                                     |
-| ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `id`                            | BIGSERIAL PK                            |                                                                                                                           |
-| `class_id`                      | BIGINT NOT NULL FK                      | One class per implementation.                                                                                             |
-| `name`                          | TEXT NOT NULL                           | Admin-visible label ("Default", "Holiday Week 2026", "Memorial Day").                                                     |
-| `priority`                      | INTEGER NOT NULL DEFAULT 3              | Higher wins on overlap. Same priority + overlap = save rejected.                                                          |
-| `valid_from_us`                 | BIGINT NOT NULL                         |                                                                                                                           |
-| `valid_to_us`                   | BIGINT NULL                             | NULL = open-ended. Closed when a same-priority successor is created.                                                      |
-| `product_id`                    | BIGINT NOT NULL FK                      | Drives pricing / visibility / booking permission / cancellation policy. (Likely stays here, not per-slot — see OQ-CSI-2.) |
-| `predecessor_class_schedule_id` | BIGINT NULL                             | Same as today; lets Phase 3 (SL-11) chain dependent classes.                                                              |
-| `is_series` / `series_*` fields | (unchanged from current Phase 1 design) | One-off workshops and paid series stay on the implementation row — they ARE the schedule + window for that offering.      |
-| `is_active`                     | BOOLEAN NOT NULL DEFAULT TRUE           | Soft-delete flag, separate from time-window.                                                                              |
-| `created_us` / `updated_us`     | BIGINT NOT NULL                         |                                                                                                                           |
+| Column                          | Type                                    | Notes                                                                                                                |
+| ------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `id`                            | BIGSERIAL PK                            |                                                                                                                      |
+| `class_id`                      | BIGINT NOT NULL FK                      | One class per implementation.                                                                                        |
+| `name`                          | TEXT NOT NULL                           | Admin-visible label ("Default", "Holiday Week 2026", "Memorial Day").                                                |
+| `priority`                      | INTEGER NOT NULL DEFAULT 3              | Higher wins on overlap. Same priority + overlap = save rejected.                                                     |
+| `valid_from_us`                 | BIGINT NOT NULL                         |                                                                                                                      |
+| `valid_to_us`                   | BIGINT NULL                             | NULL = open-ended. Closed when a same-priority successor is created.                                                 |
+| `product_id`                    | BIGINT NOT NULL FK                      | See "What `product_id` is for" below. Default placement is at the implementation level — see OQ-CSI-2.               |
+| `is_series` / `series_*` fields | (unchanged from current Phase 1 design) | One-off workshops and paid series stay on the implementation row — they ARE the schedule + window for that offering. |
+| `is_active`                     | BOOLEAN NOT NULL DEFAULT TRUE           | Soft-delete flag, separate from time-window.                                                                         |
+| `created_us` / `updated_us`     | BIGINT NOT NULL                         |                                                                                                                      |
 
 Removed from the current Phase 1 design: `facility_id`, `location_room_id`, `recurrence_pattern`, `days_of_week`, `start_time_minutes`, `duration_minutes`, `effective_from_us` / `effective_to_us`, `capacity` override. These move down to the slot table OR (for the date-range fields) become the `valid_from_us` / `valid_to_us` on the implementation itself.
 
-Mason- What is product_id for? What is predecessor_class_schedule_id for? I think that should probably be per class schedule slot since that is where I would want to require that a given class time depends on attending another.
+Also removed (per Mason's note on §59): `predecessor_class_schedule_id` — predecessor relationships are about *specific class times* requiring attendance at *another specific class time* (e.g., "Acro Level 2 at 7pm requires you to be in Acro Level 1 at 6pm the same day"). That's a slot-to-slot relationship, not an implementation-to-implementation one. Moved down to `class_schedule_slots.predecessor_class_schedule_slot_id`.
+
+**What `product_id` is for** (answering Mason's note on §59): in the current Phase 1 design, the schedule row references a `kind='class'` product. The product carries:
+
+1. **Per-permission pricing** (via `product_prices` × `price_schedules`) — what each membership tier pays. For included-with-membership recurring classes the per-tier price is $0; for workshops / series / intro it's the real ticket price.
+2. **Visibility permissions** (via `product_visibility_permission`) — which membership tiers can even see the offering in the catalog.
+3. **Booking permissions** (via `product_booking_permission`) — which membership tiers can actually book it.
+4. **Cancellation policy** (via `products.cancellation_policy_id`) — refund tiers for paid bookings.
+5. **Advance booking windows** (via `product_booking_windows`) — per-tier "you can book this N days before the session".
+
+In short: `product_id` is the bridge between "this thing on the schedule" and "the entire pricing / access-control / refund machinery already built in the Payment Design layer". Without it, every class would need its own parallel access-control fields. With it, classes inherit everything from the existing product infrastructure.
+
+Whether `product_id` belongs on the implementation or on the slot is OQ-CSI-2. The recommendation is **implementation-level** because: (a) different time-of-day slots within the same implementation are almost always the same offering at the same price, and (b) if a workshop time vs. a drop-in time really need different pricing they're conceptually different classes (different product, different schedule).
 
 **`class_schedule_slots`** (NEW):
 
-| Column                      | Type                                   | Notes                                                                         |
-| --------------------------- | -------------------------------------- | ----------------------------------------------------------------------------- |
-| `id`                        | BIGSERIAL PK                           |                                                                               |
-| `class_schedule_id`         | BIGINT NOT NULL FK                     | Cascade-delete from the implementation.                                       |
-| `day_of_week`               | SMALLINT NOT NULL CHECK (0..6)         | 0=Sun..6=Sat.                                                                 |
-| `start_time_minutes`        | INTEGER NOT NULL CHECK (0..1439)       | Local-TZ minutes-after-midnight at the slot's facility.                       |
-| `duration_minutes`          | INTEGER NOT NULL CHECK (>0) DEFAULT 60 |                                                                               |
-| `facility_id`               | BIGINT NOT NULL FK                     | Per-slot so a class can run at different facilities under one implementation. |
-| `location_room_id`          | BIGINT NOT NULL FK                     | Per-slot for the same reason.                                                 |
-| `capacity_override`         | INTEGER NULL                           | NULL = use `classes.default_capacity`.                                        |
-| `created_us` / `updated_us` | BIGINT NOT NULL                        |                                                                               |
+| Column                              | Type                                   | Notes                                                                                                                                                                  |
+| ----------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                | BIGSERIAL PK                           |                                                                                                                                                                        |
+| `class_schedule_id`                 | BIGINT NOT NULL FK                     | Cascade-delete from the implementation.                                                                                                                                |
+| `day_of_week`                       | SMALLINT NOT NULL CHECK (0..6)         | 0=Sun..6=Sat.                                                                                                                                                          |
+| `start_time_minutes`                | INTEGER NOT NULL CHECK (0..1439)       | Local-TZ minutes-after-midnight at the slot's facility.                                                                                                                |
+| `duration_minutes`                  | INTEGER NOT NULL CHECK (>0) DEFAULT 60 |                                                                                                                                                                        |
+| `facility_id`                       | BIGINT NOT NULL FK                     | Per-slot so a class can run at different facilities under one implementation.                                                                                          |
+| `location_room_id`                  | BIGINT NOT NULL FK                     | Per-slot for the same reason.                                                                                                                                          |
+| `instructor_person_id`              | BIGINT NULL FK                         | Person scheduled to teach this slot. Nullable for "TBD" (admin hasn't assigned yet). Per-session subs / trades still live on `event_session_staffing` as today.        |
+| `predecessor_class_schedule_slot_id` | BIGINT NULL FK (self-ref)             | Per Mason's note on §77 — chain dependent class times (Acro 2 @ 7pm requires Acro 1 @ 6pm). Phase 3 (SL-11) is the consumer; the column exists from day 1 to avoid migrations. |
+| `capacity_override`                 | INTEGER NULL                           | NULL = use `classes.default_capacity`.                                                                                                                                 |
+| `created_us` / `updated_us`         | BIGINT NOT NULL                        |                                                                                                                                                                        |
 
-No unique constraint on (`class_schedule_id`, `day_of_week`, `start_time_minutes`) — Mason explicitly called out "multiple time slots for the same class on the same day" (morning + evening) — so the same day-of-week appears multiple times.
+No unique constraint on (`class_schedule_id`, `day_of_week`, `start_time_minutes`) — Mason explicitly called out "multiple time slots for the same class on the same day" (morning + evening) — so the same day-of-week appears multiple times. (But see OQ-CSI-8 — recommending we still reject exact duplicate tuples as data-entry errors; distinct rows must differ on at least `location_room_id` or `start_time_minutes`.)
 
-Mason- I think that class schedule slots should also have an instructor associated with each slot to note who is scheduled to teach a given class on the schedule. I think that this is where we should handle predecessor_class_schedule_id but predecessor_class_schedule_slot. I'm also wondering if this is where we put the skill level required (if there is one) or are we going to modify this table or handle it somewhere else for Classes Phase 3 - Skill Levels.md?
+**Skill-level requirements** (answering the second half of Mason's note on §77): the current Phase 3 design (`Classes Phase 3 - Skill Levels.md` §3.2) keys skill requirements off `class_id` via a `class_skill_requirements` table. The argument for keeping it per-class is that skill prerequisites are a property of *what the class is*, not *when it runs* — if "Advanced Acro" requires the Inversion skill, that's true at every slot, not just the Tuesday slot. The argument for per-slot is more nuanced — a beginner-friendly Saturday morning slot vs. an advanced Tuesday-night slot of the same class. In practice, that's two different classes (with two different products), not two slots of one class. **Recommendation: leave skill-level requirements per-class (Phase 3 owns this).** See OQ-CSI-11 if Mason wants to revisit.
 
 ## 1.3 Active-implementation resolution
 
@@ -170,7 +183,7 @@ Per Mason's note:
 
 This is a meaningful UI surface area — likely a multi-component redesign of the Phase 1 admin page.
 
-Mason- We also need to tackle the req
+Mason- We also need to tackle the requires previous slot and skill level stuff (if we don't defer that to Classes Phase 3 - Skill Levels.md)
 
 ---
 
