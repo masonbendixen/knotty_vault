@@ -87,4 +87,31 @@ Option C only if you'd rather not carry the new schema while the higher layers c
 	- Mason- let's tackle that as a separate step after completing the server side.
 
 # 7. Notes / scratch
-(Use this section as we work through the decisions.)
+
+## 2026-05-28 — Option B server-side migration completed (pending your build)
+Full forward-migration of the server higher layers to the three-level model. Frontend deferred (OQ-5). I could not build/run tests here, so this is "written to compile + pass by construction" — please build + run the suite.
+
+**Table helpers** (`sql_util/table_helpers/`)
+- NEW `class_instances.{h,cpp}` + `class_instances_test.cpp`; NEW `class_schedule_slots.{h,cpp}` + `class_schedule_slots_test.cpp`; both added to CMake.
+- `class_schedules.{h,cpp}` rewritten to the instance-scoped impl API (`GetActiveImplementation`, `GetImplementationsByInstance`, `GetImplementationsOverlapping`, soft/hard delete); `class_schedules_test.cpp` rewritten.
+- `event_sessions.{h,cpp}`: dropped `GetEventSessionsByClassSchedule` (dead column); added `LookupBySlotAndDate` + `GetFutureClassSessionsForInstance`; `event_sessions_test.cpp` reworked.
+
+**Business logic** (`business_logic/scheduling/`)
+- NEW `class_instance_helper.{h,cpp}` + test (create/update/close/deactivate + `MigrateRecurringClassToNewProduct`), added to CMake.
+- `class_schedule_helper.{h,cpp}` rewritten: impl + slot CRUD, lazy `GetDerivedSessionsForRange`, `EnsureSessionExists`, impl-save sweep (`SweepOrphanedFutureSessions`, blocks on booked occurrences). Test rewritten.
+- `class_catalog_helper.{h,cpp}` adapted to resolve product/visibility via the active `class_instances` row; test fixture rewritten to seed an instance.
+- `recurring_session_helper.{h,cpp}` drops `class_schedule_id` propagation (keeps `class_id`); test reworked.
+- `scheduling_key_value_table.{h,cpp}` result converters swapped to the new types (CreateInstance/InstanceEdit/Migrate/CreateImplementation/Edit/Slot/DerivedSession); test reworked.
+
+**Endpoints** (`endpoints/`)
+- `admin_class_schedule_create` → creates an *implementation* (`POST /api/admin/class_schedule`, body `class_instance_id/name/priority/valid_from_us[/valid_to_us/copy_from_implementation_id]`).
+- `admin_class_schedule_update` → `UpdateImplementation` (drops `regenerate_future`; reports sweep).
+- `admin_class_schedule_deactivate` → `DeactivateImplementation` (single-arg helper; drops cancel-future).
+- `admin_class_schedules_list` → `GetImplementationsByInstance` (query param `class_instance_id`, was `facility_id`).
+- `admin_class_schedule_materialize` **removed** (files + web_app + CMake + test) — no materialization in the new model.
+- `get_classes` / `get_class_detail` unchanged (catalog API preserved); `get_class_detail_test` fixture migrated to an instance.
+- `create_database.cpp::PopulateClassSchedules` was already on the new model (your db work) — untouched.
+
+**NOT done (deliberately, follow-ups):** new admin endpoints the redesign §5 adds but that didn't exist as flat endpoints — instance create/update/deactivate, product-migrate, slot CRUD, schedule preview — plus the entire frontend (OQ-5). The admin API can create/list/update/deactivate implementations but has no instance-create or slot-CRUD route yet, so end-to-end authoring isn't reachable until those are added.
+
+**Build risk note:** written without a compiler. Most-likely places to check first if the build complains: (a) `DerivedSession`/sweep date math in `class_schedule_helper.cpp`; (b) any table-helper method-name mismatch; (c) unused-parameter warnings in `admin_class_schedule_deactivate.cpp` (`req` now unused).
