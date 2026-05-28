@@ -366,17 +366,17 @@ All eleven CLAUDE.md steps for EACH of `class_instances`, `class_schedules`, `cl
 - [ ] Also add `classes.kind` to `PopulateAdminColumnDataInfo` as an enum and its friendly name.
 
 ## 8. Permissions
-- [ ] `manage_class_schedule` permission seeded in `PopulatePermissions`; granted to admin + Studio Manager roles in `PopulateRolePermissions`. (Carried from the prior implementation — unchanged by the redesign.)
+- [x] `manage_class_schedule` permission seeded in `PopulatePermissions`; granted to admin + Studio Manager roles in `PopulateRolePermissions`. (Carried from the prior implementation — unchanged by the redesign.)
 
 ## 9. Seed Data
-- [ ] Existing seeded classes (Knotty Yoga, Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling, Handstands, Aerial Fabric) get `kind='recurring'` + one perpetual `class_instances` row each (product = the membership-included `class-dropin` product) + one default `class_schedules` impl + slots.
-- [ ] `PopulateClassInstancesAndSchedules` (replaces the old `PopulateClassSchedules`): for Knotty Yoga, seed a perpetual instance + a default impl with Mon+Wed 18:00 / 60min slots in the Main Gym at Knotty Yoga Studio. **No materialize call** — the catalog detail page derives sessions on the fly.
-- [ ] Keep the `kind='class'` `class-dropin` product. Cancellation policies already seeded.
+- [~] Existing seeded classes (Knotty Yoga, Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling, Handstands, Aerial Fabric) get `kind='recurring'` (all, via the DDL default) — but only **Knotty Yoga** currently gets a perpetual instance + default impl + slots. Seeding the instance/impl/slots for the other five is pending.
+- [x] `PopulateClassSchedules` (kept name): for Knotty Yoga, seeds a perpetual instance + a default impl with Mon+Wed 18:00 / 60min slots in the Main Gym at Knotty Yoga Studio. **No materialize call** — the catalog detail page derives sessions on the fly.
+- [x] Keep the `kind='class'` `class-dropin` product. Cancellation policies already seeded.
 
 ## 10. Tests Summary
-- [ ] Table helpers: `class_instances_test.cpp`, `class_schedules_test.cpp`, `class_schedule_slots_test.cpp`, extended `event_sessions_test.cpp`.
-- [ ] Business logic: `class_instance_helper_test.cpp`, `class_schedule_helper_test.cpp`, `class_catalog_helper_test.cpp`, extended `scheduling_key_value_table_test.cpp` (+ room-occupancy + sweep tests).
-- [ ] Endpoint tests: one per endpoint, success + permission-denied + validation paths.
+- [x] Table helpers: `class_instances_test.cpp`, `class_schedules_test.cpp`, `class_schedule_slots_test.cpp`, extended `event_sessions_test.cpp`.
+- [x] Business logic: `class_instance_helper_test.cpp`, `class_schedule_helper_test.cpp`, `class_catalog_helper_test.cpp`, extended `scheduling_key_value_table_test.cpp` (+ sweep tests). *(Room-occupancy tests pending — §4.3 not built.)*
+- [~] Endpoint tests: catalog (`get_classes`, `get_class_detail`) + the four admin implementation endpoints (create/update/deactivate/list) done with success/permission/validation paths. Instance, slot, and preview endpoint tests pending (those endpoints not built).
 - [ ] Frontend: component specs for catalog, detail, class list/detail, instance detail, impl detail, slot editor, preview, sweep-confirmation modal.
 - [ ] `ServerAccess.mock.spec.ts` updated.
 - [ ] Manual-testing-helper commands: `list_class_instances`, `list_class_schedules <instance_id>`, `preview_schedule <class_id> <date>` (no materialize command).
