@@ -42,8 +42,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Must-have.** Members see classes their tier includes; non-members see only workshops / series / intro workshop (per P-1 and M-6). For recurring class attendance, the user just shows up — no advance booking is created. For workshops / series / intro workshop / guest passes (Phases 7 + future), the booking flow uses the existing `BookEvent` infrastructure but at zero or paid tier price.
 
 **Prerequisites:**
-- Phase 1 complete (classes catalog + class_schedules + materialized event_sessions).
+- Phase 1 complete (classes catalog + the three-level `classes` → `class_instances` → `class_schedules` → `class_schedule_slots` model + lazy-derived `event_sessions`).
 - Existing payment / product / product_prices / cancellation_policies / cancellation_policy_windows infrastructure ([[Payment Design Document]], [[Event Polish- Scheduling Should Have Items]]).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> Phase 1 was redesigned to a three-level model with **lazy session derivation** (no materialization). For Phase 2 this means:
+> - **`product_id` is on `class_instances`, not on a flat `class_schedule`.** Per-tier pricing / visibility / booking permissions / cancellation policy / advance windows all resolve from the active instance's product. Where this doc says "the `class_schedule`'s product", read "the active `class_instances` row's product".
+> - **The catalog visibility query returns DERIVED sessions, not pre-materialized rows.** `GetVisibleEventSessions` (or its class-aware successor) must call `ClassScheduleHelper::GetDerivedSessionsForRange` and surface `class_id` / `class_name` / `photo_url` from the derivation, left-joining any persisted `event_sessions` rows. A future occurrence with no persisted row is normal.
+> - **Booking a paid offering ensures the `event_sessions` row first.** The `BookEvent` path for workshops / series / intro / guest passes must call `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` to create the row before attaching the booking (recording trigger #4). Membership-included recurring attendance still creates nothing until staff check-in (Phase 8).
+> - **Room-conflict / capacity checks** sum derived + persisted overlapping sessions (P-4) via the Phase 1 `RoomOccupancyHelper`.
 
 **Outcome:**
 - `GET /api/visible_event_sessions` surfaces class metadata (class_id / class_name / photo_url) for each class instance.
@@ -76,7 +83,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [x] M-7 implementation: leave `BookEvent` as-is for the paid path; add a tier-aware visibility resolver for the catalog and a "free for you" badge for membership-included classes — but NOT a server-side $0 purchase.
 
 ### 1.2 Pricing resolution
-- [x] For each `class_schedule` linked to a `product`, the user's effective price is the lowest `product_prices.price_cents` across all `product_prices` rows whose `permission_id` is NULL or whose `permission_id` is held by the user (per M-5).
+- [x] For each class, pricing comes from the active `class_instances` row's `product`. The user's effective price is the lowest `product_prices.price_cents` across all `product_prices` rows whose `permission_id` is NULL or whose `permission_id` is held by the user (per M-5).
 - [x] If user holds the inclusion permission (i.e. their membership tier's `grants_permission_id` covers the class's required permission), the offering is "included" — no price shown; "Show up to attend" CTA.
 - [x] If user does NOT hold any matching permission AND there is no `permission_id IS NULL` price row, the offering is not available to them (recurring classes per P-1).
 

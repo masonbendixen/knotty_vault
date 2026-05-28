@@ -44,10 +44,18 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Why this scope:** Mason explicitly framed templates as "fitness goals" — "I plan to work out Monday, Thursday, Saturday on a good week." Bookings come into existence only when (a) staff checks the user in at the door (Phase 8), or (b) the user paid for a workshop / series / intro / guest pass.
 
 **Prerequisites:**
-- Phase 1 (class catalog + class_schedules).
+- Phase 1 (class catalog + the three-level `classes` → `class_instances` → `class_schedules` → `class_schedule_slots` model, lazy-derived sessions).
 - Phase 2 (membership-gated visibility — `GetClassesVisibleToPerson`).
 - Phase 3 (skill levels — the eligible-classes grid is filtered by skill requirements).
 - Phase 4 (iCal RRULE support — template-add email uses single VEVENT + RRULE).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> The redesign makes this phase strictly *simpler* and confirms its no-bookings stance, but changes the binding key:
+> - **Template entries bind to `class_schedule_slot_id`, not `class_schedule_id`.** A slot (day-of-week + start time + room + instructor under an impl) has stable identity; the impl is a versioned container that changes over time. "I attend the Monday 6pm Knotty Yoga" = a template entry on that slot.
+> - **There is no materialization hook.** Sessions are derived on the fly (lazy model, OQ-CSI-12). The homepage / digest / calendar compute "is this on my template?" by evaluating the user's template-entry slots against the **derived** occurrences for the week — NOT by joining persisted `event_sessions` rows (most have none). Delete §4.4's "session-materialization hook" entirely.
+> - **Exceptions key off (`class_schedule_slot_id`, `occurrence_date_us`)**, not `event_session_id` — the occurrence usually has no persisted row.
+> - **Stale-slot handling:** if a slot referenced by a template entry is deleted (impl edit / product migration), surface it in the user portal as "this slot no longer exists — pick a new one".
+> - Everything else (no bookings, no capacity, no waitlist) is unchanged and now even cleaner — there are no soft-booking rows to manage on impl change (Mason's §140 note).
 
 **Outcome:**
 - User can view a weekly grid of classes they're eligible to attend, mark/unmark template entries.
