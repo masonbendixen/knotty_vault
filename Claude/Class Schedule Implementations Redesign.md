@@ -466,7 +466,7 @@ This is the biggest rewrite — most §2..§7 needs touching.
   - **Implementation detail (admin)**: page per impl showing priority + window + slot editor.
   - **Slot editor**: sorted list, day-of-week dropdown, time picker (per OQ-CSI-7), duration input, facility / room / instructor autocomplete dropdowns, optional predecessor-slot picker.
   - **Migration action** on a recurring `classes` row: "Migrate to new product effective DATE" form (OQ-CSI-20) — closes the perpetual instance, opens a new one with the chosen product, optionally copies forward slots from the closing instance's latest impl.
-  - **Copy-from picker** on impl create (OQ-CSI-21): "start empty" or "copy slots from <impl name>".
+  - **Copy-from picker** on impl create (OQ-CSI-21): "start empty" or "copy slots from {impl name}".
   - **"Schedule on date X" preview view** — shows active instance + active impl + resolved slots for the date.
   - **Impl-save confirmation modal**: when the save will trigger a non-zero orphan sweep, show "X future admin notes/subs will be removed by this change" with a confirm button. If the sweep is blocked by `purchase_id` rows, surface those with "cancel and refund first" actions.
   - Remove the materialize dialog component entirely.
