@@ -68,7 +68,7 @@ Before listing use cases, here is what the codebase already provides — the pla
 
 **Scheduling (Scheduling thin slice + Event Polish + Provider Portal docs):**
 - `facilities`, `location_room_types`, `location_rooms` (capacity, timezone)
-- `event_sessions` (capacity, booked_count, status, visibility flags, room) — the model classes will materialize into
+- `event_sessions` (capacity, booked_count, status, visibility flags, room) — the row class occurrences persist into (lazily, only when something is recorded; see redesign)
 - `bookings` (status: confirmed/waitlisted/cancelled/attended/no_show, `waitlist_position`, `checked_in_us`, `is_walkin`, `free_cancel_until_us`, `reminder_sent_us`)
 - `event_session_staffing` (multi-staff per session with role)
 - `cancellation_policies`, `cancellation_policy_windows`
@@ -137,7 +137,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CSer-3** Admin sets per-instance base price (used for pro-rating partial series sign-ups), per permission
 - **CSer-4** Admin enables / disables pro-rated sign-ups mid-series
 - **CSer-5** User views available series in their booking window, sees their tier price
-- **CSer-6** User buys a full series, gets an entitlement covering all materialized sessions in the series + auto-booked into each
+- **CSer-6** User buys a full series, gets an entitlement covering all derived occurrences in the series run + auto-booked into each (occurrence `event_sessions` rows ensured at purchase)
 - **CSer-7** User joins mid-series with pro-rated pricing computed from remaining sessions
 - **CSer-8** Auto-job at min-by date: if confirmed count < min and policy = auto-cancel → cancel series, refund all, email all
 - **CSer-9** Workshop = a one-off "series" of length 1 (same code path, but UI may call it "workshop")
@@ -178,7 +178,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **SL-8** Staff portal: search a person, view their current skill levels, assign new ones, revoke existing ones
 - **SL-9** History of skill-level changes per person (audit trail)
 - **SL-10** Calendar-month attendance threshold → auto-granted permission. A class can require a specific permission (e.g. `acro_club`) that is granted by a scheduled job: at the end of each calendar month, the job counts attendances against a configured set of source classes (e.g. all `partner-acro`-tagged classes); if the count meets the configured threshold for a user, the job grants that user the destination permission for the *current and next* calendar month. If the user doesn't meet the threshold again the following month, the permission auto-expires. Implementation = `attendance_threshold_rules` table (source-class-set, threshold, granted_permission_id) + monthly scheduled job + standard permission gate at booking time. No rule-engine DSL needed — pure SQL plus the job
-- **SL-11** Same-day sequencing prerequisite via a `predecessor_class_schedule_id` field on `class_schedules`. When the user attempts to book a class with `predecessor_class_schedule_id` set, the server verifies the user is also booked for that predecessor on the same day. If the user cancels the predecessor booking, the dependent booking is auto-cancelled atomically in `BookingHelper::CancelBooking` (NO email — silent cascade)
+- **SL-11** Same-day sequencing prerequisite via a `predecessor_class_schedule_slot_id` field on `class_schedule_slots` (per the redesign — predecessor is a slot-to-slot relationship, not schedule-to-schedule). When the user attempts to book a class occurrence whose slot has `predecessor_class_schedule_slot_id` set, the server verifies the user is also booked for the predecessor slot's occurrence on the same day. If the user cancels the predecessor booking, the dependent booking is auto-cancelled atomically in `BookingHelper::CancelBooking` (NO email — silent cascade)
 - **SL-12** The three prerequisite mechanisms — skill mastery (SL-5/6), monthly-attendance permissions (SL-10), and same-day predecessor (SL-11) — all compose at the standard booking-permission gate. There is no separate "rule engine"; each mechanism is just a SQL check (skill check / permission check / same-day-booking check) wired into `BookingHelper`. Staff with `manage_classes` permission can override any of them with a logged reason. P-5 ensures the attendance counts that feed SL-10 are trustworthy because users cannot self-attribute attendance
 
 ## 2.7 Capacity, Waitlist, and Min Attendees
@@ -196,7 +196,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 The template is a **personal fitness-planning tool**, not a booking. It captures the user's aspirational weekly routine ("I plan to work out Monday / Thursday / Saturday on a good week"). It does NOT create `booking` rows, does NOT consume `event_sessions.capacity`, and does NOT participate in the waitlist. The studio is membership-based — the goal is that people just show up when they can. If capacity issues ever force template entries to translate into hard bookings, that's a future "good problem to have" — punt until then.
 
 - **AT-1** User views a weekly grid of classes they are eligible to attend, marks the ones they normally attend → that becomes their attendance template
-- **AT-2** Template is per-schedule-entry (recurring) and forward-looking — it applies to all future materialized sessions of the marked schedule, without creating any booking rows
+- **AT-2** Template is per-slot (recurring) and forward-looking — it applies to all future derived occurrences of the marked slot, without creating any booking or `event_sessions` rows
 - **AT-3** User edits / removes template entries freely — no bookings to sync, no cancellation cascade, just an update to the template entry table
 - **AT-4** Adding a template entry sends a confirmation email with a recurring iCal attachment — a single `VEVENT` with an `RRULE` covering the future occurrences of the schedule (e.g. `FREQ=WEEKLY;BYDAY=TU;UNTIL=...`), so the user's calendar app expands the recurrence locally. Per-instance exceptions (AT-5) are emitted as `EXDATE` lines, not separate events
 - **AT-5** Per-instance exception: user marks "won't attend this Tuesday" with an optional note to the instructor (e.g. "on vacation") — affects what shows on the homepage and weekly digest, does not affect any booking (none exist)
@@ -284,7 +284,7 @@ The template is a **personal fitness-planning tool**, not a booking. It captures
 
 ## 2.18 Specialty Instructor Payroll (Long-term)
 - **PR-1** `specialty_instructor_rates` table per (instructor, class type) with base rate + per-student bonus + per-student-past-target bonus + personal min / max attendance overrides
-- **PR-2** Per-instance rate snapshot at session materialization
+- **PR-2** Per-occurrence rate snapshot captured when the occurrence `event_sessions` row is ensured
 - **PR-3** Payroll report: list of instructors, sessions taught in a period, attendees, computed pay
 - **PR-4** CSV export for accounting
 
@@ -338,7 +338,7 @@ Options that surfaced during planning and were rejected. Rationale recorded here
 ### Consolidated (not rejected, but not standalone)
 - **Bookable-from-anyone (member books a guest with no prior gift-permission setup).** Folded into M-9 as the "auto-create a minimal guest account on guest-pass redemption" implementation note.
 - **Workshop vs class-vs-event taxonomy.** Resolved by P-3 (workshop = `class_schedule` of length 1).
-- **Hard room-conflict block on the schedule materializer.** Softened to P-4 (honor `location_rooms.concurrent_capacity`; allow parallel things in the same room when total occupancy fits).
+- **Hard room-conflict block on session creation.** Softened to P-4 (honor `location_rooms.concurrent_capacity`; allow parallel things in the same room when total occupancy fits).
 
 ---
 
@@ -348,7 +348,7 @@ Buckets express priority + sequencing constraint, not just nice-ness. "Must have
 
 ## 5.1 Must Have (MVP — "we can run classes")
 - C-1, C-2, C-3, C-4, C-5  *(class catalog + display)*
-- CS-1 .. CS-6  *(schedule authoring + idempotent materialization)*
+- CS-1 .. CS-6, CS-9  *(schedule authoring + lazy derivation + active-schedule preview)*
 - CS-8  *(multi-occupancy rooms per P-4 — required from day 1 because rooms are shared)*
 - M-1, M-3, M-4, M-5, M-6, M-7  *(membership-gated access and pricing — the central business model under P-1)*
 - M-12  *(intro workshop as the non-member on-ramp — required so the gate has a way in)*
@@ -370,7 +370,7 @@ Buckets express priority + sequencing constraint, not just nice-ness. "Must have
 - iCal generator extensions — UID + RRULE + multi-VEVENT + STATUS:CANCELLED + VTIMEZONE on top of existing `util/ical_generator` (foundation for AT-4, WD-3, N-1)
 - AW-3, AW-4, AW-5  *(sign-up open reminders)*
 - ST-1 .. ST-6  *(instructor shift trades)*
-- CSer-1 .. CSer-10  *(series + workshops, both materialized via `class_schedules` per P-3, with min/max + pro-rating + auto-cancel)*
+- CSer-1 .. CSer-10  *(series + workshops, each a `classes` row of `kind='series'`/`'workshop'` with per-run `class_instances` + bounded impls per P-3, with min/max + pro-rating + auto-cancel)*
 - CAP-4, CAP-5, CAP-6  *(min-attendees, auto-cancel cron)*
 - CI-3, CI-5, CI-6, CI-7, CI-8  *(check-in autocomplete, walk-in, post-window edits)*
 - BC-6  *(staff-issued voucher tool — operational lever under P-6)*
@@ -425,61 +425,55 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ## Phase 1 — Foundations: Class Catalog & Schedule Authoring (Must Have core)
 
-**Goal:** admin can define a class and a recurring schedule; sessions materialize; public catalog shows classes.
+> **Redesigned 2026-05-28.** This roadmap outline reflects the three-level versioned-impl model. The detailed implementation plan lives in [[Classes Phase 1 - Catalog and Schedule Authoring]]; the design rationale + locked decisions (L-1..L-9, OQ-CSI-1..21) live in [[Class Schedule Implementations Redesign]].
 
-### 1.1 Design decisions to lock down (do this before code)
-- [ ] Decide: do "workshops" and "events" continue as separate Product kinds, or do all of them collapse into `class_schedules` with length-1 specials? Recommendation: keep "event" Product kind unchanged for one-offs; add a new "class" Product kind (linked to a `classes` row) for recurring, and have "series" be a marker on a `class_schedule` (start/end + min/max + series-purchase-product). Document the taxonomy in this section before coding (S-19).
-- [ ] Decide: does an attendance template booking consume `event_sessions.capacity`? Two options: (A) no — capacity is only consumed by paid drop-in or by explicit "confirm I'm coming" booking; (B) yes — every template-claimed instance creates a `booking` row with `status='confirmed'` and counts toward capacity. (B) is simpler and is the recommended path; (A) needs a parallel "soft hold" mechanism. **Place answer in §8 / Open Questions and resolve before 2.4.**
-- [ ] Decide: room conflict policy on materialization — hard fail (recommend) vs warn vs auto-skip (S-20).
+**Goal:** admin can define a class, an instance (run), and versioned implementations with slots; the public catalog shows classes; sessions are derived on the fly (no materialization).
 
-### 1.2 Database schema
-- [ ] Extend `classes` table: add `default_capacity` int64, `default_cancellation_policy_id` int64 nullable, `default_room_type_id` int64 nullable, `is_active` bool, `created_us`, `updated_us`. Photo support already in place.
-- [ ] Create `class_schedules` table: `id`, `class_id` (FK), `facility_id` (FK), `location_room_id` (FK), `product_id` (FK — links to Product for pricing / visibility / booking permissions / cancellation policy), `recurrence_pattern` text (`'weekly' | 'biweekly' | 'custom'`), `days_of_week` text (bitmask or comma list 0–6), `start_time_minutes` int64 (minutes-after-midnight in facility TZ), `duration_minutes` int64, `effective_from_us` int64, `effective_to_us` int64 nullable, `capacity` int64 nullable (override of class default), `is_series` bool default false, `series_start_date_us` nullable, `series_end_date_us` nullable, `series_min_attendees` int64 nullable, `series_min_by_us` int64 nullable, `series_min_not_met_policy` text nullable (`'auto_cancel_refund' | 'proceed' | 'admin_decides'`), `is_active` bool, `created_us`, `updated_us`.
-- [ ] Add `class_schedule_id` int64 nullable + `class_id` int64 nullable columns to existing `event_sessions` to link materialized instances back to their schedule entry. (Existing service / event session usage keeps these NULL.)
-- [ ] Wire the new tables into `make_database_info.cpp`, `CreateTables()`, and admin metadata steps (1.7 below). Forgetting `admin_top_level_tables` / `admin_nested_tables` is the most common mistake — call out in implementation doc.
+### 1.1 Design decisions — RESOLVED (see [[Class Schedule Implementations Redesign]] §2.0)
+- [x] Taxonomy: "event" Product kind stays for non-class one-offs; `classes.kind` enum (`recurring` | `workshop` | `series`) discriminates class offerings; workshops + series are runs (`class_instances`) with their own product, not a flag on the schedule (L-7, P-3).
+- [x] Attendance templates create NO bookings for membership-included classes — pure intent, no capacity consumption (resolved in Phase 5 redesign; lazy model, L-... / OQ-CSI-12).
+- [x] Room conflict: honor `location_rooms.concurrent_capacity`; sum derived + persisted overlapping sessions (P-4).
+- [x] Lazy session derivation instead of pre-materialization (OQ-CSI-12); product on `class_instances` (L-3); single `classes` row across runs (L-7).
+
+### 1.2 Database schema (three-level)
+- [ ] Extend `classes`: `default_capacity`, `is_active`, `created_us`, `updated_us` (already present) + **`kind` enum** (`recurring`|`workshop`|`series`, default `recurring`). NO `product_id` here.
+- [ ] New `class_instances` table: `id`, `class_id` (FK), `name`, `valid_from_us`, `valid_to_us` nullable, `product_id` (FK — pricing / visibility / booking permission / cancellation policy / advance window), `is_active`, `created_us`, `updated_us`.
+- [ ] New `class_schedules` table (the impl): `id`, `class_instance_id` (FK), `name`, `priority` (default 3), `valid_from_us`, `valid_to_us` nullable, `is_active`, `created_us`, `updated_us`.
+- [ ] New `class_schedule_slots` table: `id`, `class_schedule_id` (FK), `day_of_week`, `start_time_minutes`, `duration_minutes` (default 60), `facility_id` (FK), `location_room_id` (FK), `instructor_person_id` (FK nullable), `predecessor_class_schedule_slot_id` (FK nullable, self-ref), `capacity_override` nullable, `created_us`, `updated_us`.
+- [ ] Add `class_schedule_slot_id` int64 nullable + `occurrence_date_us` int64 nullable + `class_id` int64 nullable (denormalized) to `event_sessions`. (Existing service / event session usage keeps these NULL.)
+- [ ] Wire into `make_database_info.cpp`, `CreateTables()`, and admin metadata. Forgetting `admin_top_level_tables` / `admin_nested_tables` is the most common mistake.
 
 ### 1.3 Table helpers (under `sql_util/table_helpers/`)
-- [ ] `ClassSchedules` helper: full CRUD via `DbCrud::*` wrappers + query helpers `GetActiveSchedulesByFacility`, `GetScheduleByEventSession`.
-- [ ] Extend existing `EventSessions` helper to accept the new `class_schedule_id` / `class_id` columns in writes and surface in reads.
-- [ ] Tests for both helpers using existing `TestDatabaseUtil` pattern (no fixtures, transaction-aborted-per-test).
+- [ ] `ClassInstances` helper: CRUD + `GetActiveInstance(classId, atUs)`, `GetInstancesByClass`, `GetUpcomingInstances`.
+- [ ] `ClassSchedules` helper (instance-scoped): CRUD + `GetActiveImplementation(classInstanceId, atUs)`, `GetImplementationsByInstance`.
+- [ ] `ClassScheduleSlots` helper: CRUD + `GetSlotsByImplementation`, `GetActiveSlotsForClassOnDay(classId, dateUs)`, `GetSlotsPotentiallyConflictingInRoom`.
+- [ ] Extend `EventSessions`: `LookupBySlotAndDate`, `GetOrphanedFutureSessionsForInstance`.
+- [ ] Tests for all using existing `TestDatabaseUtil` pattern.
 
 ### 1.4 Business logic (under `business_logic/scheduling/`)
-- [ ] `ClassScheduleHelper`: 
-  - [ ] `CreateClassSchedule(...)` (validation: room belongs to facility, time bounds sane, recurrence valid).
-  - [ ] `MaterializeFutureSessions(scheduleId, throughDateUs)` — wraps existing `RecurringSessionHelper` with `class_schedule_id` / `class_id` set, with room-conflict check against existing `event_sessions` and `bookable_service_sessions` in the same room (S-20).
-  - [ ] `DeactivateClassSchedule(scheduleId, cancelFutureSessions bool)` — if true, cancels each future session via `SessionCancellationHelper`.
-  - [ ] `EditClassSchedule(scheduleId, regenerateFuture bool)` — replays materialization or leaves materialized instances alone.
-- [ ] `ClassCatalogHelper::GetClassesVisibleToPerson(personId)` — joins `classes` × `products` × `product_prices` (per permission), resolves user's best tier price and inclusion status (M-4/M-5/M-7).
-- [ ] Tests for all helpers (use `EndpointTestHelper` for cross-table state, `TestDatabaseUtil` for transactional aborts; remember `ThreadPool::Shutdown()` before next read).
+- [ ] `ClassInstanceHelper`: `CreateInstance`, `UpdateInstance`, `CloseInstance`, `MigrateRecurringClassToNewProduct` (close perpetual + open new, copy slots forward).
+- [ ] `ClassScheduleHelper`: `CreateImplementation(instanceId, req)` / `UpdateImplementation` (validates window-within-instance + same-priority-no-overlap; runs the impl-save sweep), slot CRUD, `EnsureSessionExists(slotId, occurrenceDateUs)` (lazy, idempotent), `GetDerivedSessionsForRange(classId, fromUs, toUs)`, `GetActiveScheduleView`, `SweepOrphanedFutureSessions`. No materializer.
+- [ ] `ClassCatalogHelper::GetClassesVisibleToPerson(personId)` — resolves visible classes + best tier price + inclusion status via the instance's product (M-4/M-5/M-7).
+- [ ] Tests for all helpers.
 
 ### 1.5 Endpoints (thin)
-- [ ] `GET /api/classes` — public catalog, paginated, with photos.
-- [ ] `GET /api/classes/<id>` — public detail including upcoming sessions and instructors.
-- [ ] `POST /api/admin/class_schedule` — create.
-- [ ] `PUT /api/admin/class_schedule/<id>` — edit.
-- [ ] `DELETE /api/admin/class_schedule/<id>` — deactivate.
-- [ ] `POST /api/admin/class_schedule/<id>/materialize` — generate future sessions through a given date.
-- [ ] `GET /api/admin/class_schedules?facility_id=...` — list active.
-- [ ] All admin endpoints behind `manage_products` permission (or new `manage_class_schedule`).
-- [ ] Endpoint tests covering both success and permission-denied paths.
+- [ ] `GET /api/classes` — public catalog; `GET /api/classes/<id>` — public detail (derived upcoming sessions + instructors; for workshop/series, list of upcoming instances).
+- [ ] `POST/PUT/DELETE /api/admin/class_instance[/<id>]`; `POST /api/admin/class/<classId>/migrate_product`.
+- [ ] `POST/PUT/DELETE /api/admin/class_schedule` impl endpoints (scoped under instance); slot endpoints.
+- [ ] `GET /api/admin/class_instances?class_id=`; `GET /api/admin/class_schedules?class_instance_id=`; `GET /api/admin/class_schedule_preview?class_id=&date_us=`.
+- [ ] No `materialize` endpoint. All admin endpoints behind `manage_class_schedule`. Endpoint tests for success + permission-denied + validation paths.
 
 ### 1.6 Frontend (Angular)
-- [ ] Public `classes` route (already partially wired) — catalog grid with photo + name + description, click-through to detail.
-- [ ] Public class detail page (skill requirements section is stubbed for Phase 2; instructors-who-teach list is populated from the schedule).
-- [ ] Admin "Class Schedule" page under `portal/manage`: list view (table), create / edit form (recurrence picker, day-of-week toggles, time picker, facility / room / instructor selectors, capacity override).
-- [ ] "Materialize sessions" admin action with date-range picker.
+- [ ] Public `classes` catalog grid + detail page (recurring → derived upcoming sessions; workshop/series → upcoming-runs list).
+- [ ] Admin three-level nav: class detail → instance list/detail → impl list/detail → slot editor (day-of-week dropdown, HH:MM time picker, duration default 60, facility/room/instructor autocompletes, predecessor-slot picker).
+- [ ] "Migrate to new product" action; "copy slots from impl" picker on impl create; "schedule on date X" preview; impl-save sweep confirmation modal. No materialize dialog.
 - [ ] Component specs for every component touched.
 
 ### 1.7 Admin metadata in `create_database.cpp`
-- [ ] Add `class_schedules` to `admin_top_level_tables` (or `admin_nested_tables` as a child of `classes` — recommend nested under classes given the parent/child relationship).
-- [ ] Friendly names, column data info, display templates, permissions per CLAUDE.md instructions.
+- [ ] Register `class_instances`, `class_schedules`, `class_schedule_slots` (nesting: `classes` → `class_instances` → `class_schedules` → `class_schedule_slots`). Friendly names, column data info, display templates, permissions per CLAUDE.md.
 
 ### 1.8 Tests-required summary for the phase
-- [ ] Table helpers tested per CLAUDE.md
-- [ ] Business logic helpers tested
-- [ ] Endpoints tested (all paths, including ValidationError → 400 per `error_response_status_codes.md` memory)
-- [ ] `ServerAccess.mock.spec.ts` updated for new mock methods
-- [ ] Component specs
+- [ ] Table helpers, business logic helpers, endpoints (incl. ValidationError → 400), `ServerAccess.mock.spec.ts`, component specs — all per CLAUDE.md.
 
 ---
 
@@ -596,9 +590,8 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 - [ ] Add long-line folding per RFC 5545 §3.1 (75 octets + CRLF + space continuation).
 
 ### 4.3 Helper functions for common patterns
-- [ ] `BuildBookingUid(int64_t bookingId)` / `BuildSessionUid(int64_t sessionId)` / `BuildTemplateUid(int64_t scheduleId, int64_t personId)` — centralize UID format.
-- [ ] `BuildWeeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → `FREQ=WEEKLY;BYDAY=...;UNTIL=...`. Used by attendance template emails (Phase 5).
-- [ ] `BuildBiweeklyRRule(...)`, `BuildCustomRRule(int intervalDays, int64_t untilUs)` — match `class_schedules.recurrence_pattern`.
+- [ ] `BuildBookingUid(int64_t bookingId)` / `BuildSessionUid(int64_t sessionId)` / `BuildTemplateUid(int64_t classScheduleSlotId, int64_t personId)` — centralize UID format. (Template UID keys off the slot now, per the redesign.)
+- [ ] `BuildWeeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → `FREQ=WEEKLY;BYDAY=...;UNTIL=...`. Used by attendance template emails (Phase 5). Weekly is the only cadence — `recurrence_pattern` was dropped in the redesign, so no biweekly/custom RRULE builders are needed.
 - [ ] Extend `util/ical_generator_test.cpp`: golden-text fixtures for UID, RRULE, STATUS:CANCELLED, multi-VEVENT, VTIMEZONE, line folding.
 
 ### 4.4 Update existing email paths to use the new fields (.ics is already attached today)
@@ -619,14 +612,14 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 **Goal:** users plan a weekly routine, see it on home + calendar, get a Sunday digest, mark per-instance exceptions with notes.
 
-### 5.1 Design decisions
-- [ ] **Critical:** lock in "does template entry = confirmed `bookings` row?" answer from §1.1. Recommend yes — every materialized instance the user's template covers gets an auto-created `booking` row at session-materialization time. That makes capacity accounting trivial and slots into existing infrastructure with minimum change.
-- [ ] Decide whether templates can include paid drop-in classes (recommend: no, templates are only for included-with-membership classes; paid bookings are explicit).
+### 5.1 Design decisions — RESOLVED by the redesign
+- [x] Template entries do NOT create `bookings` for membership-included classes — they are pure intent, consume no capacity, touch no waitlist (lazy model, Mason's §140 note). The earlier "templates = confirmed bookings" recommendation is reversed.
+- [ ] Decide whether templates can include paid offerings (recommend: no, templates are only for included-with-membership recurring classes; paid workshops/series are explicit purchases).
 
 ### 5.2 Database schema
 - [ ] `attendance_templates`: id, person_id (UNIQUE — one template per person), is_active, created_us, updated_us.
-- [ ] `attendance_template_entries`: id, template_id (FK), class_schedule_id (FK), created_us. UNIQUE on (template_id, class_schedule_id).
-- [ ] `attendance_template_exceptions`: id, template_id (FK), event_session_id (FK), attending bool (false = skipping that instance, true = adding a one-off not in template), note text nullable, created_us, updated_us. UNIQUE on (template_id, event_session_id).
+- [ ] `attendance_template_entries`: id, template_id (FK), `class_schedule_slot_id` (FK — bind to the slot, which has stable identity), created_us. UNIQUE on (template_id, class_schedule_slot_id).
+- [ ] `attendance_template_exceptions`: id, template_id (FK), `class_schedule_slot_id` (FK) + `occurrence_date_us` (the specific occurrence), attending bool (false = skipping, true = one-off addition), note text nullable, created_us, updated_us. UNIQUE on (template_id, class_schedule_slot_id, occurrence_date_us). (Keys off the derived-occurrence identity, not an `event_session_id`, since no row may exist.)
 
 ### 5.3 Table helpers
 - [ ] `AttendanceTemplates`, `AttendanceTemplateEntries`, `AttendanceTemplateExceptions` helpers.
@@ -634,21 +627,22 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ### 5.4 Business logic
 - [ ] `AttendanceTemplateHelper`:
-  - [ ] `GetEligibleSchedulesForPerson(personId)` — schedules the user is permission-eligible to attend (intersects `product_visibility_permission`, `product_booking_permission`, and skill requirements).
-  - [ ] `AddTemplateEntry(personId, scheduleId)` — creates entry, walks forward through already-materialized future sessions, creates `bookings` for each (if capacity permits — otherwise waitlist), sends one confirmation email with multi-event `.ics` covering the recurring set.
-  - [ ] `RemoveTemplateEntry(personId, scheduleId)` — cancel forward bookings (no refund — they were $0).
-  - [ ] `SetException(personId, eventSessionId, attending bool, note)` — creates / updates exception row, adjusts the matching booking (cancel if attending=false, create if attending=true and not present), notifies instructor (in their staff portal feed; no email by default).
-  - [ ] Session-materialization hook: when `RecurringSessionHelper` creates new sessions for a schedule, look up all `attendance_template_entries` pointing at that schedule and auto-create `bookings` for each user. Handle capacity overflow → waitlist.
-  - [ ] Tests covering all paths including capacity overflow during materialization.
-- [ ] Extend `EventSessionHelper` to surface per-user "is on my template" + "is exception" flags in the calendar query.
+  - [ ] `GetEligibleSlotsForPerson(personId)` — slots the user is permission-eligible to attend (intersects the slot's instance product's visibility / booking permissions, and skill requirements).
+  - [ ] `AddTemplateEntry(personId, classScheduleSlotId)` — creates the entry only. NO bookings created. Sends one confirmation email with a recurring `.ics` (RRULE covering the slot's future occurrences). No capacity/waitlist interaction.
+  - [ ] `RemoveTemplateEntry(personId, classScheduleSlotId)` — deletes the entry. Nothing else to clean up (no bookings exist).
+  - [ ] `SetException(personId, classScheduleSlotId, occurrenceDateUs, attending bool, note)` — creates / updates the exception row only. Notifies instructor (staff portal feed; no email by default). No booking adjustment.
+  - [ ] NO session-materialization hook — there's no materialization. Template entries are evaluated lazily against derived occurrences when rendering the homepage / digest / calendar.
+  - [ ] Stale-slot handling: if a slot referenced by a template entry is deleted (impl edit / migration), surface it in the user portal as "this slot no longer exists, pick a new one".
+  - [ ] Tests covering entry add/remove, exception set, eligibility filtering, stale-slot surfacing.
+- [ ] Extend the derived-session / calendar query to surface per-user "is on my template" + "is exception" flags.
 
 ### 5.5 Endpoints
-- [ ] `GET /api/me/eligible_schedules` — grid view feed.
+- [ ] `GET /api/me/eligible_slots` — grid view feed (eligible slots, not "schedules").
 - [ ] `GET /api/me/template` — current template entries + exceptions.
-- [ ] `POST /api/me/template/entry` { schedule_id }.
-- [ ] `DELETE /api/me/template/entry/<scheduleId>`.
-- [ ] `POST /api/me/template/exception` { event_session_id, attending, note? }.
-- [ ] `DELETE /api/me/template/exception/<eventSessionId>`.
+- [ ] `POST /api/me/template/entry` { class_schedule_slot_id }.
+- [ ] `DELETE /api/me/template/entry/<classScheduleSlotId>`.
+- [ ] `POST /api/me/template/exception` { class_schedule_slot_id, occurrence_date_us, attending, note? }.
+- [ ] `DELETE /api/me/template/exception` { class_schedule_slot_id, occurrence_date_us }.
 - [ ] `GET /api/me/today_classes` — homepage feed (eligible today: checked = booked / template, unchecked = eligible-but-not-claimed).
 - [ ] Endpoint tests.
 
@@ -694,19 +688,20 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 **Goal:** admin can create series with start/end + min/max + per-tier series price + pro-rating; users buy whole series or join mid-series.
 
-### 7.1 Database schema
-- [ ] No new table for series — uses `class_schedules.is_series=true` + the series fields already proposed in Phase 1.
-- [ ] New product kind: `'class_series'` Product. Series purchase creates one `purchase` + one parent `entitlement` covering all the series's `event_sessions`. `bookings` are auto-created per instance referencing the same `purchase_id`.
-- [ ] Add `event_sessions.series_purchase_id` nullable to mark instances that are part of a paid series.
+### 7.1 Database schema (per the redesign — see [[Class Schedule Implementations Redesign]] §1.5a)
+- [ ] A series is a `classes` row of `kind='series'` (shared marketing identity across runs) + one `class_instances` row per run (May 2026, Oct 2026 …) + a `kind='class_series'` product on each instance + a base impl per instance (+ holiday-override impls). NOT a flag on the schedule.
+- [ ] New `class_series_instances` table (1:1 augmentation of `class_instances`): `min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`.
+- [ ] Series purchase creates one `purchase` + one parent `entitlement` covering the run's derived occurrences; per-occurrence `event_sessions` rows are ensured (lazy → eager at purchase) with `series_purchase_id` set, and `bookings` reference the same `purchase_id`.
+- [ ] Add `event_sessions.series_purchase_id` nullable.
 
 ### 7.2 Business logic
 - [ ] `ClassSeriesHelper`:
-  - [ ] `CreateSeries(...)` — sets schedule + product + materializes series sessions in a single atomic step.
-  - [ ] `BookFullSeries(personId, scheduleId)` — creates one purchase at user's tier price (M-5), creates bookings for all series sessions.
-  - [ ] `BookProratedRemainingSeries(personId, scheduleId, joinDateUs)` — counts remaining sessions, computes pro-rated price = (per-instance base for tier) × remaining, creates purchase + bookings.
-  - [ ] `CancelSeries(scheduleId, adminPersonId, reason)` — cancels each child instance, refunds each booker by their per-tier paid amount.
-  - [ ] `CheckMinAttendees(scheduleId)` — called by a daily job; if past `series_min_by_us` and confirmed-count < `series_min_attendees` and policy is `auto_cancel_refund`, run `CancelSeries`.
-- [ ] Tests covering all four lifecycle paths + the daily min-check.
+  - [ ] `CreateSeriesInstance(...)` — creates the `class_instances` row + `class_series_instances` augmentation + base impl + slots, atomically. No materialization; occurrences derive.
+  - [ ] `BookFullSeries(personId, classInstanceId)` — price = (derived-occurrence count in the instance's window) × (per-tier base, M-5); ensures all occurrence `event_sessions` rows + creates bookings under one purchase.
+  - [ ] `BookProratedRemainingSeries(personId, classInstanceId, joinDateUs)` — counts remaining derived occurrences, pro-rates, ensures + books those.
+  - [ ] `CancelSeriesInstance(classInstanceId, adminPersonId, reason)` — cancels each ensured occurrence, refunds each booker per their paid amount.
+  - [ ] `CheckMinAttendees(classInstanceId)` — daily job; if past `min_by_us` and confirmed-count < `min_attendees` and policy is `auto_cancel_refund`, run `CancelSeriesInstance`.
+- [ ] Tests covering all four lifecycle paths + the daily min-check + the empty-override-impl reduces-occurrence-count pricing case.
 
 ### 7.3 Endpoints
 - [ ] `POST /api/admin/class_series` (admin create — extension of class schedule create).
@@ -736,7 +731,7 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 ### 8.2 Business logic
 - [ ] `ClassCheckinHelper`:
   - [ ] `IsCheckinOpen(eventSessionId, asOfUs)` based on window secrets.
-  - [ ] `GetCheckinList(eventSessionId)` → struct combining: (a) all `bookings` (confirmed or waitlisted) for the session, (b) people who attended this *class* (joined via `class_schedule_id` → all sessions of same schedule in last 4 weeks) and were checked in. De-duplicate by person_id.
+  - [ ] `GetCheckinList(eventSessionId)` → struct combining: (a) all `bookings` (confirmed or waitlisted) for the session, (b) people who attended this *class* (joined via `event_sessions.class_id` — the denormalized convenience column — across all persisted occurrences of the same class in the last 4 weeks) and were checked in. De-duplicate by person_id. (Check-in ensures the `event_sessions` row first — recording trigger #6.)
   - [ ] `CheckInPerson(eventSessionId, personId, staffPersonId)` — updates `bookings.checked_in_us` (creating a $0 walk-in booking if person has none).
   - [ ] `UndoCheckIn(eventSessionId, personId, staffPersonId)`.
   - [ ] `FinalizeAttendance(eventSessionId)` — at +N hours after end, marks unchecked confirmed bookings as `no_show`.
@@ -781,21 +776,25 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 
 ## Phase 10 — Scheduling Exceptions, Instructor Subs, Shift Trades (Must / Should Have)
 
-**Goal:** admin handles closures, instructor changes, sub assignments; instructors initiate trades via existing Provider Portal.
+> **Redesigned 2026-05-28.** Per-class schedule exceptions collapse into higher-priority implementations (L-8) — there is no `scheduling_exceptions` cascade for classes. There is no global "studio closed" lever (L-9); closures are per-class empty high-priority impls, and the closure batch UI deferred from Phase 1 (OQ-CSI-4) lands here. Instructor substitution becomes a recording trigger (ensure the `event_sessions` row, then write `event_session_staffing`). Studio-wide closures for *service sessions* keep using `scheduling_exceptions` as before — that table is untouched for the service-session path.
+
+**Goal:** admin closes classes for date ranges (batch empty-impl action), cancels single occurrences, substitutes instructors; instructors initiate trades via existing Provider Portal.
 
 ### 10.1 Reuse audit
-- [ ] Confirm existing `scheduling_exceptions` cascade works for class instances (it was originally designed for service sessions; need to extend to cancel class `event_sessions` too). If not, extend.
-- [ ] Confirm existing `ShiftChangeHelper` operates correctly when the shift is an `event_session` instructor assignment (it's currently keyed off `provider_availability`). May need a parallel path keyed off `event_session_staffing` rows.
+- [ ] Class closures: NOT via `scheduling_exceptions`. Implemented as empty high-priority impls under each affected class's active instance. Build the batch "close these N classes for this window" multiselect UI here (deferred OQ-CSI-4).
+- [ ] Single-occurrence cancel: `SessionCancellationHelper` — a recording trigger that ensures + persists the `event_sessions` row with `status='cancelled'`.
+- [ ] Confirm `ShiftChangeHelper` operates on `event_session_staffing` for class occurrences (currently keyed off `provider_availability`). Parallel path keyed off `event_session_staffing` rows; the row is ensured if it doesn't exist yet (lazy).
 
 ### 10.2 Database schema
-- [ ] Extend `scheduling_exceptions` cascade to also affect `event_sessions` rows by date+facility (already partly there for service sessions per Provider Portal Phase 6).
+- [ ] No new class-closure table (impls cover it). Service-session `scheduling_exceptions` unchanged.
 - [ ] (If shift trade for classes needs its own request kind:) extend `shift_change_requests` with a nullable `event_session_id` or `event_session_staffing_id` column; document the union semantics.
 
 ### 10.3 Business logic
-- [ ] Extend `SessionCancellationHelper` to handle pro-rated refunds (paid bookings get refund per cancellation policy; $0 included bookings get no refund) (SE-5).
-- [ ] New `InstructorSubstitutionHelper::Substitute(eventSessionId, newInstructorPersonId, reason)` — updates `event_session_staffing`, sends notification email to attendees (no refund).
-- [ ] Extend `ShiftChangeHelper` for class instances: trade affects `event_session_staffing` rows; on approval, no `free_cancel_until_us` extension (ST-5); send a *no-refund* notification.
-- [ ] Tests.
+- [ ] Extend `SessionCancellationHelper` to handle pro-rated refunds (paid bookings get refund per cancellation policy; $0 / membership-included bookings get no refund) (SE-5). For class occurrences it ensures the `event_sessions` row first (lazy).
+- [ ] New `InstructorSubstitutionHelper::Substitute(eventSessionSlotId, occurrenceDateUs, newInstructorPersonId, reason)` — ensures the `event_sessions` row (recording trigger #2), updates `event_session_staffing`. Per ST-4 there is NO attendee email — the new instructor surfaces on the homepage / calendar only.
+- [ ] New `ClassClosureHelper::CloseClassesForRange(classIds, fromUs, toUs)` — creates an empty high-priority impl under each class's active instance (the batch closure action).
+- [ ] Extend `ShiftChangeHelper` for class occurrences: trade affects `event_session_staffing` rows; on approval, no `free_cancel_until_us` extension (ST-5); no refund.
+- [ ] Tests. Document the ensure-on-action invariant (every per-occurrence write ensures the `event_sessions` row first).
 
 ### 10.4 Endpoints
 - [ ] `POST /api/admin/event_session/<id>/substitute` { new_instructor_person_id, reason }.
@@ -849,7 +848,7 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 **Goal:** admin records specialty instructor costs, gets a pricing assistant + per-class cost/revenue report.
 
 ### 12.1 Database schema
-- [ ] `specialty_instructor_costs`: id, event_session_id (FK) or class_schedule_id (FK — pick one; recommend session for flexibility), instructor_person_id (FK), base_rate_cents, per_student_bonus_cents, bonus_threshold_count nullable, instructor_min_attendees nullable, instructor_max_attendees nullable, notes, created_us, updated_us.
+- [ ] `specialty_instructor_costs`: id, class_instance_id (FK — a specialty instructor is hired for a specific run; per the redesign, cost keys off the instance not a flat schedule), instructor_person_id (FK), base_rate_cents, per_student_bonus_cents, bonus_threshold_count nullable, instructor_min_attendees nullable, instructor_max_attendees nullable, notes, created_us, updated_us. (Optional per-slot override if the specialty teacher only covers certain days of the instance.)
 
 ### 12.2 Business logic
 - [ ] `SpecialtyCostHelper`:
@@ -928,16 +927,19 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 - [ ] Membership upgrades / new entitlements should refresh the session's permission set without re-login (M-8). Verify how `Session::ActiveUserHasPermission` is currently cached and whether anything beyond next request is required.
 
 ### 6.3 Test data + manual-testing-helper commands
-- [ ] Add `knottyyoga_test_helper` commands: `list_class_schedules`, `materialize_schedule`, `assign_skill`, `set_template_entry`, `simulate_min_not_met`, `send_weekly_digest`, `simulate_signup_window_open`.
+- [ ] Add `knottyyoga_test_helper` commands: `list_class_instances`, `list_class_schedules <instance_id>`, `preview_schedule <class_id> <date>`, `assign_skill`, `set_template_entry`, `simulate_min_not_met`, `send_weekly_digest`, `simulate_signup_window_open`. (No `materialize_schedule` — derivation is lazy.)
 - [ ] These commands accelerate manual QA across phases.
 
 ### 6.4 Bootstrap & seed data
-- [ ] Seed a couple of demo classes (Vinyasa Flow, Aerial 101) + a default schedule + a default skill level (e.g. "Beginner Inversion") in `database_helper` so a fresh DB shows something on the calendar.
+- [ ] Seed a couple of demo recurring classes + a perpetual instance + a default impl with slots + a default skill level (e.g. "Beginner Inversion") in `database_helper` so a fresh DB shows something on the calendar (derived, no materialize step). Existing seeded classes (Knotty Yoga, etc.) get a perpetual instance + default impl.
 - [ ] Seed default `cancellation_policy` if not already present.
 
 ### 6.5 Backwards-compat with existing event flow
-- [ ] Existing one-off `event` Product kind continues to work unchanged. `event_sessions` rows without `class_id` / `class_schedule_id` are valid and represent one-off events.
-- [ ] My-bookings, calendar, etc. must render both cleanly.
+- [ ] Existing one-off `event` Product kind continues to work unchanged. `event_sessions` rows without `class_schedule_slot_id` / `class_id` are valid and represent one-off events / service sessions.
+- [ ] My-bookings, calendar, etc. must render both the derived-class view and the persisted event/service rows cleanly.
+
+### 6.6 Phase 1 rewrite-vs-migrate (resolved: rewrite in place, OQ-CSI-10)
+- [ ] Phase 1 was implemented against the old flat model but is **pre-deploy** — no production data to migrate. The redesign rewrites Phase 1's schema / helpers / endpoints / UI / tests in place (drop the old `class_schedules` flat table, build the three-level model fresh). No migration shims or "legacy host" branches per `feedback_no_premature_defensive_code.md`. Confirmed there is no deployed environment requiring a migration path.
 
 ### 6.6 Layering discipline reminder (from CLAUDE.md)
 - [ ] No SQL or `DbCrud` calls in `business_logic/` — always go through a `TableHelpers::*` class. The "feedback_no_sql_in_business_logic" memory is binding.
