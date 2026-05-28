@@ -44,12 +44,19 @@ Please create a plan with phases of implementation. Within each phase, please re
 Per P-5: staff is the only role that records attendance. NO kiosk / self-check-in (rejected — see §4 Alternatives Considered in parent doc).
 
 **Prerequisites:**
-- Phase 1 (event_sessions with class_id / class_schedule_id).
+- Phase 1 (the three-level schedule model; `event_sessions` carries `class_id` + `class_schedule_slot_id` + `occurrence_date_us`; `ClassScheduleHelper::EnsureSessionExists`).
 - Phase 2 (visibility / pricing — knows whether a class is membership-included).
 - Phase 3 (skill levels — staff override path needs the skill check).
-- Phase 5 (attendance templates — pre-pop list reads from template entries).
+- Phase 5 (attendance templates — pre-pop list reads from template entries, now slot-keyed).
 - Existing `BookingHelper` (waitlist, status flags).
 - Existing `EventReminderHelper` pattern for hourly job (`FinalizeAttendance`).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> Small but load-bearing under the lazy model: **check-in is recording trigger #6.** A membership-included class occurrence usually has NO persisted `event_sessions` row when staff opens the check-in screen — it's derived. So:
+> - The check-in screen opens against a **derived occurrence** identified by (`class_schedule_slot_id`, `occurrence_date_us`), not necessarily an existing `event_session_id`.
+> - Checking someone in calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` first (idempotent — returns the existing row if a prior check-in / note already created it), then creates the `booking` with `checked_in_us` set + `purchase_id IS NULL`.
+> - The pre-pop "template attendees" list joins `attendance_template_entries` by **`class_schedule_slot_id`** (slot-keyed, per the Phase 5 redesign), minus skip-exceptions keyed by (`class_schedule_slot_id`, `occurrence_date_us`).
+> - The "last-4-weeks attendance" lookup still joins via the denormalized `event_sessions.class_id` (only persisted/attended rows have that, which is exactly what we want).
 
 **Outcome:**
 - Staff portal: per-session check-in page with autocomplete + pre-pop list.
@@ -128,9 +135,9 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
 - [ ] `struct CheckinCandidate { int64_t personId; std::string firstName; std::string lastName; std::string email; std::string source; /* "template" | "paid_booking" | "history" */ bool alreadyCheckedIn; int64_t bookingId; /* 0 if no booking yet */ std::optional<int64_t> waitlistPosition; std::vector<int64_t> missingSkillLevelIds; }`.
 - [ ] `std::vector<CheckinCandidate> GetCheckinList(Transaction&, int64_t eventSessionId)`. Algorithm:
   1. Load session → `classScheduleId`, `classId`, `startTimeUs`, `endTimeUs`.
-  2. (a) **Paid + waitlisted bookings already on the session**: `bookings WHERE event_session_id = ?` with `source='paid_booking'`.
-  3. (b) **Template attendees**: join `attendance_template_entries WHERE class_schedule_id=?` → people, MINUS those with an `attendance_template_exceptions.attending=false` for this session. Skip people already in (a). Source = `'template'`.
-  4. (c) **4-week history**: `GetRecentCheckedInPersonsForSchedule(classScheduleId, now-28d, now)`. Skip people already in (a) or (b). Source = `'history'`.
+  2. (a) **Paid + waitlisted bookings already on the session** (only present if the occurrence row was already ensured): `bookings WHERE event_session_id = ?` (look up the persisted row by (`class_schedule_slot_id`, `occurrence_date_us`) first; may be absent) with `source='paid_booking'`.
+  3. (b) **Template attendees**: join `attendance_template_entries WHERE class_schedule_slot_id=?` → people, MINUS those with an `attendance_template_exceptions.attending=false` for this (`class_schedule_slot_id`, `occurrence_date_us`). Skip people already in (a). Source = `'template'`.
+  4. (c) **4-week history**: `GetRecentCheckedInPersonsForClass(classId, now-28d, now)` via the denormalized `event_sessions.class_id`. Skip people already in (a) or (b). Source = `'history'`.
   5. Decorate each with `missingSkillLevelIds` from `SkillLevelHelper::PersonMeetsClassRequirements(personId, classId)` — UI shows a yellow flag.
   6. Sort: alphabetical by lastName, firstName.
   7. Return.

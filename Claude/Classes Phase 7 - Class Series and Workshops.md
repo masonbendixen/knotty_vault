@@ -42,14 +42,24 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Should-have.** Admin creates a "class series" — a `class_schedule` with `is_series=true` covering a start/end date window, optional min attendees with a min-by date, optional auto-cancel-and-refund policy if min not met. Series purchases are one transaction (one `purchase`) covering all child instances. Workshops are a series of length 1 (per P-3). Users can buy a full series or join mid-series with pro-rated pricing using the per-instance base price for their tier. Series cancellation by admin issues full refunds; user-side cancel is non-refundable per P-6 but staff can grant a voucher.
 
 **Prerequisites:**
-- Phase 1 (class_schedules table, including `is_series` and series_* fields).
-- Phase 2 (visible_event_sessions surfaces class metadata + per-user pricing).
+- Phase 1 (the three-level `classes` → `class_instances` → `class_schedules` → `class_schedule_slots` model + lazy derivation). NOTE: `is_series` / `series_*` were REMOVED from `class_schedules` in the redesign — see the impact callout.
+- Phase 2 (visible class sessions surface class metadata + per-user pricing).
 - Phase 4 (iCal extensions — cancellation `.ics` with STATUS:CANCELLED).
 - Existing `BookingHelper`, `RefundHelper`, voucher infrastructure ([[Vouchers and Refunds]]).
 - Existing scheduled jobs daemon ([[Scheduled Jobs]]).
 
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.5a
+> This phase was written against "a series is a `class_schedule` with `is_series=true`". The redesign **replaces that entirely.** The new model:
+> - **A series is a `classes` row of `kind='series'`** (shared marketing identity — name / description / photo) **with one `class_instances` row per run** ("Fall 2026", "Spring 2027"). The instance carries the run's `valid_from_us`/`valid_to_us`, its `product_id` (`kind='class_series'`), and the schedule lives in the instance's `class_schedules` impl(s) + slots.
+> - **`class_series_instances` (NEW table, this phase)** is a 1:1 augmentation of `class_instances` carrying the series-bundle fields that used to be planned on `class_schedules`: `min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`. (Per L-5 / OQ-CSI-16. The `is_series` / `series_*` columns no longer exist on `class_schedules` — §2.1 below is rewritten.)
+> - **Holiday overrides during a run** (Mason's Labor Day Monday) are higher-priority empty/edited impls under the same instance — they reduce the derived-occurrence count, which feeds pricing.
+> - **Pricing = (count of derived occurrences in the instance's window) × (per-tier `per_instance_base`).** The "full series total" is computed, not stored separately — though the `price_kind` split in §2.2 is still useful for an explicit per-instance base vs an optional flat override. Derive occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` over the instance window.
+> - **A series purchase eagerly ensures `event_sessions` rows** for every derived occurrence (paid bookings can't be lazy — real money) via `ClassScheduleHelper::EnsureSessionExists`, setting `series_purchase_id` on each. The min-attendees auto-cancel job operates on those persisted rows.
+> - **Workshops** are the same shape, simpler: `classes.kind='workshop'` + one `class_instances` per run + `kind='workshop'` product + a single-slot bounded impl, NO `class_series_instances` augmentation.
+> Throughout this doc, read "series `class_schedule` / `scheduleId`" as "series `class_instances` / `classInstanceId`", and "materialize series sessions" as "ensure occurrence rows at purchase". The §4 helper signatures are reframed accordingly below.
+
 **Outcome:**
-- Admin can mark a `class_schedule` as a series at creation time (Phase 1 already lets them; this phase wires the booking + purchase model).
+- Admin creates a series run as a `class_instances` row (under a `kind='series'` class) + its `class_series_instances` augmentation + base impl; this phase wires the booking + purchase model on top.
 - Users see series cards in the catalog with start/end date, # of instances, per-tier price, min/max.
 - Booking endpoint handles full-series buy + mid-series pro-rated buy.
 - Cancel-series admin path cancels every child instance, issues refunds, emails attendees.
@@ -72,8 +82,9 @@ Lowest layer first:
 ## 1. Pre-Coding Design Decisions
 
 ### 1.1 Locked-in
-- [x] Workshop = `class_schedule` with `is_series=true` and one materialized session (P-3).
-- [x] Series price flows through existing `product_prices` per-tier (P-2) — no parallel pricing system.
+- [x] Workshop = `classes.kind='workshop'` + one `class_instances` per run + a single-slot bounded impl (P-3, redesign). No `class_series_instances` augmentation.
+- [x] Series = `classes.kind='series'` + one `class_instances` per run + a `class_series_instances` augmentation + base/override impls under the instance.
+- [x] Series price flows through existing `product_prices` per-tier (P-2) — no parallel pricing system; total = per-instance base × derived-occurrence count.
 - [x] Pro-rated formula = `(per_instance_base_price[tier]) × remaining_sessions` (resolved per parent doc — was OQ-7).
 - [x] User cannot cancel a series themselves; staff grants voucher case-by-case (resolved per parent doc — was OQ-8).
 - [x] Admin-decides path: `admin_alerts` digest + email to `admin_alert_recipients` (resolved — was OQ-9).
@@ -87,8 +98,17 @@ Lowest layer first:
 
 ## 2. Database Schema
 
-### 2.1 Reuse Phase 1 columns
-- [ ] Already present on `class_schedules`: `is_series`, `series_start_date_us`, `series_end_date_us`, `series_min_attendees`, `series_min_by_us`, `series_min_not_met_policy`. No new schema work on this table.
+### 2.1 New `class_series_instances` table (augments `class_instances` 1:1)
+- [ ] `db_schema/class_series_instances.h/.cpp`:
+  - `id BIGSERIAL PK`
+  - `class_instance_id BIGINT NOT NULL UNIQUE REFERENCES class_instances(id)` — 1:1 augmentation
+  - `min_attendees BIGINT` NULL
+  - `min_by_us BIGINT` NULL
+  - `min_not_met_policy TEXT` NULL (`'auto_cancel_refund' | 'proceed' | 'admin_decides'`, CHECK at app layer)
+  - `prorated_signups_allowed BOOLEAN NOT NULL DEFAULT FALSE`
+  - `created_us`, `updated_us`
+- [ ] The run's window (`valid_from_us`/`valid_to_us`) and product live on the parent `class_instances` row (Phase 1) — NOT duplicated here. `is_series` / `series_*` no longer exist on `class_schedules`.
+- [ ] Index on (`class_instance_id`).
 
 ### 2.2 New `product_prices.price_kind` column
 - [ ] Add `price_kind TEXT NOT NULL DEFAULT 'standard' CHECK (price_kind IN ('standard','series_total','per_instance_base'))`.
@@ -119,42 +139,42 @@ Lowest layer first:
 ### 4.1 `ClassSeriesHelper` (`business_logic/scheduling/`)
 Files: `class_series_helper.h/.cpp/_test.cpp`.
 
-- [ ] `struct CreateSeriesRequest { ... }` — wraps Phase 1's `CreateClassScheduleRequest` plus the series-specific product (with two price kinds per tier).
-- [ ] `struct CreateSeriesResult { int64_t scheduleId; int64_t productId; std::vector<int64_t> sessionIds; std::string errorCode; }`.
-- [ ] `CreateSeries(Transaction&, const CreateSeriesRequest&)`:
-  1. Validate (delegate to `ClassScheduleHelper::CreateClassSchedule` with `isSeries=true`).
-  2. Ensure the linked product has rows of both `price_kind='series_total'` and `price_kind='per_instance_base'` for each allowed tier — else return `MISSING_TIER_PRICING`.
-  3. Materialize ALL series sessions atomically (one round-trip to `MaterializeFutureSessions(throughDate=series_end_date_us)`).
+- [ ] `struct CreateSeriesInstanceRequest { ... }` — the `class_id` (an existing `kind='series'` class), the run window, the `kind='class_series'` product, the base impl + slots, and the `class_series_instances` fields (min_attendees, min_by_us, min_not_met_policy, prorated_signups_allowed).
+- [ ] `struct CreateSeriesInstanceResult { int64_t classInstanceId; int64_t productId; std::string errorCode; }`. (No `sessionIds` — occurrences are derived, not pre-created.)
+- [ ] `CreateSeriesInstance(Transaction&, const CreateSeriesInstanceRequest&)`:
+  1. Create the `class_instances` row (delegate to `ClassInstanceHelper::CreateInstance`) + the `class_series_instances` augmentation row.
+  2. Create the base impl + slots (delegate to `ClassScheduleHelper::CreateImplementation` + slot adds) under the instance.
+  3. Ensure the product has a `per_instance_base` price for each allowed tier — else return `MISSING_TIER_PRICING`. (No materialization — occurrences derive.)
   4. Return.
 
-- [ ] `BookFullSeries(Transaction&, personId, scheduleId)`:
-  1. Look up product + resolve `series_total` price for the user's best tier.
-  2. Create a `purchase` row + one `purchase_item` for the series product.
-  3. Process payment (delegate to `PaymentHelper::PayWithCard` or whatever the existing checkout flow is — Phase 7 doesn't reinvent payment).
-  4. After payment success: iterate the series's `event_sessions`, create a `booking` per session with `status='confirmed'`, `purchase_id` set, `bookings.notes='Series:<scheduleId>'`. Set `event_sessions.series_purchase_id` on each.
-  5. Send a confirmation email with a multi-VEVENT iCal (one VEVENT per child session).
-  6. Return `{ok, purchaseId, bookingIds}`.
+- [ ] `BookFullSeries(Transaction&, personId, classInstanceId)`:
+  1. Derive the run's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange(classId, instance.valid_from_us, instance.valid_to_us)` → `occurrences`.
+  2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × occurrences.size()`.
+  3. Create a `purchase` row + one `purchase_item` for the series product.
+  4. Process payment (delegate to the existing checkout flow — Phase 7 doesn't reinvent payment).
+  5. After payment success: for each occurrence, `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` (eager), set `event_sessions.series_purchase_id`, create a `booking` with `status='confirmed'`, `purchase_id` set, `bookings.notes='Series:<classInstanceId>'`.
+  6. Send a confirmation email with a multi-VEVENT iCal (one VEVENT per occurrence).
+  7. Return `{ok, purchaseId, bookingIds}`.
 
-- [ ] `BookProratedRemainingSeries(Transaction&, personId, scheduleId, joinDateUs)`:
-  1. Count `event_sessions` for this series with `start_time_us > joinDateUs AND status='scheduled'` → `remainingCount`.
-  2. Resolve `per_instance_base` price for the user's best tier → `perInstanceCents`.
-  3. Compute `totalCents = perInstanceCents * remainingCount`.
-  4. Same purchase + payment + per-instance booking creation as `BookFullSeries`, restricted to the remaining sessions.
-  5. Return.
+- [ ] `BookProratedRemainingSeries(Transaction&, personId, classInstanceId, joinDateUs)`:
+  1. Derive occurrences with `occurrence start > joinDateUs` → `remaining`.
+  2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × remaining.size()`.
+  3. Same purchase + payment + ensure-occurrence + per-occurrence booking creation as `BookFullSeries`, restricted to `remaining`.
+  4. Return.
 
-- [ ] `CancelSeries(Transaction&, scheduleId, adminPersonId, reason)`:
-  1. Find all `event_sessions` with `class_schedule_id=scheduleId AND status='scheduled'`.
-  2. For each: call `SessionCancellationHelper::CancelSession` (which already does refund + cancellation email per Phase 2's refund-pro-rating rules). Phase 2 already established: paid bookings get full refund, zero-money bookings get capacity release only.
-  3. Mark the `class_schedule.is_active=false`.
-  4. Send a "series cancelled" admin alert via the existing admin alerts infrastructure if any attendees had been booked.
+- [ ] `CancelSeriesInstance(Transaction&, classInstanceId, adminPersonId, reason)`:
+  1. Find all persisted `event_sessions` for this run via `series_purchase_id` (use `GetSessionsForSeriesPurchase` for each purchase tied to the instance) — these are the ensured paid occurrences.
+  2. For each: call `SessionCancellationHelper::CancelSession` (refund + cancellation email per Phase 2 rules: paid bookings get full refund, zero-money bookings get capacity release only).
+  3. Mark `class_instances.is_active=false` for the run.
+  4. Send a "series cancelled" admin alert if any attendees had been booked.
 
-- [ ] `CheckMinAttendees(Transaction&, scheduleId, asOfUs)`:
-  1. Load `class_schedule`. Skip if `series_min_attendees IS NULL` OR `asOfUs < series_min_by_us`.
-  2. Count distinct `bookings.person_id` for the series's first instance with `status='confirmed'`.
-  3. If count < `series_min_attendees`:
-     - If `series_min_not_met_policy='auto_cancel_refund'` → call `CancelSeries(scheduleId, systemAdminId, "Minimum attendance not met")`.
-     - If `series_min_not_met_policy='proceed'` → no-op.
-     - If `series_min_not_met_policy='admin_decides'` → write an `admin_alerts` row + queue an email to `admin_alert_recipients`. Mark the schedule as "min-not-met-pending" so we don't alert again for the same series.
+- [ ] `CheckMinAttendees(Transaction&, classInstanceId, asOfUs)`:
+  1. Load the `class_series_instances` augmentation. Skip if `min_attendees IS NULL` OR `asOfUs < min_by_us`.
+  2. Count distinct `bookings.person_id` across the run's purchased occurrences with `status='confirmed'`.
+  3. If count < `min_attendees`:
+     - `auto_cancel_refund` → call `CancelSeriesInstance(classInstanceId, systemAdminId, "Minimum attendance not met")`.
+     - `proceed` → no-op.
+     - `admin_decides` → write an `admin_alerts` row + queue an email to `admin_alert_recipients`. Mark the instance "min-not-met-pending" so we don't alert again.
 
 ### 4.2 Refund integration (existing `RefundHelper`)
 - [ ] Verify Phase 2's session-cancellation flow already issues correct refunds for series bookings. Add a regression test that cancelling one session of a series-bound purchase refunds 1/N of the original purchase total (where N = total series instances at purchase time, NOT remaining today).
@@ -166,25 +186,25 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 ## 5. Endpoints
 
-- [ ] `POST /api/admin/class_series` — extends Phase 1's `class_schedule` create with series-specific fields. Permission `manage_class_schedule`. Endpoint test.
-- [ ] `POST /api/book_class_series/<scheduleId>` body `{ join_date_us?: int64 }` — server decides full vs prorated based on `join_date_us` vs `series_start_date_us`. Returns purchase + bookings. Endpoint test (full + prorated, payment success + failure).
-- [ ] `POST /api/admin/series/<scheduleId>/check_min_attendees` — manual run, also invoked by scheduler. Permission `manage_class_schedule`. Endpoint test.
-- [ ] `POST /api/admin/series/<scheduleId>/cancel` body `{ reason }` — explicit admin-cancel endpoint. Permission `manage_class_schedule`. Endpoint test (verifies refunds queued for each paid attendee + cancellation iCal with `STATUS:CANCELLED`).
+- [ ] `POST /api/admin/class_series_instance` — creates a series run (`class_instances` + `class_series_instances` augmentation + base impl) under a `kind='series'` class. Permission `manage_class_schedule`. Endpoint test.
+- [ ] `POST /api/book_class_series/<classInstanceId>` body `{ join_date_us?: int64 }` — server decides full vs prorated based on `join_date_us` vs the instance's `valid_from_us`. Returns purchase + bookings. Endpoint test (full + prorated, payment success + failure).
+- [ ] `POST /api/admin/series/<classInstanceId>/check_min_attendees` — manual run, also invoked by scheduler. Permission `manage_class_schedule`. Endpoint test.
+- [ ] `POST /api/admin/series/<classInstanceId>/cancel` body `{ reason }` — explicit admin-cancel endpoint. Permission `manage_class_schedule`. Endpoint test (verifies refunds queued for each paid attendee + cancellation iCal with `STATUS:CANCELLED`).
 
 ## 6. Scheduled Jobs
 
-- [ ] Add daily 03:00 local job in `knottyyoga_helper`: iterates active series schedules and POSTs `/api/admin/series/<id>/check_min_attendees` for each. Idempotent.
-- [ ] Skip series whose `series_min_by_us` is far in the future (saves load); cron passes a "today" date so the endpoint can short-circuit.
+- [ ] Add daily 03:00 local job in `knottyyoga_helper`: iterates active series instances and POSTs `/api/admin/series/<classInstanceId>/check_min_attendees` for each. Idempotent.
+- [ ] Skip instances whose `class_series_instances.min_by_us` is far in the future (saves load); cron passes a "today" date so the endpoint can short-circuit.
 
 ## 7. Frontend
 
 ### 7.1 Catalog series cards
-- [ ] Class catalog cards distinguish series by an `Is Series` badge, show "X sessions starting <date>", per-tier price.
+- [ ] Class catalog cards distinguish series by the `kind='series'` badge, and list upcoming runs ("X sessions starting <date>", per-tier price) per instance.
 - [ ] Spec.
 
 ### 7.2 Series detail page
-- [ ] New `series-detail.component.*/.spec.ts` (or extension of class-detail when `is_series`).
-- [ ] Sections: hero photo + name; "What you get: 6 sessions Mon/Wed 7-8pm starting July 1"; per-tier pricing (your tier highlighted); min-attendees warning if `series_min_attendees` set and current count < threshold; "Buy full series" CTA / "Join from this week — prorated $X" CTA depending on date.
+- [ ] New `series-detail.component.*/.spec.ts` (or extension of class-detail when `classes.kind='series'`). For a series class, lists upcoming runs (instances); selecting a run shows its detail.
+- [ ] Sections: hero photo + name; "What you get: 6 sessions Mon/Wed 7-8pm starting July 1" (derived occurrence count for the run); per-tier pricing (your tier highlighted); min-attendees warning if `class_series_instances.min_attendees` set and current count < threshold; "Buy full series" CTA / "Join from this week — prorated $X" CTA depending on date.
 - [ ] BC-5 non-refundable banner.
 
 ### 7.3 Booking flow
@@ -196,11 +216,11 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 - [ ] Spec.
 
 ### 7.5 Admin series-create form
-- [ ] Extends Phase 1's class-schedule-edit form: when `is_series` toggled, reveal series-specific fields (start/end date, optional min attendees + min-by date + min-not-met policy radio buttons) and a tier-pricing matrix with two columns per tier (full-series price + per-instance-base price).
+- [ ] Builds on Phase 1's instance + impl editors: creating a run under a `kind='series'` class reveals the `class_series_instances` fields (min attendees + min-by date + min-not-met policy radio buttons) and a per-tier `per_instance_base` price matrix. The run window comes from the instance; the schedule from its base impl + slots. (No `is_series` toggle — the class's `kind` already determines this.)
 - [ ] Spec.
 
 ### 7.6 `ServerAccess` extensions
-- [ ] `createSeries(req)`, `bookSeries(scheduleId, joinDateUs?)`, `checkSeriesMinAttendees(scheduleId)`, `cancelSeries(scheduleId, reason)`.
+- [ ] `createSeriesInstance(req)`, `bookSeries(classInstanceId, joinDateUs?)`, `checkSeriesMinAttendees(classInstanceId)`, `cancelSeries(classInstanceId, reason)`.
 - [ ] Update `ServerAccess.mock.spec.ts`.
 
 ### 7.7 Types

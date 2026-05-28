@@ -84,8 +84,8 @@ Lowest layer first:
 - [x] NO waitlist participation from templates.
 - [x] Templates ONLY apply to membership-included recurring classes (NOT paid workshops / series — those are explicit bookings).
 
-### 1.2 Forward sync
-- [x] Adding a template entry walks forward through already-materialized future sessions but DOES NOT create bookings. It records the schedule-level template entry; the homepage and digest compute "is this on my template?" by joining `event_sessions.class_schedule_id → attendance_template_entries`.
+### 1.2 Forward sync (lazy model)
+- [x] Adding a template entry records the slot-level template entry only — it creates NO bookings and NO `event_sessions` rows. The homepage and digest compute "is this on my template?" by evaluating the user's template-entry slots against the **derived** occurrences for the week (`ClassScheduleHelper::GetDerivedSessionsForRange`), NOT by joining persisted rows.
 - [x] Removing a template entry is just a row delete. No cascading booking cancellation (there were no bookings).
 
 ### 1.3 Per-instance exception semantics
@@ -112,22 +112,23 @@ Lowest layer first:
 - [ ] `db_schema/attendance_template_entries.h/.cpp`:
   - `id BIGSERIAL PK`
   - `template_id BIGINT NOT NULL REFERENCES attendance_templates(id)`
-  - `class_schedule_id BIGINT NOT NULL REFERENCES class_schedules(id)`
+  - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — bind to the stable-identity slot, NOT the impl
   - `created_us`
-  - `UNIQUE (template_id, class_schedule_id)`
+  - `UNIQUE (template_id, class_schedule_slot_id)`
 - [ ] Index on (`template_id`) for "all my entries" reads.
-- [ ] Index on (`class_schedule_id`) for "who has this on their template?" reads (instructor view, materialization hook in §4.4).
+- [ ] Index on (`class_schedule_slot_id`) for "who has this slot on their template?" reads (instructor view).
 
 ### 2.3 `attendance_template_exceptions` table
 - [ ] `db_schema/attendance_template_exceptions.h/.cpp`:
   - `id BIGSERIAL PK`
   - `template_id BIGINT NOT NULL REFERENCES attendance_templates(id)`
-  - `event_session_id BIGINT NOT NULL REFERENCES event_sessions(id)`
+  - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — the slot the exception applies to
+  - `occurrence_date_us BIGINT NOT NULL` — the specific day (the occurrence usually has no persisted `event_sessions` row, so we key off the derived-occurrence identity, NOT `event_session_id`)
   - `attending BOOLEAN NOT NULL` — false = "skip this instance"; true = "one-off add"
   - `note TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
-  - `UNIQUE (template_id, event_session_id)`
-- [ ] Index on (`event_session_id`) for instructor's "exception notes for my class today" view.
+  - `UNIQUE (template_id, class_schedule_slot_id, occurrence_date_us)`
+- [ ] Index on (`class_schedule_slot_id`, `occurrence_date_us`) for instructor's "exception notes for my class today" view.
 
 ### 2.4 Wire into DB init
 - [ ] `make_database_info.cpp` adds three `Make*Table()` calls after `class_schedules`, `event_sessions`, `people`.
@@ -174,32 +175,32 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
   3. Build a recurring iCal using `BuildTemplateUid(scheduleId, personId)` + `BuildWeeklyRRule(daysOfWeek, untilUs=min(schedule.effective_to, +1y))`.
   4. Queue a confirmation email via `MailHelper` with the `.ics` attachment.
   5. Return `{ok=true, templateEntryId}`.
-- [ ] `RemoveTemplateEntry(Transaction&, personId, scheduleId)`:
+- [ ] `RemoveTemplateEntry(Transaction&, personId, classScheduleSlotId)`:
   1. Find template, delete the entry row.
   2. No email.
   3. Return `{ok=true}`.
-- [ ] Tests: add idempotent, add rejected when ineligible, remove no-op when not present.
+- [ ] Tests: add idempotent, add rejected when ineligible, remove no-op when not present, stale-slot surfaced when the slot no longer exists.
 
 ### 4.3 Per-instance exception
-- [ ] `SetException(Transaction&, personId, eventSessionId, attending, note)`:
+- [ ] `SetException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs, attending, note)`:
   1. Resolve template; if none yet, `GetOrCreateTemplateForPerson`.
-  2. UPSERT the exception row.
+  2. UPSERT the exception row keyed by (`template_id`, `class_schedule_slot_id`, `occurrence_date_us`).
   3. No email; the note flows to the instructor via the staff portal feed (5.3 / N-7).
-- [ ] `RemoveException(Transaction&, personId, eventSessionId)` — delete row.
+- [ ] `RemoveException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)` — delete row.
 
-### 4.4 Materialization hook
-- [ ] When `RecurringSessionHelper` (called via `ClassScheduleHelper::MaterializeFutureSessions`) creates new `event_sessions` for a schedule, NO booking is created — per the design lock-in in §1.1. The hook here is read-only: ensure `EventSessionHelper::GetVisibleEventSessions` joins to template entries so the "is on my template" flag works going forward.
-- [ ] No new code path — verify the join is in place. Add an integration test that materializes a new session and asserts the templated user's homepage feed shows it as checked.
+### 4.4 Derived-occurrence evaluation (NO materialization hook)
+- [ ] There is no materialization, so there is no hook. "Is this on my template?" is computed by evaluating the user's template-entry slots against the **derived** occurrences for the requested week via `ClassScheduleHelper::GetDerivedSessionsForRange`, then overlaying `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`).
+- [ ] Add a unit test that derives a future week's occurrences and asserts a templated user's homepage feed shows the slot's occurrence as checked, and that a skip-exception flips it to unchecked.
 
 ### 4.5 Homepage feed
 - [ ] `struct TodayClassEntry { int64_t eventSessionId; int64_t classId; std::string className; std::string classPhotoUrl; int64_t startUs; int64_t endUs; std::string facilityName; std::string roomName; std::vector<std::string> instructorNames; bool onTemplate; bool exceptionAttending; bool exceptionSkipping; std::string exceptionNote; std::string perInstanceNote; }`.
 - [ ] `std::vector<TodayClassEntry> GetTodayClassesForPerson(Transaction&, int64_t personId, int64_t nowUs, std::string_view ianaTz)`. Algorithm:
   1. Compute today's date in `ianaTz`.
-  2. Pull `event_sessions` whose start_us falls within "today" (start of facility day → end of facility day).
-  3. Filter to sessions whose `class_schedule_id` is eligible for the user (eligibility resolver from 4.1).
-  4. Left-join `attendance_template_entries` to set `onTemplate`.
-  5. Left-join `attendance_template_exceptions` to set `exceptionAttending` / `exceptionSkipping` / `exceptionNote`.
-  6. Left-join `event_sessions.per_instance_note` (when Phase 13 adds it; Phase 5 leaves this blank).
+  2. **Derive** today's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` for the facility day window (each carries its `class_schedule_slot_id` + `occurrence_date_us`; a persisted `event_sessions` row may or may not exist).
+  3. Filter to occurrences whose slot is eligible for the user (eligibility resolver from 4.1).
+  4. Set `onTemplate` by matching the occurrence's `class_schedule_slot_id` against the user's `attendance_template_entries`.
+  5. Overlay `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`) to set `exceptionAttending` / `exceptionSkipping` / `exceptionNote`.
+  6. Left-join any persisted `event_sessions` per-instance note (when Phase 13 / CS-7 adds it; Phase 5 leaves blank).
   7. Return sorted by `startUs`.
 - [ ] Tests cover: templated session checked, non-templated eligible session unchecked, exception-skip displayed struck-through.
 

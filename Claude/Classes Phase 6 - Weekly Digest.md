@@ -42,10 +42,17 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Should-have.** Sunday-noon (facility-TZ-aware) digest email for every active member, listing their this-week template attendance + one-off additions + paid bookings (workshops / series / intro / guest pass / regular events / services). One combined `.ics` attachment with per-occurrence VEVENTs (per parent doc WD-3). Strict opt-out support (notification preferences table). Also provides the per-user subscribable iCal feed URL (WD-6) — a `webcal://` URL the user adds to their calendar app once for auto-updating.
 
 **Prerequisites:**
+- Phase 1 (three-level schedule model + `ClassScheduleHelper::GetDerivedSessionsForRange`).
 - Phase 4 (iCal generator extensions — multi-event overload, UID helpers).
 - Phase 5 (attendance templates + exceptions — drive the recurring-classes part of the digest).
 - Existing `MailHelper` + `FormatString` + `NormalizeCrLf` patterns (per CLAUDE.md).
 - Existing `knottyyoga_helper` daemon ([[Scheduled Jobs]]).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> The "this week's recurring class attendance" part of the digest CANNOT be a `SELECT FROM bookings` — membership-included template attendance creates no booking rows and no `event_sessions` rows (lazy model). The digest must:
+> - **Derive the week's templated occurrences.** Add `WeeklyDigestHelper::GetTemplateOccurrencesForWeek(personId, weekStartUs)` that, for each of the user's `attendance_template_entries` (slot-keyed), walks the week via `ClassScheduleHelper::GetDerivedSessionsForRange` to find the slot's occurrences, then overlays `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`) to drop skips and add one-offs.
+> - **Union with persisted paid bookings.** Workshops / series / intro / guest pass / events / services DO have persisted `event_sessions` + `bookings`; those come from the existing booking query. De-dupe by occurrence.
+> - The multi-VEVENT `.ics` is built from the unioned occurrence list. UID for a templated (booking-less) occurrence uses `BuildTemplateUid(classScheduleSlotId, personId)` + the occurrence date (Phase 4 helper, slot-keyed per the redesign); paid bookings use `BuildBookingUid`.
 
 **Outcome:**
 - New `user_notification_preferences` table with defaults.
@@ -132,17 +139,16 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 - [ ] `WeeklyDigestData BuildDigestForPerson(Transaction&, int64_t personId, int64_t weekStartUs)`. Algorithm:
   1. Resolve user's primary facility timezone (or the first facility if multi).
   2. Compute `weekStartUs` as the Monday 00:00 in that TZ; `weekEndUs` as Sunday 23:59:59 in that TZ.
-  3. Pull templated sessions: join `attendance_template_entries → class_schedules → event_sessions` within the window, MINUS sessions where the user has `attendance_template_exceptions.attending=false`.
-  4. Add one-off additions: `attendance_template_exceptions.attending=true` rows within the window.
-  5. Add paid bookings: `bookings WHERE person_id=? AND purchase_id IS NOT NULL AND session start in window AND status IN ('confirmed', 'waitlisted')`.
-  6. Add upcoming services / events the user has booked (existing `BookingHelper::GetBookingsForPerson` upcoming filter).
-  7. Sort by `sessionStartUs`.
-  8. Return.
+  3. Templated occurrences: `GetTemplateOccurrencesForWeek(personId, weekStartUs)` — derives the week's occurrences for each template-entry slot (via `ClassScheduleHelper::GetDerivedSessionsForRange`), drops `attendance_template_exceptions.attending=false`, includes one-off `attending=true` additions. (NO `bookings` / `event_sessions` join for these — they're booking-less.)
+  4. Add paid bookings: `bookings WHERE person_id=? AND purchase_id IS NOT NULL AND session start in window AND status IN ('confirmed', 'waitlisted')` (these have persisted `event_sessions`). De-dupe against step 3 by (`class_schedule_slot_id`, `occurrence_date_us`).
+  5. Add upcoming services / events the user has booked (existing `BookingHelper::GetBookingsForPerson` upcoming filter).
+  6. Sort by `sessionStartUs`.
+  7. Return.
 - [ ] `bool SendDigestForPerson(Transaction&, MailHelper*, int64_t personId, int64_t weekStartUs)`:
   1. Build the data.
   2. If `rows.empty()` → skip (don't send empty digests).
   3. Format the HTML body via `FormatString` with a template constant; wrap with `NormalizeCrLf`.
-  4. Build the combined iCal: vector of `ICalEvent` (one per row), each with `BuildSessionUid(eventSessionId)`. Call `GenerateICalendar(events)` from Phase 4.
+  4. Build the combined iCal: vector of `ICalEvent` (one per row). Paid-booking rows use `BuildBookingUid(bookingId)`; templated booking-less rows use `BuildTemplateUid(classScheduleSlotId, personId)` + occurrence date. Call `GenerateICalendar(events)` from Phase 4.
   5. Queue email with `.ics` attachment.
   6. Update `UserNotificationPreferences::SetLastDigestSent(personId, now)`.
   7. Sync SQL before any `ThreadPool::Queue` (per memory `feedback_sync_sql_before_threadpool_queue.md`).
