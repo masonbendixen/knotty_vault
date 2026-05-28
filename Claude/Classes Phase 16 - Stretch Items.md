@@ -118,7 +118,7 @@ Per parent §2.17: track per-user "indicated attending but didn't attend" rate; 
 ## 3. AR-6 Series Min-Attendees Risk Dashboard
 
 ### 3.1 Business logic
-- [ ] `SeriesRiskHelper::GetSeriesUnderMinByThreshold(asOfUs)` — returns series within `series_min_by_us` window whose confirmed count is below `series_min_attendees`. Includes days-until-deadline.
+- [ ] `SeriesRiskHelper::GetSeriesUnderMinByThreshold(asOfUs)` — returns series runs (`class_instances`) within their `class_series_instances.min_by_us` window whose confirmed count is below `class_series_instances.min_attendees`. Includes days-until-deadline. (Per the schedule redesign, series fields live on the `class_series_instances` augmentation, not on `class_schedules`.)
 
 ### 3.2 Endpoint
 - [ ] `GET /api/admin/series_risk`. Permission `manage_class_schedule`.
