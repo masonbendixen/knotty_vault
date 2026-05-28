@@ -42,6 +42,24 @@ Please create a plan with phases of implementation. Within each phase, please re
 >
 > **The original Phase 1 was implemented against a flat `class_schedules` table with a "materialize through date" button.** That implementation is being replaced wholesale (rewrite-in-place per OQ-CSI-10 — pre-deploy, no production data to migrate). Where the old code exists, this plan replaces it; checkboxes below are reset to reflect the new, not-yet-built model. A "Superseded — original flat-model plan" appendix at the bottom preserves the prior decisions for history.
 
+## Implementation Status (updated 2026-05-28)
+
+**Server side: built and all unit tests passing.** Frontend deferred to a separate step (per decision in [[Class schedule build reconciliation]]).
+
+- ✅ **§2 Database schema** — `classes.kind`, new `class_instances` / `class_schedules` (impl) / `class_schedule_slots`, `event_sessions` re-keyed; wired into init pipeline. (Build + tests green.)
+- ✅ **§3 Table helpers** — `ClassInstances`, `ClassSchedules`, `ClassScheduleSlots`, extended `EventSessions` (+ tests). Note: §3.4's lazy-orphan query shipped as `GetFutureClassSessionsForInstance` (the helper returns the instance's future class sessions; the business-logic sweep decides orphan-ness).
+- ✅ **§4.1 / §4.4 / §4.7** — `ClassInstanceHelper`, impl-save sweep, business-logic tests.
+- 🟡 **§4.2 `ClassScheduleHelper`** — impl + slot CRUD, `EnsureSessionExists`, `GetDerivedSessionsForRange`, sweep: **done**. `GetActiveScheduleView` (preview backing) **deferred** with the preview endpoint (§5.4).
+- 🟡 **§4.5 `ClassCatalogHelper`** — recurring catalog + detail (derived sessions, instructor, price-via-instance): **done**. Workshop/series "upcoming runs" branch **deferred**.
+- 🟡 **§4.6 KVT** — catalog/instance/impl/slot/derived/result converters **done**; `ActiveScheduleView` + `SweepResult` converters **deferred** (their features aren't built yet).
+- ❌ **§4.3 Room concurrent-capacity check** — not started.
+- ✅ **§5.1 catalog endpoints**, ✅ **§5.5 routing** (materialize endpoint removed).
+- 🟡 **§5.2 / §5.3 admin endpoints** — implementation create/update/deactivate/list **migrated & tested** (create lives at `POST /api/admin/class_schedule` taking `class_instance_id`, not the `/class_instance/<id>/schedule` shape in the plan). Instance endpoints, migrate-product endpoint, **slot endpoints**, and **§5.4 preview** **not built** — no end-to-end authoring over HTTP yet.
+- ✅ **§8 permission** (`manage_class_schedule`) / ✅ **§9 seed** (`PopulateClassSchedules` on the new model).
+- ❌ **§6 Frontend**, **§7 admin metadata** (not verified this session), §10 frontend tests, §11 acceptance — pending.
+
+Checkboxes below reflect this. Anything still `[ ]` under §4.3, §5.2 (instance/slot/preview), §6, §7, §10 (frontend) is genuine remaining work.
+
 ## Phase Summary
 
 **Must-have core.** Admin can define a class (name, description, photo, kind, defaults), create one or more **instances** (runs) under it, attach versioned **implementations** (impls) with priority + validity window to each instance, and fill each impl with **slots** (day-of-week + start time + duration + facility + room + instructor tuples). The public catalog browses classes. Class sessions are **derived on the fly** from the active instance + active impl + slots — there is no materialization step. `event_sessions` rows persist only when something is recorded against a specific occurrence.
@@ -120,14 +138,14 @@ Lowest layer first per CLAUDE.md:
 ## 2. Database Schema
 
 ### 2.1 Extend `classes` table
-- [ ] In `db_schema/classes.h`, keep the existing column-name constants (`kClassesDefaultCapacity`, `kClassesIsActive`, `kClassesCreatedUs`, `kClassesUpdatedUs`) and add `kClassesKind`.
-- [ ] In `db_schema/classes.cpp`, add `kind TEXT NOT NULL DEFAULT 'recurring'` (enum `recurring` | `workshop` | `series`, CHECK enforced at the application layer). Keep `default_capacity`, `is_active`, `created_us`, `updated_us`.
-- [ ] **Remove** `default_cancellation_policy_id` / `default_room_type_id` if they were added by the original flat plan — cancellation policy now comes from the instance's product, and room is on the slot. (If they were never wired anywhere, just drop them.)
-- [ ] No `product_id` on `classes`.
-- [ ] Keep the `is_active` index via `DbSchema::CreateClassesIndexes`.
+- [x] In `db_schema/classes.h`, keep the existing column-name constants (`kClassesDefaultCapacity`, `kClassesIsActive`, `kClassesCreatedUs`, `kClassesUpdatedUs`) and add `kClassesKind`.
+- [x] In `db_schema/classes.cpp`, add `kind TEXT NOT NULL DEFAULT 'recurring'` (enum `recurring` | `workshop` | `series`, CHECK enforced at the application layer). Keep `default_capacity`, `is_active`, `created_us`, `updated_us`.
+- [x] **Remove** `default_cancellation_policy_id` / `default_room_type_id` if they were added by the original flat plan — cancellation policy now comes from the instance's product, and room is on the slot. (If they were never wired anywhere, just drop them.)
+- [x] No `product_id` on `classes`.
+- [x] Keep the `is_active` index via `DbSchema::CreateClassesIndexes`.
 
 ### 2.2 New `class_instances` table
-- [ ] New files `db_schema/class_instances.h/.cpp` with columns:
+- [x] New files `db_schema/class_instances.h/.cpp` with columns:
   - `id BIGSERIAL PRIMARY KEY`
   - `class_id BIGINT NOT NULL` (FK → `classes(id)` via `AddColumnForeignKeyRef`)
   - `name TEXT NOT NULL`
