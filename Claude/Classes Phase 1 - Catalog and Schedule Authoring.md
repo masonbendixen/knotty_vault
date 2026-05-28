@@ -49,16 +49,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 - ✅ **§2 Database schema** — `classes.kind`, new `class_instances` / `class_schedules` (impl) / `class_schedule_slots`, `event_sessions` re-keyed; wired into init pipeline. (Build + tests green.)
 - ✅ **§3 Table helpers** — `ClassInstances`, `ClassSchedules`, `ClassScheduleSlots`, extended `EventSessions` (+ tests). Note: §3.4's lazy-orphan query shipped as `GetFutureClassSessionsForInstance` (the helper returns the instance's future class sessions; the business-logic sweep decides orphan-ness).
 - ✅ **§4.1 / §4.4 / §4.7** — `ClassInstanceHelper`, impl-save sweep, business-logic tests.
-- 🟡 **§4.2 `ClassScheduleHelper`** — impl + slot CRUD, `EnsureSessionExists`, `GetDerivedSessionsForRange`, sweep: **done**. `GetActiveScheduleView` (preview backing) **deferred** with the preview endpoint (§5.4).
+- 🟡 **§4.2 `ClassScheduleHelper`** — impl + slot CRUD, `EnsureSessionExists`, `GetDerivedSessionsForRange`, sweep, **and `GetActiveScheduleView`**: all **done**.
 - 🟡 **§4.5 `ClassCatalogHelper`** — recurring catalog + detail (derived sessions, instructor, price-via-instance): **done**. Workshop/series "upcoming runs" branch **deferred**.
-- 🟡 **§4.6 KVT** — catalog/instance/impl/slot/derived/result converters **done**; `ActiveScheduleView` + `SweepResult` converters **deferred** (their features aren't built yet).
+- 🟡 **§4.6 KVT** — catalog/instance/impl/slot/derived/result/`ActiveScheduleView` converters **done**; no standalone `SweepResult` converter (folded into `EditResult`).
 - ❌ **§4.3 Room concurrent-capacity check** — not started.
-- ✅ **§5.1 catalog endpoints**, ✅ **§5.5 routing** (materialize endpoint removed).
-- 🟡 **§5.2 / §5.3 admin endpoints** — implementation create/update/deactivate/list **migrated & tested** (create lives at `POST /api/admin/class_schedule` taking `class_instance_id`, not the `/class_instance/<id>/schedule` shape in the plan). Instance endpoints, migrate-product endpoint, **slot endpoints**, and **§5.4 preview** **not built** — no end-to-end authoring over HTTP yet.
+- ✅ **§5 Endpoints — COMPLETE.** §5.1 catalog, §5.2 instance endpoints (create/update/deactivate/migrate-product/list), §5.3 impl + slot endpoints, §5.4 preview, §5.5 routing — all built + tested. (Impl create lives at `POST /api/admin/class_schedule` taking `class_instance_id`, rather than the `/class_instance/<id>/schedule` shape in the plan text.)
 - ✅ **§8 permission** (`manage_class_schedule`) / ✅ **§9 seed** (`PopulateClassSchedules` on the new model).
 - ❌ **§6 Frontend**, **§7 admin metadata** (not verified this session), §10 frontend tests, §11 acceptance — pending.
 
-Checkboxes below reflect this. Anything still `[ ]` under §4.3, §5.2 (instance/slot/preview), §6, §7, §10 (frontend) is genuine remaining work.
+Checkboxes below reflect this. Anything still `[ ]` under §4.3, §6, §7, §10 (frontend) is genuine remaining work. **Server side for Phases §2–§5 is feature-complete except §4.3 room-capacity and the §4.5 workshop/series "runs" branch.**
 
 ## Phase Summary
 
@@ -252,13 +251,13 @@ Lowest layer first per CLAUDE.md:
 - [x] Tests: create happy path, each validation error, perpetual-dup rejection, overlap rejection, close, migrate (verify old closed + new open + slots copied).
 
 ### 4.2 New `ClassScheduleHelper`
-- [x] `class_schedule_helper.h/.cpp` + `class_schedule_helper_test.cpp`. Public surface (all implemented **except** `GetActiveScheduleView`, deferred with the §5.4 preview endpoint):
+- [x] `class_schedule_helper.h/.cpp` + `class_schedule_helper_test.cpp`. Public surface (all implemented, incl. `GetActiveScheduleView`):
   - `CreateImplementationResult CreateImplementation(Transaction&, const CreateImplementationRequest&)` — validates parent instance exists, impl window lies within the instance window, and no same-priority overlapping impl under the instance (`OVERLAPPING_SAME_PRIORITY`). Optional `copyFromImplementationId` to seed slots (OQ-CSI-21).
   - `EditResult UpdateImplementation(Transaction&, int64_t id, const KeyValueTable& updates)` — applies the update, then runs the impl-save sweep (§4.4).
   - Slot CRUD: `AddSlot` (enforces OQ-CSI-8 duplicate guard + facility/room validity), `UpdateSlot`, `DeleteSlot` (each slot mutation also runs the sweep).
   - `int64_t EnsureSessionExists(Transaction&, int64_t slotId, int64_t occurrenceDateUs)` — idempotent: looks up `(slotId, occurrenceDateUs)` via `EventSessions::LookupBySlotAndDate`; if absent, creates the `event_sessions` row with `class_id`, `class_schedule_slot_id`, `occurrence_date_us`, computed `start_time_us` / `end_time_us` from the slot, `capacity = slot.capacity_override ?? class.default_capacity`, `status='scheduled'`. Returns the row id. This is the single entry point for the seven recording triggers.
   - `std::vector<DerivedSession> GetDerivedSessionsForRange(Transaction&, int64_t classId, int64_t fromUs, int64_t toUs)` — walks each date in range; resolves active instance (`ClassInstances::GetActiveInstance`), then active impl (`ClassSchedules::GetActiveImplementation`), expands slots matching `EXTRACT(DOW)`, and left-joins persisted `event_sessions` rows (so cancellations / subs / notes override the derived defaults). Reuses `RecurringSessionHelper::GenerateSessionDates` only as a date-walking utility.
-  - `ActiveScheduleView GetActiveScheduleView(Transaction&, int64_t classId, int64_t dateUs)` — backs the admin "schedule on date X" preview (active instance + active impl + resolved slot list). **⏳ DEFERRED — not built (ships with the §5.4 preview endpoint).**
+  - `ActiveScheduleView GetActiveScheduleView(Transaction&, int64_t classId, int64_t dateUs)` — backs the admin "schedule on date X" preview (active instance + active impl + resolved slot list). ✅ Implemented + tested (`GetActiveScheduleViewResolvesActiveImpl`, `...NoInstance`).
 - [x] Validation error codes mirror the §4.1 pattern; dedicated tests per code.
 - [x] Tests: create-impl window-within-instance, same-priority-overlap rejection, copy-from seeding, multi-slot/day derivation, per-day-different-times derivation, priority-resolution derivation (override impl wins on its dates), closure (empty impl → no derived sessions), `EnsureSessionExists` idempotency, derived-vs-persisted left-join (a cancelled persisted row suppresses/overrides the derived default).
 
@@ -280,7 +279,7 @@ Lowest layer first per CLAUDE.md:
 - [x] Tests: catalog excludes classes with no active instance; recurring detail derives upcoming sessions with instructor; cancelled persisted occurrences excluded from recurring upcoming; unknown/inactive → nullopt; upcomingLimit honored. *(workshop/series "detail lists runs" not yet implemented/tested — deferred.)*
 
 ### 4.6 KeyValueTable conversions
-- [x] Add to `business_logic/scheduling/scheduling_key_value_table.h/cpp`: converters for `ClassCatalogEntry`, `ClassDetail`, `DerivedSession`/`UpcomingSessionInfo`, `ActiveScheduleView`, `CreateInstanceResult`, `CreateImplementationResult`, `EditResult`, `MigrateResult`, `SweepResult`. *(`InstanceEditResult` + `SlotResult` also added; `ActiveScheduleView` and a standalone `SweepResult` converter deferred — those features aren't built. `EditResult` carries the sweep result.)* (No `ClassScheduleToKeyValueTable` / `ClassInstanceToKeyValueTable` — those rows already come out of the table helpers as `KeyValueTable` and flow through `SqlUtil::KeyValueTableToJson` directly.)
+- [x] Add to `business_logic/scheduling/scheduling_key_value_table.h/cpp`: converters for `ClassCatalogEntry`, `ClassDetail`, `DerivedSession`/`UpcomingSessionInfo`, `ActiveScheduleView`, `CreateInstanceResult`, `CreateImplementationResult`, `EditResult`, `MigrateResult`, `SweepResult`. *(`InstanceEditResult` + `SlotResult` + `ActiveScheduleView` converters also added. No standalone `SweepResult` converter — `EditResult` carries the sweep result.)* (No `ClassScheduleToKeyValueTable` / `ClassInstanceToKeyValueTable` — those rows already come out of the table helpers as `KeyValueTable` and flow through `SqlUtil::KeyValueTableToJson` directly.)
 - [x] Unit tests in `scheduling_key_value_table_test.cpp` covering each converter (ok + error shapes for the result types).
 
 ### 4.7 Tests for business logic
@@ -295,21 +294,21 @@ Lowest layer first per CLAUDE.md:
 
 ### 5.2 Admin instance endpoints
 - [x] Permission: keep `DbSchema::kPermissionManageClassSchedule = "manage_class_schedule"`; admin + Studio Manager roles get it.
-- [ ] `endpoints/admin_class_instance_create.h/cpp` + test: `POST /api/admin/class_instance`. Body → `CreateInstanceRequest`. 200 + `instance_id`; 400 + `error_code`. Tests: 401 anon, 403 missing perm, 400 validation, 200 persists.
-- [ ] `endpoints/admin_class_instance_update.h/cpp` + test: `PUT /api/admin/class_instance/<int>`. Tests: 403, 404, 200 applies.
-- [ ] `endpoints/admin_class_instance_deactivate.h/cpp` + test: `DELETE /api/admin/class_instance/<int>`. Soft-delete. Tests: 403, 404, 200 flips `is_active`.
-- [ ] `endpoints/admin_class_migrate_product.h/cpp` + test: `POST /api/admin/class/<classId>/migrate_product`. Body `{ new_product_id, effective_at_us, copy_slots_forward }`. Delegates to `MigrateRecurringClassToNewProduct`. Tests: 403, 404, 200 closes old + opens new.
-- [ ] `endpoints/admin_class_instances_list.h/cpp` + test: `GET /api/admin/class_instances?class_id=<id>`. Tests: 401, 403, 400 missing class_id, 200 lists.
+- [x] `endpoints/admin_class_instance_create.h/cpp` + test: `POST /api/admin/class_instance`. Body → `CreateInstanceRequest`. 200 + `instance_id`; 400 + `error_code`. Tests: 403 missing perm, 400 missing field, 400 validation, 200 persists.
+- [x] `endpoints/admin_class_instance_update.h/cpp` + test: `PUT /api/admin/class_instance/<int>`. Tests: 403, 404, 200 applies.
+- [x] `endpoints/admin_class_instance_deactivate.h/cpp` + test: `DELETE /api/admin/class_instance/<int>`. Soft-delete. Tests: 403, 404, 200 flips `is_active`.
+- [x] `endpoints/admin_class_migrate_product.h/cpp` + test: `POST /api/admin/class/<classId>/migrate_product`. Body `{ new_product_id, effective_at_us, copy_slots_forward }`. Delegates to `MigrateRecurringClassToNewProduct`. Tests: 403, 404 (no perpetual instance), 200 closes old + opens new.
+- [x] `endpoints/admin_class_instances_list.h/cpp` + test: `GET /api/admin/class_instances?class_id=<id>`. Tests: 401, 400 missing class_id, 200 lists.
 
 ### 5.3 Admin implementation + slot endpoints
 - [x] `endpoints/admin_class_schedule_create.h/cpp` + test: creates an implementation. Body → `CreateImplementationRequest` (incl. optional `copy_from_implementation_id`). Tests: 401, 403, 400 (validation `error_code`), 200 persists. *(Route shipped as `POST /api/admin/class_schedule` with `class_instance_id` in the body, not `/api/admin/class_instance/<instanceId>/schedule`.)*
 - [x] `endpoints/admin_class_schedule_update.h/cpp` + test: `PUT /api/admin/class_schedule/<int>`. Body `{ updates, }`. Runs the sweep; response includes `{ deleted_orphan_count, blocked_rows }`. Tests: 403, 404, 200 applies + reports sweep, 409/400 when blocked by a paid booking.
 - [x] `endpoints/admin_class_schedule_deactivate.h/cpp` + test: `DELETE /api/admin/class_schedule/<int>`. Soft-delete. Tests: 403, 404, 200.
 - [x] `endpoints/admin_class_schedules_list.h/cpp` + test: `GET /api/admin/class_schedules?class_instance_id=<id>`. Tests: 401, 403, 400 missing param, 200 lists impls for the instance.
-- [ ] Slot endpoints: `POST /api/admin/class_schedule/<id>/slot`, `PUT /api/admin/class_schedule_slot/<slotId>`, `DELETE /api/admin/class_schedule_slot/<slotId>` (+ tests). Slot mutations run the sweep + return its result. Add returns 400 with `DUPLICATE_SLOT` on the OQ-CSI-8 guard.
+- [x] Slot endpoints: `POST /api/admin/class_schedule/<id>/slot`, `PUT /api/admin/class_schedule_slot/<slotId>`, `DELETE /api/admin/class_schedule_slot/<slotId>` (+ tests). Slot mutations run the sweep + return its result. Add returns 400 with `DUPLICATE_SLOT` / `INVALID_SLOT` on the OQ-CSI-8 / bounds guards.
 
 ### 5.4 Admin preview endpoint
-- [ ] `endpoints/admin_class_schedule_preview.h/cpp` + test: `GET /api/admin/class_schedule_preview?class_id=<id>&date_us=<t>` → `ActiveScheduleView` (active instance + active impl + resolved slots). Tests: 403, 200 resolves the correct impl on a date covered by a high-priority override, 200 empty on a closed/dark date.
+- [x] `endpoints/admin_class_schedule_preview.h/cpp` + test: `GET /api/admin/class_schedule_preview?class_id=<id>&date_us=<t>` → `ActiveScheduleView` (active instance + active impl + resolved slots). Tests: 400 missing param, 403, 200 resolves active instance + impl + slots. *(Priority-override resolution is covered at the helper layer in `ClassScheduleHelperTest`.)*
 
 ### 5.5 Routing + testing patterns
 - [x] Register all endpoints in `endpoints/web_app.cpp` (include + anonymous-namespace pointer holder) and `endpoints/CMakeLists.txt`.
