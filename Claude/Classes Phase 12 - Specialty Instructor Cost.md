@@ -42,13 +42,16 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Nice-to-Have.** Admin records a specialty instructor's compensation rate for a class / series via the same `price_schedules` infrastructure that drives student pricing (P-2). Pricing assistant suggests per-tier prices to cover the cost on a break-even attendance and profit beyond. Per-class-type max attendees per instructor stored in a separate `instructor_class_preferences` table (parent OQ-23). Cost vs revenue panel on admin session detail. Full payroll export deferred to [[Classes Phase 16 - Stretch Items]] (PR-1..PR-4).
 
 **Prerequisites:**
-- Phase 1 (class_schedules, classes).
+- Phase 1 (three-level model — `classes` / `class_instances` / `class_schedules` / `class_schedule_slots`; lazy derivation; `ClassScheduleHelper::EnsureSessionExists`).
 - Phase 2 (product_prices per tier).
-- Phase 7 (series + per-instance-base pricing in product_prices).
+- Phase 7 (series + per-instance-base pricing in product_prices; `class_series_instances`).
 - Existing `price_schedules` infrastructure ([[Payment Design Document]]).
 
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> A specialty instructor is hired for a specific **run**, so cost keys off **`class_instance_id`**, not a flat `class_schedule_id`. And there is no materialization, so the rate-snapshot moves to **ensure-time**: when an occurrence `event_sessions` row is ensured (booking / check-in / sub), `EnsureSessionExists` (or a small hook it calls) stamps `event_sessions.specialty_instructor_cost_id` from the active cost row for the occurrence's instance. Optional per-slot cost override if the specialty teacher only covers some days of the run. Rate changes still roll forward via `price_schedules` (P-2).
+
 **Outcome:**
-- `specialty_instructor_costs` table tied to a class / series via `price_schedule_id`, NOT per-instance (parent SI-1 / SI-6).
+- `specialty_instructor_costs` table tied to a run via `class_instance_id` + `price_schedule_id`, NOT per flat schedule (parent SI-1 / SI-6).
 - `instructor_class_preferences` table (per `(instructor, class)` min/max preferences).
 - Admin pricing-assistant endpoint returns per-tier suggestion.
 - Admin session-detail cost vs revenue panel.
@@ -68,17 +71,18 @@ Lowest layer first:
 ## 1. Pre-Coding Design Decisions
 
 ### 1.1 Locked-in
-- [x] Cost lives at the schedule / series level, NOT per-instance (parent SI-1).
+- [x] Cost lives at the **run (`class_instances`) level** (a specialty instructor is hired for a specific run), NOT a flat schedule and NOT per individual occurrence (parent SI-1; redesign).
 - [x] Cost rows reference a `price_schedule_id` so rate changes roll forward via a new schedule row (parent SI-6 / P-2 / OQ-42).
 - [x] Per-instructor / per-class-type max attendees in a separate `instructor_class_preferences` table (parent OQ-23).
-- [x] Materialized sessions snapshot the rate at materialization time (parent OQ-42).
+- [x] Occurrences snapshot the rate when their `event_sessions` row is **ensured** (no materialization step — redesign).
 
 ## 2. Database Schema
 
 ### 2.1 `specialty_instructor_costs` table
 - [ ] `db_schema/specialty_instructor_costs.h/.cpp`:
   - `id BIGSERIAL PK`
-  - `class_schedule_id BIGINT NOT NULL REFERENCES class_schedules(id)`
+  - `class_instance_id BIGINT NOT NULL REFERENCES class_instances(id)` — the run the instructor is hired for
+  - `class_schedule_slot_id BIGINT NULL REFERENCES class_schedule_slots(id)` — optional per-slot override (specialty teacher only covers certain days of the run)
   - `instructor_person_id BIGINT NOT NULL REFERENCES people(id)`
   - `price_schedule_id BIGINT NOT NULL REFERENCES price_schedules(id)`
   - `base_rate_cents BIGINT NOT NULL`
@@ -86,7 +90,7 @@ Lowest layer first:
   - `bonus_threshold_count BIGINT NULL` — bonus applies for attendees beyond this count
   - `notes TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
-- [ ] Unique on `(class_schedule_id, instructor_person_id, price_schedule_id)`.
+- [ ] Unique on `(class_instance_id, class_schedule_slot_id, instructor_person_id, price_schedule_id)`.
 
 ### 2.2 `instructor_class_preferences` table
 - [ ] `db_schema/instructor_class_preferences.h/.cpp`:
@@ -99,12 +103,12 @@ Lowest layer first:
   - `created_us`, `updated_us`
 - [ ] Unique on `(instructor_person_id, class_id)`.
 
-### 2.3 Materialization snapshot
-- [ ] Add `event_sessions.specialty_instructor_cost_id BIGINT` NULL `REFERENCES specialty_instructor_costs(id)` — set at materialization time (Phase 1 materializer extension) so payroll later reads the snapshot rather than the live rate.
+### 2.3 Ensure-time rate snapshot
+- [ ] Add `event_sessions.specialty_instructor_cost_id BIGINT` NULL `REFERENCES specialty_instructor_costs(id)` — set when the occurrence row is ensured (no materialization) so payroll later reads the snapshot rather than the live rate.
 
-### 2.4 Materialization hook update
-- [ ] In `ClassScheduleHelper::MaterializeFutureSessions` (Phase 1), look up the active `specialty_instructor_costs` row for `(class_schedule_id, instructor_person_id, asOfUs)` via the active `price_schedule`. If found, set `event_sessions.specialty_instructor_cost_id` on each created session.
-- [ ] If no cost row, leave NULL (non-specialty instructors).
+### 2.4 Ensure-time hook
+- [ ] In `ClassScheduleHelper::EnsureSessionExists` (Phase 1), when creating a new occurrence row, look up the active `specialty_instructor_costs` row for the occurrence's `class_instance_id` (+ matching `class_schedule_slot_id` if a per-slot override exists), the slot's `instructor_person_id`, and `asOfUs` via the active `price_schedule`. If found, set `event_sessions.specialty_instructor_cost_id` on the new row.
+- [ ] If no cost row, leave NULL (non-specialty instructors). Idempotent: ensuring an existing row doesn't re-stamp.
 
 ### 2.5 Wire into DB init
 - [ ] `make_database_info.cpp` + `create_database.cpp`.

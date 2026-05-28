@@ -44,11 +44,14 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Important scope note:** signup windows mostly apply to **paid** offerings (workshops, series, intro). Recurring class attendance is membership-included with no advance booking (Phase 5 + Phase 8), so windows are irrelevant there.
 
 **Prerequisites:**
-- Phase 1 (class_schedules linked to products).
+- Phase 1 (three-level model; products live on `class_instances`; `ClassScheduleHelper::GetDerivedSessionsForRange`).
 - Phase 2 (visibility / pricing surface).
 - Phase 7 (series flow uses booking windows).
 - Existing `product_booking_windows` infra ([[Event Polish- Scheduling Should Have Items]]).
 - Scheduled jobs daemon ([[Scheduled Jobs]]).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> Small. "Future sessions outside your booking window" are **derived** (most have no persisted `event_sessions` row) — enumerate them via `ClassScheduleHelper::GetDerivedSessionsForRange`. The per-permission advance window comes from the **active `class_instances` row's product** (`product_booking_windows`), not from a flat schedule. A `signup_open_reminders` row keys off the occurrence identity (`class_schedule_slot_id`, `occurrence_date_us`) rather than an `event_session_id`, since the occurrence usually isn't persisted until someone books it (which then ensures the row).
 
 **Outcome:**
 - Catalog / calendar shows "Sign-ups open on Jul 15" for sessions outside the user's window.
@@ -81,12 +84,13 @@ Lowest layer first:
 - [ ] `db_schema/signup_open_reminders.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)`
-  - `event_session_id BIGINT NOT NULL REFERENCES event_sessions(id)`
-  - `notify_at_us BIGINT NOT NULL` — moment when user's window opens (session start − their best `advance_days` × 86400_000_000)
+  - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — the occurrence's slot (the occurrence usually has no persisted `event_sessions` row yet)
+  - `occurrence_date_us BIGINT NOT NULL` — the specific day
+  - `notify_at_us BIGINT NOT NULL` — moment when user's window opens (occurrence start − their best `advance_days` × 86400_000_000)
   - `notified_us BIGINT NULL`
   - `cancelled_us BIGINT NULL`
   - `created_us BIGINT NOT NULL`
-- [ ] Partial unique index `UNIQUE (person_id, event_session_id) WHERE notified_us IS NULL AND cancelled_us IS NULL` — one pending reminder at a time.
+- [ ] Partial unique index `UNIQUE (person_id, class_schedule_slot_id, occurrence_date_us) WHERE notified_us IS NULL AND cancelled_us IS NULL` — one pending reminder at a time.
 - [ ] Index on `notify_at_us` for the daily cron scan.
 
 ### 2.2 Wire into DB init
@@ -113,12 +117,12 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 
 ### 4.2 Request-reminder flow
 - [ ] `struct RequestReminderResult { bool ok; int64_t reminderId; int64_t notifyAtUs; std::string errorCode; }`.
-- [ ] `RequestReminder(Transaction&, personId, eventSessionId)`:
-  1. Load `event_sessions` → product_id, start_time_us.
+- [ ] `RequestReminder(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)`:
+  1. Resolve the occurrence's product from the slot's active `class_instances` row; compute `occurrenceStartUs` from the slot + date.
   2. Compute `advanceDays = ResolveBestAdvanceDaysForPerson(productId, personId, now)`.
-  3. Compute `notifyAtUs = start_time_us - advanceDays * 86400_000_000`.
+  3. Compute `notifyAtUs = occurrenceStartUs - advanceDays * 86400_000_000`.
   4. If `notifyAtUs <= now` → return `WINDOW_ALREADY_OPEN` (the user can book right now; no reminder needed).
-  5. Insert `signup_open_reminders` row.
+  5. Insert `signup_open_reminders` row (slot + occurrence-date keyed; no `event_sessions` row need exist yet).
 - [ ] Tests.
 
 ### 4.3 Sending pending reminders
@@ -138,7 +142,7 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 
 ## 5. Endpoints
 
-- [ ] `POST /api/me/signup_reminder/<eventSessionId>` — calls `RequestReminder`. Returns reminderId + notifyAtUs. Endpoint test (success + window-already-open + duplicate-no-op).
+- [ ] `POST /api/me/signup_reminder` body `{ class_schedule_slot_id, occurrence_date_us }` — calls `RequestReminder`. Returns reminderId + notifyAtUs. Endpoint test (success + window-already-open + duplicate-no-op).
 - [ ] `DELETE /api/me/signup_reminder/<eventSessionId>` — cancel a pending reminder.
 - [ ] `POST /api/admin/send_signup_open_reminders` — cron-callable, idempotent. Permission `admin`. Endpoint test.
 

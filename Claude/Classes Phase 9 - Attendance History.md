@@ -42,8 +42,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Must-have.** User can view paginated past attendances in the user portal, filterable by year / month / class / instructor. Each row shows class, date/time, facility, room, instructor, status. CSV export is Nice-to-Have (out of scope for the Must portion).
 
 **Prerequisites:**
-- Phase 1 (event_sessions has `class_id` / `class_schedule_id`).
+- Phase 1 (event_sessions has the denormalized `class_id` + `class_schedule_slot_id` + `occurrence_date_us`).
 - Phase 8 (bookings populate with `checked_in_us` / `status='attended'` for membership-included classes).
+
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+> Minimal. Attendance history reads **only persisted `event_sessions` rows** — and under the lazy model, a row exists precisely when something was recorded against it (check-in, etc.), which is exactly the set of attended occurrences we want. No derived-session computation is needed here. Filters key off the denormalized `event_sessions.class_id` (not a `class_schedule_id`, which no longer lives on `event_sessions`).
 
 **Outcome:**
 - `GET /api/me/attendance_history` with year / month / class / instructor filters + pagination.
@@ -70,7 +73,7 @@ No new DB tables; no new table helpers (uses existing `bookings`, `event_session
 
 ### 1.2 Filter semantics
 - [x] `year` and `month` filter the session's date in **facility-local TZ** (NOT UTC). Justification: a 11pm Pacific session on March 31 reads as March, not April UTC.
-- [x] `class_id` filters by `event_sessions.class_id` (set during materialization in Phase 1).
+- [x] `class_id` filters by `event_sessions.class_id` (denormalized convenience set when the occurrence row is ensured in Phase 1).
 - [x] `instructor_id` filters via `event_session_staffing` rows with that `person_id` and role in (`'instructor'`, `'lead_instructor'`).
 
 ## 2. Business Logic — `AttendanceHistoryHelper`

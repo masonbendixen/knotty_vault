@@ -143,13 +143,14 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
   7. Return.
 
 ### 4.3 Check-in action
-- [ ] `struct CheckInRequest { int64_t eventSessionId; int64_t personId; int64_t staffPersonId; bool skillOverride; std::string overrideReason; }`.
-- [ ] `struct CheckInResult { bool ok; int64_t bookingId; bool createdNewBooking; std::string errorCode; }`.
+- [ ] `struct CheckInRequest { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t personId; int64_t staffPersonId; bool skillOverride; std::string overrideReason; }`. (Identifies the occurrence by slot + date; the `event_sessions` row may not exist yet.)
+- [ ] `struct CheckInResult { bool ok; int64_t eventSessionId; int64_t bookingId; bool createdNewBooking; std::string errorCode; }`.
 - [ ] `CheckIn(Transaction&, const CheckInRequest&)`:
-  1. Verify `IsCheckinOpen` → else `CHECKIN_NOT_OPEN`.
-  2. Look up an existing booking for `(eventSessionId, personId)`.
-  3. If exists → call `MarkCheckedIn`. Return.
-  4. If none exists:
+  1. Verify `IsCheckinOpen` (compute occurrence start from the slot + date) → else `CHECKIN_NOT_OPEN`.
+  2. `eventSessionId = ClassScheduleHelper::EnsureSessionExists(classScheduleSlotId, occurrenceDateUs)` (idempotent — recording trigger #6).
+  3. Look up an existing booking for `(eventSessionId, personId)`.
+  4. If exists → call `MarkCheckedIn`. Return.
+  5. If none exists:
      - Verify the user is eligible for the class (membership-included via `CatalogHelper`) → else `NOT_ELIGIBLE`.
      - Verify skill requirements: if missing AND `skillOverride=true` AND staff has `manage_classes`, append override reason to `bookings.notes`; else `MISSING_SKILL_REQUIREMENTS`.
      - Verify capacity: query `event_sessions.booked_count + 1 ≤ capacity`; if not → `SESSION_FULL` (staff can still proceed via a separate flow, see CI-6 in parent + open questions).

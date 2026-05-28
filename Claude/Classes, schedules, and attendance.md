@@ -704,9 +704,9 @@ Subsections within each phase are numbered. Checkboxes are at the leaf-work-item
 - [ ] Tests covering all four lifecycle paths + the daily min-check + the empty-override-impl reduces-occurrence-count pricing case.
 
 ### 7.3 Endpoints
-- [ ] `POST /api/admin/class_series` (admin create — extension of class schedule create).
-- [ ] `POST /api/book_class_series/<scheduleId>` (full or prorated; server decides based on `joinDateUs` vs `series_start_date_us`).
-- [ ] `POST /api/admin/series/<scheduleId>/check_min_attendees` (admin manual run, also called by scheduler).
+- [ ] `POST /api/admin/class_series_instance` (admin create a run — `class_instances` + `class_series_instances` + base impl under a `kind='series'` class).
+- [ ] `POST /api/book_class_series/<classInstanceId>` (full or prorated; server decides based on `joinDateUs` vs the instance's `valid_from_us`).
+- [ ] `POST /api/admin/series/<classInstanceId>/check_min_attendees` (admin manual run, also called by scheduler).
 - [ ] Endpoint tests.
 
 ### 7.4 Scheduler integration

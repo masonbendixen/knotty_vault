@@ -39,20 +39,27 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ## Phase Summary
 
-**Must / Should-have.** Studio closures (existing `scheduling_exceptions` mechanism — extend to also cascade-cancel class instances). Admin single-instance cancel (existing `SessionCancellationHelper` — extend to handle the mixed paid + zero-money attendee population correctly). Instructor substitution (no refund, no email — homepage display only per the resolved OQ-19). Instructor-initiated shift trades / transfers (reuse `ShiftChangeHelper` from [[Provider Portal]] with a parallel path keyed off `event_session_staffing` rows). Admin "who's teaching what" grid view.
+**Must / Should-have.** Class closures (per the redesign: create empty high-priority impls under affected classes — NOT a `scheduling_exceptions` cascade). Admin single-instance cancel (existing `SessionCancellationHelper` — extend to handle the mixed paid + zero-money attendee population, ensuring the occurrence row first). Instructor substitution (no refund, no email — homepage display only per the resolved OQ-19). Instructor-initiated shift trades / transfers (reuse `ShiftChangeHelper` from [[Provider Portal]] with a parallel path keyed off `event_session_staffing` rows). Admin "who's teaching what" grid view. Ships the closure batch UI deferred from Phase 1 (OQ-CSI-4).
 
 **Prerequisites:**
-- Phase 1 (class_schedules, event_sessions with class linkage).
+- Phase 1 (three-level schedule model; `event_sessions` carries `class_id` + `class_schedule_slot_id` + `occurrence_date_us`; `ClassScheduleHelper::EnsureSessionExists` + `CreateImplementation`; `ClassClosureHelper`).
 - Phase 2 (refund pro-rating — admin cancel of paid bookings refunds, zero-money bookings don't).
 - Phase 4 (cancellation `.ics` with STATUS:CANCELLED).
 - Existing `SessionCancellationHelper`, `ShiftChangeHelper`, `scheduling_exceptions` infra ([[Provider Portal]], [[Event Polish- Scheduling Should Have Items]]).
 
+> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.7, L-8/L-9
+> This phase changes substantially:
+> - **Per-class scheduling exceptions are GONE as a separate mechanism.** A class doesn't run on a date because a higher-priority impl says so (a "Memorial Day" impl with that day's slot removed, or an empty closure impl). There is no `scheduling_exceptions` cascade for *classes*. The `scheduling_exceptions` table stays in use for **service sessions** only — untouched here.
+> - **No global "studio closed" lever (L-9).** Even on a closure day a workshop may run under its own class. Closures are per-class empty high-priority impls. This phase ships the **"close these N classes for this window" class-multiselect batch UI** (deferred OQ-CSI-4), backed by `ClassClosureHelper::CloseClassesForRange(classIds, fromUs, toUs)` which creates an empty high-priority impl under each selected class's active instance.
+> - **Ensure-on-action invariant.** Every per-occurrence write — single cancel, instructor sub, shift-trade approval — first calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` (the occurrence usually has no persisted row under the lazy model), then performs the cancel / staffing write.
+> - **Instructor substitution** operates on the ensured `event_sessions` row's `event_session_staffing` (overriding the slot's default `instructor_person_id`). Per ST-4, NO attendee email — the new instructor surfaces on the homepage / calendar only.
+
 **Outcome:**
-- Studio-closure dates cascade-cancel class instances in addition to service sessions.
-- Single-instance admin cancellation handles mixed paid / zero-money attendees correctly.
-- Instructor substitution flow updates `event_session_staffing`; homepage / calendar show the new instructor; NO emails sent.
-- Class instructor shift-trade flow mirrors Provider Portal's flow but operates on `event_session_staffing` rows (not `provider_availability`).
-- Admin "who's teaching what" grid view.
+- Class closures handled via empty high-priority impls; a batch class-multiselect UI creates them in one action. Workshops on closed dates are unaffected.
+- Single-instance admin cancellation ensures the occurrence row, then handles mixed paid / zero-money attendees correctly.
+- Instructor substitution flow ensures the row + updates `event_session_staffing`; homepage / calendar show the new instructor; NO emails sent.
+- Class instructor shift-trade flow mirrors Provider Portal's flow but operates on `event_session_staffing` rows (not `provider_availability`), ensuring the row first.
+- Admin "who's teaching what" grid view (reads derived + persisted occurrences).
 
 ## Layering & Conventions
 
@@ -68,7 +75,7 @@ Lowest layer first:
 ## 1. Pre-Coding Design Decisions
 
 ### 1.1 Reuse audit
-- [ ] Verify existing `scheduling_exceptions` cascade. It was designed for service sessions; we need it to also cancel class `event_sessions` on a date range. Read the existing `business_logic/scheduling/scheduling_exception_helper.*` (or equivalent) to confirm what it touches and where to extend.
+- [ ] Class closures do NOT extend the `scheduling_exceptions` cascade. Per the redesign, a class closure is an empty high-priority impl under the class's active instance. Build/confirm `ClassClosureHelper::CloseClassesForRange` (Phase 1 stub) which creates those impls. The `scheduling_exceptions` table + its cascade remain for **service sessions** only — do not touch that path.
 - [ ] Verify `ShiftChangeHelper`. It's keyed off `provider_availability` for service providers. For classes, the shift is `event_session_staffing.person_id` for a specific session, NOT a `provider_availability` block. We need a parallel code path.
 
 ### 1.2 Locked-in
@@ -78,8 +85,8 @@ Lowest layer first:
 
 ## 2. Database Schema
 
-### 2.1 Extend `scheduling_exceptions` cascade
-- [ ] No new columns; verify the existing CASCADE handler in the helper iterates BOTH `bookable_service_sessions` AND `event_sessions` matching the (date, facility) of the exception. If not, extend in §4.1.
+### 2.1 No class-closure schema (impls cover it)
+- [ ] No `scheduling_exceptions` extension for classes — closures are empty high-priority `class_schedules` impls (Phase 1 tables, no new columns). The `scheduling_exceptions` cascade for service sessions is unchanged.
 
 ### 2.2 Extend `shift_change_requests` table
 - [ ] Add `event_session_staffing_id BIGINT` NULL `REFERENCES event_session_staffing(id)` — for class-assignment shift trades (distinct from `provider_availability_id` for service providers).
@@ -91,9 +98,8 @@ Lowest layer first:
 
 ## 3. Table Helpers
 
-### 3.1 Extend `TableHelpers::SchedulingExceptions`
-- [ ] If `GetExceptionsForDateRange(Transaction&, dateFromUs, dateToUs, facilityId)` exists, use it. Otherwise add it.
-- [ ] Tests.
+### 3.1 Reuse Phase 1 `TableHelpers::ClassSchedules` / `ClassInstances`
+- [ ] Class closures use the Phase 1 impl-create path (`ClassSchedules::AddClassSchedule` with an empty slot set + high priority under the class's active instance). No `SchedulingExceptions` work for classes. The `SchedulingExceptions` helper stays as-is for the service-session path.
 
 ### 3.2 Extend `TableHelpers::ShiftChangeRequests`
 - [ ] Surface `event_session_staffing_id`.
@@ -104,30 +110,29 @@ Lowest layer first:
 
 ## 4. Business Logic
 
-### 4.1 Extend `SchedulingExceptionHelper` cascade
-- [ ] In the existing helper (likely `business_logic/scheduling/scheduling_exception_helper.h/.cpp`), extend the date-range scan to also pick up `event_sessions` rows in the same facility on the same date(s).
-- [ ] For each picked-up `event_sessions` row: call `SessionCancellationHelper::CancelSession(sessionId, "Studio closure: <reason>")` — which handles the refund pro-rating in §4.2 below.
-- [ ] Per-provider exceptions (provider_id non-NULL): leave class sessions alone (the closure is targeted at a provider, not the studio). If the class is taught by that provider, the **instructor substitution** flow handles it separately.
-- [ ] Tests cover: facility-wide closure cancels class + service sessions; per-provider closure cancels only service sessions.
+### 4.1 New `ClassClosureHelper` (replaces the cascade-extension)
+- [ ] `business_logic/scheduling/class_closure_helper.h/.cpp/_test.cpp`.
+- [ ] `CloseClassesForRange(Transaction&, const std::vector<int64_t>& classIds, int64_t fromUs, int64_t toUs, std::string_view reason)` — for each class, find its active `class_instances`, create an empty high-priority `class_schedules` impl (no slots) over `[fromUs, toUs)` under it. Derivation then yields no occurrences for those classes in the window. Workshops/series under their own classes are untouched unless explicitly included in `classIds`.
+- [ ] Already-purchased paid occurrences in the window (rare for recurring classes; possible for a series instance) are NOT auto-cancelled — the empty impl just stops *new* derivation. To refund + cancel a specific booked occurrence, admin uses the single-cancel path (§4.2). The impl-save sweep (Phase 1) refuses to silently drop a `purchase_id`-bearing row.
+- [ ] Tests: closing class A for a week yields no derived occurrences for A in that window; a workshop under class B in the same window still derives.
 
-### 4.2 Extend `SessionCancellationHelper`
-- [ ] Check that the existing helper handles mixed paid + zero-money bookings correctly. The current refund flow likely assumes every booking has a paid purchase — verify by reading.
-- [ ] Extend to:
+### 4.2 Extend `SessionCancellationHelper` (ensure-on-action)
+- [ ] Single-occurrence cancel takes the occurrence identity (`class_schedule_slot_id`, `occurrence_date_us`) and first calls `ClassScheduleHelper::EnsureSessionExists` to get/create the `event_sessions` row (the occurrence usually has no persisted row under the lazy model). Then:
   1. For each `booking WHERE event_session_id=? AND status='confirmed'`:
-     - If `purchase_id IS NOT NULL` → issue full refund via `RefundHelper::ProcessRefund(purchase_id)`. Queue cancellation email with `STATUS:CANCELLED` iCal (Phase 4 hookup).
-     - If `purchase_id IS NULL` → no refund, just `booking.status='cancelled'`, decrement `booked_count`, queue cancellation email (without refund line).
-  2. Mark `event_sessions.status='cancelled'` and set `cancellation_reason`.
-- [ ] Tests: mixed-population cancellation refunds the paid attendees and decrements capacity for the rest.
+     - If `purchase_id IS NOT NULL` → full refund via `RefundHelper::ProcessRefund(purchase_id)`. Queue cancellation email with `STATUS:CANCELLED` iCal (Phase 4 hookup).
+     - If `purchase_id IS NULL` → no refund; `booking.status='cancelled'`, decrement `booked_count`, queue cancellation email (no refund line).
+  2. Mark `event_sessions.status='cancelled'` + set `cancellation_reason`.
+- [ ] Tests: ensure-then-cancel on an occurrence with no prior row; mixed-population cancellation refunds paid attendees and decrements capacity for the rest.
 
 ### 4.3 New `InstructorSubstitutionHelper`
 Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cpp`.
 
-- [ ] `struct SubstituteRequest { int64_t eventSessionId; int64_t newInstructorPersonId; std::string reason; int64_t adminPersonId; }`.
+- [ ] `struct SubstituteRequest { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t newInstructorPersonId; std::string reason; int64_t adminPersonId; }`.
 - [ ] `bool Substitute(Transaction&, const SubstituteRequest&)`:
-  1. Load `event_session_staffing` for the session.
-  2. Find the existing `'instructor'` or `'lead_instructor'` row (assume one primary; if multiple, take the first ordered by id).
-  3. Update `person_id` to the new instructor; append substitution note ("Substituted by adminPerson reason: ...") to a `notes` column (add the column if missing — `event_session_staffing.notes TEXT`).
-  4. NO emails sent (per parent OQ-19 / ST-4). Homepage will reflect the new instructor on next render.
+  1. `eventSessionId = ClassScheduleHelper::EnsureSessionExists(classScheduleSlotId, occurrenceDateUs)` (recording trigger #2 — the occurrence may have had no persisted row).
+  2. Load `event_session_staffing` for the session; find the existing `'instructor'` / `'lead_instructor'` row, or seed one from the slot's default `instructor_person_id` if none exists yet.
+  3. Update `person_id` to the new instructor; append a substitution note ("Substituted by adminPerson reason: ...") to `event_session_staffing.notes` (add the column if missing — `event_session_staffing.notes TEXT`).
+  4. NO emails sent (per parent OQ-19 / ST-4). Homepage / calendar reflect the new instructor on next render (overriding the slot default).
   5. Return ok.
 - [ ] Tests.
 
@@ -147,8 +152,11 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 
 ## 5. Endpoints
 
+### 5.0 Admin class closure (batch)
+- [ ] `POST /api/admin/close_classes` body `{ class_ids: int64[], from_us, to_us, reason }` → `ClassClosureHelper::CloseClassesForRange`. Permission `manage_class_schedule`. Endpoint test (verifies empty high-priority impls created; verifies a non-selected class still derives).
+
 ### 5.1 Admin instructor-substitution
-- [ ] `POST /api/admin/event_session/<id>/substitute` body `{ new_instructor_person_id, reason }`. Permission `manage_class_schedule`. Endpoint test.
+- [ ] `POST /api/admin/class_substitute` body `{ class_schedule_slot_id, occurrence_date_us, new_instructor_person_id, reason }`. Permission `manage_class_schedule`. Endpoint test (verifies ensure-session + staffing override, no email). (Takes the occurrence identity, not an `event_session_id`, since the row may not exist yet.)
 
 ### 5.2 Provider portal class-shift-trade
 - [ ] `POST /api/provider/class_shift_change_request` body `{ request_type, target_person_id, event_session_staffing_id, notes }`. Permission `provider` (existing). Endpoint test.
@@ -164,9 +172,9 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 
 ## 6. Frontend
 
-### 6.1 Admin scheduling-exceptions page (extension)
-- [ ] In the existing scheduling-exceptions admin page, the "block dates" action already cascades to service sessions; ensure the affected-class-instances count and list are surfaced in the confirmation dialog.
-- [ ] Spec update.
+### 6.1 Admin class-closure batch UI (new — deferred OQ-CSI-4)
+- [ ] New "Close classes for a date range" admin action: class-multiselect + from/to date pickers + reason. Calls `close_classes`. Shows which classes will be dark for the window (and notes that workshops under their own classes are unaffected unless selected). This is NOT the service-session `scheduling_exceptions` page — that stays separate for the service path.
+- [ ] Spec.
 
 ### 6.2 Admin instructor-substitution dialog
 - [ ] `ui/src/app/pages/portal/manage/event-session-detail/substitute-instructor-dialog/substitute-instructor-dialog.component.*/.spec.ts`.
@@ -185,7 +193,8 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 - [ ] Spec.
 
 ### 6.6 `ServerAccess` extensions
-- [ ] `substituteInstructor(eventSessionId, newInstructorPersonId, reason)`.
+- [ ] `closeClasses(classIds, fromUs, toUs, reason)`.
+- [ ] `substituteInstructor(classScheduleSlotId, occurrenceDateUs, newInstructorPersonId, reason)`.
 - [ ] `submitClassShiftChangeRequest(req)`, etc. — likely just additions on top of the existing provider shift APIs.
 - [ ] `getInstructorLoad(facilityId, dateFrom, dateTo)`.
 - [ ] Update `ServerAccess.mock.spec.ts`.
