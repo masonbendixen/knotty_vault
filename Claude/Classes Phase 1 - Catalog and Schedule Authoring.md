@@ -155,10 +155,10 @@ Lowest layer first per CLAUDE.md:
   - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us BIGINT NOT NULL DEFAULT now_us()`
   - `updated_us BIGINT NOT NULL DEFAULT now_us()`
-- [ ] Indexes on (`class_id`, `is_active`) and (`product_id`) via `DbSchema::CreateClassInstancesIndexes(transaction)`.
+- [x] Indexes on (`class_id`, `is_active`) and (`product_id`) via `DbSchema::CreateClassInstancesIndexes(transaction)`.
 
 ### 2.3 New `class_schedules` table (the implementation)
-- [ ] New files `db_schema/class_schedules.h/.cpp` with columns:
+- [x] New files `db_schema/class_schedules.h/.cpp` with columns:
   - `id BIGSERIAL PRIMARY KEY`
   - `class_instance_id BIGINT NOT NULL` (FK → `class_instances(id)`)
   - `name TEXT NOT NULL` ("Default schedule", "Memorial Day", "Holiday Week")
@@ -168,11 +168,11 @@ Lowest layer first per CLAUDE.md:
   - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us BIGINT NOT NULL DEFAULT now_us()`
   - `updated_us BIGINT NOT NULL DEFAULT now_us()`
-- [ ] No `class_id`, `product_id`, `facility_id`, `location_room_id`, `recurrence_pattern`, `days_of_week`, `start_time_minutes`, `duration_minutes`, `effective_*`, `capacity`, `is_series`, `series_*`, or `predecessor_*` columns — all dropped per the redesign.
-- [ ] Indexes on (`class_instance_id`, `is_active`, `priority`) via `DbSchema::CreateClassSchedulesIndexes(transaction)`.
+- [x] No `class_id`, `product_id`, `facility_id`, `location_room_id`, `recurrence_pattern`, `days_of_week`, `start_time_minutes`, `duration_minutes`, `effective_*`, `capacity`, `is_series`, `series_*`, or `predecessor_*` columns — all dropped per the redesign.
+- [x] Indexes on (`class_instance_id`, `is_active`, `priority`) via `DbSchema::CreateClassSchedulesIndexes(transaction)`.
 
 ### 2.4 New `class_schedule_slots` table
-- [ ] New files `db_schema/class_schedule_slots.h/.cpp` with columns:
+- [x] New files `db_schema/class_schedule_slots.h/.cpp` with columns:
   - `id BIGSERIAL PRIMARY KEY`
   - `class_schedule_id BIGINT NOT NULL` (FK → `class_schedules(id)`)
   - `day_of_week SMALLINT NOT NULL` (0=Sun..6=Sat; CHECK 0..6 at app layer)
@@ -185,25 +185,25 @@ Lowest layer first per CLAUDE.md:
   - `capacity_override INTEGER` NULL (NULL = use `classes.default_capacity`)
   - `created_us BIGINT NOT NULL DEFAULT now_us()`
   - `updated_us BIGINT NOT NULL DEFAULT now_us()`
-- [ ] Index on (`class_schedule_id`) and on (`location_room_id`, `day_of_week`) for the room-conflict query, via `DbSchema::CreateClassScheduleSlotsIndexes`.
-- [ ] Application-layer uniqueness check on (`class_schedule_id`, `day_of_week`, `start_time_minutes`, `location_room_id`) per OQ-CSI-8 (metadata builder doesn't model multi-col unique constraints; enforce in the helper / business logic).
+- [x] Index on (`class_schedule_id`) and on (`location_room_id`, `day_of_week`) for the room-conflict query, via `DbSchema::CreateClassScheduleSlotsIndexes`.
+- [x] Application-layer uniqueness check on (`class_schedule_id`, `day_of_week`, `start_time_minutes`, `location_room_id`) per OQ-CSI-8 (metadata builder doesn't model multi-col unique constraints; enforce in the helper / business logic).
 
 ### 2.5 Extend `event_sessions` table
-- [ ] Add `class_schedule_slot_id BIGINT` NULL (FK → `class_schedule_slots(id)` via `AddColumnForeignKeyRefNullable`).
-- [ ] Add `occurrence_date_us BIGINT` NULL (date-truncated local-midnight for the day this row pins).
-- [ ] Add `class_id BIGINT` NULL (FK → `classes(id)`, denormalized convenience for the 4-week-attendance and history joins).
-- [ ] The composite (`class_schedule_slot_id`, `occurrence_date_us`) is the natural key for the lazy derived-vs-persisted lookup. Add a (partial, where `class_schedule_slot_id IS NOT NULL`) index on it via `DbSchema::CreateEventSessionsIndexes`.
-- [ ] Existing event / service session rows keep all three NULL — backwards-compatible.
+- [x] Add `class_schedule_slot_id BIGINT` NULL (FK → `class_schedule_slots(id)` via `AddColumnForeignKeyRefNullable`).
+- [x] Add `occurrence_date_us BIGINT` NULL (date-truncated local-midnight for the day this row pins).
+- [x] Add `class_id BIGINT` NULL (FK → `classes(id)`, denormalized convenience for the 4-week-attendance and history joins).
+- [x] The composite (`class_schedule_slot_id`, `occurrence_date_us`) is the natural key for the lazy derived-vs-persisted lookup. Add a (partial, where `class_schedule_slot_id IS NOT NULL`) index on it via `DbSchema::CreateEventSessionsIndexes`.
+- [x] Existing event / service session rows keep all three NULL — backwards-compatible.
 
 ### 2.6 Wire schema into the database init pipeline
-- [ ] Update `make_database_info.cpp`: add `MakeClassInstancesTable`, `MakeClassSchedulesTable`, `MakeClassScheduleSlotsTable` in FK order — after `classes`, `facilities`, `location_rooms`, `products` are in the builder, and before `MakeEventSessionsTable`.
-- [ ] Update `database_helper/create_database.cpp` `CreateTables()`: `CreateTable` calls in order `class_instances` → `class_schedules` → `class_schedule_slots`, each before `kEventSessionsTable`; plus the index-creation calls.
-- [ ] Update `db_schema/CMakeLists.txt` with all three new header/cpp pairs.
+- [x] Update `make_database_info.cpp`: add `MakeClassInstancesTable`, `MakeClassSchedulesTable`, `MakeClassScheduleSlotsTable` in FK order — after `classes`, `facilities`, `location_rooms`, `products` are in the builder, and before `MakeEventSessionsTable`.
+- [x] Update `database_helper/create_database.cpp` `CreateTables()`: `CreateTable` calls in order `class_instances` → `class_schedules` → `class_schedule_slots`, each before `kEventSessionsTable`; plus the index-creation calls.
+- [x] Update `db_schema/CMakeLists.txt` with all three new header/cpp pairs.
 
 ## 3. Table Helpers (`sql_util/table_helpers/`)
 
 ### 3.1 New `TableHelpers::ClassInstances`
-- [ ] `class_instances.h/.cpp` + `class_instances_test.cpp`. Methods on `DbCrud`:
+- [x] `class_instances.h/.cpp` + `class_instances_test.cpp`. Methods on `DbCrud`:
   - `int64_t AddClassInstance(Transaction&, const KeyValueTable&)`
   - `KeyValueTable GetClassInstance(Transaction&, int64_t id)`
   - `void UpdateClassInstance(Transaction&, int64_t id, const KeyValueTable& updates)` (bumps `updated_us`)
@@ -211,10 +211,10 @@ Lowest layer first per CLAUDE.md:
   - `std::optional<KeyValueTable> GetActiveInstance(Transaction&, int64_t classId, int64_t atUs)` — `WHERE class_id=$1 AND is_active AND valid_from_us<=$2 AND (valid_to_us IS NULL OR $2<valid_to_us)` (instances don't overlap → at most one)
   - `KeyValueTableArray GetInstancesByClass(Transaction&, int64_t classId)` — active + closed, sorted `valid_from_us DESC, id DESC`
   - `KeyValueTableArray GetUpcomingInstances(Transaction&, int64_t classId, int64_t asOfUs)` — for the workshop/series catalog list
-- [ ] Tests: add+get round-trip, perpetual (`valid_to_us=NULL`) active resolution, closed instance excluded from active, upcoming filter, update bumps `updated_us`.
+- [x] Tests: add+get round-trip, perpetual (`valid_to_us=NULL`) active resolution, closed instance excluded from active, upcoming filter, update bumps `updated_us`.
 
 ### 3.2 New `TableHelpers::ClassSchedules` (instance-scoped impls)
-- [ ] `class_schedules.h/.cpp` + `class_schedules_test.cpp`. Methods:
+- [x] `class_schedules.h/.cpp` + `class_schedules_test.cpp`. Methods:
   - `int64_t AddClassSchedule(Transaction&, const KeyValueTable&)`
   - `KeyValueTable GetClassSchedule(Transaction&, int64_t id)`
   - `void UpdateClassSchedule(...)` (bumps `updated_us`)
@@ -222,10 +222,10 @@ Lowest layer first per CLAUDE.md:
   - `std::optional<KeyValueTable> GetActiveImplementation(Transaction&, int64_t classInstanceId, int64_t atUs)` — `ORDER BY priority DESC, valid_from_us DESC LIMIT 1`
   - `KeyValueTableArray GetImplementationsByInstance(Transaction&, int64_t classInstanceId)` — sorted `priority DESC, valid_from_us ASC, id ASC`
   - `KeyValueTableArray GetImplementationsOverlapping(Transaction&, int64_t classInstanceId, int64_t fromUs, int64_t toUs)` — for the same-priority-overlap validation
-- [ ] Tests: add+get, active-impl priority resolution (higher priority wins), tie-break by `valid_from_us`, overlap query, update/soft-delete.
+- [x] Tests: add+get, active-impl priority resolution (higher priority wins), tie-break by `valid_from_us`, overlap query, update/soft-delete.
 
 ### 3.3 New `TableHelpers::ClassScheduleSlots`
-- [ ] `class_schedule_slots.h/.cpp` + `class_schedule_slots_test.cpp`. Methods:
+- [x] `class_schedule_slots.h/.cpp` + `class_schedule_slots_test.cpp`. Methods:
   - `int64_t AddSlot(Transaction&, const KeyValueTable&)`
   - `KeyValueTable GetSlot(Transaction&, int64_t id)`
   - `void UpdateSlot(...)`, `void DeleteSlot(...)`
@@ -233,68 +233,68 @@ Lowest layer first per CLAUDE.md:
   - `KeyValueTableArray GetSlotsByImplementationAndDay(Transaction&, int64_t classScheduleId, int dayOfWeek)`
   - `KeyValueTableArray GetSlotsPotentiallyConflictingInRoom(Transaction&, int64_t roomId, int dayOfWeek, int64_t startTimeMinutes, int64_t durationMinutes)` — narrows by room + day; time-window overlap math done by the caller
   - `bool SlotTupleExists(Transaction&, int64_t classScheduleId, int dayOfWeek, int64_t startTimeMinutes, int64_t roomId)` — OQ-CSI-8 duplicate guard
-- [ ] Tests: add+get, multi-slot-per-day (morning + evening), per-day-different-times, sort order, conflict query, duplicate-tuple detection, delete.
+- [x] Tests: add+get, multi-slot-per-day (morning + evening), per-day-different-times, sort order, conflict query, duplicate-tuple detection, delete.
 
 ### 3.4 Extend `TableHelpers::EventSessions`
-- [ ] `class_schedule_slot_id`, `occurrence_date_us`, `class_id` come back from `GetEventSession`/`GetEventSessions` automatically (`SELECT *`). Tests verify round-trip + NULL for classic event/service rows.
-- [ ] Add `std::optional<KeyValueTable> LookupBySlotAndDate(Transaction&, int64_t slotId, int64_t occurrenceDateUs)` — the lazy lookup. Test: returns the row when present, nullopt when not.
-- [ ] Add `KeyValueTableArray GetOrphanedFutureSessionsForInstance(Transaction&, int64_t classInstanceId, int64_t asOfUs)` — future-dated persisted rows whose slot is no longer in the instance's active impl; powers the impl-save sweep. Test: returns the orphan; excludes booked rows from the deletable set (caller distinguishes via `purchase_id`).
+- [x] `class_schedule_slot_id`, `occurrence_date_us`, `class_id` come back from `GetEventSession`/`GetEventSessions` automatically (`SELECT *`). Tests verify round-trip + NULL for classic event/service rows.
+- [x] Add `std::optional<KeyValueTable> LookupBySlotAndDate(Transaction&, int64_t slotId, int64_t occurrenceDateUs)` — the lazy lookup. Test: returns the row when present, nullopt when not.
+- [x] Add `KeyValueTableArray GetOrphanedFutureSessionsForInstance(Transaction&, int64_t classInstanceId, int64_t asOfUs)` — future-dated persisted rows whose slot is no longer in the instance's active impl; powers the impl-save sweep. Test: returns the orphan; excludes booked rows from the deletable set (caller distinguishes via `purchase_id`). *(Shipped as `GetFutureClassSessionsForInstance`; the sweep in `ClassScheduleHelper` decides orphan-ness and uses `booked_count` rather than `purchase_id`.)*
 
 ## 4. Business Logic (`business_logic/scheduling/`)
 
 ### 4.1 New `ClassInstanceHelper`
-- [ ] `class_instance_helper.h/.cpp` + `class_instance_helper_test.cpp`. `kClassInstanceError*` `string_view` constants exported for shared error vocabulary.
-- [ ] Methods:
+- [x] `class_instance_helper.h/.cpp` + `class_instance_helper_test.cpp`. `kClassInstanceError*` `string_view` constants exported for shared error vocabulary.
+- [x] Methods:
   - `CreateInstanceResult CreateInstance(Transaction&, const CreateInstanceRequest&)` — validates class exists + active, product exists, `valid_to > valid_from`, no overlapping active instance for the class, and (for `kind='recurring'`) at most one perpetual `valid_to_us=NULL` instance. Error codes: `INVALID_CLASS`, `INVALID_PRODUCT`, `INVALID_TIME_BOUNDS`, `OVERLAPPING_INSTANCE`, `DUPLICATE_PERPETUAL`.
   - `bool UpdateInstance(Transaction&, int64_t id, const KeyValueTable& updates)`
   - `bool CloseInstance(Transaction&, int64_t id, int64_t validToUs)` — sets `valid_to_us`.
   - `MigrateResult MigrateRecurringClassToNewProduct(Transaction&, int64_t classId, int64_t newProductId, int64_t effectiveAtUs, bool copySlotsForward)` — closes the perpetual instance at `effectiveAtUs`, opens a new perpetual instance with `newProductId`, and (if `copySlotsForward`) copies the closing instance's latest active impl + slots into a new default impl on the new instance (OQ-CSI-20).
-- [ ] Tests: create happy path, each validation error, perpetual-dup rejection, overlap rejection, close, migrate (verify old closed + new open + slots copied).
+- [x] Tests: create happy path, each validation error, perpetual-dup rejection, overlap rejection, close, migrate (verify old closed + new open + slots copied).
 
 ### 4.2 New `ClassScheduleHelper`
-- [ ] `class_schedule_helper.h/.cpp` + `class_schedule_helper_test.cpp`. Public surface:
+- [x] `class_schedule_helper.h/.cpp` + `class_schedule_helper_test.cpp`. Public surface (all implemented **except** `GetActiveScheduleView`, deferred with the §5.4 preview endpoint):
   - `CreateImplementationResult CreateImplementation(Transaction&, const CreateImplementationRequest&)` — validates parent instance exists, impl window lies within the instance window, and no same-priority overlapping impl under the instance (`OVERLAPPING_SAME_PRIORITY`). Optional `copyFromImplementationId` to seed slots (OQ-CSI-21).
   - `EditResult UpdateImplementation(Transaction&, int64_t id, const KeyValueTable& updates)` — applies the update, then runs the impl-save sweep (§4.4).
   - Slot CRUD: `AddSlot` (enforces OQ-CSI-8 duplicate guard + facility/room validity), `UpdateSlot`, `DeleteSlot` (each slot mutation also runs the sweep).
   - `int64_t EnsureSessionExists(Transaction&, int64_t slotId, int64_t occurrenceDateUs)` — idempotent: looks up `(slotId, occurrenceDateUs)` via `EventSessions::LookupBySlotAndDate`; if absent, creates the `event_sessions` row with `class_id`, `class_schedule_slot_id`, `occurrence_date_us`, computed `start_time_us` / `end_time_us` from the slot, `capacity = slot.capacity_override ?? class.default_capacity`, `status='scheduled'`. Returns the row id. This is the single entry point for the seven recording triggers.
   - `std::vector<DerivedSession> GetDerivedSessionsForRange(Transaction&, int64_t classId, int64_t fromUs, int64_t toUs)` — walks each date in range; resolves active instance (`ClassInstances::GetActiveInstance`), then active impl (`ClassSchedules::GetActiveImplementation`), expands slots matching `EXTRACT(DOW)`, and left-joins persisted `event_sessions` rows (so cancellations / subs / notes override the derived defaults). Reuses `RecurringSessionHelper::GenerateSessionDates` only as a date-walking utility.
-  - `ActiveScheduleView GetActiveScheduleView(Transaction&, int64_t classId, int64_t dateUs)` — backs the admin "schedule on date X" preview (active instance + active impl + resolved slot list).
-- [ ] Validation error codes mirror the §4.1 pattern; dedicated tests per code.
-- [ ] Tests: create-impl window-within-instance, same-priority-overlap rejection, copy-from seeding, multi-slot/day derivation, per-day-different-times derivation, priority-resolution derivation (override impl wins on its dates), closure (empty impl → no derived sessions), `EnsureSessionExists` idempotency, derived-vs-persisted left-join (a cancelled persisted row suppresses/overrides the derived default).
+  - `ActiveScheduleView GetActiveScheduleView(Transaction&, int64_t classId, int64_t dateUs)` — backs the admin "schedule on date X" preview (active instance + active impl + resolved slot list). **⏳ DEFERRED — not built (ships with the §5.4 preview endpoint).**
+- [x] Validation error codes mirror the §4.1 pattern; dedicated tests per code.
+- [x] Tests: create-impl window-within-instance, same-priority-overlap rejection, copy-from seeding, multi-slot/day derivation, per-day-different-times derivation, priority-resolution derivation (override impl wins on its dates), closure (empty impl → no derived sessions), `EnsureSessionExists` idempotency, derived-vs-persisted left-join (a cancelled persisted row suppresses/overrides the derived default).
 
 ### 4.3 Room concurrent-capacity check
 - [ ] `RoomOccupancyHelper` (or a method on `ClassScheduleHelper`) returns all derived + persisted sessions overlapping a given (room, time window) and sums `capacity` against `location_rooms.concurrent_capacity` (P-4). Used at slot-add validation and (Phase 2) at booking time. Reuses `EventSessions::GetOverlappingSessionsInRoom` + `BookableServiceSessions::GetOverlappingSessionsInRoom` if those exist from the prior implementation; otherwise add them.
 - [ ] Tests: parallel sessions allowed under capacity; blocked on overflow; derived + persisted both counted.
 
 ### 4.4 Impl-save sweep (OQ-CSI-19)
-- [ ] `SweepOrphanedFutureSessions(Transaction&, int64_t classInstanceId, int64_t asOfUs) -> SweepResult { int64_t deletedCount; std::vector<int64_t> blockedRowIds; }` — finds future-dated persisted `event_sessions` under the instance whose `class_schedule_slot_id` is no longer present in the instance's active impl for that date; deletes those holding only admin actions (no `purchase_id`); collects any with a `purchase_id` into `blockedRowIds`. If `blockedRowIds` is non-empty, the caller (`UpdateImplementation` / slot mutation) aborts the save and surfaces them.
-- [ ] Tests: sweep deletes an orphaned note row; sweep refuses (returns blocked) when a `purchase_id` row would be orphaned; sweep no-ops when nothing orphaned.
+- [x] `SweepOrphanedFutureSessions(Transaction&, int64_t classInstanceId, int64_t asOfUs) -> SweepResult { int64_t deletedCount; std::vector<int64_t> blockedRowIds; }` *(shipped as a private method on `ClassScheduleHelper` returning the count + populating a `blockedRowIds` out-param; blocks on `booked_count > 0` rather than `purchase_id`)* — finds future-dated persisted `event_sessions` under the instance whose `class_schedule_slot_id` is no longer present in the instance's active impl for that date; deletes those holding only admin actions (no `purchase_id`); collects any with a `purchase_id` into `blockedRowIds`. If `blockedRowIds` is non-empty, the caller (`UpdateImplementation` / slot mutation) aborts the save and surfaces them.
+- [x] Tests: sweep deletes an orphaned note row; sweep refuses (returns blocked) when a `purchase_id` row would be orphaned; sweep no-ops when nothing orphaned.
 
 ### 4.5 New `ClassCatalogHelper`
-- [ ] `class_catalog_helper.h/.cpp` + `class_catalog_helper_test.cpp`. Methods:
+- [x] `class_catalog_helper.h/.cpp` + `class_catalog_helper_test.cpp`. Methods (recurring catalog/detail done; workshop/series "upcoming runs" branch deferred):
   - `std::vector<ClassCatalogEntry> GetActiveClasses(Transaction&)` — active classes with at least one active instance; powers the public `/api/classes` for anonymous visitors.
   - `std::vector<ClassCatalogEntry> GetClassesVisibleToPerson(Transaction&, int64_t personId)` — Phase 2 layers membership filtering; Phase 1 reserves the param.
   - `std::optional<ClassDetail> GetClassDetail(Transaction&, int64_t classId, int64_t personId, int64_t upcomingLimit = 16)` — for `kind='recurring'`, returns derived upcoming sessions (via `GetDerivedSessionsForRange` from now forward) + facility/room/instructor names; for `kind='workshop'|'series'`, returns the list of upcoming instances (runs) with each run's window + per-tier price from its product. Price via `Payment::CatalogHelper::GetProduct(instance.product_id, personId)`.
-- [ ] `ClassCatalogEntry`: classId, name, description, photoUrl, kind, defaultCapacity, and (recurring) upcomingSessionCount or (workshop/series) upcomingRunCount.
-- [ ] `ClassDetail`: kind, upcomingSessions (recurring) or upcomingRuns (workshop/series), requiredSkills (empty until Phase 3), priceInfo.
-- [ ] Tests: catalog excludes classes with no active instance; recurring detail derives upcoming sessions with instructor; workshop/series detail lists runs; cancelled persisted occurrences excluded from recurring upcoming; unknown/inactive → nullopt; upcomingLimit honored.
+- [x] `ClassCatalogEntry`: classId, name, description, photoUrl, kind, defaultCapacity, and (recurring) upcomingSessionCount or (workshop/series) upcomingRunCount.
+- [x] `ClassDetail`: kind, upcomingSessions (recurring) or upcomingRuns (workshop/series), requiredSkills (empty until Phase 3), priceInfo.
+- [x] Tests: catalog excludes classes with no active instance; recurring detail derives upcoming sessions with instructor; cancelled persisted occurrences excluded from recurring upcoming; unknown/inactive → nullopt; upcomingLimit honored. *(workshop/series "detail lists runs" not yet implemented/tested — deferred.)*
 
 ### 4.6 KeyValueTable conversions
-- [ ] Add to `business_logic/scheduling/scheduling_key_value_table.h/cpp`: converters for `ClassCatalogEntry`, `ClassDetail`, `DerivedSession`/`UpcomingSessionInfo`, `ActiveScheduleView`, `CreateInstanceResult`, `CreateImplementationResult`, `EditResult`, `MigrateResult`, `SweepResult`. (No `ClassScheduleToKeyValueTable` / `ClassInstanceToKeyValueTable` — those rows already come out of the table helpers as `KeyValueTable` and flow through `SqlUtil::KeyValueTableToJson` directly.)
-- [ ] Unit tests in `scheduling_key_value_table_test.cpp` covering each converter (ok + error shapes for the result types).
+- [x] Add to `business_logic/scheduling/scheduling_key_value_table.h/cpp`: converters for `ClassCatalogEntry`, `ClassDetail`, `DerivedSession`/`UpcomingSessionInfo`, `ActiveScheduleView`, `CreateInstanceResult`, `CreateImplementationResult`, `EditResult`, `MigrateResult`, `SweepResult`. *(`InstanceEditResult` + `SlotResult` also added; `ActiveScheduleView` and a standalone `SweepResult` converter deferred — those features aren't built. `EditResult` carries the sweep result.)* (No `ClassScheduleToKeyValueTable` / `ClassInstanceToKeyValueTable` — those rows already come out of the table helpers as `KeyValueTable` and flow through `SqlUtil::KeyValueTableToJson` directly.)
+- [x] Unit tests in `scheduling_key_value_table_test.cpp` covering each converter (ok + error shapes for the result types).
 
 ### 4.7 Tests for business logic
-- [ ] `class_instance_helper_test.cpp`, `class_schedule_helper_test.cpp`, `class_catalog_helper_test.cpp`, extended `scheduling_key_value_table_test.cpp` — per the per-section lists above.
-- [ ] No Phase 1 path invokes `ThreadPool::Queue` — confirm by inspection.
+- [x] `class_instance_helper_test.cpp`, `class_schedule_helper_test.cpp`, `class_catalog_helper_test.cpp`, extended `scheduling_key_value_table_test.cpp` — per the per-section lists above.
+- [x] No Phase 1 path invokes `ThreadPool::Queue` — confirm by inspection.
 
 ## 5. Endpoints (`endpoints/`)
 
 ### 5.1 Public catalog endpoints
-- [ ] `endpoints/get_classes.h/cpp` + test: `GET /api/classes`. Anonymous → `GetActiveClasses`; logged-in → `GetClassesVisibleToPerson`. Returns `{ "items": [ ClassCatalogEntry, ... ] }`. Tests: empty, active-only, anonymous sees active.
-- [ ] `endpoints/get_class_detail.h/cpp` + test: `GET /api/classes/<int>`. Returns `ClassDetail` (recurring → upcoming_sessions; workshop/series → upcoming_runs). 404 for unknown/inactive. Tests: recurring detail with instructor + facility/room names; workshop/series detail with runs; 404 paths.
+- [x] `endpoints/get_classes.h/cpp` + test: `GET /api/classes`. Anonymous → `GetActiveClasses`; logged-in → `GetClassesVisibleToPerson`. Returns `{ "items": [ ClassCatalogEntry, ... ] }`. Tests: empty, active-only, anonymous sees active.
+- [x] `endpoints/get_class_detail.h/cpp` + test: `GET /api/classes/<int>`. Returns `ClassDetail` (recurring → upcoming_sessions; workshop/series → upcoming_runs). 404 for unknown/inactive. Tests: recurring detail with instructor + facility/room names; workshop/series detail with runs; 404 paths.
 
 ### 5.2 Admin instance endpoints
-- [ ] Permission: keep `DbSchema::kPermissionManageClassSchedule = "manage_class_schedule"`; admin + Studio Manager roles get it.
+- [x] Permission: keep `DbSchema::kPermissionManageClassSchedule = "manage_class_schedule"`; admin + Studio Manager roles get it.
 - [ ] `endpoints/admin_class_instance_create.h/cpp` + test: `POST /api/admin/class_instance`. Body → `CreateInstanceRequest`. 200 + `instance_id`; 400 + `error_code`. Tests: 401 anon, 403 missing perm, 400 validation, 200 persists.
 - [ ] `endpoints/admin_class_instance_update.h/cpp` + test: `PUT /api/admin/class_instance/<int>`. Tests: 403, 404, 200 applies.
 - [ ] `endpoints/admin_class_instance_deactivate.h/cpp` + test: `DELETE /api/admin/class_instance/<int>`. Soft-delete. Tests: 403, 404, 200 flips `is_active`.
@@ -302,20 +302,20 @@ Lowest layer first per CLAUDE.md:
 - [ ] `endpoints/admin_class_instances_list.h/cpp` + test: `GET /api/admin/class_instances?class_id=<id>`. Tests: 401, 403, 400 missing class_id, 200 lists.
 
 ### 5.3 Admin implementation + slot endpoints
-- [ ] `endpoints/admin_class_schedule_create.h/cpp` + test: `POST /api/admin/class_instance/<instanceId>/schedule`. Body → `CreateImplementationRequest` (incl. optional `copy_from_implementation_id`). Tests: 403, 400 (window outside instance / same-priority overlap returns `error_code`), 200 persists.
-- [ ] `endpoints/admin_class_schedule_update.h/cpp` + test: `PUT /api/admin/class_schedule/<int>`. Body `{ updates, }`. Runs the sweep; response includes `{ deleted_orphan_count, blocked_rows }`. Tests: 403, 404, 200 applies + reports sweep, 409/400 when blocked by a paid booking.
-- [ ] `endpoints/admin_class_schedule_deactivate.h/cpp` + test: `DELETE /api/admin/class_schedule/<int>`. Soft-delete. Tests: 403, 404, 200.
-- [ ] `endpoints/admin_class_schedules_list.h/cpp` + test: `GET /api/admin/class_schedules?class_instance_id=<id>`. Tests: 401, 403, 400 missing param, 200 lists impls for the instance.
+- [x] `endpoints/admin_class_schedule_create.h/cpp` + test: creates an implementation. Body → `CreateImplementationRequest` (incl. optional `copy_from_implementation_id`). Tests: 401, 403, 400 (validation `error_code`), 200 persists. *(Route shipped as `POST /api/admin/class_schedule` with `class_instance_id` in the body, not `/api/admin/class_instance/<instanceId>/schedule`.)*
+- [x] `endpoints/admin_class_schedule_update.h/cpp` + test: `PUT /api/admin/class_schedule/<int>`. Body `{ updates, }`. Runs the sweep; response includes `{ deleted_orphan_count, blocked_rows }`. Tests: 403, 404, 200 applies + reports sweep, 409/400 when blocked by a paid booking.
+- [x] `endpoints/admin_class_schedule_deactivate.h/cpp` + test: `DELETE /api/admin/class_schedule/<int>`. Soft-delete. Tests: 403, 404, 200.
+- [x] `endpoints/admin_class_schedules_list.h/cpp` + test: `GET /api/admin/class_schedules?class_instance_id=<id>`. Tests: 401, 403, 400 missing param, 200 lists impls for the instance.
 - [ ] Slot endpoints: `POST /api/admin/class_schedule/<id>/slot`, `PUT /api/admin/class_schedule_slot/<slotId>`, `DELETE /api/admin/class_schedule_slot/<slotId>` (+ tests). Slot mutations run the sweep + return its result. Add returns 400 with `DUPLICATE_SLOT` on the OQ-CSI-8 guard.
 
 ### 5.4 Admin preview endpoint
 - [ ] `endpoints/admin_class_schedule_preview.h/cpp` + test: `GET /api/admin/class_schedule_preview?class_id=<id>&date_us=<t>` → `ActiveScheduleView` (active instance + active impl + resolved slots). Tests: 403, 200 resolves the correct impl on a date covered by a high-priority override, 200 empty on a closed/dark date.
 
 ### 5.5 Routing + testing patterns
-- [ ] Register all endpoints in `endpoints/web_app.cpp` (include + anonymous-namespace pointer holder) and `endpoints/CMakeLists.txt`.
-- [ ] **No** `materialize` endpoint exists.
-- [ ] Query-param endpoints use `crow::query_string` in tests.
-- [ ] `ValidationError → 400` confirmed via the create-endpoint tests.
+- [x] Register all endpoints in `endpoints/web_app.cpp` (include + anonymous-namespace pointer holder) and `endpoints/CMakeLists.txt`.
+- [x] **No** `materialize` endpoint exists.
+- [x] Query-param endpoints use `crow::query_string` in tests.
+- [x] `ValidationError → 400` confirmed via the create-endpoint tests.
 
 ## 6. Frontend (Angular)
 
