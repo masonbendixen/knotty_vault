@@ -76,10 +76,15 @@ Option C only if you'd rather not carry the new schema while the higher layers c
 # 6. Open questions for Mason
 
 - **OQ-1.** Which option / sequence do you want? (Recommendation: A-now-then-B.)
+	- Mason- I'm compiling is just part of it. I need unit tests to pass so option B really is the only option.
 - **OQ-2.** For `class_schedule_helper.cpp` under Option A: **stub the bodies** (keep the file + endpoints compiling, methods return empty results) or **exclude the helper + its flat-model endpoints from CMake** (cleaner, but removes routes until Phase B)?
+	- Mason- We need to go with option B. I'm not interested in just getting things to compile with a broken code base.
 - **OQ-3.** Is a "green core build with dead flat-model class paths" acceptable as an intermediate state, or do you want the tests target green too before we call it done?
+	- Mason- I will not check in to version control without all unit tests passing.
 - **OQ-4.** When we do Option B, confirm the rollback lesson: land it **one layer at a time with your review between layers**, not as a single sweep?
+	- Mason- I need all the tests to pass. I didn't realize what you were doing before. I thought you were moving on to the next phases. I didn't realize this was all because of the model changes. 
 - **OQ-5.** Frontend flat-model surface (`class-schedule-materialize-dialog`, `class.types.ts`, ServerAccess class-schedule methods) — leave untouched until the backend migration is done, or remove the materialize UI now since the new model has no materialization step?
+	- Mason- let's tackle that as a separate step after completing the server side.
 
 # 7. Notes / scratch
 (Use this section as we work through the decisions.)
