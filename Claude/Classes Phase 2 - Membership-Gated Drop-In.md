@@ -43,9 +43,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 **Prerequisites:**
 - Phase 1 complete (classes catalog + the three-level `classes` → `class_instances` → `class_schedules` → `class_schedule_slots` model + lazy-derived `event_sessions`).
-- Existing payment / product / product_prices / cancellation_policies / cancellation_policy_windows infrastructure ([[Payment Design Document]], [[Event Polish- Scheduling Should Have Items]]).
+- Existing payment / product / product_prices / cancellation_policies / cancellation_policy_windows infrastructure \([[Payment Design Document]], [[Event Polish- Scheduling Should Have Items]]\).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
 > Phase 1 was redesigned to a three-level model with **lazy session derivation** (no materialization). For Phase 2 this means:
 > - **`product_id` is on `class_instances`, not on a flat `class_schedule`.** Per-tier pricing / visibility / booking permissions / cancellation policy / advance windows all resolve from the active instance's product. Where this doc says "the `class_schedule`'s product", read "the active `class_instances` row's product".
 > - **The catalog visibility query returns DERIVED sessions, not pre-materialized rows.** `GetVisibleEventSessions` (or its class-aware successor) must call `ClassScheduleHelper::GetDerivedSessionsForRange` and surface `class_id` / `class_name` / `photo_url` from the derivation, left-joining any persisted `event_sessions` rows. A future occurrence with no persisted row is normal.
