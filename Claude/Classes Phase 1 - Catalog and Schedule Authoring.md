@@ -382,12 +382,15 @@ All eleven CLAUDE.md steps for EACH of `class_instances`, `class_schedules`, `cl
 - [x] Keep the `kind='class'` `class-dropin` product. Cancellation policies already seeded.
 
 ## 10. Tests Summary
+
+> **§10 status (verified 2026-05-29):** Complete **except** the manual-testing-helper commands (last bullet). The endpoint + frontend lines, marked pending when this was written, were delivered in Phases 5 and 6.
+
 - [x] Table helpers: `class_instances_test.cpp`, `class_schedules_test.cpp`, `class_schedule_slots_test.cpp`, extended `event_sessions_test.cpp`.
 - [x] Business logic: `class_instance_helper_test.cpp`, `class_schedule_helper_test.cpp`, `class_catalog_helper_test.cpp`, extended `scheduling_key_value_table_test.cpp` (+ sweep tests). *(Room-occupancy tests pending — §4.3 not built.)*
-- [~] Endpoint tests: catalog (`get_classes`, `get_class_detail`) + the four admin implementation endpoints (create/update/deactivate/list) done with success/permission/validation paths. Instance, slot, and preview endpoint tests pending (those endpoints not built).
-- [ ] Frontend: component specs for catalog, detail, class list/detail, instance detail, impl detail, slot editor, preview, sweep-confirmation modal.
-- [ ] `ServerAccess.mock.spec.ts` updated.
-- [ ] Manual-testing-helper commands: `list_class_instances`, `list_class_schedules <instance_id>`, `preview_schedule <class_id> <date>` (no materialize command).
+- [x] Endpoint tests: catalog (`get_classes`, `get_class_detail`) + **all** admin endpoints — instance create/update/deactivate/list, schedule create/update/deactivate/list, slot create/update/delete, slots-list (+ predecessor candidates), and preview — each with success/permission/validation paths.
+- [x] Frontend: specs for the public catalog (`class-info`) + detail (`class-detail`), and the consolidated admin UI — `class-schedule-manage.component.spec.ts`, the five dialog specs (instance / migrate / schedule / slot / class form), and `class-schedule-date-util.spec.ts`. *(The originally-planned separate "instance detail / impl detail / slot editor / preview / sweep-modal" components were consolidated into one component + dialogs in §6.3; the sweep is surfaced inline rather than as a modal.)*
+- [x] `ServerAccess.mock.spec.ts` updated (class catalog, instance/schedule/slot CRUD, preview, slot listing, cross-class predecessor candidates).
+- [ ] Manual-testing-helper commands: `list_class_instances`, `list_class_schedules <instance_id>`, `preview_schedule <class_id> <date>` (no materialize command). **Not built** — the `test_helper/commands/` framework has no class command file yet (only booking/product/subscription/user/utility/voucher).
 
 ## 11. Cross-Layer Acceptance Criteria
 A new admin on a fresh DB can:
