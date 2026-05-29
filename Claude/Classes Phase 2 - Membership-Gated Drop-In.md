@@ -37,6 +37,30 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+## Implementation Status (2026-05-29)
+
+**Done — the membership/pricing surface + booking guard (the §10 acceptance pillars), with tests at every layer. Frontend verified (367 specs pass, `ng build` clean); C++ written to convention for the user to build.**
+
+Delivered:
+- **DB:** `products.is_membership_included BOOLEAN NOT NULL DEFAULT FALSE` (constant + DDL in `products.{h,cpp}`).
+- **Business logic §4.1:** `Payment::CatalogHelper::ResolveBestPriceForPerson` + `PersonalizedPrice` (inclusion-wins, then lowest qualifying tier/public price, else `NO_TIER_MATCH`) + `PersonHoldsPermission`. 5 new `catalog_helper_test` cases.
+- **Class catalog integration:** `ClassCatalogHelper::GetClassDetail` now sets real `isIncludedInMembership` + tier price + `isAvailable`; `GetClassesVisibleToPerson` hides deliberately members-only classes the viewer can't access (precise filter via `productIsMembershipIncluded` so unpriced classes keep prior visibility — no Phase-1 test breakage). 3 new `class_catalog_helper_test` cases.
+- **Booking guard §4.3:** `BookingHelper::BookEvent` rejects a membership-included class session with `NO_ADVANCE_BOOKING_REQUIRED` (maps to 400 via the endpoint's default branch — OQ-P2-2). 2 new `booking_helper_test` cases (reject + paid-class-still-books).
+- **KVT §4.4:** `ClassDetailToKeyValueTable` surfaces `price_is_available`; `price_included_in_membership` is now real. KVT tests added.
+- **Endpoints §5.1 (partial):** `/api/classes/<id>` already flows the resolved price via `ClassDetailToKeyValueTable`; `book_event` maps the guard to 400.
+- **Frontend §6.1:** `ClassDetail.price_is_available` added; `ServerAccessNetwork.getClassDetail` normalizes the boolean-ish price flags (the KVT→JSON layer emits `"true"/"false"` strings — also fixes a latent Phase-1 truthy-string bug); `class-detail` shows included / tier-price+no-refund-note / members-only via `pricingState`. Component spec + mock + mock.spec updated.
+- **Admin §7:** friendly name + bool edit-type for `is_membership_included`.
+
+Deferred (documented, not started — each carries either regression risk to non-class flows or is a larger surface):
+- **§4.2 event-session visibility projection** — surfacing class metadata on `GetVisibleEventSessions` needs the derived-session rewrite (`GetDerivedSessionsForRange`); large. The class catalog already covers the class visibility/pricing surface.
+- **§4.3 cancel no-refund / admin-cancel refund split** — must be scoped to *class* bookings only; changing `CancelBooking`/`SessionCancellationHelper` globally would regress existing event refunds. Needs care + dedicated tests.
+- **§5.2 `GET /api/me/visible_classes`** — new endpoint.
+- **§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped: pricing/visibility resolve through the active `class_instances` product (canonical source), avoiding a denormalized column nobody populates. See OQ below.
+- **Frontend §6.2 calendar chips, §6.3 my-bookings class chrome, §6.4 `cancellation-policy.component`, §6.5 `getVisibleClasses`** — depend on §4.2/§5.2/cancel work above.
+
+New open question:
+- **OQ-P2-3.** Confirm dropping `classes.required_permission_id` (compute via the active instance's product instead of denormalizing). Recommended: yes — the catalog filter joins `classes→class_instances→products` and resolves through `ResolveBestPriceForPerson`; a denormalized column would need sync on every product/instance change.
+
 ## Phase Summary
 
 **Must-have.** Members see classes their tier includes; non-members see only workshops / series / intro workshop (per P-1 and M-6). For recurring class attendance, the user just shows up — no advance booking is created. For workshops / series / intro workshop / guest passes (Phases 7 + future), the booking flow uses the existing `BookEvent` infrastructure but at zero or paid tier price.
@@ -94,19 +118,19 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 ## 2. Database Schema
 
 ### 2.1 Confirm reused tables
-- [ ] No new tables. Reuse:
+- [x] No new tables. Reuse:
   - `product_prices` (per-permission pricing — already supports M-2 for paid offerings).
   - `product_booking_windows` (per-permission `advance_days` — for AW-1).
   - `product_entitlement_rules.grants_permission_id` (membership tier → permission).
   - `cancellation_policies`, `cancellation_policy_windows`.
 
 ### 2.2 Small flag additions
-- [ ] `classes.required_permission_id BIGINT` NULL — the permission a user must hold to attend this class. NULL = no permission required (rare; only for the studio's first generic offerings). Resolved via the class's product (`products.booking_permission_id`), so this is a denormalized convenience for catalog filtering. Optional — could compute on the fly. Recommend YES because the catalog filter query is hot.
-- [ ] `products.is_membership_included BOOLEAN NOT NULL DEFAULT FALSE` — if true AND user holds the booking permission, attendance is included with their membership (M-1). Drives the "Included" badge.
+- [~] `classes.required_permission_id BIGINT` NULL — **skipped (OQ-P2-3):** resolve via the active instance's product instead of denormalizing.
+- [x] `products.is_membership_included BOOLEAN NOT NULL DEFAULT FALSE` — drives the "Included" badge + the booking guard.
 
 ### 2.3 Wire into DB init
-- [ ] Update `make_database_info.cpp` and `create_database.cpp` to add these columns to existing tables.
-- [ ] Update `db_schema/classes.h` and `db_schema/products.h` (or wherever they live) with column-name constants.
+- [x] `make_database_info.cpp` builds `products` from `MakeProductsTable` (updated); `create_database.cpp` creates it — the new column flows automatically.
+- [x] `db_schema/products.h` has `kProductsIsMembershipIncluded`. *(No `classes.h` change — see §2.2.)*
 
 ## 3. Table Helpers
 
@@ -124,10 +148,10 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 ## 4. Business Logic
 
+> §4.2 (event-session visibility projection), the §4.3 cancel/admin-cancel refund split, and §4.4's `EventSessionInfoToKeyValueTable` class fields are **deferred** — see the Implementation Status block. §4.1, the §4.3 booking guard, and §4.4's `ClassDetail` price fields are **done**.
+
 ### 4.1 Pricing-resolution helper (extension of `CatalogHelper`)
-- [ ] In `business_logic/payment/catalog_helper.h/.cpp`:
-  - Add `struct ResolvedPrice { int64_t priceCents = 0; std::string currency; int64_t permissionId = 0; bool isIncluded = false; bool isAvailable = true; std::string unavailableReason; }`.
-  - Add `ResolvedPrice ResolveBestPriceForPerson(Transaction&, int64_t productId, int64_t personId, int64_t asOfUs)`. Algorithm:
+- [x] In `business_logic/payment/catalog_helper.h/.cpp`: added `struct PersonalizedPrice` (renamed to avoid colliding with the existing `ResolvedPrice`) + `ResolveBestPriceForPerson(Transaction&, productId, personId)` (uses the currently-active price schedule, not an `asOfUs` arg) + `PersonHoldsPermission`. Tests added (included member, tier member vs public non-member, lowest-tier-wins, non-member-blocked, product-not-found). Algorithm:
     1. Load product → if `is_membership_included && user holds booking_permission_id` → `isIncluded=true`, priceCents=0.
     2. Load all active `product_prices` rows for the product at `asOfUs`.
     3. Filter to rows where `permission_id IS NULL` OR `permission_id` ∈ user's effective permission set.
@@ -146,8 +170,8 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [ ] **Membership-included recurring classes do NOT pass through `BookEvent`** at all in Phase 2 — there is no advance booking. Verify with a test that calling `POST /api/book_event/<sessionId>` on a membership-included recurring class returns either:
   - (a) 400 with `errorCode=NO_ADVANCE_BOOKING_REQUIRED` (preferred — surfaces the convention), OR
   - (b) silently succeeds and creates a zero-money booking (not preferred, conflicts with the "booking exists only at check-in" rule).
-  - Pick (a). Add the explicit reject path in `BookingHelper::BookEvent` when the session's class has `is_membership_included && user holds booking permission`.
-- [ ] For workshops / series / intro (paid path), `BookEvent` runs as today — creates purchase + booking, charges Square, etc.
+  - [x] Picked (a): `BookingHelper::BookEvent` rejects with `NO_ADVANCE_BOOKING_REQUIRED` when the session has a `class_id` and `ResolveBestPriceForPerson(...).isIncluded`. Tests added.
+- [x] For workshops / series / intro (paid path), `BookEvent` runs as today — verified by `BookEventAllowsPaidClassSession` (a class session that is *not* membership-included books normally).
 - [ ] **User-initiated cancellation** (`POST /api/cancel_booking/<id>`):
   - For paid bookings: free the capacity, advance the waitlist (existing `BookingHelper::CancelBooking`), but DO NOT issue a refund (per P-6). Update return JSON so the UI knows no refund is happening; the user can see the cancellation-policy display (BC-5) BEFORE clicking cancel.
   - For zero-money bookings (shouldn't exist post-Phase 2, but defensive): just free capacity.
@@ -156,8 +180,8 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
   - No refund for zero-money bookings.
 
 ### 4.4 KeyValueTable conversions
-- [ ] Extend `EventSessionInfoToKeyValueTable` to include the new `class_*` fields and `resolved_price.*` sub-table.
-- [ ] Tests in `scheduling_key_value_table_test.cpp`.
+- [~] `EventSessionInfoToKeyValueTable` `class_*` / `resolved_price.*` fields — deferred (tied to §4.2).
+- [x] `ClassDetailToKeyValueTable` now surfaces `price_is_available` and the real `price_included_in_membership`. Tests in `scheduling_key_value_table_test.cpp`.
 
 ## 5. Endpoints
 
@@ -176,10 +200,10 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 ## 6. Frontend
 
 ### 6.1 Class detail page (extension)
-- [ ] Show resolved price / "Included with your membership" / "Members only" badge from the API.
-- [ ] Hide the "Book this class" CTA for membership-included recurring classes; show "Just show up — your membership includes this" with a hint that staff will check them in.
-- [ ] For paid offerings: show "Reserve" CTA + the resolved tier price + BC-5 cancellation-policy text inline ("No refunds — staff may issue a voucher case-by-case").
-- [ ] Component spec.
+- [x] Shows resolved price / "Included with your membership" / "Members only" via the `pricingState` getter, driven by the API's `price_*` fields (normalized to real booleans in `ServerAccessNetwork.getClassDetail`).
+- [x] Included recurring classes show "Just show up — staff will check you in" (no Book CTA).
+- [x] Paid offerings show the resolved tier price + the BC-5 "No refunds — staff may issue a voucher case-by-case" note inline. *(A dedicated "Reserve" button is deferred until the paid class-booking flow is wired from class-detail — Phase 7.)*
+- [x] Component spec updated (included / paid+no-refund / members-only).
 
 ### 6.2 Calendar view labels
 - [ ] In `pages/calendar/calendar-event/calendar-event.component.ts`, color-code or chip-label sessions by status: "Included" / "Tier-priced ($25)" / "Members only".
@@ -201,12 +225,12 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 ## 7. Admin Metadata
 
-- [ ] Verify admin UI for `product_prices` allows tier-per-product pricing end-to-end for class products. Add a test if the existing admin CRUD has a gap.
-- [ ] Friendly name for `products.is_membership_included` ("Included with membership").
+- [~] Verify admin UI for `product_prices` tier pricing end-to-end — not re-verified this pass (the existing product/pricing admin already supports per-permission `product_prices`).
+- [x] Friendly name + bool edit-type for `products.is_membership_included` ("Included with membership") in `create_database.cpp`.
 
 ## 8. Permissions
 
-- [ ] No new permissions needed in this phase. The existing `manage_products` covers product / pricing edits; `manage_class_schedule` (introduced in Phase 1) covers schedules.
+- [x] No new permissions needed in this phase. The existing `manage_products` covers product / pricing edits; `manage_class_schedule` (introduced in Phase 1) covers schedules.
 
 ## 9. Tests-Required Summary
 
