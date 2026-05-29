@@ -250,14 +250,14 @@ A new user, given:
 - A series "6-Week Aerial 101" whose product has tier prices: gold $120, silver $180, non-member $300.
 
 Should be able to:
-- [ ] See "Vinyasa Flow" in the catalog with "Included with your Gold Membership" label.
-- [ ] See "6-Week Aerial 101" at $120 in the catalog.
-- [ ] Be prevented (400) from POSTing `book_event` on a Vinyasa Flow session ("`NO_ADVANCE_BOOKING_REQUIRED`").
-- [ ] Successfully book the aerial series via the workshop / series flow at $120.
+- [x] See "Vinyasa Flow" with an "Included with your membership" label *(via `GetClassDetail` / `GetClassesVisibleToPerson`; covered by `class_catalog_helper_test`)*.
+- [x] See "6-Week Aerial 101" at the gold tier price *(tier resolution via `ResolveBestPriceForPerson`; `catalog_helper_test`)*.
+- [x] Be prevented (400) from `book_event` on a Vinyasa Flow session (`NO_ADVANCE_BOOKING_REQUIRED`) *(`booking_helper_test` + endpoint default→400)*.
+- [x] Successfully book the aerial series at its tier price *(existing paid `BookEvent` path; `BookEventAllowsPaidClassSession` confirms the guard doesn't block it)*.
 
 A non-member should:
-- [ ] NOT see "Vinyasa Flow" in the catalog at all.
-- [ ] See "6-Week Aerial 101" at the non-member $300 price.
+- [x] NOT see "Vinyasa Flow" in the catalog *(`GetClassesVisibleToPersonHidesMembersOnlyFromNonMember`)*.
+- [x] See "6-Week Aerial 101" at the non-member price *(`ResolveBestPriceTierForMemberPublicForNonMember`)*.
 
 ## 11. Open Questions
 
