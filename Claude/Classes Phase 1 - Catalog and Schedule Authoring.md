@@ -358,18 +358,20 @@ Lowest layer first per CLAUDE.md:
 
 All eleven CLAUDE.md steps for EACH of `class_instances`, `class_schedules`, `class_schedule_slots`. Nesting: `class_instances` nested under `classes`; `class_schedules` nested under `class_instances`; `class_schedule_slots` nested under `class_schedules`.
 
-- [ ] **Step 1** — confirm `db_schema/*.h` constants referenced.
-- [ ] **Step 2** — `make_database_info.cpp` (done in §2.6).
-- [ ] **Step 3** — `CreateTables()` (done in §2.6).
-- [ ] **Step 4** — `PopulateAdminTopLevelTables()`: add `class_instances`, `class_schedules`, `class_schedule_slots` (every table with column metadata or per-table permissions MUST be here due to FK constraints — this is the most common mistake).
-- [ ] **Step 5** — `PopulateAdminNestedTables()` + `PopulateAllowedTables()`: register the nesting chain above.
-- [ ] **Step 6** — `PopulateAdminTablePermissions()`: map all three to `manage_class_schedule`.
-- [ ] **Step 7** — `PopulateAdminColumnDataInfo()`: column edit types for every column (instance: dates as date pickers, product_id as FK picker; impl: priority numeric, dates; slot: day-of-week enum, start time, duration, facility/room/instructor FK pickers).
-- [ ] **Step 8** — `PopulateAdminColumnFriendlyNames()`.
-- [ ] **Step 9** — `PopulateAdminTableFriendlyNames()`: "Class Instances", "Class Schedules (Implementations)", "Class Schedule Slots".
-- [ ] **Step 10** — `PopulateAdminTableDisplayTemplates()`: FK-picker display strings (instance: `"{name} ({valid_from_us}..{valid_to_us})"`; impl: `"{name} (priority {priority})"`; slot: `"{day_of_week} {start_time_minutes}min room {location_room_id}"`).
-- [ ] **Step 11** — `CMakeLists.txt` updates (done in §2.6 + §3).
-- [ ] Also add `classes.kind` to `PopulateAdminColumnDataInfo` as an enum and its friendly name.
+> **§7 status (verified 2026-05-29):** DONE in `create_database.cpp`. All three tables are registered across `PopulateAdminTopLevelTables`, `PopulateAdminNestedTables`, `PopulateAllowedTables`, `PopulateAdminTablePermissions` (→ `manage_class_schedule`), `PopulateAdminColumnDataInfo`, `PopulateAdminColumnFriendlyNames`, `PopulateAdminTableFriendlyNames`, and `PopulateAdminTableDisplayTemplates`; `classes.kind` has column-data-info + a friendly name. This is what makes the generic CRUD endpoints work on these tables (which the §6.3 class-schedules UI and the class CRUD rely on). Two cosmetic deviations from the original wording, both intentional / non-blocking — see Step 7 and Step 9.
+
+- [x] **Step 1** — `db_schema/*.h` constants referenced.
+- [x] **Step 2** — `make_database_info.cpp` (done in §2.6).
+- [x] **Step 3** — `CreateTables()` (done in §2.6).
+- [x] **Step 4** — `PopulateAdminTopLevelTables()`: `class_instances`, `class_schedules`, `class_schedule_slots` registered.
+- [x] **Step 5** — `PopulateAdminNestedTables()` + `PopulateAllowedTables()`: nesting chain registered.
+- [x] **Step 6** — `PopulateAdminTablePermissions()`: all three mapped to `manage_class_schedule`.
+- [x] **Step 7** — `PopulateAdminColumnDataInfo()`: edit types present for every column. *(Refinement: FK columns — `product_id`, facility/room/instructor — and `day_of_week` / `classes.kind` use `number`/`text` edit types rather than dedicated FK-picker / enum widgets in the generic admin editor. Non-blocking: the dedicated §6.3 class-schedules UI provides the real FK dropdowns, date/time pickers, and the instructor autocomplete, so the generic editor is the fallback path only.)*
+- [x] **Step 8** — `PopulateAdminColumnFriendlyNames()`.
+- [x] **Step 9** — `PopulateAdminTableFriendlyNames()`: "Class Instances", "Class Schedules", "Class Schedule Slots". *(Used "Class Schedules" rather than "Class Schedules (Implementations)" — matches the jargon-free terminology adopted in §6.3.)*
+- [x] **Step 10** — `PopulateAdminTableDisplayTemplates()`: instance `"{name}"`, schedule `"{name} (priority {priority})"`, slot `"day {day_of_week} {start_time_minutes}min"`.
+- [x] **Step 11** — `CMakeLists.txt` updates (done in §2.6 + §3).
+- [x] `classes.kind` added to `PopulateAdminColumnDataInfo` + a friendly name. *(Edit type is `text`, not a dedicated enum widget — see Step 7.)*
 
 ## 8. Permissions
 - [x] `manage_class_schedule` permission seeded in `PopulatePermissions`; granted to admin + Studio Manager roles in `PopulateRolePermissions`. (Carried from the prior implementation — unchanged by the redesign.)
