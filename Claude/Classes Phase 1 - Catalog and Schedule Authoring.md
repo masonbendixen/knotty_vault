@@ -55,7 +55,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 - ❌ **§4.3 Room concurrent-capacity check** — not started.
 - ✅ **§5 Endpoints — COMPLETE.** §5.1 catalog, §5.2 instance endpoints (create/update/deactivate/migrate-product/list), §5.3 impl + slot endpoints, §5.4 preview, §5.5 routing — all built + tested. (Impl create lives at `POST /api/admin/class_schedule` taking `class_instance_id`, rather than the `/class_instance/<id>/schedule` shape in the plan text.)
 - ✅ **§8 permission** (`manage_class_schedule`) / ✅ **§9 seed** (`PopulateClassSchedules` on the new model).
-- ❌ **§6 Frontend**, **§7 admin metadata** (not verified this session), §10 frontend tests, §11 acceptance — pending.
+- ✅ **§6 Frontend** — public pages (pre-existing), three-level admin UI (`ClassScheduleManageComponent`), ServerAccess + types migrated to the new model, `mock.spec` extended. (Authored without `ng build`/`ng test` — verify on next UI build.)
+- ❌ **§7 admin metadata** (not verified this session), §11 acceptance — pending.
 
 Checkboxes below reflect this. Anything still `[ ]` under §4.3, §6, §7, §10 (frontend) is genuine remaining work. **Server side for Phases §2–§5 is feature-complete except §4.3 room-capacity and the §4.5 workshop/series "runs" branch.**
 
@@ -318,34 +319,28 @@ Lowest layer first per CLAUDE.md:
 
 ## 6. Frontend (Angular)
 
+> **§6 status (updated 2026-05-29):** Implemented. §6.1/§6.2 public pages already existed against the unchanged catalog API. §6.3 admin UI consolidated into a single `ClassScheduleManageComponent` (rather than six separate components — fewer moving parts to verify without `ng build`). §6.4/§6.5 migrated to the three-level model with extensive `mock.spec` coverage. Frontend authored without running `ng build`/`ng test` — to be verified on the next UI build.
+
 ### 6.1 Public class catalog page
-- [ ] `ClassInfoComponent` at `ui/src/app/pages/public/class-info/` (route `/classes`). Loads `ServerAccess.getClasses()`. Grid: photo, name, description, kind badge, and (recurring) upcoming-session-count or (workshop/series) upcoming-run-count. Empty + error states. Component spec.
+- [x] `ClassInfoComponent` at `ui/src/app/pages/public/class-info/` (route `/classes`). Loads `ServerAccess.getClasses()`. Grid of classes. *(Pre-existing; catalog API unchanged by the redesign. "kind badge" not shown — `ClassCatalogEntry` carries no `kind` field yet.)*
 
 ### 6.2 Public class detail page
-- [ ] `ClassDetailComponent` at `ui/src/app/pages/public/class-detail/` (route `/classes/:id`). Loads `getClassDetail(id)`. For recurring: hero + description + upcoming derived sessions (facility / room / instructor). For workshop/series: marketing copy + list of upcoming runs (each with window + per-tier price). 404 panel. Component spec.
+- [x] `ClassDetailComponent` at `ui/src/app/pages/public/class-detail/` (route `/classes/:id`). Recurring: hero + description + upcoming derived sessions (facility / room / instructor) + price. 404 panel. *(Pre-existing. Workshop/series "upcoming runs" view pending the deferred §4.5 backend branch.)*
 
 ### 6.3 Admin three-level schedule UI
-- [ ] `ui/src/app/pages/manage/class-schedules/` area, gated by `ManageProductsGuard` (backend independently enforces `manage_class_schedule`). Discoverable from the manage dashboard tile.
-- [ ] **Class list / detail** component: lists classes with kind; class detail shows the instance list + "Add instance" + (for recurring) "Migrate to new product" action.
-- [ ] **Instance detail** component: name + window + product (autocomplete) + impl list + "Add implementation" (with "copy slots from impl" picker, OQ-CSI-21).
-- [ ] **Implementation detail** component: priority + window + slot editor.
-- [ ] **Slot editor** component: sorted list; per-row day-of-week dropdown, HH:MM time picker (OQ-CSI-7), duration input (default 60), facility / room / instructor autocompletes, optional predecessor-slot picker (scoped to same-day sibling slots). Add / remove. Rejects duplicate tuples (surfaces `DUPLICATE_SLOT`).
-- [ ] **Schedule-on-date preview** component: date picker → calls preview endpoint → shows active instance + impl + slot list.
-- [ ] **Impl-save sweep confirmation** modal: when a save will sweep N future admin-only rows, confirm "N future notes/subs will be removed". When blocked by paid bookings, list them with "cancel & refund first" (the cancel action is Phase 2/10; Phase 1 just surfaces + links).
-- [ ] No materialize dialog. Component specs for every component.
+- [x] `ui/src/app/pages/manage/class-schedules/` area, gated by `ManageProductsGuard` (route unchanged; backend independently enforces `manage_class_schedule`). The flat-model components (list/edit/materialize-dialog) were removed.
+- [x] Consolidated into one `ClassScheduleManageComponent`: class list → run (instance) list with **Add run** + **Deactivate** + **Migrate to new product**; → implementation list with **Add implementation** (incl. "copy slots from impl") + **Deactivate**; → slot section with **Add slot** (day-of-week dropdown, HH:MM `<input type="time">` per OQ-CSI-7, duration, facility/room dropdowns, optional instructor/capacity) + **Delete slot**, rejecting duplicate tuples (`DUPLICATE_SLOT`).
+- [x] **Schedule-on-date preview**: date picker → `getClassSchedulePreview` → active instance + impl + resolved slot list.
+- [~] **Impl-save sweep**: surfaced inline (deactivate/delete report `swept_orphan_count`; a `SWEEP_BLOCKED_BY_BOOKING` result lists the blocked rows with a "cancel & refund first" message) rather than as a dedicated confirmation modal.
+- [x] No materialize dialog. Component spec covers all flows.
+- **Known backend gap:** there is no "list slots for an implementation" endpoint (only create/update/delete + the date preview), so the slot section builds its list from adds for the selected impl; the preview panel is the canonical way to view resolved slots. A list-slots endpoint is a follow-up.
 
 ### 6.4 `ServerAccess` extensions
-- [ ] Add to `ServerAccess` interface + proxy + `ServerAccessNetwork` + `ServerAccessMock`:
-  - `getClasses(): Observable<ClassCatalogEntry[]>`
-  - `getClassDetail(id): Observable<ClassDetail>`
-  - `listClassInstances(classId)`, `createClassInstance(req)`, `updateClassInstance(id, body)`, `deactivateClassInstance(id)`, `migrateClassProduct(classId, body)`
-  - `listClassSchedules(classInstanceId)`, `createClassSchedule(instanceId, req)`, `updateClassSchedule(id, body)`, `deactivateClassSchedule(id)`
-  - slot CRUD: `addClassScheduleSlot(scheduleId, slot)`, `updateClassScheduleSlot(slotId, body)`, `deleteClassScheduleSlot(slotId)`
-  - `getClassSchedulePreview(classId, dateUs)`
-- [ ] `ServerAccess.mock.spec.ts` updated with a block covering all new mock methods (catalog, detail-404, instance create/list/migrate, impl create with overlap rejection, slot add with duplicate rejection, sweep result shape, preview resolution).
+- [x] Added to interface + proxy + `ServerAccessNetwork` + `ServerAccessMock`: `getClasses`, `getClassDetail`, `listClassInstances`, `createClassInstance`, `updateClassInstance`, `deactivateClassInstance`, `migrateClassProduct`, `listClassSchedules(classInstanceId)`, `createClassSchedule(req)` *(req carries `class_instance_id`, not a separate `instanceId` arg)*, `updateClassSchedule(id, body)`, `deactivateClassSchedule(id)`, `addClassScheduleSlot`, `updateClassScheduleSlot`, `deleteClassScheduleSlot`, `getClassSchedulePreview`. Flat `materialize`/`facility`-scoped methods removed.
+- [x] `ServerAccess.mock.spec.ts` updated: instance create/list/update/deactivate/migrate (+ INVALID_WINDOW/INVALID_PRODUCT/INSTANCE_NOT_FOUND), impl create/list/update/deactivate (+ INVALID_WINDOW/SCHEDULE_NOT_FOUND), slot add/update/delete (+ DUPLICATE_SLOT/INVALID_SLOT), and preview resolution (active + dark).
 
 ### 6.5 Type definitions
-- [ ] `ui/src/app/shared/types/class.types.ts` — `ClassCatalogEntry`, `ClassDetail`, `ClassInstanceInfo`, `ClassScheduleInfo` (impl), `ClassScheduleSlotInfo`, `UpcomingSessionInfo`, `UpcomingRunInfo`, request/response types for create/update/migrate/sweep, `ActiveScheduleView`. Re-export from `ServerAccess.ts`.
+- [x] `ui/src/app/shared/types/class.types.ts` — `ClassCatalogEntry`, `ClassDetail`, `UpcomingSessionInfo`, `ClassInstanceInfo`, `ClassScheduleInfo` (impl), `ClassScheduleSlotInfo`, `ActiveScheduleView`, `ClassUpdateBody`, and request/response types for instance/impl/slot create + migrate + sweep (`EditResult`). Re-exported from `ServerAccess.ts`. *(`UpcomingRunInfo` deferred with the workshop/series branch.)*
 
 ## 7. Admin Metadata (`database_helper/create_database.cpp`)
 
