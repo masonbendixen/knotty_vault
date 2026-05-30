@@ -158,6 +158,7 @@ Lowest layer first.
 - **OQ-PA-1.** Access-set representation: (A) `class_access_permissions` join table [recommended], (B) `$0 product_prices` rows, or (C) permission hierarchy? (A) handles orthogonal permissions (partner-acro) and attendance grants cleanly.
 - **OQ-PA-2.** Is the access set on the **class** or the **class_instances product**? Pricing lives on the product (per the Phase-1 redesign); access could too, for consistency — but membership inclusion feels class-level. Recommend product-level for one resolution path, with the class as the catalog identity.
 - **OQ-PA-3.** Do membership tiers nest (Platinum ⊇ Gold ⊇ Silver)? If yes, seed the access set / grants accordingly; partner-acro stays orthogonal regardless. Affects how many permissions each membership grants.
+	- Mason- Silver is the lowest level, silver partner acro includes silver plus access to beginner partner acro classes, gold grants access to silver partner acro plus access to the gold tier classes, platinum includes gold and a number of other random benefits so there definitely is a nesting heirarchy.
 - **OQ-PA-4.** Should Phase 2 be reopened to do this cleanup now, or should the `is_membership_included` column be left dormant (unused) until Phase 3 lands the full permission model? Recommend cleaning it up now (small) so no code depends on the wrong abstraction.
 
 # 6. Cross-references
