@@ -37,6 +37,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+> ⚠️ **Superseded modeling (2026-05-29):** the binary `products.is_membership_included` / `price_included_in_membership` introduced below is the **wrong abstraction**. Inclusion is per-permission, not a boolean (memberships grant permissions; classes accept a *set* of permissions; attendance/skill also grant permissions per SL-10/12). See [[Permission-based class access redesign]] for the corrective plan. The tier-pricing path (M-5 via `product_prices`) is unaffected; only the binary inclusion modeling changes.
+
 ## Implementation Status (2026-05-29)
 
 **Done — the membership/pricing surface + booking guard (the §10 acceptance pillars), with tests at every layer. Frontend verified (367 specs pass, `ng build` clean); C++ written to convention for the user to build.**
