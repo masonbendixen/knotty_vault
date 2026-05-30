@@ -109,6 +109,8 @@ Options (see **OQ-PA-1**):
 Recommendation: **(A)**, with attendance-/skill-derived permissions flowing
 through the same `GetEffectivePermissionIds` union. Confirm via OQ-PA-1.
 
+Mason- I'm leaning towards A but I'm not sure that is enough. For instance, I might require for intermediate partner acro that people have achieved skill intermediate_acro, have attended 6 beginner level partner acro classes the previous month (or the current month), AND be a gold or platinum member. I probably want some kind of admin override for this too.
+
 # 3. Corrective work (undo the Phase 2 binary flag)
 
 Lowest layer first.
