@@ -144,6 +144,7 @@ Use cases drawn from the Overview, plus suggestions in §3. IDs are stable handl
 - **CSer-10** Series booking is one purchase; cancelling the series cancels all child instance bookings together
 
 ## 2.4 Membership-Gated Access & Pricing
+> Inclusion is **per-permission, not a boolean** — see [[Permission-based class access redesign]]. A class accepts a *set* of permissions (M-1's "memberships X, Y, Z"); memberships, attendance thresholds (SL-10), skills, and roles all grant permissions into one access gate (SL-12). A Phase-2 binary `is_membership_included` flag was a mistake and is being removed.
 - **M-1** Admin marks a class instance / schedule entry as "included in memberships X, Y, Z" — members with those permissions can mark template and attend for free
 - **M-2** Per-tier pricing applies to workshops and series only (NOT individual recurring class instances — per P-1 there is no drop-in pricing for recurring classes); admin sets per-permission price including the non-member tier where the offering is open to non-members
 - **M-3** Admin sets per-permission visibility (e.g. private classes visible only to platinum members)
