@@ -140,7 +140,7 @@ Because the hierarchy collapses tier-OR, most groups are single-literal hard req
 
 **Admin override (Mason's note).** Staff with `manage_classes` can book a person past any failing group, recording who / when / why (matches SL-6 / SL-12). Per-attempt and logged — never a standing bypass. Likely a `booking_requirement_overrides` audit row (or a reason field on the booking).
 
-**Simpler fallback if CNF feels heavy:** a flat **required-permission set (AND)** + **required-skill set (AND)** + same-day predecessor, leaning entirely on the hierarchy for tier-OR. This handles Mason's example exactly (no multi-literal group needed) and is a strict subset of CNF — we can ship this first and add OR-groups only when a real disjunction appears. See **OQ-PA-5**.
+**Decision (OQ-PA-5): CNF chosen now** for maximum flexibility. Groups + literals are keyed on the **class** (OQ-PA-2). (A flat AND-set was the discarded fallback.)
 
 **Pricing is unchanged by all this.** Recurring-class access is still binary-by-requirements (no drop-in price, P-1); workshops/series keep per-permission `product_prices` (M-5). "Included for this viewer" = recurring class whose requirement groups the viewer satisfies.
 
@@ -151,12 +151,12 @@ Lowest layer first.
 ### 3.1 Database
 - [ ] **Remove `products.is_membership_included`** — constant in `db_schema/products.h`, the DDL column in `products.cpp`, and the admin metadata in `create_database.cpp` (`PopulateAdminColumnDataInfo` + `PopulateAdminColumnFriendlyNames`).
 - [ ] **Permission-implication hierarchy** — new `permission_implications (permission_id, implies_permission_id)` table (schema + DDL + `make_database_info` + `create_database` CreateTables + admin metadata + table-helper) + a seed of the tier DAG (silver ⊂ silver_partner_acro ⊂ gold ⊂ platinum + platinum benefits).
-- [ ] **Requirement groups** (per §2.2; final shape per OQ-PA-5) — either `class_requirement_groups` + `class_requirement_group_literals` (CNF), or the flat `class_required_permissions` + reuse Phase-3 `class_required_skills` (AND-set). Schema + DDL + metadata + table-helpers.
-- [ ] **Override audit** (OQ-PA-6) — `booking_requirement_overrides` row or a reason column on `bookings`.
+- [ ] **Requirement groups (CNF, per OQ-PA-5)** — `class_requirement_groups (id, class_id, label)` + `class_requirement_group_literals (group_id, permission_id NULL, skill_level_id NULL)`. Schema + DDL + `make_database_info` + `create_database` CreateTables + admin metadata (nested under `classes`) + table-helpers.
+- [ ] **Override audit (OQ-PA-6)** — `booking_requirement_overrides (id, booking_id, person_id, class_id, overridden_by_person_id, reason, failed_groups, created_us)`; the gate's override path requires `manage_classes` and writes this row.
 
 ### 3.2 Business logic
 - [ ] **`GetEffectivePermissionIds` — expand the transitive closure** over `permission_implications` (role + membership + attendance + skill grants → closure). This is the linchpin: it makes tier-OR and "platinum ⇒ gold" automatic for every downstream check. Add a focused test.
-- [ ] **A single access gate** (new `ClassAccessHelper` or method) — evaluate the requirement groups for `(personId, classId/productId)`: every group satisfied (≥1 held permission/skill, closure-aware) ⇒ accessible; supports a staff-override path that writes the audit row. `BookingHelper`, the catalog, and Phase-3 prerequisites all call this one gate (SL-12: one gate, pure SQL).
+- [ ] **A single access gate** (new `ClassAccessHelper` or method) — evaluate the requirement groups for `(personId, classId)`: every group satisfied (≥1 held permission/skill, closure-aware) ⇒ accessible; supports a staff-override path that writes the audit row. `BookingHelper`, the catalog, and Phase-3 prerequisites all call this one gate (SL-12: one gate, pure SQL).
 - [ ] **`CatalogHelper::ResolveBestPriceForPerson` / `PersonalizedPrice`** — drop the `is_membership_included` read and `productIsMembershipIncluded`. `isIncluded` = recurring class whose access gate the viewer passes; workshops/series keep the lowest-qualifying-tier price path unchanged.
 - [ ] **`ClassCatalogHelper::GetClassDetail` / `GetClassesVisibleToPerson`** — filter/label via the access gate (passes gate ⇒ visible/included; recurring + fails gate ⇒ hidden per M-6).
 - [ ] **`BookingHelper::BookEvent` `NO_ADVANCE_BOOKING_REQUIRED` guard** — fire on *recurring class kind + viewer passes the access gate*, not on the flag.
@@ -175,7 +175,7 @@ Lowest layer first.
 - [ ] Add a cross-reference to this redesign in §2.4 and the §1 "what exists" list.
 
 ### 4.2 [[Classes Phase 1 - Catalog and Schedule Authoring]]
-- [ ] If OQ-PA-1 = (A), the `class_access_permissions` table + admin metadata is a Phase-1-style schema addition; note it here (the class-authoring UI should let an admin pick the access permission set per class). Mark as a Phase 1 follow-up or a shared dependency of Phase 2/3.
+- [ ] The `class_requirement_groups` + `class_requirement_group_literals` + `permission_implications` tables are Phase-1-style schema additions (class-level, OQ-PA-2). The class-authoring UI gains a "Requirements" editor: add groups, add permission/skill literals to each group. Mark as a Phase 1 follow-up / shared dependency of Phase 2/3.
 
 ### 4.3 [[Classes Phase 2 - Membership-Gated Drop-In]]
 - [ ] Primary cleanup site. Update the Phase 2 status block + §1.1/§2.2/§4.1/§4.3/§6.1 to the permission-set model; remove the `is_membership_included` deliverables and replace with the access-set resolution. The already-built tier-pricing path (M-5 via `product_prices`) stays — only the binary inclusion modeling changes.
@@ -195,16 +195,38 @@ Lowest layer first.
 - **OQ-PA-2.** ✅ **Resolved (Mason): class-level.** Requirement groups + the access gate key on `class_id`; pricing stays on the `class_instances` product. (So the requirement-group tables below use `class_id`.)
 	- Mason- This is class level. Confirmed :)
 - **OQ-PA-3.** ✅ **Resolved (Mason):** tiers nest — silver ⊂ silver_partner_acro ⊂ gold ⊂ platinum, platinum adds extra benefits. Model via `permission_implications` (DAG) + closure expansion (§2.2a). Need the full grant/implication seed list from Mason (which permissions each tier implies, incl. platinum's "random benefits").
-- **OQ-PA-4.** Reopen Phase 2 to remove `is_membership_included` now, or leave it dormant until this lands? *Recommend:* remove now (small) so nothing depends on the wrong abstraction; build the hierarchy + gate as shared infra consumed by Phase 2 (pricing/inclusion) and Phase 3 (prerequisites).
+- **OQ-PA-4.** ✅ **Resolved (Mason): remove `is_membership_included` now.** §3 corrective work proceeds; the hierarchy + gate are shared infra consumed by Phase 2 (pricing/inclusion) and Phase 3 (prerequisites).
 	- Mason- I'd like to remove it now.
-- **OQ-PA-5.** Requirement representation: **CNF requirement groups** (max flexibility — OR within a group, AND across groups) vs **flat AND-sets** (required-permissions + required-skills, tier-OR via the hierarchy)? Mason's stated example works with either; CNF only earns its keep if a genuine cross-type disjunction ("gold OR staff_comp") is needed. *Recommend:* build AND-sets first (covers the example), with the schema shaped so OR-groups can be added later without migration pain — i.e. start with `class_requirement_groups` where each group has one literal, allowing more literals per group when needed.
+- **OQ-PA-5.** ✅ **Resolved (Mason): CNF requirement groups now.** Tables: `class_requirement_groups (id, class_id, label)` + `class_requirement_group_literals (group_id, permission_id NULL, skill_level_id NULL)`. Access = every group has ≥1 satisfied literal (closure-aware) — pure SQL `NOT EXISTS(... AND NOT EXISTS(...))`. (The "AND-sets" fallback is dropped.)
 	- Mason- I'd like the CNF model now for maximum flexibility.
-- **OQ-PA-6.** Override storage + scope: a dedicated `booking_requirement_overrides` audit row (who/when/why/which groups) vs a reason column on `bookings`? And which permission gates it — `manage_classes`? *Recommend:* dedicated audit row; `manage_classes`.
+- **OQ-PA-6.** ✅ **Resolved (Mason → recommendation): dedicated `booking_requirement_overrides` audit table, gated by `manage_classes`.** (a) over (b).
 	- Mason- Can you explain what you are asking in more detail? Maybe use an example.
-- **OQ-PA-7.** SL-10 attendance window: Mason's example says "previous month **or** current month." Make the threshold window configurable on `attendance_threshold_rules` (e.g. `window = previous_calendar_month | current_calendar_month | rolling_30d`)? And does the granted permission cover *current + next* month (as SL-10 currently states) or just the qualifying month?
+	- **Clarification (what the override is + the actual question).** The access gate (the CNF groups) will *block* a booking when a person doesn't satisfy every group. The override is the "but staff can let them in anyway" escape hatch (SL-6 / SL-12). Two things to decide:
+		- **(1) How do we record an override?** *Example:* Intermediate Partner Acro needs `intermediate_acro` (skill) **AND** `acro_6_recent` (attendance) **AND** `gold` (membership). Dana attended only 4 beginner classes last month (no `acro_6_recent`) and is `silver_partner_acro` (not `gold`), so the gate blocks them. Head coach Pat judges Dana ready and books them anyway. We want a durable record that this bypass happened. Options:
+			- **(a) Dedicated audit table** `booking_requirement_overrides (booking_id, person_id, class_id, overridden_by_person_id, reason, failed_groups, created_us)` — e.g. `{booking 812, Dana, Intermediate Partner Acro, Pat, "ready — coach approved", "attendance, membership", …}`. Queryable: "all overrides last month," "everyone Pat let in," "which gates get bypassed most."
+			- **(b) Two columns on `bookings`** — `requirement_override_by` + `requirement_override_reason`. Simpler, no new table, but you lose the structured "which groups were skipped" and it clutters the bookings row.
+		- **(2) Who may override?** Which permission must the staff member hold — `manage_classes` (the class-management permission)? Or something else?
+		- *Why it matters:* these gates exist partly to prevent gaming (P-5), so an auditable trail of who bypassed what and why is valuable — hence the recommendation of (a) + `manage_classes`. **Decision needed: (a) audit table or (b) bookings columns; and the gating permission.**
+		- Mason- I'll go with your recommendation.
+- **OQ-PA-7.** ✅ **Resolved (Mason):** an earned grant is valid for the **current month + the next month**; a person earns it by hitting the threshold on **either last-month or current-month** attendance (community-participation incentive). *Implementation note (Phase 3 / SL-10):* "reap benefits immediately" means the count can't only be evaluated at month-end — re-evaluate on each staff check-in (the attendance event, P-5) and grant the permission through end of next month the moment the running current-month count crosses the threshold; a month-rollover job still handles people who qualified last month but haven't attended yet this month. The grant is refreshed each month they keep qualifying and lapses after a month without hitting the threshold.
 	- Mason- I would like it to cover the current month plus the next month. Partner acro very much is dependent on community participation. Hence wanting to let people into the intermediate program who attended more than a certain number of classes last month. However, if they have participated that much this current month, I'd like them to start reaping the benefits immediately.
 
-# 6. Cross-references
+# 6. Status & build order (2026-05-30)
+
+**All open questions are resolved** (PA-2 class-level · PA-3 nested hierarchy · PA-4 remove flag now · PA-5 CNF groups · PA-6 audit table + `manage_classes` · PA-7 current+next-month grant). The plan is implementation-ready. The only outstanding item is **seed data, not design**: the exact `permission_implications` edges + which classes require which permissions/skills (Mason to supply; can be filled in as the studio finalizes tiers).
+
+Suggested build order (bottom-up, shared infra first; this redesign owns the **infra**, while Phase 3 owns the SL-10 attendance job and skill literals):
+1. **Schema** — `permission_implications`; `class_requirement_groups` + `class_requirement_group_literals`; `booking_requirement_overrides`. Wire `make_database_info` + `create_database` (CreateTables + admin metadata, nested under `classes`). Remove `products.is_membership_included` + its admin metadata.
+2. **Table helpers** — CRUD for the new tables + tests.
+3. **`GetEffectivePermissionIds` closure expansion** over `permission_implications` (recursive CTE) + tests — the linchpin.
+4. **`ClassAccessHelper` access gate** (CNF evaluation, closure-aware, staff-override path writing the audit row) + tests.
+5. **Rewire consumers** to the gate — `CatalogHelper::ResolveBestPriceForPerson` (drop the flag), `ClassCatalogHelper` visibility/inclusion, `BookingHelper::BookEvent` guard — + update their tests.
+6. **Frontend** — derive inclusion/members-only from the gate result; update `class-detail` + specs. (Admin "Requirements" editor UI can be a Phase-1 follow-up.)
+7. **Doc reconciliation** — apply §4 edits to the parent doc + Phase 1/2/3 docs.
+
+SL-10's attendance-threshold job, the skill-level tables (SL-5/6), and the "Requirements" authoring UI are **Phase 3 / Phase 1** deliverables that plug into this infra — not part of the immediate cleanup.
+
+# 7. Cross-references
 - Parent: [[Classes, schedules, and attendance]] (M-1, M-5, M-6, P-1, SL-10/11/12, C-1).
 - Corrects: [[Classes Phase 2 - Membership-Gated Drop-In]].
 - Depends on / feeds: [[Classes Phase 3 - Skill Levels]] (attendance + skill permissions), [[Classes Phase 1 - Catalog and Schedule Authoring]] (schema home for the access set).
