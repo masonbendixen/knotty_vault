@@ -148,11 +148,11 @@ Because the hierarchy collapses tier-OR, most groups are single-literal hard req
 
 Lowest layer first.
 
-### 3.1 Database
-- [ ] **Remove `products.is_membership_included`** — constant in `db_schema/products.h`, the DDL column in `products.cpp`, and the admin metadata in `create_database.cpp` (`PopulateAdminColumnDataInfo` + `PopulateAdminColumnFriendlyNames`).
-- [ ] **Permission-implication hierarchy** — new `permission_implications (permission_id, implies_permission_id)` table (schema + DDL + `make_database_info` + `create_database` CreateTables + admin metadata + table-helper) + a seed of the tier DAG (silver ⊂ silver_partner_acro ⊂ gold ⊂ platinum + platinum benefits).
-- [ ] **Requirement groups (CNF, per OQ-PA-5)** — `class_requirement_groups (id, class_id, label)` + `class_requirement_group_literals (group_id, permission_id NULL, skill_level_id NULL)`. Schema + DDL + `make_database_info` + `create_database` CreateTables + admin metadata (nested under `classes`) + table-helpers.
-- [ ] **Override audit (OQ-PA-6)** — `booking_requirement_overrides (id, booking_id, person_id, class_id, overridden_by_person_id, reason, failed_groups, created_us)`; the gate's override path requires `manage_classes` and writes this row.
+### 3.1 Database ✅ DONE (2026-05-30) — extensively tested; C++ for Mason to build
+- [~] **Remove `products.is_membership_included`** — **deferred to §3.2**: still read by `CatalogHelper::ResolveBestPriceForPerson`, so removing the constant now would break the build. Removed atomically with the consumer rewiring in §3.2.
+- [x] **Permission-implication hierarchy** — `db_schema/permission_implications.{h,cpp}` (FK×2 to permissions + unique edge + `permission_id` index), wired into `make_database_info` + `create_database` (CreateTables + indexes) + top-level admin metadata. Table helper `TableHelpers::PermissionImplications` with CRUD **and `ExpandClosure`** (recursive-CTE transitive closure; bigint-cast seeds; cycle-safe via `UNION`). Tests: chain walk, DAG branch, leaf, empty, no-edges, cycle termination. *(Seed edges = data Mason supplies.)*
+- [x] **Requirement groups (CNF)** — `class_requirement_groups.{h,cpp}` (FK class + label + timestamps) + `class_requirement_group_literals.{h,cpp}` (FK group + nullable FK permission + nullable `skill_level_id` BIGINT, **no FK** — Phase-3 `skill_levels` forward ref). Wired into init + nested admin metadata (groups under `classes`, literals under groups) + `manage_class_schedule` gate. Table helpers `ClassRequirementGroups` + `ClassRequirementGroupLiterals` (literals split AddPermissionLiteral / AddSkillLiteral). Tested.
+- [x] **Override audit (OQ-PA-6)** — `booking_requirement_overrides.{h,cpp}` (`booking_id` made **nullable** FK — audit subject is person/class/who/why; gate sets the booking when known) + helper `BookingRequirementOverrides`. Tested. *(Not generic-CRUD registered — written by the §3.2 gate.)*
 
 ### 3.2 Business logic
 - [ ] **`GetEffectivePermissionIds` — expand the transitive closure** over `permission_implications` (role + membership + attendance + skill grants → closure). This is the linchpin: it makes tier-OR and "platinum ⇒ gold" automatic for every downstream check. Add a focused test.
