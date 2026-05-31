@@ -161,11 +161,14 @@ Lowest layer first.
 - [x] **`ClassCatalogHelper::GetClassDetail` / `GetClassesVisibleToPerson`** — rewired to the access gate + `classes.kind`: recurring + passes gate ⇒ included (no drop-in price, P-1); workshop/series + passes gate ⇒ tier price via `ResolveBestPriceForPerson`; fails gate ⇒ members-only/hidden (M-6). Phase-2 flag tests rewritten to use requirement groups; Phase-1 no-group fixtures stay visible (open).
 - [x] **`BookingHelper::BookEvent` `NO_ADVANCE_BOOKING_REQUIRED` guard** — now fires on *recurring `classes.kind` + viewer passes the access gate* (via a `ClassAccessHelper` member), not the flag. Tests rewritten (recurring+gated rejects; series still books).
 
-### 3.3 Frontend
-- [ ] Rename/redefine `ClassDetail.price_included_in_membership` → keep the derived semantic ("included for this viewer") but ensure it is computed server-side from the access model, not a product flag. `price_is_available` stays (members-only when the viewer holds no access permission and there's no purchasable tier). Update `class-detail` copy + specs accordingly.
+### 3.3 Frontend ✅ DONE (2026-05-31) — specs green (class-detail 19, mock 351)
+- [x] **Kept the field name `ClassDetail.price_included_in_membership`, redefined the semantic.** The flag is now documented as *derived per viewer by the server* from the permission-based access model (membership tier + closure, attendance, skill, role vs. the class's CNF requirement groups + `classes.kind`) — explicitly NOT a stored product flag. `price_is_available` retained (members-only when no access path + no purchasable tier, M-6). Renaming the field was declined to avoid a frontend/backend KVT-key mismatch; the doc allowed keeping the semantic. Updated `class.types.ts` doc-comments, the `pricingState` comment in `class-detail.component.ts` (precedence: included → paid → members-only), and the backend KVT-test comment anchoring the keys to the gate.
 
-### 3.4 Tests
-- [ ] Update `catalog_helper_test`, `class_catalog_helper_test`, `booking_helper_test`, `scheduling_key_value_table_test`, and the frontend class-detail / mock specs to the permission-set model (replace the `is_membership_included`-flag fixtures with access-permission fixtures).
+### 3.4 Tests ✅ DONE (2026-05-31)
+- [x] `catalog_helper_test` / `class_catalog_helper_test` / `booking_helper_test` — flag fixtures replaced with requirement-group + permission-implication fixtures (done in §3.2; verified zero `is_membership_included` references remain repo-wide).
+- [x] `scheduling_key_value_table_test` — pure struct→KVT mapping; never carried a product-flag fixture. Kept the included/members-only/no-price cases; added a comment clarifying the flags are gate-derived upstream.
+- [x] Frontend `class-detail.component.spec.ts` — added a precedence test (inclusion wins over a residual purchasable price; "per session" not shown for a covered viewer) on top of the existing included/paid/members-only/none coverage.
+- [x] Frontend `ServerAccess.mock.spec.ts` — added access-derived `getClassDetail` cases (recurring+covered ⇒ included/no price; no-access ⇒ members-only) via the `_mockDetail` shadow.
 
 # 4. Per-document impact
 
