@@ -52,6 +52,7 @@ These are the atoms — every form in the studio uses some combination of these.
 - **Checkbox** — single boolean toggle. *Code name: `simple-bool`.*
 - **Dropdown / Select** — pick one option from a fixed list. *Code name: `simple-enum`.*
 - **Date Picker** — pick a single date with a calendar popover. *Code name: `simple-date`.*
+- **Date Strip / Week Navigator** — a horizontal row of day buttons with prev/next-week chevrons, used to pick an appointment date when booking a one-on-one service. Variants: state per day (selected / available / unavailable / disabled). *Currently bespoke to the service-booking page (the "week navigator" markup inside `service-booking.component`); not the same as the Material `Date Picker` above — candidate for promotion to a shared component.*
 - **Foreign-Key Picker** — a searchable picker for choosing a related record from the database (e.g. "select a product" or "select a customer"). Looks like a text input with a typeahead dropdown. *Code name: `fk-picker`.*
 - **Photo Upload Control** — drag-and-drop or click-to-upload, with thumbnail preview and crop affordance. *Code name: `photo-upload`.*
 - **Payment Method / Card Picker** — list of saved credit cards with radio selection, "add new card" button, and "remove" action per card. *Code names: `payment-method`, `card-picker`.*
