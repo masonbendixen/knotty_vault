@@ -194,16 +194,13 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 ## 5. Endpoints
 
 ### 5.1 Reuse + extend existing endpoints
-- [ ] `GET /api/visible_event_sessions?placement=upcoming|home_page` — already exists. Verify it correctly serializes the new class fields when `class_id` is set. Add endpoint test cases for member-with-included and non-member.
-- [ ] `POST /api/book_event/<id>` — already exists. Add a guard at the top of the handler / inside `BookingHelper::BookEvent` to reject membership-included class bookings with the new `NO_ADVANCE_BOOKING_REQUIRED` error. Add endpoint test.
-- [ ] `POST /api/cancel_booking/<id>` — already exists. Adjust the response payload to return **`refund: { issued: false, reason: "non_refundable" }`** (OQ-P2-1) per P-6. Add endpoint test asserting no refund was triggered (test mail helper captures no `BookingCancellationMail` with a refund line).
-- [ ] `GET /api/classes` and `GET /api/classes/<id>` (introduced in Phase 1) — extend to use `ResolveBestPriceForPerson`. Add endpoint tests.
+- [x] `GET /api/visible_event_sessions?placement=upcoming|home_page` — now serializes `class_id` + `class_name` when the session belongs to a class (auto via the §4.2 projection + KVT). Endpoint test `visible_event_sessions_test.cpp::SurfacesClassMetadata`.
+- [x] `POST /api/book_event/<id>` — the `BookingHelper::BookEvent` guard rejects a membership-included recurring class with `NO_ADVANCE_BOOKING_REQUIRED`; the endpoint now maps it to a **machine-detectable 400** (`ErrorResponse::Create("no_advance_booking_required", …)`) instead of a generic BadRequest. Test `book_event_test.cpp::BookRecurringClassReturnsNoAdvanceBookingRequired`.
+- [x] `POST /api/cancel_booking/<id>` — response now includes the structured **`refund: { issued, reason, amount_cents, currency }`** object (OQ-P2-1); a class booking cancelled by the user is `issued:false, reason:"non_refundable"` (P-6). Flat `refund_*` fields kept for back-compat. Tests `cancel_booking_test.cpp::CancelClassBookingReturnsNonRefundable` + `CancelNonClassBookingRefundHasNoReason`.
+- [x] `GET /api/classes` and `GET /api/classes/<id>` — **already viewer-aware (verified):** `/api/classes` calls `GetClassesVisibleToPerson(personId)` when logged in (`GetActiveClasses` for anonymous); `/api/classes/<id>` (`get_class_detail`) resolves price via `GetClassDetail` → `ResolveBestPriceForPerson` and emits the `price_*` fields. Price *resolution* is thoroughly covered at the helper layer (`catalog_helper_test`, `class_catalog_helper_test`). The lightweight catalog *list* intentionally carries no per-card price (price lives on the detail). No endpoint change needed.
 
-### 5.2 New visibility endpoint (helpful for the user homepage)
-- [ ] `GET /api/me/visible_classes` (logged in only) — returns the union of:
-  - All `class_schedules` (active, with at least one materialized future session) where the user holds the booking permission (membership-included).
-  - All paid offerings (series / workshops / intro / guest-pass-flagged) visible to them at their tier price.
-- [ ] Lightweight payload — drives the homepage today-classes feed + the "My Schedule" eligibility grid in Phase 5. Reuses `ClassCatalogHelper::GetClassesVisibleToPerson` plus an attendance-template join (stubbed in Phase 2; fully wired in Phase 5).
+### 5.2 New visibility endpoint (helpful for the user homepage) — DEFERRED to Phase 5
+- [~] **`GET /api/me/visible_classes` — deferred (redundant now; distinct value is Phase 5).** Its core ("classes visible to this viewer — included + paid offerings at their tier") is **already served by `GET /api/classes`**, which calls `ClassCatalogHelper::GetClassesVisibleToPerson(personId)` for a logged-in user. A separate authenticated route only becomes non-redundant once Phase 5 adds its distinct payload — the **attendance-template join** (explicitly "stubbed in Phase 2; fully wired in Phase 5") driving the homepage today-classes feed + the "My Schedule" eligibility grid. Building it now would be a redundant endpoint with no consumer (the §6 homepage feed is also deferred). Land it in Phase 5 alongside the attendance-template data it's meant to carry.
 
 ## 6. Frontend
 
@@ -247,7 +244,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [x] Updated `event_session_helper_test.cpp`: visible-event-sessions surfaces class metadata (`class_id`/`class_name`) + resolved price (`VisibleSessionSurfacesClassMetadata`, `StandaloneSessionHasNoClassMetadata`).
 - [x] Updated `booking_helper_test.cpp`: reject `NO_ADVANCE_BOOKING_REQUIRED`, paid booking still works, **plus the §4.3 cancel matrix** (class non-refundable / non-class refundable / free-cancel override / zero-money no-throw).
 - [~] `session_cancellation_helper_test.cpp` (admin-cancel): full refund for paid bookings (existing). Zero-money no-refund test deferred to Phase 8 (NULL purchase_id not constructible yet — M-7).
-- [ ] Endpoint tests for `visible_event_sessions`, `book_event` (reject path), `cancel_booking` (no-refund path), `classes`, `classes/<id>`, `me/visible_classes`.
+- [x] Endpoint tests: `visible_event_sessions` (class metadata), `book_event` (NO_ADVANCE_BOOKING_REQUIRED → 400 reject path), `cancel_booking` (P-6 `refund.issued=false/reason=non_refundable` + non-class contrast). `classes` / `classes/<id>` are already viewer-aware (covered at the helper layer); `me/visible_classes` deferred to Phase 5.
 - [ ] Frontend specs for class-detail (included vs paid), calendar chip rendering, my-bookings class chrome, cancellation-policy component, mock service.
 
 ## 10. Cross-Layer Acceptance Criteria
