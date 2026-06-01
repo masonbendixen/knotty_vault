@@ -66,7 +66,7 @@ Deferred (documented, not started — each carries either regression risk to non
 - **§4.2 event-session visibility projection** — **partial (§4.2):** `class_id`/`class_name` now surfaced; the per-viewer `subtitle_label` + derived-session rewrite is **descoped** (obsolete `is_membership_included`; large; redundant with the class catalog).
 - **§5.2 `GET /api/me/visible_classes`** — new endpoint (still deferred).
 - ~~**§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped~~ → **resolved/closed 2026-06-01 (see §3):** pricing/visibility resolve through the active `class_instances` product + `GetBestProductPriceByProductSchedulePermissions`; the skipped column/methods are obsolete under the access redesign. §3 is done (verification + new round-trip tests).
-- **Frontend §6.2 calendar chips, §6.3 my-bookings class chrome, §6.4 `cancellation-policy.component`, §6.5 `getVisibleClasses`** — depend on §4.2/§5.2/cancel work above.
+- **Frontend §6** — **§6.1 class-detail DONE; §6.3 my-bookings cancel-messaging DONE (2026-06-01, class-aware non-refundable).** Remaining deferred: §6.2 calendar chips (calendar is mock-only, no live session data), §6.3 class photo/name on the booking *card* (needs a backend `UserBookingInfo` extension), §6.4 shared `cancellation-policy.component` (display already inline in both consumers — optional refactor), §6.5 `getVisibleClasses` (blocked on §5.2 → Phase 5).
 
 Open questions — **all resolved (2026-06-01), see §11.** OQ-P2-3 (drop `classes.required_permission_id`) was confirmed and is moot under the access redesign.
 
@@ -210,23 +210,18 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [x] Paid offerings show the resolved tier price + the BC-5 "No refunds — staff may issue a voucher case-by-case" note inline. *(A dedicated "Reserve" button is deferred until the paid class-booking flow is wired from class-detail — Phase 7.)*
 - [x] Component spec updated (included / paid+no-refund / members-only).
 
-### 6.2 Calendar view labels
-- [ ] In `pages/calendar/calendar-event/calendar-event.component.ts`, color-code or chip-label sessions by status: "Included" / "Tier-priced ($25)" / "Members only".
-- [ ] Spec.
+### 6.2 Calendar view labels — DEFERRED (calendar is mock-only)
+- [~] **Deferred.** The calendar (`pages/calendar/`) is **entirely mock-driven** — `CalendarService` returns `mockCalendarResponse()` with a `TODO replace with API call`, and `CalendarEvent` carries only `{id,title,startTime,endTime,location}` (no class / price / membership fields). It is not wired to `visible_event_sessions` or any backend. Chip-labeling sessions by "Included / Tier-priced / Members only" first requires connecting the calendar to the real session API — a calendar↔API integration well outside Phase 2's membership-gating scope. Revisit when the calendar is wired to live data. (The membership pricing/visibility surface is already delivered via the class catalog + `visible_event_sessions`, which now carry `class_*` + `can_book` + price.)
 
-### 6.3 My-bookings page
-- [ ] Confirm class instances render with class info (photo + class name) rather than generic "event" chrome.
-- [ ] For class bookings, show "No refund — contact staff if you need a voucher" instead of the existing refund-window UI.
-- [ ] Spec.
+### 6.3 My-bookings page — PARTIAL (cancel messaging DONE 2026-06-01)
+- [x] **Cancel flow is class-aware (P-6).** In `my-events.component`: when the cancel-confirm fetches the session and it belongs to a class (`EventSession.class_id`, surfaced by §4.2), it shows **"Class bookings are non-refundable. Contact staff if you need a voucher."** and sets the no-refund acknowledgment instead of computing a refund-window breakdown. After cancel, when the response carries `refund.reason === "non_refundable"` (§5.1 / OQ-P2-1), the result message says the booking is non-refundable (not the misleading "policy window has passed"). Added `class_id`/`class_name` to the `EventSession` TS type and the `refund` object to `CancelBookingResponse`. Tests: `my-events.component.spec.ts` (class non-refundable pre-cancel notice, non-class keeps the window text, post-cancel `refund.reason` message) — 42 specs green.
+- [~] **Class photo + class name on the booking *card* — deferred.** The booking list (`getMyBookings` → `UserBooking`) shows the product name; surfacing the class photo/name requires adding `class_id`/`class_name` to the backend `UserBookingInfo` / `GetBookingsForPerson` (a backend change, not frontend-only). Land it with that backend extension.
 
-### 6.4 BC-5 cancellation-policy display
-- [ ] Add a `cancellation-policy.component.ts` that renders the refund-window breakdown OR an explicit "non-refundable" notice from a `CancellationPolicyInfo` input.
-- [ ] Use it on the class-detail page and at the cancel-confirmation dialog.
-- [ ] Spec.
+### 6.4 BC-5 cancellation-policy display — DEFERRED (display already inline; component is an optional refactor)
+- [~] **Deferred (optional DRY refactor).** The cancellation-policy *display* is already delivered in both places it's needed: the **class-detail** page shows the BC-5 "No refunds — staff may issue a voucher case-by-case" note inline (§6.1, done), and **my-events** renders the refund-window breakdown / non-refundable notice inline (§6.3). There is no separate cancel-confirmation *dialog* (my-events uses an inline confirm panel). Extracting a shared `cancellation-policy.component` would be a cosmetic refactor of two working consumers, not new capability — deferred as a tidy-up.
 
-### 6.5 `ServerAccess` extensions
-- [ ] `getVisibleClasses()` for the new endpoint.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+### 6.5 `ServerAccess` extensions — DEFERRED (blocked on §5.2)
+- [~] **Deferred.** `getVisibleClasses()` would call `GET /api/me/visible_classes`, which was **deferred to Phase 5** (§5.2 — redundant with `GET /api/classes` today; its distinct attendance-template payload is a Phase-5 deliverable). No endpoint to call ⇒ no client method to add yet. Lands with §5.2 in Phase 5.
 
 ## 7. Admin Metadata
 
@@ -245,7 +240,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [x] Updated `booking_helper_test.cpp`: reject `NO_ADVANCE_BOOKING_REQUIRED`, paid booking still works, **plus the §4.3 cancel matrix** (class non-refundable / non-class refundable / free-cancel override / zero-money no-throw).
 - [~] `session_cancellation_helper_test.cpp` (admin-cancel): full refund for paid bookings (existing). Zero-money no-refund test deferred to Phase 8 (NULL purchase_id not constructible yet — M-7).
 - [x] Endpoint tests: `visible_event_sessions` (class metadata), `book_event` (NO_ADVANCE_BOOKING_REQUIRED → 400 reject path), `cancel_booking` (P-6 `refund.issued=false/reason=non_refundable` + non-class contrast). `classes` / `classes/<id>` are already viewer-aware (covered at the helper layer); `me/visible_classes` deferred to Phase 5.
-- [ ] Frontend specs for class-detail (included vs paid), calendar chip rendering, my-bookings class chrome, cancellation-policy component, mock service.
+- [x] Frontend specs: class-detail (included / paid+no-refund / members-only — §6.1) and my-bookings cancel messaging (class non-refundable pre-cancel + post-cancel `refund.reason` — §6.3, 42 specs green). Deferred: calendar chip rendering (§6.2, mock-only calendar), shared cancellation-policy component (§6.4, optional), `getVisibleClasses` mock (§6.5, blocked on §5.2).
 
 ## 10. Cross-Layer Acceptance Criteria
 
