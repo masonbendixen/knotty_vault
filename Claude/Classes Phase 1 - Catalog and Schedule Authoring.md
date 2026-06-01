@@ -60,7 +60,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 Checkboxes below reflect this. Anything still `[ ]` under §6, §7, §10 (frontend) is genuine remaining work. **Server side for Phases §2–§5 is feature-complete except the §4.5 workshop/series "runs" branch** (§4.3 room-capacity landed 2026-05-31).
 
-- 🟡 **§6.6 Requirements editor (access requirement-group authoring UI)** — **PENDING follow-up** added 2026-05-31 per [[Permission-based class access redesign]] §4.2. The access model's schema/gate/consumers are built; the per-class authoring surface (tie a class to permissions via a friendly editor instead of the raw generic table editor) is not. Shared dependency of Phase 2 / Phase 3.
+- 🟡 **§6.6 Requirements editor (access requirement-group authoring UI)** — **backend DONE 2026-05-31** (read endpoint `GET /api/admin/class/<id>/requirements` + `ClassAccessHelper::GetClassRequirements`; writes reuse generic CRUD); **frontend PENDING**. Per [[Permission-based class access redesign]] §4.2; shared dependency of Phase 2 / Phase 3.
 
 ## Phase Summary
 
