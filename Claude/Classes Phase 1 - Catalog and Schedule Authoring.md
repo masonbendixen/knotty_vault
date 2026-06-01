@@ -60,6 +60,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 Checkboxes below reflect this. Anything still `[ ]` under §4.3, §6, §7, §10 (frontend) is genuine remaining work. **Server side for Phases §2–§5 is feature-complete except §4.3 room-capacity and the §4.5 workshop/series "runs" branch.**
 
+- 🟡 **§6.6 Requirements editor (access requirement-group authoring UI)** — **PENDING follow-up** added 2026-05-31 per [[Permission-based class access redesign]] §4.2. The access model's schema/gate/consumers are built; the per-class authoring surface (tie a class to permissions via a friendly editor instead of the raw generic table editor) is not. Shared dependency of Phase 2 / Phase 3.
+
 ## Phase Summary
 
 **Must-have core.** Admin can define a class (name, description, photo, kind, defaults), create one or more **instances** (runs) under it, attach versioned **implementations** (impls) with priority + validity window to each instance, and fill each impl with **slots** (day-of-week + start time + duration + facility + room + instructor tuples). The public catalog browses classes. Class sessions are **derived on the fly** from the active instance + active impl + slots — there is no materialization step. `event_sessions` rows persist only when something is recorded against a specific occurrence.
@@ -354,6 +356,22 @@ Lowest layer first per CLAUDE.md:
 ### 6.5 Type definitions
 - [x] `ui/src/app/shared/types/class.types.ts` — `ClassCatalogEntry`, `ClassDetail`, `UpcomingSessionInfo`, `ClassInstanceInfo`, `ClassScheduleInfo` (impl), `ClassScheduleSlotInfo`, `ActiveScheduleView`, `ClassUpdateBody`, and request/response types for instance/impl/slot create + migrate + sweep (`EditResult`). Re-exported from `ServerAccess.ts`. *(`UpcomingRunInfo` deferred with the workshop/series branch.)*
 
+### 6.6 Access requirement-group authoring UI — the "Requirements" editor (PENDING)
+
+> **Added 2026-05-31 per [[Permission-based class access redesign]] §4.2.** Shared dependency of Phase 2 (membership inclusion) and Phase 3 (skill / attendance prerequisites). The permission-based access model's **schema + gate + consumers are built** (redesign §3.1/§3.2/§3.3): `permission_implications`, `class_requirement_groups`, `class_requirement_group_literals`, `booking_requirement_overrides`, `Scheduling::ClassAccessHelper`, and the closure-expanded `GetEffectivePermissionIds`. What is **missing is the authoring surface**: today a class can only be tied to a permission through the **generic admin table editor** (raw FK IDs, group/literal rows edited by hand). This deliverable gives the class-schedules page a first-class editor for a class's access rule. Backend before frontend (per convention).
+
+**Backend:**
+- [ ] Decide the write path. The two access tables are already generic-CRUD registered (redesign §3.1, gated by `manage_class_schedule`), so writes *can* reuse `addItemFetchPrimaryKey` / `updateItem` / `deleteItem` exactly like the §6.3 class CRUD — **no new write endpoints required**. Recommend that path for writes.
+- [ ] Add one **read** endpoint `GET /api/admin/class/<classId>/requirements` (gated by `manage_class_schedule`) returning the group→literal tree with **resolved names** (each literal's permission code/friendly name; skill-level name once Phase 3 lands), so the UI doesn't have to N+1 the permissions table. Thin handler → a `ClassAccessHelper` (or `ClassCatalogHelper`) read method that joins groups + literals + permissions. Table-helper read already exists (`ClassRequirementGroups::GetGroupsByClass`, `ClassRequirementGroupLiterals::GetLiteralsByGroup`); add the name-resolving aggregate + endpoint, with table-helper + endpoint tests.
+- [ ] `permission_implications` (the tier hierarchy) stays in the generic admin editor — it's admin-only global data, not per-class authoring.
+
+**Frontend:**
+- [ ] A **Requirements** panel on the selected class, alongside the §6.3 class-properties panel. Renders the class's requirement groups as AND-ed cards; each card shows its label and its OR-ed literals. Empty state = "Open to everyone (no requirements)".
+- [ ] Add / edit / delete a **group** (label); add / remove a **literal** within a group. A literal is a **permission** (a `mat-autocomplete` over the permissions list — never a raw ID) or, once Phase 3 ships `skill_levels`, a **skill level**; exactly one of the two per literal.
+- [ ] A plain-language summary of the effective rule, e.g. *"Included for: Gold or Platinum members; AND Intermediate Acro skill; AND attended ≥6 beginner partner-acro classes recently."* Make clear the hierarchy means "Gold" already covers Platinum (closure), so admins rarely enumerate tiers.
+- [ ] `ServerAccess` method(s) for the read endpoint + any wrappers; mirror the §6.3 generic-CRUD calls for writes. Specs: a `requirements`-panel component spec + `ServerAccess.mock.spec.ts` coverage for the new read method.
+- [ ] Cross-reference: the booking-time **staff override** (writing `booking_requirement_overrides`) is a *booking-flow* surface (Phase 2 / Phase 8 check-in), not this authoring editor — note the boundary so the two don't get conflated.
+
 ## 7. Admin Metadata (`database_helper/create_database.cpp`)
 
 All eleven CLAUDE.md steps for EACH of `class_instances`, `class_schedules`, `class_schedule_slots`. Nesting: `class_instances` nested under `classes`; `class_schedules` nested under `class_instances`; `class_schedule_slots` nested under `class_schedules`.
@@ -408,6 +426,7 @@ All Phase 1 questions resolved via [[Class Schedule Implementations Redesign]] �
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 1, P-7.
 - Predecessor work: [[Scheduling thin slice]], [[Provider Portal]].
 - Feeds into: [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 5 - Attendance Templates]], [[Classes Phase 7 - Class Series and Workshops]], [[Classes Phase 10 - Scheduling Exceptions and Shift Trades]].
+- Access model + the §6.6 Requirements-editor follow-up: [[Permission-based class access redesign]] (§4.2).
 
 ---
 

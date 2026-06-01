@@ -53,6 +53,14 @@ Delivered:
 - **Frontend §6.1:** `ClassDetail.price_is_available` added; `ServerAccessNetwork.getClassDetail` normalizes the boolean-ish price flags (the KVT→JSON layer emits `"true"/"false"` strings — also fixes a latent Phase-1 truthy-string bug); `class-detail` shows included / tier-price+no-refund-note / members-only via `pricingState`. Component spec + mock + mock.spec updated.
 - **Admin §7:** friendly name + bool edit-type for `is_membership_included`.
 
+> **✅ Superseded by [[Permission-based class access redesign]] §3 (built 2026-05-31). The binary inclusion modeling above was removed and replaced; the tier-pricing path stayed.** Concretely:
+> - **DB §2.2 / Admin §7:** `products.is_membership_included` (constant, DDL, friendly name, bool edit-type) **removed**. Inclusion is now declared per-class via `class_requirement_groups` + `class_requirement_group_literals` (CNF), with a `permission_implications` hierarchy.
+> - **Business logic §4.1:** `ResolveBestPriceForPerson` / `PersonalizedPrice` no longer carry `isIncluded` / `productIsMembershipIncluded`; `PersonHoldsPermission` removed. `GetEffectivePermissionIds` is now closure-expanded and the new `Scheduling::ClassAccessHelper` is the single access gate.
+> - **Class catalog §4.x:** `GetClassDetail` / `GetClassesVisibleToPerson` derive inclusion from `ClassAccessHelper.CheckAccess` + `classes.kind` (recurring + passes gate ⇒ included, no drop-in price; workshop/series + passes ⇒ tier price; fails ⇒ members-only/hidden).
+> - **Booking guard §4.3:** `NO_ADVANCE_BOOKING_REQUIRED` now fires on *recurring kind + viewer passes the gate*, not the flag.
+> - **Frontend §6.1:** unchanged at runtime — `ClassDetail.price_included_in_membership` kept its name but is now a server-derived "included for this viewer" flag (redesign §3.3), not a product flag. The `is_membership_included` test fixtures were replaced with requirement-group fixtures (redesign §3.4).
+> - **Net:** the M-5 tier-pricing path (per-permission `product_prices`, lowest-wins) is untouched; only the binary inclusion bit changed. OQ-P2-3 (drop `classes.required_permission_id`) is moot — access lives in requirement groups, not a denormalized column.
+
 Deferred (documented, not started — each carries either regression risk to non-class flows or is a larger surface):
 - **§4.2 event-session visibility projection** — surfacing class metadata on `GetVisibleEventSessions` needs the derived-session rewrite (`GetDerivedSessionsForRange`); large. The class catalog already covers the class visibility/pricing surface.
 - **§4.3 cancel no-refund / admin-cancel refund split** — must be scoped to *class* bookings only; changing `CancelBooking`/`SessionCancellationHelper` globally would regress existing event refunds. Needs care + dedicated tests.
