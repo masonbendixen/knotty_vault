@@ -62,9 +62,9 @@ Delivered:
 > - **Net:** the M-5 tier-pricing path (per-permission `product_prices`, lowest-wins) is untouched; only the binary inclusion bit changed. OQ-P2-3 (drop `classes.required_permission_id`) is moot — access lives in requirement groups, not a denormalized column.
 
 Deferred (documented, not started — each carries either regression risk to non-class flows or is a larger surface):
-- **§4.2 event-session visibility projection** — surfacing class metadata on `GetVisibleEventSessions` needs the derived-session rewrite (`GetDerivedSessionsForRange`); large. The class catalog already covers the class visibility/pricing surface.
-- **§4.3 cancel no-refund / admin-cancel refund split** — must be scoped to *class* bookings only; changing `CancelBooking`/`SessionCancellationHelper` globally would regress existing event refunds. Needs care + dedicated tests.
-- **§5.2 `GET /api/me/visible_classes`** — new endpoint.
+- ~~**§4.3 cancel no-refund / admin-cancel refund split**~~ → **DONE 2026-06-01 (§4.3):** class bookings are non-refundable on user cancel (P-6, `refundReason="non_refundable"`, override still refunds); zero-money (NULL `purchase_id`) bookings no longer throw and get no refund on either user- or admin-cancel (SE-5). Scoped to class/zero-money paths; non-class event refunds unchanged.
+- **§4.2 event-session visibility projection** — **partial (§4.2):** `class_id`/`class_name` now surfaced; the per-viewer `subtitle_label` + derived-session rewrite is **descoped** (obsolete `is_membership_included`; large; redundant with the class catalog).
+- **§5.2 `GET /api/me/visible_classes`** — new endpoint (still deferred).
 - ~~**§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped~~ → **resolved/closed 2026-06-01 (see §3):** pricing/visibility resolve through the active `class_instances` product + `GetBestProductPriceByProductSchedulePermissions`; the skipped column/methods are obsolete under the access redesign. §3 is done (verification + new round-trip tests).
 - **Frontend §6.2 calendar chips, §6.3 my-bookings class chrome, §6.4 `cancellation-policy.component`, §6.5 `getVisibleClasses`** — depend on §4.2/§5.2/cancel work above.
 
@@ -159,7 +159,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 ## 4. Business Logic
 
-> §4.2 (event-session visibility projection), the §4.3 cancel/admin-cancel refund split, and §4.4's `EventSessionInfoToKeyValueTable` class fields are **deferred** — see the Implementation Status block. §4.1, the §4.3 booking guard, and §4.4's `ClassDetail` price fields are **done**.
+> **Status (2026-06-01):** §4.1 (pricing), the §4.3 booking guard, the **§4.3 cancel/admin-cancel refund split (P-6 / SE-5)**, and §4.4 (`ClassDetail` price fields + `EventSessionInfoToKeyValueTable` `class_*` fields) are **DONE**. §4.2 is **partially done** — the class-metadata surfacing (`class_id` / `class_name`) landed; the per-viewer `subtitle_label` / derived-session rewrite is **descoped** (obsolete `is_membership_included`, large, redundant with the class catalog — see the note in §4.2).
 
 ### 4.1 Pricing-resolution helper (extension of `CatalogHelper`)
 - [x] In `business_logic/payment/catalog_helper.h/.cpp`: added `struct PersonalizedPrice` (renamed to avoid colliding with the existing `ResolvedPrice`) + `ResolveBestPriceForPerson(Transaction&, productId, personId)` (uses the currently-active price schedule, not an `asOfUs` arg) + `PersonHoldsPermission`. Tests added (included member, tier member vs public non-member, lowest-tier-wins, non-member-blocked, product-not-found). Algorithm:
@@ -170,12 +170,10 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
     5. If no rows match → `isAvailable=false`, `unavailableReason=NO_TIER_MATCH`.
   - Add tests for: included member, tier-priced member, non-member with non-member price, non-member with no non-member price (NOT_AVAILABLE).
 
-### 4.2 Extend `EventSessionHelper::GetVisibleEventSessions`
-- [ ] Already returns event sessions for the catalog; extend the projection to also surface class metadata when `class_id` is set:
-  - `class_id`, `class_name`, `class_photo_url`, `is_membership_included` (resolved via product), the user's `ResolvedPrice`, and a `subtitle_label` such as `"Included with your Gold Membership"` / `"$25 / drop-in for Gold"` / `"Members only — upgrade to attend"`.
-- [ ] When the request has no `personId` (anonymous), only the base `permission_id IS NULL` price is surfaced, and `is_membership_included` is left as a hint.
-- [ ] Add a filter parameter `class_only` (bool) so the public `/classes/upcoming` page can request only class sessions.
-- [ ] Tests covering: anonymous, member-with-included, member-with-paid-tier, non-member, no-matching-price.
+### 4.2 Extend `EventSessionHelper::GetVisibleEventSessions` — PARTIAL (2026-06-01)
+- [x] **Surface `class_id` + `class_name`** when the session belongs to a class. The three visibility queries (`upcoming` / `home_page` / by-id) now `LEFT JOIN classes c ON es.class_id = c.id` and select `c.name AS class_name`; `EventSessionInfo` gained `classId` / `className`, parsed in `EventSessionInfoFromRow`. Tests in `event_session_helper_test.cpp` (`VisibleSessionSurfacesClassMetadata`, `StandaloneSessionHasNoClassMetadata`).
+- [~] **Descoped: `is_membership_included` / `subtitle_label` / derived-session rewrite.** `is_membership_included` is an obsolete product flag (removed by the redesign — inclusion is the requirement-group gate, not a product bit). The per-viewer subtitle + the "return DERIVED sessions via `GetDerivedSessionsForRange`" rewrite is large and **redundant with the class catalog** (`ClassCatalogHelper::GetClassesVisibleToPerson`/`GetClassDetail` already deliver per-viewer class visibility + pricing via the access gate). `canBook` + `amount_cents` already encode "members only" / tier price on the event-session feed. The subtitle is a presentation concern the deferred §6.2 calendar frontend can compute from `class_name` + `amount_cents` + `can_book`. Revisit only if a concrete calendar consumer needs more.
+- [x] `class_photo_url` — not stored as a column; the frontend derives `/api/get_scaled_photo/classes/<class_id>/…` from the surfaced `class_id` (same pattern as elsewhere). No backend field needed.
 
 ### 4.3 Booking flow under P-1 / P-6
 - [ ] **Membership-included recurring classes do NOT pass through `BookEvent`** at all in Phase 2 — there is no advance booking. Verify with a test that calling `POST /api/book_event/<sessionId>` on a membership-included recurring class returns either:
@@ -183,16 +181,15 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
   - (b) silently succeeds and creates a zero-money booking (not preferred, conflicts with the "booking exists only at check-in" rule).
   - [x] Picked (a): `BookingHelper::BookEvent` rejects with `NO_ADVANCE_BOOKING_REQUIRED` when the session has a `class_id` and `ResolveBestPriceForPerson(...).isIncluded`. Tests added.
 - [x] For workshops / series / intro (paid path), `BookEvent` runs as today — verified by `BookEventAllowsPaidClassSession` (a class session that is *not* membership-included books normally).
-- [ ] **User-initiated cancellation** (`POST /api/cancel_booking/<id>`):
-  - For paid bookings: free the capacity, advance the waitlist (existing `BookingHelper::CancelBooking`), but DO NOT issue a refund (per P-6). Return **`refund: { issued: false, reason: "non_refundable" }`** (OQ-P2-1) so the UI knows no refund is happening; the user can see the cancellation-policy display (BC-5) BEFORE clicking cancel.
-  - For zero-money bookings (shouldn't exist post-Phase 2, but defensive): just free capacity.
-- [ ] **Admin-initiated session cancellation** (`SessionCancellationHelper`):
-  - Full refund for paid bookings (existing behavior).
-  - No refund for zero-money bookings.
+- [x] **User-initiated cancellation** (`BookingHelper::CancelBooking`) — DONE (2026-06-01):
+  - A **class booking** (the session has `class_id`) takes the **non-refundable** path under P-6: capacity is freed + waitlist advances, but no money is returned. `CancelBookingResult.refundReason = "non_refundable"` so the endpoint can surface **`refund: { issued: false, reason: "non_refundable" }`** (OQ-P2-1). A studio-caused **free-cancel override** still refunds (100%). A standalone (non-class) event keeps the existing policy-based refund.
+  - **Zero-money bookings** (NULL `purchase_id`, as staff check-in creates): `purchase_id` is now parsed defensively (was an unconditional `std::stoll` that **threw** on NULL) — cancelling frees capacity and issues no refund.
+  - Tests: `booking_helper_test.cpp` — `CancelClassBookingIssuesNoRefundP6`, `CancelNonClassBookingHasNoNonRefundableReason`, `CancelClassBookingFreeCancelOverrideIsRefundable`, `CancelZeroMoneyClassBookingDoesNotThrow`.
+- [x] **Admin-initiated session cancellation** (`SessionCancellationHelper::CancelSession`) — DONE (2026-06-01): paid bookings get the existing 100% refund; **zero-money (NULL `purchase_id`) bookings get no refund** and no longer throw (same defensive parse, SE-5). Test: `session_cancellation_helper_test.cpp::CancelZeroMoneyBookingIssuesNoRefund`.
 
 ### 4.4 KeyValueTable conversions
-- [~] `EventSessionInfoToKeyValueTable` `class_*` / `resolved_price.*` fields — deferred (tied to §4.2).
-- [x] `ClassDetailToKeyValueTable` now surfaces `price_is_available` and the real `price_included_in_membership`. Tests in `scheduling_key_value_table_test.cpp`.
+- [x] `EventSessionInfoToKeyValueTable` now emits `class_id` + `class_name` when the session belongs to a class (omitted for standalone events). `resolved_price.*` is already emitted (`amount_cents` / `currency` / `pricing_permission_id` / `can_book`). Tests: `scheduling_key_value_table_test.cpp` (`EventSessionInfoSurfacesClassMetadata`, `EventSessionInfoOmitsClassMetadataForStandaloneEvent`). *(The obsolete `is_membership_included` field is intentionally not emitted — see §4.2.)*
+- [x] `ClassDetailToKeyValueTable` surfaces `price_is_available` and the (now gate-derived) `price_included_in_membership`. Tests in `scheduling_key_value_table_test.cpp`.
 
 ## 5. Endpoints
 
@@ -247,9 +244,9 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 - [x] Table helper tests for the access-permission column round-trips — `products_test.cpp` (`GetProductSurfacesPermissionColumns` / `...AbsentWhenNull` / `GetActiveProductsSurfacesPermissionColumns`); tier-price resolution already covered by `product_prices_test.cpp` (`GetBestProductPriceByProductSchedulePermissions*`).
 - [x] `catalog_helper_test.cpp`: `ResolveBestPriceForPerson` covers included→tier-price, lowest-wins, non-member-with-price, non-member-blocked, product-not-found (done in the §4.1 work + the access-redesign closure test).
-- [ ] Updated `event_session_helper_test.cpp`: visible-event-sessions surfaces class metadata + resolved price.
-- [ ] Updated `booking_helper_test.cpp`: reject `NO_ADVANCE_BOOKING_REQUIRED`, paid booking still works.
-- [ ] Updated `event_session_cancellation_helper_test.cpp` (or whichever owns admin-cancel): full refund for paid, no refund for zero-money.
+- [x] Updated `event_session_helper_test.cpp`: visible-event-sessions surfaces class metadata (`class_id`/`class_name`) + resolved price (`VisibleSessionSurfacesClassMetadata`, `StandaloneSessionHasNoClassMetadata`).
+- [x] Updated `booking_helper_test.cpp`: reject `NO_ADVANCE_BOOKING_REQUIRED`, paid booking still works, **plus the §4.3 cancel matrix** (class non-refundable / non-class refundable / free-cancel override / zero-money no-throw).
+- [x] `session_cancellation_helper_test.cpp` (admin-cancel): full refund for paid (existing), no refund for zero-money (`CancelZeroMoneyBookingIssuesNoRefund`).
 - [ ] Endpoint tests for `visible_event_sessions`, `book_event` (reject path), `cancel_booking` (no-refund path), `classes`, `classes/<id>`, `me/visible_classes`.
 - [ ] Frontend specs for class-detail (included vs paid), calendar chip rendering, my-bookings class chrome, cancellation-policy component, mock service.
 
