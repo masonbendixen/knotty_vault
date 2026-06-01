@@ -68,8 +68,7 @@ Deferred (documented, not started — each carries either regression risk to non
 - **§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped: pricing/visibility resolve through the active `class_instances` product (canonical source), avoiding a denormalized column nobody populates. See OQ below.
 - **Frontend §6.2 calendar chips, §6.3 my-bookings class chrome, §6.4 `cancellation-policy.component`, §6.5 `getVisibleClasses`** — depend on §4.2/§5.2/cancel work above.
 
-New open question:
-- **OQ-P2-3.** Confirm dropping `classes.required_permission_id` (compute via the active instance's product instead of denormalizing). Recommended: yes — the catalog filter joins `classes→class_instances→products` and resolves through `ResolveBestPriceForPerson`; a denormalized column would need sync on every product/instance change.
+Open questions — **all resolved (2026-06-01), see §11.** OQ-P2-3 (drop `classes.required_permission_id`) was confirmed and is moot under the access redesign.
 
 ## Phase Summary
 
@@ -183,7 +182,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
   - [x] Picked (a): `BookingHelper::BookEvent` rejects with `NO_ADVANCE_BOOKING_REQUIRED` when the session has a `class_id` and `ResolveBestPriceForPerson(...).isIncluded`. Tests added.
 - [x] For workshops / series / intro (paid path), `BookEvent` runs as today — verified by `BookEventAllowsPaidClassSession` (a class session that is *not* membership-included books normally).
 - [ ] **User-initiated cancellation** (`POST /api/cancel_booking/<id>`):
-  - For paid bookings: free the capacity, advance the waitlist (existing `BookingHelper::CancelBooking`), but DO NOT issue a refund (per P-6). Update return JSON so the UI knows no refund is happening; the user can see the cancellation-policy display (BC-5) BEFORE clicking cancel.
+  - For paid bookings: free the capacity, advance the waitlist (existing `BookingHelper::CancelBooking`), but DO NOT issue a refund (per P-6). Return **`refund: { issued: false, reason: "non_refundable" }`** (OQ-P2-1) so the UI knows no refund is happening; the user can see the cancellation-policy display (BC-5) BEFORE clicking cancel.
   - For zero-money bookings (shouldn't exist post-Phase 2, but defensive): just free capacity.
 - [ ] **Admin-initiated session cancellation** (`SessionCancellationHelper`):
   - Full refund for paid bookings (existing behavior).
@@ -198,7 +197,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 ### 5.1 Reuse + extend existing endpoints
 - [ ] `GET /api/visible_event_sessions?placement=upcoming|home_page` — already exists. Verify it correctly serializes the new class fields when `class_id` is set. Add endpoint test cases for member-with-included and non-member.
 - [ ] `POST /api/book_event/<id>` — already exists. Add a guard at the top of the handler / inside `BookingHelper::BookEvent` to reject membership-included class bookings with the new `NO_ADVANCE_BOOKING_REQUIRED` error. Add endpoint test.
-- [ ] `POST /api/cancel_booking/<id>` — already exists. Adjust the response payload so the `refund_*` fields explicitly reflect "no refund issued" per P-6. Add endpoint test asserting no refund was triggered (test mail helper captures no `BookingCancellationMail` with a refund line).
+- [ ] `POST /api/cancel_booking/<id>` — already exists. Adjust the response payload to return **`refund: { issued: false, reason: "non_refundable" }`** (OQ-P2-1) per P-6. Add endpoint test asserting no refund was triggered (test mail helper captures no `BookingCancellationMail` with a refund line).
 - [ ] `GET /api/classes` and `GET /api/classes/<id>` (introduced in Phase 1) — extend to use `ResolveBestPriceForPerson`. Add endpoint tests.
 
 ### 5.2 New visibility endpoint (helpful for the user homepage)
@@ -271,8 +270,13 @@ A non-member should:
 
 ## 11. Open Questions
 
-- **OQ-P2-1.** Cancel-during-non-refund-window response: should the API return 200 + `refund: { issued: false, reason: "policy" }`, or 200 + nothing about refund? Recommended: explicit `refund: { issued: false, reason: "non_refundable" }` so the UI can render the right message.
-- **OQ-P2-2.** Should `NO_ADVANCE_BOOKING_REQUIRED` be a 400 or a 409? Recommended: 400 ValidationError (clearly user-side wrong) — matches existing error-status policy in memory `error_response_status_codes.md`.
+**All resolved (2026-06-01).** No open questions remain for Phase 2.
+
+- **OQ-P2-1.** ✅ **RESOLVED (Mason → recommendation):** user-initiated cancel inside a non-refund window returns **200 + `refund: { issued: false, reason: "non_refundable" }`** so the UI can render the right message. *(Implementation note: this shape is the contract for the deferred §4.3 cancel path + §5.1 `cancel_booking`.)*
+	- Mason- I'll go with your recommendation.
+- **OQ-P2-2.** ✅ **RESOLVED (Mason → recommendation):** `NO_ADVANCE_BOOKING_REQUIRED` is a **400** (ValidationError) — matches the status-code policy in memory `error_response_status_codes.md`. *(Already implemented: the booking guard maps to 400 via the endpoint's default branch.)*
+	- Mason- I'll go with your recommendation.
+- **OQ-P2-3.** ✅ **RESOLVED / moot:** drop `classes.required_permission_id` (do not denormalize). Confirmed — and the [[Permission-based class access redesign]] makes it moot: access lives in `class_requirement_groups` / `class_requirement_group_literals`, resolved by `ClassAccessHelper`; pricing/visibility resolve through the active `class_instances` product. The §2.2 / §3.3 column is permanently skipped.
 
 ## 12. Cross-References
 
