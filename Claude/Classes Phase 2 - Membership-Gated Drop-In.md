@@ -68,7 +68,7 @@ Deferred (documented, not started — each carries either regression risk to non
 - ~~**§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped~~ → **resolved/closed 2026-06-01 (see §3):** pricing/visibility resolve through the active `class_instances` product + `GetBestProductPriceByProductSchedulePermissions`; the skipped column/methods are obsolete under the access redesign. §3 is done (verification + new round-trip tests).
 - **Frontend §6** — **§6.1 class-detail DONE; §6.3 my-bookings cancel-messaging DONE (2026-06-01, class-aware non-refundable).** Remaining deferred: §6.2 calendar chips (calendar is mock-only, no live session data), §6.3 class photo/name on the booking *card* (needs a backend `UserBookingInfo` extension), §6.4 shared `cancellation-policy.component` (display already inline in both consumers — optional refactor), §6.5 `getVisibleClasses` (blocked on §5.2 → Phase 5).
 
-Open questions — **all resolved (2026-06-01), see §11.** OQ-P2-3 (drop `classes.required_permission_id`) was confirmed and is moot under the access redesign.
+Open questions — **all resolved (2026-06-01), see §12.** OQ-P2-3 (drop `classes.required_permission_id`) was confirmed and is moot under the access redesign.
 
 ## Phase Summary
 
@@ -259,7 +259,53 @@ A non-member should:
 - [x] NOT see "Vinyasa Flow" in the catalog *(`GetClassesVisibleToPersonHidesMembersOnlyFromNonMember`)*.
 - [x] See "6-Week Aerial 101" at the non-member price *(`ResolveBestPriceTierForMemberPublicForNonMember`)*.
 
-## 11. Open Questions
+## 11. Weekly "Our Schedule" view + requirement inline descriptions
+
+> **Added 2026-06-01 (Mason).** Two related additions:
+> 1. A human-readable **`inline_description`** on each access requirement group — a free-text blurb describing that requirement (e.g. "Gold or Platinum membership", "Intermediate Acro skill").
+> 2. A public **"Our Schedule"** weekly page (Sun–Sat) showing every active class's slots for the coming week, each with a class **photo thumbnail, class name, instructor, duration, the requirements inline description, and any "requires attending" predecessor**.
+>
+> Builds on existing infrastructure: Phase 1's lazy derived-session model (`ClassScheduleHelper::GetDerivedSessionsForRange`), the requirement-group access model ([[Permission-based class access redesign]]), SL-11 predecessor resolution, the photo whitelist (`classes` is photo-supported), and the dynamic "Our Classes" nav. Bottom-up build order: **DB → table helpers → business logic → endpoints → frontend.**
+
+**Design decisions:**
+- **`inline_description` lives on `class_requirement_groups`** (per-group blurb), not a single class-level field — so the description tracks the actual CNF groups and the §6.6 Requirements editor edits it inline beside each group. Display surfaces the **AND-join** of a class's non-empty group descriptions (empty ⇒ "open to everyone"). *(Alternative — one class-level field — rejected for that reason.)*
+- The **"Our Schedule" page is public / anonymous-capable** (like `/api/classes`): it shows *what runs each day*, not a booking surface. Recurring classes have no advance booking (P-1) and there is no Reserve flow yet, so this is purely informational.
+- **"Valid over the next week" = a 7-day Sun–Sat window.** Default = the current week (the UTC-midnight Sunday on/before today through the following Saturday, matching the Phase-1 occurrence-date convention); an optional `week_start_us` pages forward/back. Per day, resolve each active class's active instance → active impl → slots whose `day_of_week` matches (exactly `GetDerivedSessionsForRange`).
+
+### 11.1 Database
+- [ ] Add **`inline_description TEXT NOT NULL DEFAULT ''`** to `class_requirement_groups` — `db_schema/class_requirement_groups.{h,cpp}`: add `kClassRequirementGroupsInlineDescription` + `AddColumnNotNullableWithDefault(..., "''")`. No new table, no FK. Pre-deploy (no migration).
+- [ ] `create_database.cpp` admin metadata for the new column: `PopulateAdminColumnDataInfo` (`text` edit type) + `PopulateAdminColumnFriendlyNames` ("Requirement Description"). (The table is already a nested admin-CRUD table under `classes` from the redesign §3.1.)
+
+### 11.2 Table Helpers
+- [ ] `TableHelpers::ClassRequirementGroups`: `inline_description` round-trips automatically via `GetGroup`/`GetGroupsByClass` (`SELECT *`). Add an `AddGroup` overload taking the description (or rely on `UpdateGroup` / generic CRUD to set it). Extend `class_requirement_groups_test.cpp` to assert the column round-trips and that `UpdateGroup` bumps it.
+- [ ] **No new query for the weekly view** — it reuses Phase 1 reads: `ClassInstances::GetActiveInstance`, `ClassSchedules::GetActiveImplementation`, `ClassScheduleSlots::GetSlotsByImplementationAndDay`, and the SL-11 predecessor read `GetSlotsByImplementationWithPredecessor` (already resolves `predecessor_class_name` / `_day_of_week` / `_start_time_minutes`). Confirm those cover the predecessor display fields (they do).
+
+### 11.3 Business Logic
+- [ ] New **`WeeklyScheduleHelper`** (`business_logic/scheduling/weekly_schedule_helper.{h,cpp}`) — or a method on `ClassCatalogHelper`:
+  - `struct ScheduleSlotView { int64_t classId; std::string className; bool classHasPhoto; int64_t dayOfWeek; int64_t startUs; int64_t endUs; int64_t durationMinutes; std::optional<int64_t> instructorPersonId; std::string instructorName; std::string requirementsDescription; bool requiresAttending; std::string predecessorClassName; int64_t predecessorDayOfWeek; int64_t predecessorStartTimeMinutes; }`
+  - `struct WeeklySchedule { int64_t weekStartUs; std::vector<ScheduleSlotView> slots; }` (slots carry `dayOfWeek`; the endpoint groups into Sun–Sat).
+  - `WeeklySchedule GetWeeklySchedule(Transaction&, int64_t weekStartUs)` — resolve the week start (≤0 ⇒ current week's Sunday); for each active class (`ClassCatalogHelper::GetActiveClasses`), call `ClassScheduleHelper::GetDerivedSessionsForRange(classId, weekStartUs, weekStartUs + 7*kUsPerDay)`; for each `DerivedSession` build a `ScheduleSlotView`, resolving: class name + `has_photo` (photo table lookup), instructor name (`people` via `slot.instructorPersonId`), `durationMinutes` (`(endUs-startUs)/60s`), `requirementsDescription` (AND-join the class's non-empty `class_requirement_groups.inline_description`s), and predecessor (look up the derived slot by id → `predecessor_class_schedule_slot_id` → class + day + start via the SL-11 enriched read).
+  - Helper to compute the Sunday-on/before a timestamp at UTC-midnight (reuse the Phase-1 `TruncToUtcMidnight` + `DayOfWeekUtc` utilities).
+  - **No SQL in business logic** — go through the table helpers (`feedback_no_sql_in_business_logic`).
+- [ ] `requirementsDescription`: join non-empty group `inline_description`s with " · " (AND semantics); empty when the class has no requirement groups. (Reuse / extend `ClassAccessHelper::GetClassRequirements`, which already reads the groups — add `inlineDescription` to `RequirementGroupView` here so both the schedule and the §6.6 editor use one read.)
+- [ ] Tests (`weekly_schedule_helper_test.cpp`): a class with Mon+Wed slots lands on the right days; instructor/duration/photo-flag resolved; requirements description joined from groups (and empty for an open class); predecessor surfaced when set and absent otherwise; a class with no active instance/impl on a day is omitted (dark day); `weekStartUs<=0` defaults to the current week.
+
+### 11.4 Endpoints
+- [ ] **`GET /api/schedule/week[?week_start_us=<us>]`** — public (anonymous OK, mirrors `/api/classes`). Thin handler → `WeeklyScheduleHelper::GetWeeklySchedule`. Response: `{ "week_start_us", "days": [ { "day_of_week", "date_us", "slots": [ { "class_id", "class_name", "has_photo", "instructor_name", "start_time_us", "end_time_us", "duration_minutes", "requirements_description", "requires_attending": { "class_name", "day_of_week", "start_time_minutes" } | absent } ] } ] }`. KVT converters (`ScheduleSlotViewToKeyValueTable`) in `scheduling_key_value_table`; the endpoint nests slots under each day (same parent-KVT-then-array pattern as `get_class_detail`). Register in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [ ] Endpoint tests (`endpoints/schedule_week_test.cpp`): anonymous 200; a seeded class with Mon/Wed slots populates only those days; `requirements_description` + `requires_attending` present when configured; empty week returns 7 empty days; `week_start_us` paging.
+- [ ] **§6.6 read** (`ClassAccessHelper::GetClassRequirements` + `GET /api/admin/class/<id>/requirements`) surfaces the new per-group `inline_description` (add to `RequirementGroupView` + `RequirementGroupToKeyValueTable`); update the helper + KVT tests.
+
+### 11.5 Frontend
+- [ ] **"Our Schedule" nav entry** — prepend a fixed **"Our Schedule"** item to the TOP of the dynamic "Our Classes" top-level menu (above "All Classes"), linking to `/schedule`. (`shared/services/header/header.service.ts` + `mockHeaderResponse.ts` — the menu is already populated dynamically from active classes; add the fixed item first.)
+- [ ] **Public route `/schedule`** → new `OurScheduleComponent` (`pages/public/our-schedule/`, standalone, `SharedModule`). Renders a **Sun–Sat grid** (7 columns desktop, stacked on mobile); each day lists its class slots as cards showing: class **photo thumbnail** (`/api/get_scaled_photo/classes/<id>/…` when `has_photo`, with a placeholder otherwise), **class name**, **instructor**, **duration**, **requirements inline description**, and a **"Requires attending: {class} · {day} {time}"** line when set. Prev/next/today week navigation via `week_start_us`. Empty-day state ("No classes").
+- [ ] **`ServerAccess`**: `getWeeklySchedule(weekStartUs?)` across the interface + proxy + `ServerAccessNetwork` (`GET /api/schedule/week`) + `ServerAccessMock`. New `WeeklySchedule` / `ScheduleDay` / `ScheduleSlot` types in `class.types.ts` (re-exported). Booleans (`has_photo`) normalized per the KVT-string convention.
+- [ ] **§6.6 Requirements editor** (`class-requirements-editor.component`): add a per-group **inline description** text field, persisted via the generic-CRUD `updateItem` on `class_requirement_groups` (same path as the group label). Surface it in the rule display.
+- [ ] Specs: `our-schedule.component.spec.ts` (renders days/slots; photo / instructor / duration / requirements / predecessor; week nav; empty day), `ServerAccess.mock.spec.ts` for `getWeeklySchedule`, header-service spec for the prepended "Our Schedule" item, and the updated requirements-editor spec (inline-description field).
+
+### 11.6 Tests rollup
+- [ ] DB/table-helper inline_description round-trip · `WeeklyScheduleHelper` (days / enrichment / predecessor / requirements join / dark days / week-start default) · `/api/schedule/week` endpoint + the §6.6 inline_description read · frontend Our Schedule component, ServerAccess mock, header nav, and Requirements-editor inline-description field.
+
+## 12. Open Questions
 
 **All resolved (2026-06-01).** No open questions remain for Phase 2.
 
@@ -269,7 +315,7 @@ A non-member should:
 	- Mason- I'll go with your recommendation.
 - **OQ-P2-3.** ✅ **RESOLVED / moot:** drop `classes.required_permission_id` (do not denormalize). Confirmed — and the [[Permission-based class access redesign]] makes it moot: access lives in `class_requirement_groups` / `class_requirement_group_literals`, resolved by `ClassAccessHelper`; pricing/visibility resolve through the active `class_instances` product. The §2.2 / §3.3 column is permanently skipped.
 
-## 12. Cross-References
+## 13. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 2.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]].
