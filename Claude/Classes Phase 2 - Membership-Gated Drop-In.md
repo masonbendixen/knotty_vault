@@ -65,7 +65,7 @@ Deferred (documented, not started — each carries either regression risk to non
 - **§4.2 event-session visibility projection** — surfacing class metadata on `GetVisibleEventSessions` needs the derived-session rewrite (`GetDerivedSessionsForRange`); large. The class catalog already covers the class visibility/pricing surface.
 - **§4.3 cancel no-refund / admin-cancel refund split** — must be scoped to *class* bookings only; changing `CancelBooking`/`SessionCancellationHelper` globally would regress existing event refunds. Needs care + dedicated tests.
 - **§5.2 `GET /api/me/visible_classes`** — new endpoint.
-- **§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped: pricing/visibility resolve through the active `class_instances` product (canonical source), avoiding a denormalized column nobody populates. See OQ below.
+- ~~**§2.2 `classes.required_permission_id`, §3.1 `GetProductByClassId`, §3.2 `GetActivePricesForProduct`** — intentionally skipped~~ → **resolved/closed 2026-06-01 (see §3):** pricing/visibility resolve through the active `class_instances` product + `GetBestProductPriceByProductSchedulePermissions`; the skipped column/methods are obsolete under the access redesign. §3 is done (verification + new round-trip tests).
 - **Frontend §6.2 calendar chips, §6.3 my-bookings class chrome, §6.4 `cancellation-policy.component`, §6.5 `getVisibleClasses`** — depend on §4.2/§5.2/cancel work above.
 
 Open questions — **all resolved (2026-06-01), see §11.** OQ-P2-3 (drop `classes.required_permission_id`) was confirmed and is moot under the access redesign.
@@ -141,19 +141,21 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 - [x] `make_database_info.cpp` builds `products` from `MakeProductsTable` (updated); `create_database.cpp` creates it — the new column flows automatically.
 - [x] `db_schema/products.h` has `kProductsIsMembershipIncluded`. *(No `classes.h` change — see §2.2.)*
 
-## 3. Table Helpers
+## 3. Table Helpers ✅ DONE (2026-06-01)
+
+> **No new production table-helper code was needed — every §3 capability already exists or was obsoleted by the [[Permission-based class access redesign]].** The work this section actually required (tier-price resolution + surfacing the access-permission columns) lives in helpers built earlier; the one genuine gap was a missing round-trip *test*, now added. Details per item below.
 
 ### 3.1 Extend `TableHelpers::Products`
-- [ ] Surface `is_membership_included`, `booking_permission_id`, `visibility_permission_id` in reads.
-- [ ] Add `GetProductByClassId(Transaction&, int64_t classId)` if not already present — used by pricing resolution.
-- [ ] Tests for column round-trips.
+- [x] **Surface `booking_permission_id` / `visibility_permission_id` in reads** — already satisfied: both columns exist on `products` and `GetProduct` / `GetActiveProducts` return them (`DbCrud::GetRow`/`GetActiveProducts` = `SELECT *`). **Added round-trip tests** in `products_test.cpp` (`GetProductSurfacesPermissionColumns`, `GetProductPermissionColumnsAbsentWhenNull`, `GetActiveProductsSurfacesPermissionColumns`).
+- [x] ~~Surface `is_membership_included`~~ — **column removed** by the redesign; do not re-add. Class access is decided by the requirement-group gate (`ClassAccessHelper`), not a product flag.
+- [x] ~~Add `GetProductByClassId`~~ — **obsolete under the three-level model.** A class has no single product; the product lives on the active `class_instances` row. Callers resolve it via `TableHelpers::ClassInstances::GetActiveInstance(classId, atUs).product_id` (Phase 1), which `ClassCatalogHelper` already uses. (Confirms the Implementation-Status "intentionally skipped" note.)
+- [x] Tests for column round-trips — **done** (the three tests above).
 
 ### 3.2 Extend `TableHelpers::ProductPrices`
-- [ ] If not already present, add `GetActivePricesForProduct(Transaction&, int64_t productId, int64_t asOfUs)` — returns rows where the product's active `price_schedules` row covers `asOfUs`. Used for tier-price resolution.
-- [ ] Tests.
+- [x] ~~Add `GetActivePricesForProduct(productId, asOfUs)`~~ — **already covered, in better form.** Tier-price resolution uses `ProductPrices::GetBestProductPriceByProductSchedulePermissions(productId, scheduleId, permissionIds, variantId)` (lowest qualifying tier, NULL-permission fallback, variant-scoped), with the active schedule resolved by `CatalogHelper::GetActivePriceScheduleId`. That path is exercised by `ResolveBestPriceForPerson` and already has thorough `product_prices_test` coverage (basic lowest-wins, empty-list fallback, permission fallback, variant scoping). A separate "list all active tier prices" method has **no consumer** in Phase 2 (YAGNI; the catalog resolves the single best price) — not added.
 
 ### 3.3 Extend `TableHelpers::Classes`
-- [ ] Surface the new `required_permission_id` column.
+- [x] ~~Surface `required_permission_id`~~ — **obsolete:** the column was permanently skipped (OQ-P2-3); access lives in `class_requirement_groups` / `class_requirement_group_literals`. `Classes::GetClass` (`SELECT *`) would surface any real column automatically; there is nothing to add.
 
 ## 4. Business Logic
 
@@ -243,8 +245,8 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 ## 9. Tests-Required Summary
 
-- [ ] Table helper tests for the new column round-trips.
-- [ ] `catalog_helper_test.cpp`: `ResolveBestPriceForPerson` covers included, paid tier, multi-permission lowest-wins, non-member-with-price, non-member-blocked.
+- [x] Table helper tests for the access-permission column round-trips — `products_test.cpp` (`GetProductSurfacesPermissionColumns` / `...AbsentWhenNull` / `GetActiveProductsSurfacesPermissionColumns`); tier-price resolution already covered by `product_prices_test.cpp` (`GetBestProductPriceByProductSchedulePermissions*`).
+- [x] `catalog_helper_test.cpp`: `ResolveBestPriceForPerson` covers included→tier-price, lowest-wins, non-member-with-price, non-member-blocked, product-not-found (done in the §4.1 work + the access-redesign closure test).
 - [ ] Updated `event_session_helper_test.cpp`: visible-event-sessions surfaces class metadata + resolved price.
 - [ ] Updated `booking_helper_test.cpp`: reject `NO_ADVANCE_BOOKING_REQUIRED`, paid booking still works.
 - [ ] Updated `event_session_cancellation_helper_test.cpp` (or whichever owns admin-cancel): full refund for paid, no refund for zero-money.
