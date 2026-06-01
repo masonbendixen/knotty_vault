@@ -170,27 +170,29 @@ Lowest layer first.
 - [x] Frontend `class-detail.component.spec.ts` — added a precedence test (inclusion wins over a residual purchasable price; "per session" not shown for a covered viewer) on top of the existing included/paid/members-only/none coverage.
 - [x] Frontend `ServerAccess.mock.spec.ts` — added access-derived `getClassDetail` cases (recurring+covered ⇒ included/no price; no-access ⇒ members-only) via the `_mockDetail` shadow.
 
-# 4. Per-document impact
+# 4. Per-document impact ✅ DONE (2026-05-31)
 
-### 4.1 Parent — [[Classes, schedules, and attendance]]
-- [ ] **C-1**: drop "included-with-membership flag" wording; a class declares an **access permission set** (+ skill requirements). Keep "list of allowed booking permissions."
-- [ ] **M-1**: reaffirm as a *set* of membership permissions ("included in memberships X, Y, Z"), realized via the access set — explicitly not a boolean.
-- [ ] Add a cross-reference to this redesign in §2.4 and the §1 "what exists" list.
+All §4 edits applied across the parent + Phase 1/2/3/5/7/8/9 docs.
 
-### 4.2 [[Classes Phase 1 - Catalog and Schedule Authoring]]
-- [ ] The `class_requirement_groups` + `class_requirement_group_literals` + `permission_implications` tables are Phase-1-style schema additions (class-level, OQ-PA-2). The class-authoring UI gains a "Requirements" editor: add groups, add permission/skill literals to each group. Mark as a Phase 1 follow-up / shared dependency of Phase 2/3.
+### 4.1 Parent — [[Classes, schedules, and attendance]] ✅
+- [x] **C-1**: dropped "included-with-membership flag"; now declares an **access permission set** (via requirement groups) + skill requirements; kept "list of allowed booking permissions."
+- [x] **M-1**: reaffirmed as a *set* of membership permissions realized via access requirement groups (closure-aware), explicitly not a boolean; added the "included for this viewer = derived" framing.
+- [x] Cross-reference added — §2.4 already had it; added a "what exists (built)" bullet to §1 listing the redesign's tables/helpers + the pending §6.6 authoring UI.
 
-### 4.3 [[Classes Phase 2 - Membership-Gated Drop-In]]
-- [ ] Primary cleanup site. Update the Phase 2 status block + §1.1/§2.2/§4.1/§4.3/§6.1 to the permission-set model; remove the `is_membership_included` deliverables and replace with the access-set resolution. The already-built tier-pricing path (M-5 via `product_prices`) stays — only the binary inclusion modeling changes.
+### 4.2 [[Classes Phase 1 - Catalog and Schedule Authoring]] ✅
+- [x] Added **§6.6 "Requirements editor"** as a PENDING Phase-1 follow-up (backend read endpoint + generic-CRUD writes; frontend Requirements panel with a permission/skill literal picker on the selected class), a status-block flag, and a cross-reference. Shared dependency of Phase 2/3.
 
-### 4.4 [[Classes Phase 3 - Skill Levels]]
-- [ ] Owns SL-10 (`attendance_threshold_rules` + monthly grant job — Mason's "attend N classes last month → permission"; note the "current OR previous month" wording in Mason's example → the rule/job needs a configurable window, see OQ-PA-7), SL-5/6 (skill gate), SL-11 (predecessor), SL-12 (one gate). These attendance-/skill-derived permissions enter the closure-expanded `GetEffectivePermissionIds` and the shared access gate (§3.2). The requirement-group model + access gate likely *lands here* (or is shared infra between Phase 2/3) since it's the home of prerequisites — the `class_requirement_groups` skill literals are exactly SL-5.
+### 4.3 [[Classes Phase 2 - Membership-Gated Drop-In]] ✅
+- [x] Added a supersession note to the status block mapping each `is_membership_included` deliverable to its replacement; struck the §2.2 column add ("do not re-add"), the §7 admin metadata, and updated the §10 acceptance fixture to a requirement group. Tier-pricing path (M-5) explicitly preserved; OQ-P2-3 noted moot.
 
-### 4.5 [[Classes Phase 5 - Attendance Templates]] / [[Classes Phase 8 - Staff Check-in]] / [[Classes Phase 9 - Attendance History]]
-- [ ] These produce the *attendance facts* SL-10 counts (P-5: staff-only attribution; CI-4: check-in creates the booking for membership-included recurring classes). No model change, but the SL-10 job depends on their data — note the dependency.
+### 4.4 [[Classes Phase 3 - Skill Levels]] ✅
+- [x] Added **§1.4 reconciliation**: the access gate + requirement-group infra (incl. the nullable `skill_level_id` literal column) are built and shared; raised **OQ-P3-SKILL** (recommend modeling skill requirements as requirement-group skill literals, making the separate `class_skill_requirements` table/§3.3/§4 redundant); flagged the required work to **extend `ClassAccessHelper` to evaluate skill literals** (currently skipped) + add the FK; noted SL-10 permissions flow through the closure and the override audit table is built. Marked §2.3 inline as possibly-redundant.
 
-### 4.6 [[Classes Phase 7 - Class Series and Workshops]]
-- [ ] Confirms the per-permission *pricing* path (M-2/M-5) is unaffected by this redesign — paid offerings keep `product_prices`. Only recurring-class inclusion changes.
+### 4.5 [[Classes Phase 5 - Attendance Templates]] / [[Classes Phase 8 - Staff Check-in]] / [[Classes Phase 9 - Attendance History]] ✅
+- [x] Added dependency notes to all three: they produce the attendance facts **SL-10** counts; Phase 8 also flagged as the natural home for the gate **override** action (`booking_requirement_overrides`). No model change.
+
+### 4.6 [[Classes Phase 7 - Class Series and Workshops]] ✅
+- [x] Added a note confirming the per-permission *pricing* path (M-2/M-5, `product_prices`) is unaffected — only recurring-class inclusion changed; pricing is now closure-aware over the tier hierarchy.
 
 # 5. Open Questions
 
@@ -216,7 +218,12 @@ Lowest layer first.
 
 # 6. Status & build order (2026-05-30)
 
-**All open questions are resolved** (PA-2 class-level · PA-3 nested hierarchy · PA-4 remove flag now · PA-5 CNF groups · PA-6 audit table + `manage_classes` · PA-7 current+next-month grant). The plan is implementation-ready. The only outstanding item is **seed data, not design**: the exact `permission_implications` edges + which classes require which permissions/skills (Mason to supply; can be filled in as the studio finalizes tiers).
+**All open questions are resolved** (PA-2 class-level · PA-3 nested hierarchy · PA-4 remove flag now · PA-5 CNF groups · PA-6 audit table + `manage_classes` · PA-7 current+next-month grant).
+
+**Implementation status (2026-05-31): §3 (database + business logic + frontend + tests) and §4 (doc reconciliation) are all COMPLETE.** The redesign itself is done. What remains is downstream, not part of this corrective work:
+- **Seed data (Mason):** the exact `permission_implications` edges + which classes require which permissions/skills (fill in as the studio finalizes tiers).
+- **§6.6 Requirements authoring UI (Phase-1 follow-up):** a friendly per-class editor for requirement groups/literals — today they're only editable via the generic admin table editor. Now tracked as a deliverable in [[Classes Phase 1 - Catalog and Schedule Authoring]] §6.6.
+- **OQ-P3-SKILL (Phase 3):** confirm modeling skill requirements as requirement-group skill literals (recommended) and extend `ClassAccessHelper` to evaluate skill literals.
 
 Suggested build order (bottom-up, shared infra first; this redesign owns the **infra**, while Phase 3 owns the SL-10 attendance job and skill literals):
 1. **Schema** — `permission_implications`; `class_requirement_groups` + `class_requirement_group_literals`; `booking_requirement_overrides`. Wire `make_database_info` + `create_database` (CreateTables + admin metadata, nested under `classes`). Remove `products.is_membership_included` + its admin metadata.

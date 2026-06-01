@@ -37,6 +37,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+> **Access redesign note (2026-05-31, [[Permission-based class access redesign]] §4.5):** Check-in is where attendance facts are created (P-5: staff-only attribution; CI-4: check-in creates the booking for membership-included recurring classes — there is no advance booking for those, per P-1). Those facts are exactly what **SL-10** counts toward the attendance-threshold permission. Also: when a person is **blocked by the access gate**, the logged staff **override** writes `booking_requirement_overrides` via `ClassAccessHelper::RecordOverride` (built, redesign §3.2) — the check-in UI is a natural home for that override action. No access-model change; note the dependency + the override surface.
+
 ## Phase Summary
 
 **Must-have, benefits from earlier phases.** Staff opens a check-in screen for a class session within the configurable window (default −1h to +3h around session start), sees a pre-populated list (template attendees + paid bookings + last-4-weeks attendance), can autocomplete-search additional people, and marks them attended with one click. For membership-included recurring classes, the check-in itself **creates** the `booking` row (`purchase_id IS NULL`); for paid bookings, the check-in updates the existing booking's `checked_in_us`.

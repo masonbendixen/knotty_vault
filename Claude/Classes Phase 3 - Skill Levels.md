@@ -81,6 +81,25 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 ### 1.3 Revocation
 - [x] Yes — staff can revoke a previously granted skill. Audit-trail-friendly: capture `removed_us`, `removed_by_person_id`, `removed_reason`.
 
+### 1.4 Reconciliation with the permission-based access model (added 2026-05-31)
+
+> Per [[Permission-based class access redesign]] §4.4. The redesign built the **shared access gate + requirement-group infra** that this phase's skill gate (SL-5/6, SL-12) plugs into — Phase 3 **consumes** it rather than building a parallel mechanism.
+
+**Already built (redesign §3, do not rebuild):**
+- [x] `Scheduling::ClassAccessHelper::CheckAccess(classId, personId)` — the one booking gate (SL-12). Evaluates the class's CNF requirement groups (AND across groups, OR within), closure-aware.
+- [x] `class_requirement_groups` + `class_requirement_group_literals`. **A literal can already be a skill level**: `class_requirement_group_literals.skill_level_id` exists as a **nullable BIGINT with no FK** — a deliberate forward reference to *this* phase's `skill_levels` table.
+- [x] `booking_requirement_overrides` audit table + `ClassAccessHelper::RecordOverride(...)` — the logged staff-override path (SL-6). Phase 3's "staff override with reason" writes here; do not invent a second override record.
+- [x] `CatalogHelper::GetEffectivePermissionIds` is closure-expanded, so **SL-10 attendance-threshold permissions and any role/membership permission flow into the gate automatically** once granted.
+
+**Decision needed — where do skill requirements live? (reconciliation open question OQ-P3-SKILL):**
+- **(Recommended) Model skill requirements as skill literals in requirement groups.** SL-5 "class requires skill X" becomes a single-literal group `{skill_level_id: X}`; "X or Y" is one group with two skill literals; skill AND membership AND attendance is three groups — all evaluated by the one gate. This unifies SL-12 and is exactly what the redesign assumed ("the requirement-group skill literals are exactly SL-5"). **Consequence:** the separate **§2.3 `class_skill_requirements` table + §3.3 helper + §4 `PersonMeetsClassRequirements`** below are **redundant** — drop them; the authoring UI is the §6.6 Phase-1 Requirements editor (skill-literal picker), and enforcement is already in `ClassAccessHelper`.
+- **(Alternative) Keep `class_skill_requirements`** as a dedicated table and have `ClassAccessHelper` additionally read it. Simpler authoring (one table per concern) but **splits the gate** into "groups + a side table," re-introducing exactly the fragmentation SL-12 set out to avoid. Not recommended.
+- *Mason to confirm.* The rest of §2.3/§3.3/§4 is written against the original separate-table plan; if the recommendation is taken, mark those `[~]` superseded.
+
+**Required work regardless of the above:**
+- [ ] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals.** It currently evaluates only *permission* literals and **explicitly skips `skill_level_id` literals** (documented in redesign §3.2 — "Skill literals are not yet evaluated; Phase-3 `skill_levels`"). This phase wires the skill side: a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Add the FK on `class_requirement_group_literals.skill_level_id → skill_levels(id)` now that the table exists.
+- [ ] **Booking enforcement is already in the gate** — the §4 hook below should call `ClassAccessHelper::CheckAccess` (extended above), not a new standalone skill check. Keep the clear `MISSING_SKILL_REQUIREMENTS`-style error by surfacing the failed group labels from `AccessResult`.
+
 ## 2. Database Schema
 
 ### 2.1 `skill_levels` table
@@ -110,6 +129,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] Index on `person_id` for `GetActiveAssignmentsForPerson`.
 
 ### 2.3 `class_skill_requirements` table
+> ⚠️ **Possibly redundant — see §1.4 (OQ-P3-SKILL).** If skill requirements are modeled as skill literals in `class_requirement_group_literals` (recommended), this table, its §3.3 helper, and §4's `PersonMeetsClassRequirements` are dropped in favor of the shared `ClassAccessHelper`. Confirm with Mason before building.
 - [ ] `db_schema/class_skill_requirements.h/.cpp`:
   - `id BIGSERIAL PK`
   - `class_id BIGINT NOT NULL REFERENCES classes(id)`

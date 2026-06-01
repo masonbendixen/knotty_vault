@@ -37,6 +37,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+> **Access redesign note (2026-05-31, [[Permission-based class access redesign]] §4.6):** This phase's per-permission *pricing* path (M-2/M-5 via `product_prices`, lowest-tier-wins) is **unaffected** by the permission-based access redesign — paid offerings keep `product_prices`. The redesign changed only recurring-class *inclusion* (now requirement-group-driven; the `is_membership_included` flag was removed). Workshop/series pricing still resolves through `CatalogHelper::ResolveBestPriceForPerson`, now **closure-aware** over the tier hierarchy — a higher membership tier automatically qualifies for a lower tier's price without enumerating tiers.
+
 ## Phase Summary
 
 **Should-have.** Admin creates a "class series" — a `class_schedule` with `is_series=true` covering a start/end date window, optional min attendees with a min-by date, optional auto-cancel-and-refund policy if min not met. Series purchases are one transaction (one `purchase`) covering all child instances. Workshops are a series of length 1 (per P-3). Users can buy a full series or join mid-series with pro-rated pricing using the per-instance base price for their tier. Series cancellation by admin issues full refunds; user-side cancel is non-refundable per P-6 but staff can grant a voucher.

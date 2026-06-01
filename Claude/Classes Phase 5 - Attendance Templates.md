@@ -37,6 +37,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+> **Access redesign note (2026-05-31, [[Permission-based class access redesign]] §4.5):** The attendance facts this phase deals with feed **SL-10** — the attendance-threshold permission grant ("attended ≥N classes last/this month → a time-boxed permission some classes require"). No access-model change here, but the SL-10 monthly grant job (Phase 3) **depends on this phase's attendance data**, and the permissions it grants flow into the closure-expanded `GetEffectivePermissionIds` → the shared `Scheduling::ClassAccessHelper` gate. Note the dependency.
+
 ## Phase Summary
 
 **Should-have, core engagement.** Users mark which class schedules they normally plan to attend → that's their **attendance template** (per-schedule-entry, not per-instance). Templates are a *personal fitness-planning tool*, NOT a reservation: they do NOT create `booking` rows, do NOT consume `event_sessions.capacity`, and do NOT participate in the waitlist. They drive the user homepage today-classes feed, the weekly digest (Phase 6), and per-instance exception notes that surface to the instructor.

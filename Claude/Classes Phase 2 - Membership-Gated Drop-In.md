@@ -136,7 +136,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 ### 2.2 Small flag additions
 - [~] `classes.required_permission_id BIGINT` NULL — **skipped (OQ-P2-3):** resolve via the active instance's product instead of denormalizing.
-- [x] `products.is_membership_included BOOLEAN NOT NULL DEFAULT FALSE` — drives the "Included" badge + the booking guard.
+- [x] ~~`products.is_membership_included BOOLEAN NOT NULL DEFAULT FALSE`~~ — **REMOVED by [[Permission-based class access redesign]] §3 (2026-05-31).** Do not re-add this column. Inclusion is declared per-class via `class_requirement_groups` + `class_requirement_group_literals` and resolved by `Scheduling::ClassAccessHelper` (closure-aware). See the supersession note in the Implementation Status block.
 
 ### 2.3 Wire into DB init
 - [x] `make_database_info.cpp` builds `products` from `MakeProductsTable` (updated); `create_database.cpp` creates it — the new column flows automatically.
@@ -236,7 +236,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 ## 7. Admin Metadata
 
 - [~] Verify admin UI for `product_prices` tier pricing end-to-end — not re-verified this pass (the existing product/pricing admin already supports per-permission `product_prices`).
-- [x] Friendly name + bool edit-type for `products.is_membership_included` ("Included with membership") in `create_database.cpp`.
+- [x] ~~Friendly name + bool edit-type for `products.is_membership_included`~~ — **REMOVED with the column** ([[Permission-based class access redesign]] §3, 2026-05-31). The redesign instead registered `class_requirement_groups` + `class_requirement_group_literals` (nested admin metadata under `classes`, gated by `manage_class_schedule`) and `permission_implications` (top-level, admin-only) — the friendly authoring UI for these is the §6.6 Phase-1 follow-up.
 
 ## 8. Permissions
 
@@ -256,7 +256,7 @@ Reuse existing tables — no new schema except a small set of flag columns on `p
 
 A new user, given:
 - An active "Gold Membership" entitlement that grants `gold_member` permission.
-- A class "Vinyasa Flow" whose product has `is_membership_included=true` and `booking_permission_id = gold_member`.
+- A recurring class "Vinyasa Flow" with a single access requirement group holding the `gold_member` permission literal (closure-expanded, so platinum also satisfies it). *(Post-redesign: was `products.is_membership_included=true` + `booking_permission_id = gold_member` — see the supersession note.)*
 - A series "6-Week Aerial 101" whose product has tier prices: gold $120, silver $180, non-member $300.
 
 Should be able to:

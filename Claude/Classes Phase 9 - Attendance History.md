@@ -37,6 +37,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Place plan here
 
+> **Access redesign note (2026-05-31, [[Permission-based class access redesign]] §4.5):** The attendance history this phase surfaces is the same data **SL-10** counts for the attendance-threshold permission grant (Phase 3's monthly job reads these facts). No access-model change; note the dependency.
+
 ## Phase Summary
 
 **Must-have.** User can view paginated past attendances in the user portal, filterable by year / month / class / instructor. Each row shows class, date/time, facility, room, instructor, status. CSV export is Nice-to-Have (out of scope for the Must portion).
