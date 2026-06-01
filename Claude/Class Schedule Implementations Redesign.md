@@ -1,10 +1,10 @@
 ---
 fileClass: Project
 Category: Claude
-Status: Design locked — ready for Section 3 doc updates
+Status: COMPLETE — design locked + Section 3 doc updates incorporated (verified 2026-05-31)
 Authors: Mason Bendixen
-Last Updated: 5/27/2026
-Version: 0.2
+Last Updated: 5/31/2026
+Version: 0.3
 tags:
 ---
 # Overview
@@ -404,7 +404,13 @@ Tag each with a decision before Section 3 (doc updates) kicks off.
 
 ---
 
-# 3. Doc Update Plan (UNBLOCKED — all open questions resolved 2026-05-27)
+# 3. Doc Update Plan (✅ INCORPORATED — verified 2026-05-31)
+
+> **Status: all §3 doc updates were carried out** (the per-item checkboxes below were left unticked during execution and are kept as the historical plan). Verified 2026-05-31:
+> - **§3.1 Parent** — done: §1 redesign callout (#94), §2.2/§2.12 reframes, **P-7** principle, **CS-9** preview use case, the rejected "flat single-row schedule" alternative, §6 roadmap callout.
+> - **§3.2 Phase 1** — done: doc rewritten in place + the three-level model built in code; Phase 1 cites this doc as "Design source."
+> - **§3.3 Siblings** — done: Phases 2, 5, 6, 7, 8, 9, 10, 11, 12 each carry a "Class Schedule Redesign Impact (2026-05-28)" callout; Phase 4 (iCal) correctly untouched. **Phase 3 (Skill Levels) was intentionally not in scope** (OQ-CSI-11: skill requirements stay per-class — no schedule-model impact).
+> - **§3.4 Misc** — no memory entry was needed.
 
 The following docs need updating. Order matters — parent first (it sets the use cases the children specialize), then Phase 1 (the schema authority), then siblings that reference the schema.
 
