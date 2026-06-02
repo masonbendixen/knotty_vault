@@ -277,9 +277,9 @@ A non-member should:
 - [x] `create_database.cpp` admin metadata: `PopulateAdminColumnDataInfo` row (`text` edit type, optional) + `PopulateAdminColumnFriendlyNames` row ("Requirement Description"). (The table is already a nested admin-CRUD table under `classes` from the redesign §3.1.)
 - [x] Test: `class_requirement_groups_test.cpp::InlineDescriptionDefaultsEmptyAndRoundTrips` — defaults to `''` on add and round-trips through `UpdateGroup`. (Covers the §11.2 round-trip bullet too.)
 
-### 11.2 Table Helpers
-- [ ] `TableHelpers::ClassRequirementGroups`: `inline_description` round-trips automatically via `GetGroup`/`GetGroupsByClass` (`SELECT *`). Add an `AddGroup` overload taking the description (or rely on `UpdateGroup` / generic CRUD to set it). Extend `class_requirement_groups_test.cpp` to assert the column round-trips and that `UpdateGroup` bumps it.
-- [ ] **No new query for the weekly view** — it reuses Phase 1 reads: `ClassInstances::GetActiveInstance`, `ClassSchedules::GetActiveImplementation`, `ClassScheduleSlots::GetSlotsByImplementationAndDay`, and the SL-11 predecessor read `GetSlotsByImplementationWithPredecessor` (already resolves `predecessor_class_name` / `_day_of_week` / `_start_time_minutes`). Confirm those cover the predecessor display fields (they do).
+### 11.2 Table Helpers ✅ DONE (2026-06-02) — C++ for Mason to build
+- [x] `TableHelpers::ClassRequirementGroups`: `inline_description` round-trips automatically via `GetGroup`/`GetGroupsByClass` (`DbCrud::GetRow` / `GetRowsByValuesWithOrderBy` = `SELECT *`). Added a 4-arg **`AddGroup(tx, classId, label, inlineDescription)`** overload (the existing 3-arg delegates with `""`). Tests in `class_requirement_groups_test.cpp`: `InlineDescriptionDefaultsEmptyAndRoundTrips` (default `''` + `UpdateGroup` round-trip, from §11.1) and `AddGroupWithInlineDescription` (overload sets it on create).
+- [x] **No new query for the weekly view** — confirmed it reuses Phase 1 reads: `ClassInstances::GetActiveInstance`, `ClassSchedules::GetActiveImplementation`, `ClassScheduleSlots::GetSlotsByImplementationAndDay`, and the SL-11 predecessor read `GetSlotsByImplementationWithPredecessor`. Verified the latter's SQL already selects `predecessor_class_name` / `predecessor_start_time_minutes` / `predecessor_day_of_week`, so §11.3 can resolve "requires attending" with no new query.
 
 ### 11.3 Business Logic
 - [ ] New **`WeeklyScheduleHelper`** (`business_logic/scheduling/weekly_schedule_helper.{h,cpp}`) — or a method on `ClassCatalogHelper`:
