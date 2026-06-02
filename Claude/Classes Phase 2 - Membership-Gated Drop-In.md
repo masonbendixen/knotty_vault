@@ -272,9 +272,10 @@ A non-member should:
 - The **"Our Schedule" page is public / anonymous-capable** (like `/api/classes`): it shows *what runs each day*, not a booking surface. Recurring classes have no advance booking (P-1) and there is no Reserve flow yet, so this is purely informational.
 - **"Valid over the next week" = a 7-day Sun–Sat window.** Default = the current week (the UTC-midnight Sunday on/before today through the following Saturday, matching the Phase-1 occurrence-date convention); an optional `week_start_us` pages forward/back. Per day, resolve each active class's active instance → active impl → slots whose `day_of_week` matches (exactly `GetDerivedSessionsForRange`).
 
-### 11.1 Database
-- [ ] Add **`inline_description TEXT NOT NULL DEFAULT ''`** to `class_requirement_groups` — `db_schema/class_requirement_groups.{h,cpp}`: add `kClassRequirementGroupsInlineDescription` + `AddColumnNotNullableWithDefault(..., "''")`. No new table, no FK. Pre-deploy (no migration).
-- [ ] `create_database.cpp` admin metadata for the new column: `PopulateAdminColumnDataInfo` (`text` edit type) + `PopulateAdminColumnFriendlyNames` ("Requirement Description"). (The table is already a nested admin-CRUD table under `classes` from the redesign §3.1.)
+### 11.1 Database ✅ DONE (2026-06-02) — C++ for Mason to build
+- [x] Added **`inline_description TEXT NOT NULL DEFAULT ''`** to `class_requirement_groups` — `db_schema/class_requirement_groups.h` (`kClassRequirementGroupsInlineDescription` constant + comment) and `.cpp` (`AddColumnNotNullableWithDefault(..., DB_TYPE_STRING, "''")`, placed after `label`). No new table, no FK. Pre-deploy (no migration).
+- [x] `create_database.cpp` admin metadata: `PopulateAdminColumnDataInfo` row (`text` edit type, optional) + `PopulateAdminColumnFriendlyNames` row ("Requirement Description"). (The table is already a nested admin-CRUD table under `classes` from the redesign §3.1.)
+- [x] Test: `class_requirement_groups_test.cpp::InlineDescriptionDefaultsEmptyAndRoundTrips` — defaults to `''` on add and round-trips through `UpdateGroup`. (Covers the §11.2 round-trip bullet too.)
 
 ### 11.2 Table Helpers
 - [ ] `TableHelpers::ClassRequirementGroups`: `inline_description` round-trips automatically via `GetGroup`/`GetGroupsByClass` (`SELECT *`). Add an `AddGroup` overload taking the description (or rely on `UpdateGroup` / generic CRUD to set it). Extend `class_requirement_groups_test.cpp` to assert the column round-trips and that `UpdateGroup` bumps it.
