@@ -309,7 +309,45 @@ A non-member should:
 - [x] **Frontend** (verified, 388 pass): Our Schedule component, ServerAccess mock `getWeeklySchedule`, header nav "Our Schedule", and Requirements-editor inline-description field.
 - [ ] **C++ (for Mason to build/run)**: DB/table-helper inline_description round-trip · `WeeklyScheduleHelper` (days / enrichment / predecessor / requirements join / dark days / week-start default / **mid-week-`valid_from` regression** — `EarlierWeekdayShownEvenWhenInstanceStartedMidWeek`) · `/api/schedule/week` endpoint + the §6.6 inline_description read. *(Tests written; not built locally per the no-build-server rule.)*
 
-## 12. Open Questions
+## 12. Instructors (admin management + people thumbnails)
+
+> **Added 2026-06-02 (Mason).** An admin-portal area to manage **Instructors**: view the list, full CRUD, pick a **person** from the system to promote to instructor, edit a **bio**, and upload/see a **photo**. Plus: people listings in the portal show a **thumbnail** per person (useful for the class instructor picker and the staff page).
+
+**What already exists (do NOT rebuild):**
+- `instructors` table (`id`, `person_id`→`people`, `bio`) + `TableHelpers::Instructors` (`AddInstructor`/`GetInstructorById`/`GetInstructorByPersonId`/`GetAllInstructors`/`UpdateInstructorBio`/`DeleteInstructor`).
+- Public read **`GET /api/get_instructors`** → `{ items: [{ instructor_id, person_id, first_name, last_name, bio, has_photo }] }` via `Auth::InstructorHelper::GetInstructorsForPublicDisplay` — **already joins the person name + `has_photo`**. Reusable as the admin list source (verify it returns ALL instructors, not a public-only subset).
+- Generic admin CRUD: `instructors` is registered top-level + nested, with a `bio` column data-info (long-text), friendly names, and **photo support** (`photo_support_tables`). The `people` display template is name-based (`{first_name} {last_name} - {email}`), so a `person_id` FK picker shows names.
+- Photo endpoints: `POST /api/upload_photo/<table>/<id>/<type>`, `DELETE /api/delete_photo/<table>/<id>`, `Images::ImageHelper`. Frontend: `uploadPhoto`, `hasPhoto`, the `controls/photo-upload` component, and `getFkOptions(table, search, n)`.
+- **`people` is photo-support registered ⇒ the generic admin `people` table view already renders a 50×50 thumbnail per row** (`controls/table-view-control`).
+- Public Instructors page (`pages/public/instructors`) renders `instructors/<id>` photos; `instructors` is now on the public scaled-photo allow-list (§11.3 follow-up).
+
+**Design decision — a dedicated Instructors admin page (not the raw generic CRUD).** The generic table CRUD *can* edit instructors, but (a) its list shows `person_id` as a raw number — the instructors display template `{person_id}` can't resolve to the person's name (the resolver only fills own-row columns, no join), and (b) photo upload is a separate thumbnail-click, not part of add/edit. A small bespoke page delivers the asked-for UX — a list of **name + thumbnail + bio**, an add flow that **searches people** and captures a bio, and **inline photo upload** — while reusing the existing backend wholesale.
+
+### 12.1 Backend (C++ — for Mason to build)
+- [ ] **Prevent a duplicate instructor per person.** `instructors.person_id` is not unique today, so promoting the same person twice creates two rows. Add a **UNIQUE constraint on `instructors.person_id`** (db_schema DDL) — simplest and safe. Table-helper test: a second `AddInstructor` for the same person fails.
+- [ ] **Confirm `GET /api/get_instructors` returns ALL instructors** (not a filtered public subset). If it filters, add an admin-scoped list or relax for admins. The admin page needs every instructor with `person_id, first_name, last_name, bio, has_photo`. Test pins the returned shape.
+- [ ] (Reuse — no new endpoints) create = generic `add_item` on `instructors {person_id, bio}`; edit bio = `update_item`; delete = `delete_item`; photo = `upload_photo` / `delete_photo`. All already admin-gated.
+
+### 12.2 ServerAccess layer (frontend)
+- [ ] Reuse `getInstructors()`, `getFkOptions('people', search, n)`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`, `uploadPhoto`, `hasPhoto`. Add a typed convenience only if it clarifies (e.g. `createInstructor(personId, bio)` wrapping `addItemFetchPrimaryKey`). Mirror any new method in `ServerAccess.mock` + `ServerAccess.mock.spec.ts`.
+
+### 12.3 Frontend — Instructors admin page
+- [ ] New standalone route under the admin portal (`pages/admin/instructors/`, SharedModule) + an **"Instructors"** entry on the admin landing page.
+- [ ] **List**: a card/row per instructor with a round thumbnail (`/api/get_scaled_photo/instructors/<id>/64/64`, person-icon fallback), `First Last`, a bio snippet, and Edit + Delete actions.
+- [ ] **Add**: a searchable **people picker** (autocomplete over `getFkOptions('people', …)`, showing the people display template) + a bio textarea → `addItemFetchPrimaryKey('instructors', { person_id, bio })`; on success, reveal the `photo-upload` component bound to the new instructor id. Optionally filter out people who are already instructors.
+- [ ] **Edit**: a bio textarea + the `photo-upload` component (`tableName='instructors'`, `tableItemId=instructor_id`) to add/replace the picture; Save → `updateItem`.
+- [ ] **Delete**: confirm → `deleteItem('instructors','id', id)`. Verify orphaned-photo cleanup via the existing delete semantics.
+- [ ] Specs: component spec (list renders names + thumbnails; add flow calls create with the picked person + bio; edit calls `updateItem`; delete confirms) + mock spec.
+
+### 12.4 People thumbnails in the portal
+- [ ] **Confirm** the generic admin `people` table view already shows the per-row 50×50 thumbnail (it should — `people` is photo-support registered). If a *bespoke* people/staff listing exists that doesn't, apply the same thumbnail (`/api/get_scaled_photo/people/<id>/…`). NOTE: `people` photos are on the **private** scaled-photo path (login required) — fine for the admin portal; public pages use the public `instructors` path instead.
+- [ ] Internal **staff page** (`pages/staff/…`): if it lists people, add the thumbnail for parity (admin-authenticated, so the private `people` photo path is OK).
+
+### 12.5 Tests rollup
+- [ ] Backend: instructors unique-person guard; `get_instructors` shape/coverage.
+- [ ] Frontend: Instructors admin component (list / add / edit / delete / photo), ServerAccess mock + spec, people-thumbnail confirmation.
+
+## 13. Open Questions
 
 **All resolved (2026-06-01).** No open questions remain for Phase 2.
 
@@ -319,7 +357,7 @@ A non-member should:
 	- Mason- I'll go with your recommendation.
 - **OQ-P2-3.** ✅ **RESOLVED / moot:** drop `classes.required_permission_id` (do not denormalize). Confirmed — and the [[Permission-based class access redesign]] makes it moot: access lives in `class_requirement_groups` / `class_requirement_group_literals`, resolved by `ClassAccessHelper`; pricing/visibility resolve through the active `class_instances` product. The §2.2 / §3.3 column is permanently skipped.
 
-## 13. Cross-References
+## 14. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 2.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]].
