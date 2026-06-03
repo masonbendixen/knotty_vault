@@ -328,24 +328,24 @@ A non-member should:
 - [x] **Confirmed `GET /api/get_instructors` returns ALL instructors** — `Auth::InstructorHelper::GetInstructorsForPublicDisplay` calls `Instructors::GetAllInstructors` and only skips an orphan (person row missing, which the FK makes near-impossible); there is **no public/active filter**, so it is correct to reuse for the admin list. Added identity-field coverage the admin page depends on: `instructor_helper_test` Basic now pins `instructorId` (the photo-path key, distinct from `personId`); `get_instructors_test` Basic now asserts `instructor_id` + `person_id` in the JSON. (Existing empty/multiple/empty-bio/`has_photo:false` coverage retained.)
 - [x] (Reuse — no new endpoints) create = generic `add_item` on `instructors {person_id, bio}`; edit bio = `update_item`; delete = `delete_item`; photo = `upload_photo` / `delete_photo`. All already admin-gated. *(The UNIQUE constraint is the backstop for the generic `add_item` create path.)*
 
-### 12.2 ServerAccess layer (frontend)
-- [ ] Reuse `getInstructors()`, `getFkOptions('people', search, n)`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`, `uploadPhoto`, `hasPhoto`. Add a typed convenience only if it clarifies (e.g. `createInstructor(personId, bio)` wrapping `addItemFetchPrimaryKey`). Mirror any new method in `ServerAccess.mock` + `ServerAccess.mock.spec.ts`.
+### 12.2 ServerAccess layer (frontend) ✅ DONE (2026-06-02)
+- [x] **Reused existing methods — no interface change.** The page composes `getInstructors()`, `getFkOptions('people', …)`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`, `uploadPhoto`, `hasPhoto` directly; a typed `createInstructor` wrapper wasn't worth a new surface. **Mock made coherent:** added a generic `instructors` table to `ServerAccess.mock` (`["bio","id","person_id"]`, seeded for persons 1–2) and rewrote `getInstructors()` to **derive** from it joined with `people` (+ `has_photo` from the in-memory photo map), so create/edit/delete via the generic CRUD helpers reflect in mock mode. Mock spec block "Instructors (Classes Phase 2 §12)" — derivation, add reflects, edit+delete reflect.
 
-### 12.3 Frontend — Instructors admin page
-- [ ] New standalone route under the admin portal (`pages/admin/instructors/`, SharedModule) + an **"Instructors"** entry on the admin landing page.
-- [ ] **List**: a card/row per instructor with a round thumbnail (`/api/get_scaled_photo/instructors/<id>/64/64`, person-icon fallback), `First Last`, a bio snippet, and Edit + Delete actions.
-- [ ] **Add**: a searchable **people picker** (autocomplete over `getFkOptions('people', …)`, showing the people display template) + a bio textarea → `addItemFetchPrimaryKey('instructors', { person_id, bio })`; on success, reveal the `photo-upload` component bound to the new instructor id. Optionally filter out people who are already instructors.
-- [ ] **Edit**: a bio textarea + the `photo-upload` component (`tableName='instructors'`, `tableItemId=instructor_id`) to add/replace the picture; Save → `updateItem`.
-- [ ] **Delete**: confirm → `deleteItem('instructors','id', id)`. Verify orphaned-photo cleanup via the existing delete semantics.
-- [ ] Specs: component spec (list renders names + thumbnails; add flow calls create with the picked person + bio; edit calls `updateItem`; delete confirms) + mock spec.
+### 12.3 Frontend — Instructors admin page ✅ DONE (2026-06-02)
+- [x] New standalone `InstructorsAdminComponent` (`pages/admin/instructors/`, SharedModule + `PhotoUploadComponent`), registered as the `instructors` child route (before the legacy `:tableName` catch-all) + a **"Manage Instructors"** button on the admin dashboard (`goToInstructors()`).
+- [x] **List**: a row per instructor with a round thumbnail (`/api/get_scaled_photo/instructors/<id>/64/64`, person-icon fallback), `First Last`, a plain-text bio snippet (HTML stripped + truncated), and Edit + Delete actions.
+- [x] **Add**: a searchable **people picker** (`mat-autocomplete` over `getFkOptions('people', …)`, `displayWith` for clean labels, excludes people already instructors) + a bio textarea → `addItemFetchPrimaryKey('instructors', { person_id, bio })`; on success the panel reveals the `photo-upload` component bound to the new instructor id. Guarded: Create disabled / errors without a chosen person.
+- [x] **Edit**: a bio textarea + the `photo-upload` component (`tableName='instructors'`, `tableItemId=instructor_id`) to add/replace the picture; Save → `updateItem`.
+- [x] **Delete**: inline two-step confirm → `deleteItem('instructors','id', id)`, then reload. (Photo cleanup handled by existing `delete_photo`/cascade semantics.)
+- [x] Specs: `instructors-admin.component.spec.ts` (11 tests — load/list, thumbnail vs icon, empty state, bio-snippet, people search + exclusion, blank-search no-op, create guard, create writes + reveals photo upload, edit saves, delete confirm/cancel, load error); dashboard `goToInstructors` nav test.
 
-### 12.4 People thumbnails in the portal
-- [ ] **Confirm** the generic admin `people` table view already shows the per-row 50×50 thumbnail (it should — `people` is photo-support registered). If a *bespoke* people/staff listing exists that doesn't, apply the same thumbnail (`/api/get_scaled_photo/people/<id>/…`). NOTE: `people` photos are on the **private** scaled-photo path (login required) — fine for the admin portal; public pages use the public `instructors` path instead.
-- [ ] Internal **staff page** (`pages/staff/…`): if it lists people, add the thumbnail for parity (admin-authenticated, so the private `people` photo path is OK).
+### 12.4 People thumbnails in the portal ✅ DONE (2026-06-02)
+- [x] **Confirmed** the generic admin `people` table view already renders a per-row 50×50 thumbnail — `controls/table-view-control` shows a `.photo-thumbnail` (with placeholder) for any photo-support table, and `people` is photo-support registered. No change needed. (`people` photos stay on the **private** scaled-photo path — login required — which is correct for the admin portal; public pages use the public `instructors` path.)
+- [x] Internal **staff portal** (`pages/staff/…`) is workflow pages (dashboard, check-in, provider bookings/schedule/time-off/shift-requests) — there is **no people/team listing** there, so nothing to add. The public "meet the team" surface is the Instructors page (`pages/public/instructors`), which already renders photos.
 
 ### 12.5 Tests rollup
 - [x] **Backend (12.1)** *(for Mason to build/run)*: `instructors_test` unique-person guard (`AddInstructorDuplicatePersonRejected`, `AddInstructorDistinctPersonsAllowed`); `instructor_helper_test` + `get_instructors_test` pin `instructor_id` / `person_id` shape.
-- [ ] Frontend: Instructors admin component (list / add / edit / delete / photo), ServerAccess mock + spec, people-thumbnail confirmation.
+- [x] **Frontend (verified, 2275 specs pass)**: `InstructorsAdminComponent` (11 tests), `ServerAccess.mock` Instructors derivation/CRUD block (3 tests), admin dashboard `goToInstructors` nav test, and confirmation that the generic people view already shows thumbnails.
 
 ## 13. Open Questions
 
