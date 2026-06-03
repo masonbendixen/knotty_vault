@@ -91,10 +91,10 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [x] `booking_requirement_overrides` audit table + `ClassAccessHelper::RecordOverride(...)` — the logged staff-override path (SL-6). Phase 3's "staff override with reason" writes here; do not invent a second override record.
 - [x] `CatalogHelper::GetEffectivePermissionIds` is closure-expanded, so **SL-10 attendance-threshold permissions and any role/membership permission flow into the gate automatically** once granted.
 
-**Decision needed — where do skill requirements live? (reconciliation open question OQ-P3-SKILL):**
-- **(Recommended) Model skill requirements as skill literals in requirement groups.** SL-5 "class requires skill X" becomes a single-literal group `{skill_level_id: X}`; "X or Y" is one group with two skill literals; skill AND membership AND attendance is three groups — all evaluated by the one gate. This unifies SL-12 and is exactly what the redesign assumed ("the requirement-group skill literals are exactly SL-5"). **Consequence:** the separate **§2.3 `class_skill_requirements` table + §3.3 helper + §4 `PersonMeetsClassRequirements`** below are **redundant** — drop them; the authoring UI is the §6.6 Phase-1 Requirements editor (skill-literal picker), and enforcement is already in `ClassAccessHelper`.
-- **(Alternative) Keep `class_skill_requirements`** as a dedicated table and have `ClassAccessHelper` additionally read it. Simpler authoring (one table per concern) but **splits the gate** into "groups + a side table," re-introducing exactly the fragmentation SL-12 set out to avoid. Not recommended.
-- *Mason to confirm.* The rest of §2.3/§3.3/§4 is written against the original separate-table plan; if the recommendation is taken, mark those `[~]` superseded.
+**Decision (resolved 2026-06-03 — OQ-P3-SKILL): model skill requirements as skill literals in requirement groups.**
+- [x] **Skill requirements are modeled as skill literals in `class_requirement_group_literals`.** SL-5 "class requires skill X" becomes a single-literal group `{skill_level_id: X}`; "X or Y" is one group with two skill literals; skill AND membership AND attendance is three groups — all evaluated by the one gate. This unifies SL-12 and is exactly what the redesign assumed ("the requirement-group skill literals are exactly SL-5").
+- **Consequence:** the separate **§2.3 `class_skill_requirements` table + §3.3 helper + §4 `PersonMeetsClassRequirements`** are **superseded** — they are marked `[~]` and **not built**. Requirement authoring is the §6.6 Phase-1 Requirements editor (skill-literal picker), and enforcement is already in `ClassAccessHelper`. The admin endpoints in §5.3 and the class-edit UI in §6.4 are likewise redirected to the requirement-group editor.
+- **(Rejected alternative)** Keeping `class_skill_requirements` as a dedicated side table would split the gate into "groups + a side table," re-introducing exactly the fragmentation SL-12 set out to avoid.
 
 **Required work regardless of the above:**
 - [ ] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals.** It currently evaluates only *permission* literals and **explicitly skips `skill_level_id` literals** (documented in redesign §3.2 — "Skill literals are not yet evaluated; Phase-3 `skill_levels`"). This phase wires the skill side: a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Add the FK on `class_requirement_group_literals.skill_level_id → skill_levels(id)` now that the table exists.
@@ -128,22 +128,23 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] Partial unique index: `UNIQUE (person_id, skill_level_id) WHERE removed_us IS NULL` — one active assignment per (person, skill) at a time. Re-grant after revocation creates a new row.
 - [ ] Index on `person_id` for `GetActiveAssignmentsForPerson`.
 
-### 2.3 `class_skill_requirements` table
-> ⚠️ **Possibly redundant — see §1.4 (OQ-P3-SKILL).** If skill requirements are modeled as skill literals in `class_requirement_group_literals` (recommended), this table, its §3.3 helper, and §4's `PersonMeetsClassRequirements` are dropped in favor of the shared `ClassAccessHelper`. Confirm with Mason before building.
-- [ ] `db_schema/class_skill_requirements.h/.cpp`:
-  - `id BIGSERIAL PK`
-  - `class_id BIGINT NOT NULL REFERENCES classes(id)`
-  - `skill_level_id BIGINT NOT NULL REFERENCES skill_levels(id)`
-  - `required_at_signup BOOLEAN NOT NULL DEFAULT TRUE` — vs attended-but-warn (Could Have, soft-warn at check-in)
-  - `created_us`
-- [ ] Unique on (`class_id`, `skill_level_id`).
+### 2.3 `class_skill_requirements` table — `[~]` SUPERSEDED (do not build)
+> ❌ **Superseded per §1.4 (OQ-P3-SKILL, resolved 2026-06-03).** Skill requirements are modeled as skill literals in `class_requirement_group_literals`; this dedicated table, its §3.3 helper, and §4's `PersonMeetsClassRequirements` are **not built**. Kept here only for historical context.
+- [~] ~~`db_schema/class_skill_requirements.h/.cpp`:~~
+  - ~~`id BIGSERIAL PK`~~
+  - ~~`class_id BIGINT NOT NULL REFERENCES classes(id)`~~
+  - ~~`skill_level_id BIGINT NOT NULL REFERENCES skill_levels(id)`~~
+  - ~~`required_at_signup BOOLEAN NOT NULL DEFAULT TRUE`~~
+  - ~~`created_us`~~
+- [~] ~~Unique on (`class_id`, `skill_level_id`).~~
 
 ### 2.4 Photo support
 - [ ] In `create_database.cpp`, add `skill_levels` to `photo_support_tables` so the existing photo upload / scale endpoints accept skill-level photos.
 
 ### 2.5 Wire into DB init
-- [ ] `make_database_info.cpp` adds three `Make*Table()` calls in FK order.
-- [ ] `create_database.cpp` `CreateTables()` adds three `CreateTable()` calls.
+- [ ] `make_database_info.cpp` adds two `Make*Table()` calls in FK order (`skill_levels`, then `skill_level_assignments`; `class_skill_requirements` dropped per §1.4).
+- [ ] `create_database.cpp` `CreateTables()` adds two `CreateTable()` calls.
+- [ ] Add the FK `class_requirement_group_literals.skill_level_id → skill_levels(id)` now that `skill_levels` exists (per §1.4 required work).
 - [ ] CMakeLists for `db_schema/` and `sql_util/table_helpers/`.
 
 ## 3. Table Helpers
@@ -168,12 +169,12 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
   - `SetRemoval(Transaction&, int64_t id, int64_t removedByPersonId, std::string_view removedReason)` — marks the row revoked
 - [ ] Tests for the partial-unique-index behavior (re-grant after revoke creates a new active row).
 
-### 3.3 `TableHelpers::ClassSkillRequirements`
-- [ ] `class_skill_requirements.h/.cpp/_test.cpp`:
-  - `AddRequirement(Transaction&, ...)`
-  - `RemoveRequirement(Transaction&, int64_t classId, int64_t skillLevelId)`
-  - `GetRequirementsForClass(Transaction&, int64_t classId)` → list of (skillLevelId, required_at_signup)
-- [ ] Tests.
+### 3.3 `TableHelpers::ClassSkillRequirements` — `[~]` SUPERSEDED (do not build)
+> ❌ **Superseded per §1.4.** Class skill requirements live in the existing `class_requirement_group_literals` table (managed by the requirement-group helper from the permission-based-access redesign). No dedicated helper is built.
+- [~] ~~`class_skill_requirements.h/.cpp/_test.cpp`:~~
+  - ~~`AddRequirement(Transaction&, ...)`~~
+  - ~~`RemoveRequirement(Transaction&, int64_t classId, int64_t skillLevelId)`~~
+  - ~~`GetRequirementsForClass(Transaction&, int64_t classId)`~~
 
 ## 4. Business Logic
 
@@ -246,7 +247,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ### 6.1 User portal — `/my/account/skills`
 - [ ] `ui/src/app/pages/account/my-skills/my-skills.component.ts/.html/.scss/.spec.ts`.
-- [ ] Grid of badge cards: photo, name, "Earned <date>", description.
+- [ ] Grid of badge cards: photo, name, "Earned {date}", description.
 - [ ] Empty state: "You don't have any skill levels yet. Talk to a staff member to get evaluated."
 - [ ] Use the standard back-nav / title-font / RouterTestingModule pattern per memory `feedback_account_page_layout.md`.
 
@@ -303,7 +304,9 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 ## 10. Open Questions
 
 - **OQ-P3-1.** Should revoking a skill auto-cancel any future paid bookings the user has for classes that required it? Recommended: no — the user already has the booking; if there's a real safety concern, staff cancels manually with a voucher (BC-6). Less invasive.
+	- Mason- I'll go with your recommendation.
 - **OQ-P3-2.** Should the public `GET /api/skill_levels` endpoint return all skills, or filter to `is_active=true`? Recommended: filter to active.
+	- Mason- I'll go with your recommendation.
 
 ## 11. Cross-References
 
