@@ -180,42 +180,48 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ## 4. Business Logic
 
-### 4.1 `SkillLevelHelper` (in `business_logic/auth/` or a new `business_logic/skills/`)
-- [ ] Place in `business_logic/skills/skill_level_helper.h/.cpp` for clarity (mirrors `business_logic/auth/`, `business_logic/payment/`).
-- [ ] Methods:
+### 4.1 `SkillLevelHelper` (in `business_logic/skills/`)
+- [x] Placed in `business_logic/skills/skill_level_helper.h/.cpp` (new `Skills` namespace + subdir, wired into `business_logic/CMakeLists.txt`).
+- [x] Methods (built; `PersonSkillInfo`/`SkillLevelInfo` expose `hasPhoto` rather than a `photoUrl` string, matching the codebase convention — the frontend builds `/api/photo/skill_levels/{id}` like it does for instructors/classes):
   ```cpp
   struct AssignSkillRequest { int64_t personId; int64_t skillLevelId; int64_t assignerPersonId; std::string note; };
-  struct AssignSkillResult { bool ok; int64_t assignmentId; std::string errorCode; };
+  struct AssignSkillResult { bool ok; int64_t assignmentId; std::string errorCode; };  // "INVALID_ARGUMENT"|"PERSON_NOT_FOUND"|"SKILL_NOT_FOUND"
   AssignSkillResult AssignSkill(Transaction&, const AssignSkillRequest&);
 
   struct RevokeSkillRequest { int64_t personId; int64_t skillLevelId; int64_t revokerPersonId; std::string reason; };
   bool RevokeSkill(Transaction&, const RevokeSkillRequest&);
 
-  struct PersonSkillInfo { int64_t skillLevelId; std::string code; std::string name; std::string photoUrl; int64_t assignedUs; std::string note; };
+  struct PersonSkillInfo { int64_t assignmentId; int64_t skillLevelId; std::string code; std::string name; std::string description; bool hasPhoto; int64_t assignedUs; std::string note; };
   std::vector<PersonSkillInfo> GetPersonSkills(Transaction&, int64_t personId);
-  ```
-- [ ] `AssignSkill` is idempotent — if person already has the active skill, returns ok with the existing id; does not insert duplicate. Auto-populates `assigned_us = now`.
-- [ ] `RevokeSkill` flips `removed_us = now`, sets `removed_by_person_id`, `removed_reason`. No-op if not currently active.
-- [ ] All return-value structs surface enough info to render the UI without a follow-up call.
 
-> ❌ **`PersonMeetsClassRequirements` / `ClassRequirementsCheck` are SUPERSEDED per §1.4.** The class-requirements check is owned by the shared `Scheduling::ClassAccessHelper::CheckAccess`, extended in §1.4 required-work to evaluate skill literals. `SkillLevelHelper` exposes only assign / revoke / read-skills; it does **not** evaluate class gates.
-- [ ] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** (the §1.4 required-work item — currently `class_access_helper.cpp:57` skips them): a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Also populate `skillLevelName` in the view/read path (`class_access_helper.cpp:128`, currently left empty "until Phase 3"). Add tests to `class_access_helper_test.cpp` for the skill-literal branch (held / not-held / mixed with permission literals). **Sequence after §2 + §3.2.**
+  // Typed catalog reads backing §5.1 endpoints (wrap TableHelpers::SkillLevels + resolve hasPhoto):
+  std::vector<SkillLevelInfo> GetActiveSkillLevels(Transaction&);
+  SkillLevelInfo GetSkillLevel(Transaction&, int64_t skillLevelId);  // id == 0 when missing
+  ```
+- [x] `AssignSkill` is idempotent — if person already has the active skill, returns ok with the existing id; does not insert duplicate. `assigned_us` defaulted to `now_us()` by the table helper. Validates person + skill exist first (clean errorCode instead of a raw FK throw).
+- [x] `RevokeSkill` soft-revokes the active grant via `SkillLevelAssignments::SetRemoval` (stamps `removed_us`/`removed_by_person_id`/`removed_reason`). No-op (returns false) if not currently active.
+- [x] All return-value structs surface enough info (code/name/description/hasPhoto/assignedUs/note) to render the UI without a follow-up call.
+- [x] No CRUD SQL in the helper — it composes `TableHelpers::SkillLevels`, `TableHelpers::SkillLevelAssignments`, `TableHelpers::People`, and `Images::ImageHelper` (per `feedback_no_sql_in_business_logic`).
+- [x] Tests `skill_level_helper_test.cpp`: assign creates active grant, idempotent (no duplicate), invalid-arg / missing-person / missing-skill error codes, revoke removes grant, revoke no-op when none, reassign-after-revoke makes a fresh active row, `GetPersonSkills` resolves fields + excludes revoked + empty case, active-list ordered/excludes-inactive, `GetSkillLevel` found/missing.
+
+> ❌ **`PersonMeetsClassRequirements` / `ClassRequirementsCheck` are SUPERSEDED per §1.4.** The class-requirements check is owned by the shared `Scheduling::ClassAccessHelper::CheckAccess`. `SkillLevelHelper` exposes only assign / revoke / read-skills; it does **not** evaluate class gates.
+- [x] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** — already done in §1.4 (skill literal satisfied iff active `skill_level_assignments` row; `skillLevelName` resolved in the read path; tests in `class_access_helper_test.cpp`).
 
 ### 4.2 Booking-flow integration
-> Per §1.4: the gate is the shared `Scheduling::ClassAccessHelper`, not a standalone skill check. This section now wires the **skill side** of the already-present gate rather than adding a new one.
-- [ ] In `BookingHelper::BookEvent` (which Phase 2 already adjusted): the booking gate already calls `ClassAccessHelper::CheckAccess`. Once §4.1's skill-literal evaluation lands, skill requirements are enforced automatically — no new call site is added here.
-- [ ] If not met:
-  - Default path: return 400 `MISSING_SKILL_REQUIREMENTS`, surfacing the failed group labels from `AccessResult` (which now include skill-level names) in the response.
-  - Override path: if request body has `staff_override = true` AND the caller has `manage_classes` permission, bypass and record the override via the existing `ClassAccessHelper::RecordOverride(...)` (writes `booking_requirement_overrides`) — do **not** invent a second override record (per §1.4).
-- [ ] For the staff-check-in flow (Phase 8) the same gate runs — staff sees the warning + a "Yes, allow anyway with reason: ___" prompt, recorded through `RecordOverride`.
-- [ ] Tests (extend `booking_helper_test.cpp` and `class_access_helper_test.cpp`) cover: meets all, missing one, missing all, staff override accepted + audit row written, non-staff override rejected.
+> Per §1.4: the gate is the shared `Scheduling::ClassAccessHelper`. **⚠️ Status correction (2026-06-03):** the plan assumed booking enforcement was "automatic once skill literals evaluate," but it is **not** wired as a blocking gate yet — see below. The gate machinery (`CheckAccess`, `RecordOverride` + `booking_requirement_overrides` audit) is built and tested; the *blocking enforcement at booking* is not.
+- [x] `ClassAccessHelper::CheckAccess` is skill-aware (§1.4) and `RecordOverride` writes the audit row (tested: `class_access_helper_test.cpp::RecordOverrideWritesAudit`).
+- [ ] **NOT YET WIRED — needs a decision before coding.** `BookingHelper::BookEvent`'s only `CheckAccess` call (`booking_helper.cpp:336`) is an *inverse* short-circuit: for a **recurring** class, if the person already has access it returns `kErrorNoAdvanceBookingRequired` ("your membership includes this — just show up"). There is **no** branch that *rejects* a paid booking when the person LACKS a required skill, and no `staff_override` handling. So a `MISSING_SKILL_REQUIREMENTS` blocking gate + override path is genuinely new code, not automatic. **Open question OQ-P3-3 (below).**
+- [ ] Default path (once decided): return `MISSING_SKILL_REQUIREMENTS`, surfacing failed group labels (now skill-aware) from `AccessResult`.
+- [ ] Override path: `staff_override = true` + caller has `manage_classes` → bypass and `RecordOverride(...)`.
+- [ ] For the staff-check-in flow (Phase 8) the same gate runs — deferred to Phase 8.
+- [ ] Tests for the blocking path (meets all / missing one / missing all / staff override accepted + audit / non-staff override rejected) land with whichever phase wires the enforcement.
 
 ### 4.3 KeyValueTable conversions
-- [ ] In `business_logic/skills/skill_key_value_table.h/.cpp`:
-  - `SkillLevelToKeyValueTable(const SkillLevelInfo&)`
-  - `PersonSkillInfoToKeyValueTable(...)`
+- [x] In `business_logic/skills/skill_key_value_table.h/.cpp`:
+  - [x] `SkillLevelToKeyValueTable(const SkillLevelInfo&)` + `SkillLevelsToKeyValueTableArray(...)`
+  - [x] `PersonSkillInfoToKeyValueTable(const PersonSkillInfo&)` + `PersonSkillInfosToKeyValueTableArray(...)`
   - ~~`ClassRequirementsCheckToKeyValueTable(...)`~~ — superseded; the gate result is surfaced by `ClassAccessHelper`'s existing `AccessResult` conversion.
-- [ ] Tests.
+- [x] Tests `skill_key_value_table_test.cpp` (both single + array converters, active/inactive + photo flags, empty arrays).
 
 ## 5. Endpoints
 
@@ -292,7 +298,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 ## 8. Tests-Required Summary
 
 - [ ] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) plus partial-unique-index regression. (`class_skill_requirements` helper dropped per §1.4.)
-- [ ] Business logic: `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills), extended `class_access_helper_test.cpp` for the skill-literal branch, updated `booking_helper_test.cpp` for the gate path with override (audit row) and reject branches.
+- [x] Business logic (Phase 4): `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills/catalog reads) + `skill_key_value_table_test.cpp` (conversions) ✅. `class_access_helper_test.cpp` skill-literal branch ✅ (§1.4). `booking_helper_test.cpp` reject/override branches → deferred with OQ-P3-3 (blocking gate not yet wired).
 - [ ] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error per memory `error_response_status_codes.md`). Plus tests for any skill-literal extension to the existing requirement-group editor endpoint (§5.3).
 - [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, and the requirements-editor skill-literal picker (§6.4).
 - [ ] `ServerAccess.mock.spec.ts` updated.
@@ -306,7 +312,12 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] Staff with `manage_classes` can submit the same booking with `staff_override=true` + reason "verified live in person" and have it accepted.
 - [ ] If staff later revokes the original skill ("re-evaluated after months off"), the member's `/my/account/skills` page no longer shows it.
 
-## 10. Open Questions — ALL RESOLVED (2026-06-03)
+## 10. Open Questions
+
+- [ ] **OQ-P3-3 (NEW, 2026-06-03 — needs your decision).** Where does the *blocking* skill gate at booking live? Discovered while implementing §4: `BookingHelper::BookEvent` only uses `CheckAccess` as a "you already have access → no advance booking needed" short-circuit for recurring classes; it never *rejects* a paid booking for a missing skill, and has no `staff_override` path. Options: **(a)** add the blocking gate + `MISSING_SKILL_REQUIREMENTS` + override handling to `BookingHelper`/the booking endpoint now (modifies the Phase-2 paid path — per `feedback_one_layer_at_a_time`, wanted your sign-off before editing the booking flow); **(b)** defer all booking-time enforcement to the Phase-8 staff-check-in flow and keep Phase 3 to authoring + the user/staff/admin skill surfaces; **(c)** something else. The gate + audit primitives are ready either way.
+	- Mason- A person shouldn't be able to sign up for a given class if they don't have the skill without admin / staff override. It should show up in the UI that the skill is required.
+
+### Resolved (2026-06-03)
 
 - [x] **OQ-P3-SKILL (resolved).** Where do skill requirements live? → **Modeled as skill literals in `class_requirement_group_literals`**, evaluated by the shared `ClassAccessHelper`. The dedicated `class_skill_requirements` table/helper/check (§2.3, §3.3, §4.1's `PersonMeetsClassRequirements`) are superseded. See §1.4.
 - [x] **OQ-P3-1 (resolved — no).** Revoking a skill does **not** auto-cancel the user's existing future paid bookings for classes that required it. The user keeps the booking; if there's a genuine safety concern, staff cancels manually with a voucher (BC-6). Less invasive.
