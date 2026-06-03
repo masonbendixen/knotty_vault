@@ -141,32 +141,35 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] In `create_database.cpp`, add `skill_levels` to `photo_support_tables` so the existing photo upload / scale endpoints accept skill-level photos.
 
 ### 2.5 Wire into DB init
-- [ ] `make_database_info.cpp` adds two `Make*Table()` calls in FK order (`skill_levels`, then `skill_level_assignments`; `class_skill_requirements` dropped per §1.4).
-- [ ] `create_database.cpp` `CreateTables()` adds two `CreateTable()` calls.
-- [ ] Add the FK `class_requirement_group_literals.skill_level_id → skill_levels(id)` now that `skill_levels` exists (per §1.4 required work).
-- [ ] CMakeLists for `db_schema/` and `sql_util/table_helpers/`.
+- [x] `make_database_info.cpp` adds the two `Make*Table()` calls in FK order (`skill_levels`, then `skill_level_assignments`), placed before the requirement-group literals so the new FK target exists.
+- [x] `create_database.cpp` `CreateTables()` adds the two `CreateTable()` + index calls (and includes the new headers).
+- [x] Added the FK `class_requirement_group_literals.skill_level_id → skill_levels(id)` (per §1.4 required work).
+- [x] CMakeLists for `db_schema/` and `sql_util/table_helpers/` (sources + the two new `*_test.cpp`).
 
 ## 3. Table Helpers
 
 ### 3.1 `TableHelpers::SkillLevels`
-- [ ] `skill_levels.h/.cpp/_test.cpp`:
-  - `AddSkillLevel(Transaction&, const KeyValueTable&)`
-  - `GetSkillLevel(Transaction&, int64_t id)` / `GetSkillLevelByCode(...)`
-  - `GetActiveSkillLevels(Transaction&)` (ORDER BY sort_order)
-  - `UpdateSkillLevel(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - `DeleteSkillLevel(Transaction&, int64_t id)` ← soft (set `is_active=false`)
-- [ ] Tests covering CRUD, soft delete, unique-code violation.
+> Partially built for the §1.4 gate slice (add + read-by-id, used to resolve a skill literal's name). Remaining methods land with the rest of Phase 3.
+- [x] `skill_levels.h/.cpp/_test.cpp` created:
+  - [x] `AddSkillLevel(Transaction&, code, name)` + `AddSkillLevel(Transaction&, const KeyValueTable&)`
+  - [x] `GetSkillLevel(Transaction&, int64_t id)`
+  - [ ] `GetSkillLevelByCode(...)`
+  - [ ] `GetActiveSkillLevels(Transaction&)` (ORDER BY sort_order)
+  - [ ] `UpdateSkillLevel(Transaction&, int64_t id, const KeyValueTable& updates)`
+  - [ ] `DeleteSkillLevel(Transaction&, int64_t id)` ← soft (set `is_active=false`)
+- [x] Tests for the built slice (add + defaults, KeyValueTable add, missing→empty). Remaining tests (soft delete, unique-code violation) land with the rest of §3.1.
 
 ### 3.2 `TableHelpers::SkillLevelAssignments`
-- [ ] `skill_level_assignments.h/.cpp/_test.cpp`:
-  - `AddAssignment(Transaction&, const KeyValueTable&)`
-  - `GetAssignment(Transaction&, int64_t id)`
-  - `GetActiveAssignmentsForPerson(Transaction&, int64_t personId)` — `WHERE removed_us IS NULL`
-  - `GetAllAssignmentsForPerson(Transaction&, int64_t personId)` — historical including revocations (audit view)
-  - `GetActiveAssignment(Transaction&, int64_t personId, int64_t skillLevelId)` — for idempotency check
-  - `PersonHasSkill(Transaction&, int64_t personId, int64_t skillLevelId)` → bool
-  - `SetRemoval(Transaction&, int64_t id, int64_t removedByPersonId, std::string_view removedReason)` — marks the row revoked
-- [ ] Tests for the partial-unique-index behavior (re-grant after revoke creates a new active row).
+> Built for the §1.4 gate slice. `GetAllAssignmentsForPerson` (audit view) is the only deferred method.
+- [x] `skill_level_assignments.h/.cpp/_test.cpp` created:
+  - [x] `AddAssignment(Transaction&, personId, skillLevelId, assignedByPersonId, note)` (typed args rather than raw KeyValueTable)
+  - [x] `GetAssignment(Transaction&, int64_t id)`
+  - [x] `GetActiveAssignmentsForPerson(Transaction&, int64_t personId)` — `WHERE removed_us IS NULL`
+  - [ ] `GetAllAssignmentsForPerson(Transaction&, int64_t personId)` — historical including revocations (audit view)
+  - [x] `GetActiveAssignment(Transaction&, int64_t personId, int64_t skillLevelId)`
+  - [x] `PersonHasSkill(Transaction&, int64_t personId, int64_t skillLevelId)` → bool (consumed by the gate)
+  - [x] `SetRemoval(Transaction&, int64_t id, int64_t removedByPersonId, std::string_view removedReason)`
+- [x] Tests: add+defaults, `PersonHasSkill` active/inactive, `GetActiveAssignment`, `SetRemoval` revokes, re-grant after revoke creates a new active row (app-level; the partial-unique DB guard is prod-only per §2.2), active-list excludes revoked.
 
 ### 3.3 `TableHelpers::ClassSkillRequirements` — `[~]` SUPERSEDED (do not build)
 > ❌ **Superseded per §1.4.** Class skill requirements live in the existing `class_requirement_group_literals` table (managed by the requirement-group helper from the permission-based-access redesign). No dedicated helper is built.
