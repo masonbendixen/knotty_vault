@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 5/23/2026
-Version: 0.1
+Last Updated: 6/3/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -191,35 +191,35 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
   struct PersonSkillInfo { int64_t skillLevelId; std::string code; std::string name; std::string photoUrl; int64_t assignedUs; std::string note; };
   std::vector<PersonSkillInfo> GetPersonSkills(Transaction&, int64_t personId);
-
-  struct ClassRequirementsCheck { bool meetsAll; std::vector<int64_t> missingSkillLevelIds; std::vector<std::string> missingSkillNames; };
-  ClassRequirementsCheck PersonMeetsClassRequirements(Transaction&, int64_t personId, int64_t classId);
   ```
 - [ ] `AssignSkill` is idempotent — if person already has the active skill, returns ok with the existing id; does not insert duplicate. Auto-populates `assigned_us = now`.
 - [ ] `RevokeSkill` flips `removed_us = now`, sets `removed_by_person_id`, `removed_reason`. No-op if not currently active.
-- [ ] `PersonMeetsClassRequirements` joins `class_skill_requirements` against `skill_level_assignments WHERE removed_us IS NULL AND person_id = ?`. Returns `meetsAll=true` if every required skill is held; otherwise lists what's missing.
 - [ ] All return-value structs surface enough info to render the UI without a follow-up call.
 
+> ❌ **`PersonMeetsClassRequirements` / `ClassRequirementsCheck` are SUPERSEDED per §1.4.** The class-requirements check is owned by the shared `Scheduling::ClassAccessHelper::CheckAccess`, extended in §1.4 required-work to evaluate skill literals. `SkillLevelHelper` exposes only assign / revoke / read-skills; it does **not** evaluate class gates.
+- [x] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** (the §1.4 required-work item): a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Add tests to `class_access_helper_test.cpp` for the skill-literal branch (held / not-held / mixed with permission literals).
+
 ### 4.2 Booking-flow integration
-- [ ] In `BookingHelper::BookEvent` (which Phase 2 already adjusted): after the membership-included reject check, look up `event_sessions.class_id` and call `SkillLevelHelper::PersonMeetsClassRequirements`.
+> Per §1.4: the gate is the shared `Scheduling::ClassAccessHelper`, not a standalone skill check. This section now wires the **skill side** of the already-present gate rather than adding a new one.
+- [ ] In `BookingHelper::BookEvent` (which Phase 2 already adjusted): the booking gate already calls `ClassAccessHelper::CheckAccess`. Once §4.1's skill-literal evaluation lands, skill requirements are enforced automatically — no new call site is added here.
 - [ ] If not met:
-  - Default path: return 400 `MISSING_SKILL_REQUIREMENTS` with the missing skill list in the response.
-  - Override path: if request body has `staff_override = true` AND the caller has `manage_classes` permission, bypass with a logged reason (recorded in `bookings.notes`).
-- [ ] For the staff-check-in flow (Phase 8) the same check runs — staff sees the warning + a "Yes, allow anyway with reason: ___" prompt.
-- [ ] Tests cover: meets all, missing one, missing all, staff override accepted, non-staff override rejected.
+  - Default path: return 400 `MISSING_SKILL_REQUIREMENTS`, surfacing the failed group labels from `AccessResult` (which now include skill-level names) in the response.
+  - Override path: if request body has `staff_override = true` AND the caller has `manage_classes` permission, bypass and record the override via the existing `ClassAccessHelper::RecordOverride(...)` (writes `booking_requirement_overrides`) — do **not** invent a second override record (per §1.4).
+- [ ] For the staff-check-in flow (Phase 8) the same gate runs — staff sees the warning + a "Yes, allow anyway with reason: ___" prompt, recorded through `RecordOverride`.
+- [ ] Tests (extend `booking_helper_test.cpp` and `class_access_helper_test.cpp`) cover: meets all, missing one, missing all, staff override accepted + audit row written, non-staff override rejected.
 
 ### 4.3 KeyValueTable conversions
 - [ ] In `business_logic/skills/skill_key_value_table.h/.cpp`:
   - `SkillLevelToKeyValueTable(const SkillLevelInfo&)`
   - `PersonSkillInfoToKeyValueTable(...)`
-  - `ClassRequirementsCheckToKeyValueTable(...)`
+  - ~~`ClassRequirementsCheckToKeyValueTable(...)`~~ — superseded; the gate result is surfaced by `ClassAccessHelper`'s existing `AccessResult` conversion.
 - [ ] Tests.
 
 ## 5. Endpoints
 
 ### 5.1 Public / logged-in endpoints
 - [ ] `endpoints/get_skill_levels.h/cpp` + test:
-  - `GET /api/skill_levels` — list active skill levels with photo URLs.
+  - `GET /api/skill_levels` — list **active only** (`is_active=true`) skill levels with photo URLs (resolved OQ-P3-2). Test the active-filter explicitly.
 - [ ] `endpoints/get_skill_level_detail.h/cpp` + test:
   - `GET /api/skill_levels/<id>` — single detail.
 - [ ] `endpoints/get_my_skills.h/cpp` + test:
@@ -233,11 +233,11 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] `endpoints/staff_revoke_skill.h/cpp` + test:
   - `DELETE /api/staff/person/<id>/skill/<skillId>` body `{ reason: string }`.
 
-### 5.3 Admin endpoints for class requirements
-- [ ] `endpoints/admin_set_class_skill_requirement.h/cpp` + test:
-  - `POST /api/admin/class/<id>/skill_requirement` body `{ skill_level_id, required_at_signup }`.
-- [ ] `endpoints/admin_remove_class_skill_requirement.h/cpp` + test:
-  - `DELETE /api/admin/class/<id>/skill_requirement/<skillId>`.
+### 5.3 Admin endpoints for class requirements — `[~]` SUPERSEDED (do not build)
+> ❌ **Superseded per §1.4.** Class skill requirements are authored through the existing **requirement-group editor endpoints** (from the permission-based-access redesign), adding/removing skill literals on a group. No skill-specific admin endpoints are added.
+- [~] ~~`endpoints/admin_set_class_skill_requirement.h/cpp`~~
+- [~] ~~`endpoints/admin_remove_class_skill_requirement.h/cpp`~~
+- [ ] **If the requirement-group editor endpoints do not yet expose a skill-literal field**, extend them (and their tests) to accept `skill_level_id` on a literal. Verify against the redesign's existing endpoint before adding anything new.
 
 ### 5.4 Routing + permission
 - [ ] All registered in `web_app.cpp`.
@@ -264,12 +264,15 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] Each row has a "Revoke" button → confirm + reason field.
 - [ ] Spec.
 
-### 6.4 Admin — class edit form extension
-- [ ] In the Phase 1 class-schedules-edit component, add a "Required skill levels" multi-select using the skill-levels list.
+### 6.4 Admin — class requirements editor extension
+> Per §1.4: skill requirements are skill literals in requirement groups. Authoring happens in the **§6.6 Phase-1 Requirements editor**, not a standalone multi-select.
+- [ ] In the existing requirement-group editor (Phase-1 / permission-based-access redesign), add a **skill-literal picker** so a literal can reference a skill level (populated from `getSkillLevels()`) alongside the existing permission literals.
+- [ ] Render skill literals with the skill name (and photo if available) in the group display.
 - [ ] Spec.
 
 ### 6.5 `ServerAccess` extensions
-- [ ] `getSkillLevels()`, `getSkillLevelDetail(id)`, `getMySkills()`, `getPersonSkills(personId)`, `assignSkill(personId, skillLevelId, note)`, `revokeSkill(personId, skillLevelId, reason)`, `setClassSkillRequirement(classId, skillLevelId, requiredAtSignup)`, `removeClassSkillRequirement(classId, skillLevelId)`.
+- [ ] `getSkillLevels()`, `getSkillLevelDetail(id)`, `getMySkills()`, `getPersonSkills(personId)`, `assignSkill(personId, skillLevelId, note)`, `revokeSkill(personId, skillLevelId, reason)`.
+- [ ] ~~`setClassSkillRequirement(...)` / `removeClassSkillRequirement(...)`~~ — superseded per §1.4; class skill requirements are authored via the existing requirement-group editor's `ServerAccess` methods (extend those for a skill-literal field if needed).
 - [ ] Update `ServerAccess.mock.spec.ts`.
 
 ### 6.6 Types
@@ -279,19 +282,19 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 - [ ] `skill_levels` → `admin_top_level_tables`.
 - [ ] `skill_level_assignments` → `admin_nested_tables` under `people` keyed by `person_id`.
-- [ ] `class_skill_requirements` → `admin_nested_tables` under `classes` keyed by `class_id`.
+- [~] ~~`class_skill_requirements` → `admin_nested_tables`~~ — superseded per §1.4 (no such table).
 - [ ] Permissions: all gated by `manage_skills`.
 - [ ] Column data info, friendly names, table friendly names, display templates.
 - [ ] Photo support in `photo_support_tables`.
 
 ## 8. Tests-Required Summary
 
-- [ ] Table helpers: three new `*_test.cpp` files plus partial-unique-index regression.
-- [ ] Business logic: `skill_level_helper_test.cpp` (assign/revoke/idempotency/requirements check), updated `booking_helper_test.cpp` for the requirements-gate path with override and reject branches.
-- [ ] Endpoint tests for all eight new endpoints (success + permission-denied + validation-error per memory `error_response_status_codes.md`).
-- [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, class-edit multiselect.
+- [ ] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) plus partial-unique-index regression. (`class_skill_requirements` helper dropped per §1.4.)
+- [ ] Business logic: `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills), extended `class_access_helper_test.cpp` for the skill-literal branch, updated `booking_helper_test.cpp` for the gate path with override (audit row) and reject branches.
+- [ ] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error per memory `error_response_status_codes.md`). Plus tests for any skill-literal extension to the existing requirement-group editor endpoint (§5.3).
+- [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, and the requirements-editor skill-literal picker (§6.4).
 - [ ] `ServerAccess.mock.spec.ts` updated.
-- [ ] Seed data: two demo skill levels with photos pending upload, one demo requirement on the "Aerial 101" class.
+- [ ] Seed data: two demo skill levels with photos pending upload, one demo requirement modeled as a skill literal in a requirement group on the "Aerial 101" class.
 
 ## 9. Cross-Layer Acceptance Criteria
 
@@ -301,12 +304,11 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] Staff with `manage_classes` can submit the same booking with `staff_override=true` + reason "verified live in person" and have it accepted.
 - [ ] If staff later revokes the original skill ("re-evaluated after months off"), the member's `/my/account/skills` page no longer shows it.
 
-## 10. Open Questions
+## 10. Open Questions — ALL RESOLVED (2026-06-03)
 
-- **OQ-P3-1.** Should revoking a skill auto-cancel any future paid bookings the user has for classes that required it? Recommended: no — the user already has the booking; if there's a real safety concern, staff cancels manually with a voucher (BC-6). Less invasive.
-	- Mason- I'll go with your recommendation.
-- **OQ-P3-2.** Should the public `GET /api/skill_levels` endpoint return all skills, or filter to `is_active=true`? Recommended: filter to active.
-	- Mason- I'll go with your recommendation.
+- [x] **OQ-P3-SKILL (resolved).** Where do skill requirements live? → **Modeled as skill literals in `class_requirement_group_literals`**, evaluated by the shared `ClassAccessHelper`. The dedicated `class_skill_requirements` table/helper/check (§2.3, §3.3, §4.1's `PersonMeetsClassRequirements`) are superseded. See §1.4.
+- [x] **OQ-P3-1 (resolved — no).** Revoking a skill does **not** auto-cancel the user's existing future paid bookings for classes that required it. The user keeps the booking; if there's a genuine safety concern, staff cancels manually with a voucher (BC-6). Less invasive.
+- [x] **OQ-P3-2 (resolved — active only).** `GET /api/skill_levels` returns **only `is_active=true`** skill levels. (Admin/staff still see inactive ones via the admin table views.) See §5.1.
 
 ## 11. Cross-References
 
