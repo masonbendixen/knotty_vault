@@ -149,27 +149,27 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 ## 3. Table Helpers
 
 ### 3.1 `TableHelpers::SkillLevels`
-> Partially built for the §1.4 gate slice (add + read-by-id, used to resolve a skill literal's name). Remaining methods land with the rest of Phase 3.
+> ✅ Fully built (§1.4 gate slice + remaining staff/admin CRUD).
 - [x] `skill_levels.h/.cpp/_test.cpp` created:
   - [x] `AddSkillLevel(Transaction&, code, name)` + `AddSkillLevel(Transaction&, const KeyValueTable&)`
   - [x] `GetSkillLevel(Transaction&, int64_t id)`
-  - [ ] `GetSkillLevelByCode(...)`
-  - [ ] `GetActiveSkillLevels(Transaction&)` (ORDER BY sort_order)
-  - [ ] `UpdateSkillLevel(Transaction&, int64_t id, const KeyValueTable& updates)`
-  - [ ] `DeleteSkillLevel(Transaction&, int64_t id)` ← soft (set `is_active=false`)
-- [x] Tests for the built slice (add + defaults, KeyValueTable add, missing→empty). Remaining tests (soft delete, unique-code violation) land with the rest of §3.1.
+  - [x] `GetSkillLevelByCode(...)` — `DbCrud::GetRow` on the unique `code` column.
+  - [x] `GetActiveSkillLevels(Transaction&)` — custom SQL `WHERE is_active = TRUE ORDER BY sort_order ASC, id ASC` (multi-column order → custom SQL per memory).
+  - [x] `UpdateSkillLevel(Transaction&, int64_t id, const KeyValueTable& updates)` — `DbCrud::UpdateRow`, stamps `updated_us = now_us()`.
+  - [x] `DeleteSkillLevel(Transaction&, int64_t id)` ← soft (sets `is_active=false` via `UpdateSkillLevel`).
+- [x] Tests: add + defaults, KeyValueTable add, missing→empty, by-code (found/missing), **unique-code violation throws**, active-list ordering by `sort_order`, active-list excludes inactive, update changes fields + bumps `updated_us`, **soft delete deactivates + drops from active list**.
 
 ### 3.2 `TableHelpers::SkillLevelAssignments`
-> Built for the §1.4 gate slice. `GetAllAssignmentsForPerson` (audit view) is the only deferred method.
+> ✅ Fully built.
 - [x] `skill_level_assignments.h/.cpp/_test.cpp` created:
   - [x] `AddAssignment(Transaction&, personId, skillLevelId, assignedByPersonId, note)` (typed args rather than raw KeyValueTable)
   - [x] `GetAssignment(Transaction&, int64_t id)`
   - [x] `GetActiveAssignmentsForPerson(Transaction&, int64_t personId)` — `WHERE removed_us IS NULL`
-  - [ ] `GetAllAssignmentsForPerson(Transaction&, int64_t personId)` — historical including revocations (audit view)
+  - [x] `GetAllAssignmentsForPerson(Transaction&, int64_t personId)` — historical including revocations (audit view); custom SQL `WHERE person_id = $1 ORDER BY assigned_us DESC, id ASC`.
   - [x] `GetActiveAssignment(Transaction&, int64_t personId, int64_t skillLevelId)`
   - [x] `PersonHasSkill(Transaction&, int64_t personId, int64_t skillLevelId)` → bool (consumed by the gate)
   - [x] `SetRemoval(Transaction&, int64_t id, int64_t removedByPersonId, std::string_view removedReason)`
-- [x] Tests: add+defaults, `PersonHasSkill` active/inactive, `GetActiveAssignment`, `SetRemoval` revokes, re-grant after revoke creates a new active row (app-level; the partial-unique DB guard is prod-only per §2.2), active-list excludes revoked.
+- [x] Tests: add+defaults, `PersonHasSkill` active/inactive, `GetActiveAssignment`, `SetRemoval` revokes, re-grant after revoke creates a new active row (app-level; the partial-unique DB guard is prod-only per §2.2), active-list excludes revoked, **full audit view includes revoked + scopes to the person**, **empty audit view when none**.
 
 ### 3.3 `TableHelpers::ClassSkillRequirements` — `[~]` SUPERSEDED (do not build)
 > ❌ **Superseded per §1.4.** Class skill requirements live in the existing `class_requirement_group_literals` table (managed by the requirement-group helper from the permission-based-access redesign). No dedicated helper is built.
