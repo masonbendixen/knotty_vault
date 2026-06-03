@@ -138,7 +138,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [~] ~~Unique on (`class_id`, `skill_level_id`).~~
 
 ### 2.4 Photo support
-- [ ] In `create_database.cpp`, add `skill_levels` to `photo_support_tables` so the existing photo upload / scale endpoints accept skill-level photos.
+- [x] In `create_database.cpp`, add `skill_levels` to `photo_support_tables` so the existing photo upload / scale endpoints accept skill-level photos. ✅ Added `AddRow(DbSchema::kSkillLevelsTable)` in `PopulatePhotoSupportTables` (header already included). Prod-only seed path (not exercised by the test harness, like the other `Populate*`/`CreateXxxIndexes` paths), so no unit test added.
 
 ### 2.5 Wire into DB init
 - [x] `make_database_info.cpp` adds the two `Make*Table()` calls in FK order (`skill_levels`, then `skill_level_assignments`), placed before the requirement-group literals so the new FK target exists.
