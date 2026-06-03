@@ -197,7 +197,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [ ] All return-value structs surface enough info to render the UI without a follow-up call.
 
 > ❌ **`PersonMeetsClassRequirements` / `ClassRequirementsCheck` are SUPERSEDED per §1.4.** The class-requirements check is owned by the shared `Scheduling::ClassAccessHelper::CheckAccess`, extended in §1.4 required-work to evaluate skill literals. `SkillLevelHelper` exposes only assign / revoke / read-skills; it does **not** evaluate class gates.
-- [x] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** (the §1.4 required-work item): a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Add tests to `class_access_helper_test.cpp` for the skill-literal branch (held / not-held / mixed with permission literals).
+- [ ] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** (the §1.4 required-work item — currently `class_access_helper.cpp:57` skips them): a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Also populate `skillLevelName` in the view/read path (`class_access_helper.cpp:128`, currently left empty "until Phase 3"). Add tests to `class_access_helper_test.cpp` for the skill-literal branch (held / not-held / mixed with permission literals). **Sequence after §2 + §3.2.**
 
 ### 4.2 Booking-flow integration
 > Per §1.4: the gate is the shared `Scheduling::ClassAccessHelper`, not a standalone skill check. This section now wires the **skill side** of the already-present gate rather than adding a new one.
