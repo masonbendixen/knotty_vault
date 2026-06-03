@@ -323,10 +323,10 @@ A non-member should:
 
 **Design decision — a dedicated Instructors admin page (not the raw generic CRUD).** The generic table CRUD *can* edit instructors, but (a) its list shows `person_id` as a raw number — the instructors display template `{person_id}` can't resolve to the person's name (the resolver only fills own-row columns, no join), and (b) photo upload is a separate thumbnail-click, not part of add/edit. A small bespoke page delivers the asked-for UX — a list of **name + thumbnail + bio**, an add flow that **searches people** and captures a bio, and **inline photo upload** — while reusing the existing backend wholesale.
 
-### 12.1 Backend (C++ — for Mason to build)
-- [ ] **Prevent a duplicate instructor per person.** `instructors.person_id` is not unique today, so promoting the same person twice creates two rows. Add a **UNIQUE constraint on `instructors.person_id`** (db_schema DDL) — simplest and safe. Table-helper test: a second `AddInstructor` for the same person fails.
-- [ ] **Confirm `GET /api/get_instructors` returns ALL instructors** (not a filtered public subset). If it filters, add an admin-scoped list or relax for admins. The admin page needs every instructor with `person_id, first_name, last_name, bio, has_photo`. Test pins the returned shape.
-- [ ] (Reuse — no new endpoints) create = generic `add_item` on `instructors {person_id, bio}`; edit bio = `update_item`; delete = `delete_item`; photo = `upload_photo` / `delete_photo`. All already admin-gated.
+### 12.1 Backend ✅ DONE (2026-06-02) — C++ for Mason to build
+- [x] **Prevent a duplicate instructor per person.** Added `databaseInfo.AddUniqueConstraint(kInstructorsTable, kInstructorsPersonId)` in `MakeInstructorsTable` (`db_schema/instructors.cpp`) — `person_id` is now FK + UNIQUE (one-to-one with a person). Pre-deploy, no migration. Tests in `instructors_test.cpp`: `AddInstructorDuplicatePersonRejected` (second `AddInstructor` for the same person throws) + `AddInstructorDistinctPersonsAllowed` (two different people both succeed).
+- [x] **Confirmed `GET /api/get_instructors` returns ALL instructors** — `Auth::InstructorHelper::GetInstructorsForPublicDisplay` calls `Instructors::GetAllInstructors` and only skips an orphan (person row missing, which the FK makes near-impossible); there is **no public/active filter**, so it is correct to reuse for the admin list. Added identity-field coverage the admin page depends on: `instructor_helper_test` Basic now pins `instructorId` (the photo-path key, distinct from `personId`); `get_instructors_test` Basic now asserts `instructor_id` + `person_id` in the JSON. (Existing empty/multiple/empty-bio/`has_photo:false` coverage retained.)
+- [x] (Reuse — no new endpoints) create = generic `add_item` on `instructors {person_id, bio}`; edit bio = `update_item`; delete = `delete_item`; photo = `upload_photo` / `delete_photo`. All already admin-gated. *(The UNIQUE constraint is the backstop for the generic `add_item` create path.)*
 
 ### 12.2 ServerAccess layer (frontend)
 - [ ] Reuse `getInstructors()`, `getFkOptions('people', search, n)`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`, `uploadPhoto`, `hasPhoto`. Add a typed convenience only if it clarifies (e.g. `createInstructor(personId, bio)` wrapping `addItemFetchPrimaryKey`). Mirror any new method in `ServerAccess.mock` + `ServerAccess.mock.spec.ts`.
@@ -344,7 +344,7 @@ A non-member should:
 - [ ] Internal **staff page** (`pages/staff/…`): if it lists people, add the thumbnail for parity (admin-authenticated, so the private `people` photo path is OK).
 
 ### 12.5 Tests rollup
-- [ ] Backend: instructors unique-person guard; `get_instructors` shape/coverage.
+- [x] **Backend (12.1)** *(for Mason to build/run)*: `instructors_test` unique-person guard (`AddInstructorDuplicatePersonRejected`, `AddInstructorDistinctPersonsAllowed`); `instructor_helper_test` + `get_instructors_test` pin `instructor_id` / `person_id` shape.
 - [ ] Frontend: Instructors admin component (list / add / edit / delete / photo), ServerAccess mock + spec, people-thumbnail confirmation.
 
 ## 13. Open Questions
