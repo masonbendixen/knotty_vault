@@ -35,7 +35,7 @@ Three facts about the current code shape the entire decision — all confirmed b
 
 2. **There is one libpqxx connection per process, guarded by one process-wide mutex.** `ProductionTransactionProvider::RunInTransaction` takes `std::lock_guard<std::mutex>(connectionMutex_)` for the entire transaction lifetime (`production_transaction_provider.cpp:11-24`), because libpqxx connections are not thread-safe. Every request in the multithreaded Crow app already serializes on this one mutex. **This is the single most important architectural constraint** — it dictates how each isolation model must acquire its connection.
 
-Mason- This seems like a point of contention. So connections are not thread safe and can't be shared? Should we create multiple connections and use a pool of them to scale better to multiple threads?
+Mason- This seems like a point of contention. So connections are not thread safe and can't be shared? Should we create multiple connections and use a pool of them to scale better to multiple threads? I'm assuming that establishing a connection is expensive and we want to reuse these versus creating them per connection but I could be wrong.
 
 3. **Per-tenant configuration already lives in a per-database table.** Square credentials, the Square environment (sandbox vs prod), SMTP/SES credentials, the sender identity, and the website address are all rows in `config_secrets` (read via `SecretsHelper`, never via the generic CRUD layer). If each tenant has its **own** `config_secrets` table, all of this per-tenant config "just works" with **zero** changes to `SecretsHelper`, `SquareClient`, or `MailHelper` construction logic — only *when* and *with which database* they're built changes.
 
