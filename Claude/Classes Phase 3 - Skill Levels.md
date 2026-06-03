@@ -97,13 +97,13 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - **(Rejected alternative)** Keeping `class_skill_requirements` as a dedicated side table would split the gate into "groups + a side table," re-introducing exactly the fragmentation SL-12 set out to avoid.
 
 **Required work regardless of the above:**
-- [ ] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals.** It currently evaluates only *permission* literals and **explicitly skips `skill_level_id` literals** (documented in redesign §3.2 — "Skill literals are not yet evaluated; Phase-3 `skill_levels`"). This phase wires the skill side: a skill literal is satisfied iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id`. Add the FK on `class_requirement_group_literals.skill_level_id → skill_levels(id)` now that the table exists.
-- [ ] **Booking enforcement is already in the gate** — the §4 hook below should call `ClassAccessHelper::CheckAccess` (extended above), not a new standalone skill check. Keep the clear `MISSING_SKILL_REQUIREMENTS`-style error by surfacing the failed group labels from `AccessResult`.
+- [x] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals.** ✅ Done — `class_access_helper.cpp` now satisfies a skill literal iff the viewer holds an active `skill_level_assignments` row (`removed_us IS NULL`) for that `skill_level_id` (via `SkillLevelAssignments::PersonHasSkill`). `GetClassRequirements` now resolves the skill literal's display name from `skill_levels`. FK `class_requirement_group_literals.skill_level_id → skill_levels(id)` added (skill_levels now created before the literals table). Tests added in `class_access_helper_test.cpp` (skill-only gate, revoke re-blocks, skill-OR-permission within a group, skill-AND-permission across groups, name resolution).
+- [x] **Booking enforcement is already in the gate** — `BookingHelper` and `ClassCatalogHelper` already call `ClassAccessHelper::CheckAccess`, so the skill side now flows through to booking/catalog automatically; **no new call site added**. The failed group labels in `AccessResult` carry the (now skill-aware) group names for the `MISSING_SKILL_REQUIREMENTS`-style error.
 
 ## 2. Database Schema
 
 ### 2.1 `skill_levels` table
-- [ ] `db_schema/skill_levels.h/.cpp`:
+- [x] `db_schema/skill_levels.h/.cpp`: ✅ built with all columns below.
   - `id BIGSERIAL PK`
   - `code TEXT NOT NULL UNIQUE`  (slug, e.g. `handstand_wall`)
   - `name TEXT NOT NULL`
@@ -111,22 +111,21 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
   - `sort_order BIGINT NOT NULL DEFAULT 0`
   - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us`, `updated_us`
-- [ ] Index on (`is_active`, `sort_order`).
+- [x] Index on (`is_active`, `sort_order`) — `CreateSkillLevelsIndexes` (real-DB path only).
 
 ### 2.2 `skill_level_assignments` table
-- [ ] `db_schema/skill_level_assignments.h/.cpp`:
+- [x] `db_schema/skill_level_assignments.h/.cpp`: ✅ built. `removed_by_person_id` is a nullable FK to `people(id)`; all other columns as below.
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)`
   - `skill_level_id BIGINT NOT NULL REFERENCES skill_levels(id)`
   - `assigned_by_person_id BIGINT NOT NULL REFERENCES people(id)`
-  - `assigned_us BIGINT NOT NULL`
+  - `assigned_us BIGINT NOT NULL DEFAULT now_us()`
   - `note TEXT NOT NULL DEFAULT ''`
   - `removed_us BIGINT` NULL
-  - `removed_by_person_id BIGINT` NULL
+  - `removed_by_person_id BIGINT` NULL (FK people)
   - `removed_reason TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
-- [ ] Partial unique index: `UNIQUE (person_id, skill_level_id) WHERE removed_us IS NULL` — one active assignment per (person, skill) at a time. Re-grant after revocation creates a new row.
-- [ ] Index on `person_id` for `GetActiveAssignmentsForPerson`.
+- [x] Partial unique index `UNIQUE (person_id, skill_level_id) WHERE removed_us IS NULL` + `person_id` index — `CreateSkillLevelAssignmentsIndexes`. ⚠️ Note: `CreateXxxIndexes` run only in the real DB-creation path, **not** in the test harness's `SetupAllTables`, so the partial-unique guard is verified in prod, not unit tests; helper read paths use explicit `removed_us IS NULL` filters so correctness does not depend on the index.
 
 ### 2.3 `class_skill_requirements` table — `[~]` SUPERSEDED (do not build)
 > ❌ **Superseded per §1.4 (OQ-P3-SKILL, resolved 2026-06-03).** Skill requirements are modeled as skill literals in `class_requirement_group_literals`; this dedicated table, its §3.3 helper, and §4's `PersonMeetsClassRequirements` are **not built**. Kept here only for historical context.

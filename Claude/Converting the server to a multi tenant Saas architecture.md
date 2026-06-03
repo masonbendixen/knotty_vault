@@ -69,6 +69,7 @@ Each tenant gets its own database (`knottyyoga_acme`, `knottyyoga_knotty`, …) 
 - **Isolation:** **maximal.** Cross-tenant data access is physically impossible — a query against tenant A's connection cannot see tenant B's tables. No predicate discipline required, ever. This is the safest possible answer and removes a whole class of "did I scope that query?" bugs from the generic CRUD surface.
 - **Connection model:** **the main new work.** The single baked-at-startup connection becomes a small registry of per-tenant `DatabaseHelper` + `TransactionProvider`, created lazily and cached. Each tenant gets its own connection and its own mutex → tenants no longer block each other (a *concurrency improvement* over today). The cost is Postgres `max_connections` (~100 on a t3.micro): one persistent connection per tenant is fine for dozens of tenants; hundreds would need PgBouncer or a bounded pool (a documented future guardrail, not a day-one concern).
 - **Ops:** many databases, one RDS instance. Migrations loop over databases. **Per-tenant PITR / snapshot / restore is clean** (you can `pg_dump`/restore one tenant without touching others, and later lift a big tenant onto its own RDS instance with no code change). `config_secrets` is per-database → per-tenant config works for free.
+	- Mason- Is there additional AWS cost for multiple databases?
 
 ## 1.3 Decision matrix and recommendation
 
