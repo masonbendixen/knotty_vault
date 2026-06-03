@@ -207,14 +207,14 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 > ❌ **`PersonMeetsClassRequirements` / `ClassRequirementsCheck` are SUPERSEDED per §1.4.** The class-requirements check is owned by the shared `Scheduling::ClassAccessHelper::CheckAccess`. `SkillLevelHelper` exposes only assign / revoke / read-skills; it does **not** evaluate class gates.
 - [x] **Extend `ClassAccessHelper::CheckAccess` to evaluate skill literals** — already done in §1.4 (skill literal satisfied iff active `skill_level_assignments` row; `skillLevelName` resolved in the read path; tests in `class_access_helper_test.cpp`).
 
-### 4.2 Booking-flow integration
-> Per §1.4: the gate is the shared `Scheduling::ClassAccessHelper`. **⚠️ Status correction (2026-06-03):** the plan assumed booking enforcement was "automatic once skill literals evaluate," but it is **not** wired as a blocking gate yet — see below. The gate machinery (`CheckAccess`, `RecordOverride` + `booking_requirement_overrides` audit) is built and tested; the *blocking enforcement at booking* is not.
+### 4.2 Booking-flow integration ✅ (OQ-P3-3 resolved — option a)
+> The gate is the shared `Scheduling::ClassAccessHelper`, now **enforced as a blocking gate at booking** (Mason: "a person shouldn't be able to sign up without the skill, absent admin/staff override; the UI shows the skill is required").
 - [x] `ClassAccessHelper::CheckAccess` is skill-aware (§1.4) and `RecordOverride` writes the audit row (tested: `class_access_helper_test.cpp::RecordOverrideWritesAudit`).
-- [ ] **NOT YET WIRED — needs a decision before coding.** `BookingHelper::BookEvent`'s only `CheckAccess` call (`booking_helper.cpp:336`) is an *inverse* short-circuit: for a **recurring** class, if the person already has access it returns `kErrorNoAdvanceBookingRequired` ("your membership includes this — just show up"). There is **no** branch that *rejects* a paid booking when the person LACKS a required skill, and no `staff_override` handling. So a `MISSING_SKILL_REQUIREMENTS` blocking gate + override path is genuinely new code, not automatic. **Open question OQ-P3-3 (below).**
-- [ ] Default path (once decided): return `MISSING_SKILL_REQUIREMENTS`, surfacing failed group labels (now skill-aware) from `AccessResult`.
-- [ ] Override path: `staff_override = true` + caller has `manage_classes` → bypass and `RecordOverride(...)`.
-- [ ] For the staff-check-in flow (Phase 8) the same gate runs — deferred to Phase 8.
-- [ ] Tests for the blocking path (meets all / missing one / missing all / staff override accepted + audit / non-staff override rejected) land with whichever phase wires the enforcement.
+- [x] **Blocking gate wired into `BookingHelper::BookEvent`.** Restructured the old recurring-only short-circuit into a unified gate: for any session tied to a class, evaluate `CheckAccess`. If `!allowed` → reject with `kErrorMissingRequirements` (`MISSING_SKILL_REQUIREMENTS`), carrying `failedRequirementLabels` (the failed group labels — skill/membership names). When the gate passes, a recurring class still returns `NO_ADVANCE_BOOKING_REQUIRED` (P-1). Consistent with the catalog/detail (`ClassCatalogHelper`), which already marks `!allowed` classes unavailable — there is no "pay to bypass" path, so no existing paid-drop-in behavior breaks (classes with no requirement groups stay open).
+- [x] **Override path.** `BookEventRequest` gained `staffOverride` / `actingPersonId` / `overrideReason`. When the gate fails and `staffOverride` is set (authorized at the endpoint), the bypass is logged via `ClassAccessHelper::RecordOverride(...)` (NULL booking id) and booking proceeds. For a recurring class the override is audited and still returns `NO_ADVANCE_BOOKING_REQUIRED`.
+- [x] **Endpoint (`book_event.cpp`).** Parses `staff_override` + `override_reason`; only honors the override when the caller is admin or has `manage_class_schedule` (`Session::IsAdmin` / `ActiveUserHasPermission`) — a raw flag from an unprivileged user is ignored. Maps `MISSING_SKILL_REQUIREMENTS` → **403** with a `missing_requirements` array extension so the UI can show "You're missing: X, Y" and (for staff) offer the override.
+- [ ] For the staff-check-in flow (Phase 8) the same gate runs at the door — deferred to Phase 8.
+- [x] Tests. **`booking_helper_test.cpp`**: blocks when missing skill (+ failed labels), allows when skill held, staff override bypasses + writes audit row (series), recurring missing-skill blocked (not "just show up"), recurring override → `NO_ADVANCE` + audit. **`book_event_test.cpp`**: 403 + `missing_requirements` for under-qualified user, staff override (with `manage_class_schedule`) succeeds, override flag without permission still 403.
 
 ### 4.3 KeyValueTable conversions
 - [x] In `business_logic/skills/skill_key_value_table.h/.cpp`:
@@ -298,7 +298,7 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 ## 8. Tests-Required Summary
 
 - [ ] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) plus partial-unique-index regression. (`class_skill_requirements` helper dropped per §1.4.)
-- [x] Business logic (Phase 4): `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills/catalog reads) + `skill_key_value_table_test.cpp` (conversions) ✅. `class_access_helper_test.cpp` skill-literal branch ✅ (§1.4). `booking_helper_test.cpp` reject/override branches → deferred with OQ-P3-3 (blocking gate not yet wired).
+- [x] Business logic (Phase 4): `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills/catalog reads) + `skill_key_value_table_test.cpp` (conversions) ✅. `class_access_helper_test.cpp` skill-literal branch ✅ (§1.4). `booking_helper_test.cpp` reject/override branches ✅ (OQ-P3-3 option a — block missing skill, allow when held, staff override + audit, recurring blocked / recurring override). `book_event_test.cpp` 403 + override-success + override-without-permission ✅.
 - [ ] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error per memory `error_response_status_codes.md`). Plus tests for any skill-literal extension to the existing requirement-group editor endpoint (§5.3).
 - [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, and the requirements-editor skill-literal picker (§6.4).
 - [ ] `ServerAccess.mock.spec.ts` updated.
@@ -308,16 +308,15 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 - [ ] Staff in the staff portal can search for a member, see they have zero skills, click "Assign", pick "Inversions (Wall Handstand)", add a note "Demonstrated cleanly on Mar 5", save, and see the row appear immediately.
 - [ ] The member can log in to `/my/account/skills` and see the new badge with the assigned date.
-- [ ] An attempt by that member to book the "Aerial 2 Workshop" (which requires the "Aerial Basics" skill they don't have) returns 400 `MISSING_SKILL_REQUIREMENTS`.
-- [ ] Staff with `manage_classes` can submit the same booking with `staff_override=true` + reason "verified live in person" and have it accepted.
+- [x] An attempt by that member to book the "Aerial 2 Workshop" (which requires the "Aerial Basics" skill they don't have) returns `MISSING_SKILL_REQUIREMENTS` (HTTP 403, with the failed requirement labels). ✅ §4.2
+- [x] Staff with `manage_class_schedule` can submit the same booking with `staff_override=true` + reason "verified live in person" and have it accepted (logged via `RecordOverride`). ✅ §4.2
 - [ ] If staff later revokes the original skill ("re-evaluated after months off"), the member's `/my/account/skills` page no longer shows it.
 
-## 10. Open Questions
-
-- [ ] **OQ-P3-3 (NEW, 2026-06-03 — needs your decision).** Where does the *blocking* skill gate at booking live? Discovered while implementing §4: `BookingHelper::BookEvent` only uses `CheckAccess` as a "you already have access → no advance booking needed" short-circuit for recurring classes; it never *rejects* a paid booking for a missing skill, and has no `staff_override` path. Options: **(a)** add the blocking gate + `MISSING_SKILL_REQUIREMENTS` + override handling to `BookingHelper`/the booking endpoint now (modifies the Phase-2 paid path — per `feedback_one_layer_at_a_time`, wanted your sign-off before editing the booking flow); **(b)** defer all booking-time enforcement to the Phase-8 staff-check-in flow and keep Phase 3 to authoring + the user/staff/admin skill surfaces; **(c)** something else. The gate + audit primitives are ready either way.
-	- Mason- A person shouldn't be able to sign up for a given class if they don't have the skill without admin / staff override. It should show up in the UI that the skill is required.
+## 10. Open Questions — ALL RESOLVED
 
 ### Resolved (2026-06-03)
+
+- [x] **OQ-P3-3 (resolved — option a).** The blocking skill gate lives in `BookingHelper::BookEvent` / `book_event.cpp` (§4.2): a person cannot book a class they don't qualify for (skill/membership) absent an admin/`manage_class_schedule` staff override with a logged reason; the booking UI surfaces the failed requirements (`missing_requirements` array on the 403). The Phase-8 check-in flow runs the same gate at the door. Mason: "A person shouldn't be able to sign up for a given class if they don't have the skill without admin / staff override. It should show up in the UI that the skill is required."
 
 - [x] **OQ-P3-SKILL (resolved).** Where do skill requirements live? → **Modeled as skill literals in `class_requirement_group_literals`**, evaluated by the shared `ClassAccessHelper`. The dedicated `class_skill_requirements` table/helper/check (§2.3, §3.3, §4.1's `PersonMeetsClassRequirements`) are superseded. See §1.4.
 - [x] **OQ-P3-1 (resolved — no).** Revoking a skill does **not** auto-cancel the user's existing future paid bookings for classes that required it. The user keeps the booking; if there's a genuine safety concern, staff cancels manually with a voucher (BC-6). Less invasive.
