@@ -331,13 +331,13 @@ A non-member should:
 ### 12.2 ServerAccess layer (frontend) ✅ DONE (2026-06-02)
 - [x] **Reused existing methods — no interface change.** The page composes `getInstructors()`, `getFkOptions('people', …)`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`, `uploadPhoto`, `hasPhoto` directly; a typed `createInstructor` wrapper wasn't worth a new surface. **Mock made coherent:** added a generic `instructors` table to `ServerAccess.mock` (`["bio","id","person_id"]`, seeded for persons 1–2) and rewrote `getInstructors()` to **derive** from it joined with `people` (+ `has_photo` from the in-memory photo map), so create/edit/delete via the generic CRUD helpers reflect in mock mode. Mock spec block "Instructors (Classes Phase 2 §12)" — derivation, add reflects, edit+delete reflect.
 
-### 12.3 Frontend — Instructors admin page ✅ DONE (2026-06-02)
-- [x] New standalone `InstructorsAdminComponent` (`pages/admin/instructors/`, SharedModule + `PhotoUploadComponent`), registered as the `instructors` child route (before the legacy `:tableName` catch-all) + a **"Manage Instructors"** button on the admin dashboard (`goToInstructors()`).
+### 12.3 Frontend — Instructors management page ✅ DONE (2026-06-02; relocated to Manage Products on Mason's correction)
+- [x] **First-class card in the Manage Products portal** — NOT the `/admin` CRUD editor. New standalone `InstructorsAdminComponent` (`pages/manage/instructors/`, SharedModule + RouterModule + `PhotoUploadComponent`) at route **`/manage/instructors`**, reached from a new **"Instructors"** dashboard card (`co_present` icon, next to Class Schedules) on `manage-dashboard`. Standard manage header: "← Back to manage portal" + `din-condensed-bold text-2xl` title. *(First cut wrongly placed it under `/admin`; the `/admin` route, dashboard button, and `goToInstructors` were removed.)*
 - [x] **List**: a row per instructor with a round thumbnail (`/api/get_scaled_photo/instructors/<id>/64/64`, person-icon fallback), `First Last`, a plain-text bio snippet (HTML stripped + truncated), and Edit + Delete actions.
 - [x] **Add**: a searchable **people picker** (`mat-autocomplete` over `getFkOptions('people', …)`, `displayWith` for clean labels, excludes people already instructors) + a bio textarea → `addItemFetchPrimaryKey('instructors', { person_id, bio })`; on success the panel reveals the `photo-upload` component bound to the new instructor id. Guarded: Create disabled / errors without a chosen person.
 - [x] **Edit**: a bio textarea + the `photo-upload` component (`tableName='instructors'`, `tableItemId=instructor_id`) to add/replace the picture; Save → `updateItem`.
 - [x] **Delete**: inline two-step confirm → `deleteItem('instructors','id', id)`, then reload. (Photo cleanup handled by existing `delete_photo`/cascade semantics.)
-- [x] Specs: `instructors-admin.component.spec.ts` (11 tests — load/list, thumbnail vs icon, empty state, bio-snippet, people search + exclusion, blank-search no-op, create guard, create writes + reveals photo upload, edit saves, delete confirm/cancel, load error); dashboard `goToInstructors` nav test.
+- [x] Specs: `instructors-admin.component.spec.ts` (11 tests — load/list, thumbnail vs icon, empty state, bio-snippet, people search + exclusion, blank-search no-op, create guard, create writes + reveals photo upload, edit saves, delete confirm/cancel, load error; `provideRouter([])` for the back-link); `manage-dashboard.component.spec.ts` asserts the Instructors card renders.
 
 ### 12.4 People thumbnails in the portal ✅ DONE (2026-06-02)
 - [x] **Confirmed** the generic admin `people` table view already renders a per-row 50×50 thumbnail — `controls/table-view-control` shows a `.photo-thumbnail` (with placeholder) for any photo-support table, and `people` is photo-support registered. No change needed. (`people` photos stay on the **private** scaled-photo path — login required — which is correct for the admin portal; public pages use the public `instructors` path.)
@@ -345,7 +345,7 @@ A non-member should:
 
 ### 12.5 Tests rollup
 - [x] **Backend (12.1)** *(for Mason to build/run)*: `instructors_test` unique-person guard (`AddInstructorDuplicatePersonRejected`, `AddInstructorDistinctPersonsAllowed`); `instructor_helper_test` + `get_instructors_test` pin `instructor_id` / `person_id` shape.
-- [x] **Frontend (verified, 2275 specs pass)**: `InstructorsAdminComponent` (11 tests), `ServerAccess.mock` Instructors derivation/CRUD block (3 tests), admin dashboard `goToInstructors` nav test, and confirmation that the generic people view already shows thumbnails.
+- [x] **Frontend (verified, 2275 specs pass)**: `InstructorsAdminComponent` (11 tests), `ServerAccess.mock` Instructors derivation/CRUD block (3 tests), `manage-dashboard` Instructors-card test, and confirmation that the generic people view already shows thumbnails.
 
 ## 13. Open Questions
 
