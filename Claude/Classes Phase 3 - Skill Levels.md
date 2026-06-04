@@ -297,6 +297,13 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [x] Photo support in `photo_support_tables` — done in §2.4 (`skill_levels` registered), so the admin form's photo upload works for skill badges.
 - [x] Note: the `class_requirement_group_literals.skill_level_id` admin column metadata was already present (added in §1.4), so authoring a skill literal through the generic CRUD / requirements editor already works.
 
+### 7.1 Dedicated "Skills" management page (added 2026-06-03, beyond original plan)
+> The generic admin table UI works, but the user wanted a first-class **Skills** card under **Manage Products** with CRUD + photo view/edit (like Instructors). Built mirroring `instructors-admin`:
+- [x] **Backend admin read** — `TableHelpers::SkillLevels::GetAllSkillLevels` (all rows incl. inactive) + `SkillLevelHelper::GetAllSkillLevels` + `GET /api/admin/skill_levels` (gated `manage_skills`, returns `has_photo`). Tests at all three layers (table helper, business, endpoint 401/403/200-incl-inactive).
+- [x] **ServerAccess** — `getAllSkillLevels()` added across interface/proxy/network/mock + mock spec.
+- [x] **Frontend** — `pages/manage/skills/skills-admin.component.*`: list (badge thumb + name + code + Active/Inactive chip + sort_order), Add/Edit panels (code/name/description/sort_order/is_active + `app-photo-upload`, deferred on add / live on edit), Delete (hard via generic `deleteItem`; FK-in-use → "set it inactive instead"). Writes reuse the generic CRUD (`addItemFetchPrimaryKey`/`updateItem`/`deleteItem`) against `skill_levels`. Route `/manage/skills` + a "Skills" dashboard card (`military_tech` icon). Component spec + dashboard-card spec added.
+- ⚠️ Requires a server rebuild (new endpoint + §7 `create_database.cpp` seed) and a DB recreate (so `manage_skills` is granted to admin/Studio Manager and `skill_levels` is in `admin_top_level_tables`).
+
 ## 8. Tests-Required Summary
 
 - [x] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) ✅ (§3). (Partial-unique-index is prod-only per §2.2; `class_skill_requirements` helper dropped per §1.4.)
