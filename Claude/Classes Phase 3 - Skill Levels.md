@@ -254,38 +254,37 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ## 6. Frontend
 
-### 6.1 User portal — `/my/account/skills`
-- [ ] `ui/src/app/pages/account/my-skills/my-skills.component.ts/.html/.scss/.spec.ts`.
-- [ ] Grid of badge cards: photo, name, "Earned {date}", description.
-- [ ] Empty state: "You don't have any skill levels yet. Talk to a staff member to get evaluated."
-- [ ] Use the standard back-nav / title-font / RouterTestingModule pattern per memory `feedback_account_page_layout.md`.
+### 6.1 User portal — `/my/account/skills` ✅
+- [x] `ui/src/app/pages/account/my-skills/my-skills.component.ts/.html/.scss/.spec.ts`; route `skills` registered in `account.routes.ts`.
+- [x] Grid of bordered badge cards: photo (when `has_photo`, `/api/get_scaled_photo/skill_levels/<id>/...`), name, "Earned {date}" (`assigned_us` → `formatCalendarDate`), description, note. Loading + error states.
+- [x] Empty state: "You don't have any skill levels yet. Talk to a staff member to get evaluated."
+- [x] Standard back-nav / `din-condensed-bold` title / `RouterTestingModule` spec per `feedback_account_page_layout`.
 
-### 6.2 Class detail page — skill section
-- [ ] In the existing Phase 1 class-detail component, add a "Required skills" section. Each requirement is a chip with a `you-have` / `you-don't-have` icon if logged in.
-- [ ] If user has all → show a green "You meet the prerequisites" banner.
-- [ ] If missing → show a red "You're missing: X, Y" banner with a "Talk to staff for evaluation" CTA.
-- [ ] Spec.
+### 6.2 Class detail page — skill section ✅
+- [x] In the existing public class-detail component, added a "Required skills" section (gated on `required_skills.length > 0`). Each requirement is a `mat-chip`; when logged in, a green `check_circle` (held) / red `cancel` (missing) avatar icon (case-insensitive trimmed name match vs `getMySkills()`).
+- [x] All held → green "You meet the prerequisites" banner.
+- [x] Missing → red "You're missing: X, Y" banner + "Talk to staff for evaluation" CTA.
+- [x] Held/missing computed in `.ts` as a `ClassRequirementsCheck`. Auth via `AuthService.authData.isAuth`. Spec extended (chips, both banners, not-logged-in bare chips, case-insensitive match).
 
-### 6.3 Staff portal — person skill management
-- [ ] `ui/src/app/pages/portal/staff/person-skills/person-skills.component.*` + spec.
-- [ ] Person search at the top (autocomplete) — reuse the existing `/api/staff/people/search` if it exists; if not, create one (it's also needed for Phase 8 check-in).
-- [ ] Selecting a person populates a table of their current skills + a button "Assign new skill" → dialog with skill picker + note field.
-- [ ] Each row has a "Revoke" button → confirm + reason field.
-- [ ] Spec.
+### 6.3 Staff portal — person skill management ✅
+- [x] `ui/src/app/pages/staff/person-skills/person-skills.component.*` (followed the actual `pages/staff/` convention, not the nominal `portal/staff/`) + route in `staff.routes.ts` + a dashboard card.
+- [x] Person search reuses the existing `staffSearchPeople` (`/api/staff/people/search`), debounced autocomplete.
+- [x] Selecting a person → table of `getPersonSkills` (name, assigned date, note); "Assign new skill" → `AssignSkillDialogComponent` (skill `mat-select` from `getSkillLevels`, excludes held; optional note) → `assignSkill` + refetch.
+- [x] Per-row "Revoke" → `RevokeSkillDialogComponent` (confirm + reason) → `revokeSkill` + refetch.
+- [x] Specs for the page + both dialogs (search, select, assign flow, revoke flow, empty state, cancel no-ops).
 
-### 6.4 Admin — class requirements editor extension
-> Per §1.4: skill requirements are skill literals in requirement groups. Authoring happens in the **§6.6 Phase-1 Requirements editor**, not a standalone multi-select.
-- [ ] In the existing requirement-group editor (Phase-1 / permission-based-access redesign), add a **skill-literal picker** so a literal can reference a skill level (populated from `getSkillLevels()`) alongside the existing permission literals.
-- [ ] Render skill literals with the skill name (and photo if available) in the group display.
-- [ ] Spec.
+### 6.4 Admin — class requirements editor extension ✅
+- [x] In `class-requirements-editor.component`, added a per-group **skill-literal picker** (`mat-select` from active `getSkillLevels()`, excludes already-used skills) beside the existing permission autocomplete.
+- [x] Adding writes a `class_requirement_group_literals` row via the same generic CRUD path with `skill_level_id` set (no `permission_id`); removal uses the same delete-by-id path.
+- [x] Skill literals render as a distinct amber `military_tech` chip using `skill_level_name` (falls back to a lookup in the loaded skill list). Spec extended (load/sort/active-filter, add with skill_level_id only, render by name, name fallback, remove, permission path still green).
 
-### 6.5 `ServerAccess` extensions
-- [ ] `getSkillLevels()`, `getSkillLevelDetail(id)`, `getMySkills()`, `getPersonSkills(personId)`, `assignSkill(personId, skillLevelId, note)`, `revokeSkill(personId, skillLevelId, reason)`.
-- [ ] ~~`setClassSkillRequirement(...)` / `removeClassSkillRequirement(...)`~~ — superseded per §1.4; class skill requirements are authored via the existing requirement-group editor's `ServerAccess` methods (extend those for a skill-literal field if needed).
-- [ ] Update `ServerAccess.mock.spec.ts`.
+### 6.5 `ServerAccess` extensions ✅
+- [x] `getSkillLevels()`, `getSkillLevelDetail(id)`, `getMySkills()`, `getPersonSkills(personId)`, `assignSkill(personId, skillLevelId, note?)`, `revokeSkill(personId, skillLevelId, reason?)` — added to the interface (`types/ServerAccess.ts`), proxy (`network/ServerAccess.ts`), real impl (`ServerAccessNetwork.ts`, with `is_active`/`has_photo` string→bool coercion), and mock (`ServerAccess.mock.ts`, in-memory state).
+- [x] ~~`setClassSkillRequirement(...)`~~ — superseded per §1.4 (authored via the requirement-group editor's generic CRUD).
+- [x] `ServerAccess.mock.spec.ts` updated (active-filter/order, detail found/inactive/404, my-skills + 401, assign + idempotent + 404, revoke + no-op).
 
-### 6.6 Types
-- [ ] `ui/src/app/shared/types/skill.types.ts`: `SkillLevel`, `PersonSkill`, `ClassRequirementsCheck`.
+### 6.6 Types ✅
+- [x] `ui/src/app/shared/types/skill.types.ts`: `SkillLevel`, `PersonSkill`, `AssignSkillResult`, `RevokeSkillResult`, plus UI helpers `SkillRequirementStatus` + `ClassRequirementsCheck` (re-exported from `@shared/types/ServerAccess`).
 
 ## 7. Admin Metadata
 
@@ -301,8 +300,8 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 - [x] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) ✅ (§3). (Partial-unique-index is prod-only per §2.2; `class_skill_requirements` helper dropped per §1.4.)
 - [x] Business logic (Phase 4): `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills/catalog reads) + `skill_key_value_table_test.cpp` (conversions) ✅. `class_access_helper_test.cpp` skill-literal branch ✅ (§1.4). `booking_helper_test.cpp` reject/override branches ✅ (OQ-P3-3 option a — block missing skill, allow when held, staff override + audit, recurring blocked / recurring override). `book_event_test.cpp` 403 + override-success + override-without-permission ✅.
 - [x] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error) ✅. §5.3 needs no endpoint (generic CRUD), so no extra endpoint test.
-- [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, and the requirements-editor skill-literal picker (§6.4).
-- [ ] `ServerAccess.mock.spec.ts` updated.
+- [x] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page (+ both dialogs), and the requirements-editor skill-literal picker (§6.4). ✅
+- [x] `ServerAccess.mock.spec.ts` updated. ✅
 - [ ] Seed data: two demo skill levels with photos pending upload, one demo requirement modeled as a skill literal in a requirement group on the "Aerial 101" class.
 
 ## 9. Cross-Layer Acceptance Criteria
