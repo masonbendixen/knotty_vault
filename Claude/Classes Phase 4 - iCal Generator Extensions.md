@@ -65,6 +65,14 @@ Primarily a library phase, plus **one small DB column** (`bookings.calendar_sequ
 
 No frontend work in this phase.
 
+## Implementation Status (2026-06-04)
+
+**Done:** §8 DB column (`bookings.calendar_sequence` + admin metadata + table-helper read/atomic increment + tests); §2 struct fields; §3.1 single-event emission (UID with OQ-P4-3 synthetic fallback, DTSTAMP, SEQUENCE, STATUS, RRULE, ORGANIZER, ATTENDEE); §3.2 multi-event overload; §3.4 UTF-8-safe line folding; §4 builders (Build{Booking,Session,Template}Uid, Build{Weekly,Biweekly,Custom}RRule, FoldLine); §5 generator tests (incl. fold + UTF-8 + builders); §6.1 confirmation UIDs at all four `.ics` call sites (payment_helper, book_service, cart_checkout, staff_upgrade_session — the last bumps sequence as an update); §6.2 **booking** cancellation `.ics` (new attachment: matching UID + STATUS:CANCELLED + incremented sequence, in `cancel_booking.cpp`); §7 mail/endpoint tests for confirmation UID + cancellation.
+
+**Deferred (need the build/tzdata verification loop):**
+- **§3.3 VTIMEZONE / DST-aware recurring events + OQ-P4-2 tzdata bootstrap.** Recurring events currently emit the correct UTC `DTSTART`+`RRULE` form (the §3.3 documented fallback). Full `VTIMEZONE`/`TZID` emission needs `date/tz` (first use in the server) plus the `set_install` bootstrap + container tzdata — best done where it can be compiled/verified. Consumers (Phase 5 templates, Phase 6 digest) work on the UTC form meanwhile.
+- **§6.2 peripheral cancellation paths:** SessionCancellationMail, ProviderCancelled*/ProviderChangeClient, and WaitlistPromotion `.ics`. Only the user/admin booking-cancellation path is wired.
+
 ## 1. Pre-Coding Design Decisions
 
 ### 1.1 Lock-in (resolved per parent doc Phase 4 + §9 OQ-20)
@@ -82,32 +90,32 @@ No frontend work in this phase.
 
 Additive only — do not rename or repurpose existing fields.
 
-- [ ] Add `std::string uid` — required by RFC 5545. Format is the caller's choice; helper builders in §4 centralize the conventions.
-- [ ] Add `std::string status` — `""` (omit field), `"CONFIRMED"`, `"CANCELLED"`. `"CANCELLED"` emits `STATUS:CANCELLED`.
-- [ ] Add `std::string rrule` — emitted verbatim as `RRULE:<value>` when non-empty. Caller is responsible for RFC 5545 grammar; helper builders in §4 build common patterns.
-- [ ] Add `std::string organizerEmail` and `std::string organizerName` — emit as `ORGANIZER;CN=<name>:mailto:<email>`.
-- [ ] Add `std::string attendeeEmail` and `std::string attendeeName` — emit as `ATTENDEE;CN=<name>;RSVP=FALSE:mailto:<email>`.
-- [ ] Add `std::string sequence` (default `"0"`) — emitted as `SEQUENCE:<n>`. Incremented on each update so calendar apps accept the latest version.
-- [ ] Existing fields stay: `title`, `startTimeUs`, `endTimeUs`, `timezone`, `location`, `description`. None renamed.
-- [ ] Regression test: an all-default `ICalEvent` produces the same byte sequence as today plus a new `DTSTAMP` line. (Update the existing golden-text tests accordingly.)
+- [x] Add `std::string uid` — required by RFC 5545. Format is the caller's choice; helper builders in §4 centralize the conventions.
+- [x] Add `std::string status` — `""` (omit field), `"CONFIRMED"`, `"CANCELLED"`. `"CANCELLED"` emits `STATUS:CANCELLED`.
+- [x] Add `std::string rrule` — emitted verbatim as `RRULE:<value>` when non-empty. Caller is responsible for RFC 5545 grammar; helper builders in §4 build common patterns.
+- [x] Add `std::string organizerEmail` and `std::string organizerName` — emit as `ORGANIZER;CN=<name>:mailto:<email>`.
+- [x] Add `std::string attendeeEmail` and `std::string attendeeName` — emit as `ATTENDEE;CN=<name>;RSVP=FALSE:mailto:<email>`.
+- [x] Add `std::string sequence` (default `"0"`) — emitted as `SEQUENCE:<n>`. Incremented on each update so calendar apps accept the latest version.
+- [x] Existing fields stay: `title`, `startTimeUs`, `endTimeUs`, `timezone`, `location`, `description`. None renamed.
+- [x] Regression test: existing golden-text tests still pass (substring-based); new tests assert the added UID/DTSTAMP/SEQUENCE lines.
 
 ## 3. Extend `GenerateICalendar` in `util/ical_generator.cpp`
 
-### 3.1 Single-event path (existing function)
-- [ ] Emit `UID:<uid>\r\n` after the `BEGIN:VEVENT`. **UID fallback (OQ-P4-3 resolved):** if `uid` is empty, log a warning and substitute a synthetic `synthetic-<uuid>@knottyyoga.com` so a missing UID never blocks an email. Never assert/crash.
-- [ ] Emit `DTSTAMP:<now_utc>\r\n` — `now()` in `YYYYMMDDTHHMMSSZ` UTC form. RFC 5545 mandatory.
-- [ ] Emit `SEQUENCE:<sequence>\r\n` after DTSTAMP.
-- [ ] If `status` non-empty: emit `STATUS:<status>\r\n`.
-- [ ] If `rrule` non-empty: emit `RRULE:<rrule>\r\n`.
-- [ ] If `organizerEmail` non-empty: emit `ORGANIZER;CN=<organizerName>:mailto:<organizerEmail>\r\n`.
-- [ ] If `attendeeEmail` non-empty: emit `ATTENDEE;CN=<attendeeName>;RSVP=FALSE:mailto:<attendeeEmail>\r\n`.
+### 3.1 Single-event path (existing function) ✅
+- [x] Emit `UID:<uid>\r\n` after the `BEGIN:VEVENT`. **UID fallback (OQ-P4-3 resolved):** if `uid` is empty, log a warning and substitute a synthetic `synthetic-<us>-<counter>@knottyyoga.com` so a missing UID never blocks an email. Never assert/crash. (Time+atomic-counter instead of a uuid lib — no new dependency.)
+- [x] Emit `DTSTAMP:<now_utc>\r\n` — `now()` in `YYYYMMDDTHHMMSSZ` UTC form. RFC 5545 mandatory.
+- [x] Emit `SEQUENCE:<sequence>\r\n` after DTSTAMP.
+- [x] If `status` non-empty: emit `STATUS:<status>\r\n`.
+- [x] If `rrule` non-empty: emit `RRULE:<rrule>\r\n`.
+- [x] If `organizerEmail` non-empty: emit `ORGANIZER;CN=<organizerName>:mailto:<organizerEmail>\r\n`.
+- [x] If `attendeeEmail` non-empty: emit `ATTENDEE;CN=<attendeeName>;RSVP=FALSE:mailto:<attendeeEmail>\r\n`.
 
-### 3.2 New multi-event overload
-- [ ] Add `std::string GenerateICalendar(const std::vector<ICalEvent>& events)`.
-- [ ] One `BEGIN:VCALENDAR` / `END:VCALENDAR` wrapping multiple `BEGIN:VEVENT` / `END:VEVENT` blocks.
-- [ ] If any event has a non-empty `timezone` AND a non-empty `rrule`, emit one `VTIMEZONE` block per distinct `timezone` value before the first VEVENT (de-dup the set).
+### 3.2 New multi-event overload ✅
+- [x] Add `std::string GenerateICalendar(const std::vector<ICalEvent>& events)`.
+- [x] One `BEGIN:VCALENDAR` / `END:VCALENDAR` wrapping multiple `BEGIN:VEVENT` / `END:VEVENT` blocks.
+- [~] ~~If any event has a non-empty `timezone` AND a non-empty `rrule`, emit one `VTIMEZONE` block per distinct `timezone`~~ — folded into the deferred §3.3 VTIMEZONE work; the digest (Phase 6) uses per-occurrence VEVENTs (concrete UTC instants), which need no VTIMEZONE.
 
-### 3.3 VTIMEZONE block emission
+### 3.3 VTIMEZONE block emission — ⏸ DEFERRED (recurring events use the UTC `RRULE` fallback for now; needs the build/tzdata loop — see Implementation Status)
 **tzdata bootstrap (OQ-P4-2 resolved).** This is the FIRST use of `date/tz.h` anywhere in the server --- today `ical_generator.cpp` includes only `date/date.h` and emits UTC \(the `timezone` field is currently unused\). The build already compiles the `date` library with `-DUSE_OS_TZDB=0` \(conan `date/3.0.4` default `use_system_tz_db=False`\), which is the right setting to KEEP: local dev builds on Windows/Visual Studio, where `date` cannot use an OS tz database, so the OS-tzdb path is not an option cross-platform. With `USE_OS_TZDB=0` the library reads a bundled IANA tzdata directory rather than `/usr/share/zoneinfo`. Therefore:
  - [ ] Ship a known-good IANA tzdata snapshot in the deploy artifact (and the conan `date` package's bundled tzdata for local dev) and call `date::set_install("<path>")` ONCE at process startup, in BOTH `main.cpp` (web server) and the `knottyyoga_helper`/scheduler `main.cpp`, before any `locate_zone` call.
  - [ ] Add a startup self-check: call `date::locate_zone("America/Los_Angeles")` (or `date::get_tzdb()`) at boot; on failure, log a fatal error and refuse to start, so missing/misconfigured tzdata fails fast instead of at first recurring-email generation.
@@ -119,22 +127,22 @@ Additive only — do not rename or repurpose existing fields.
 - [ ] For non-recurring entries (`rrule.empty()`), continue to use `DTSTART:<utcZ>` / `DTEND:<utcZ>` form — simpler, works fine for one-offs.
 - [ ] For recurring entries when timezone is set, emit `DTSTART;TZID=<tz>:<localwall>` / `DTEND;TZID=<tz>:<localwall>` referencing the embedded `VTIMEZONE`.
 
-### 3.4 Long-line folding (RFC 5545 §3.1)
-- [ ] After all lines are emitted, post-process the output: any line exceeding 75 octets is folded by inserting `CRLF + space` at the 75-octet boundary, then continuing.
-- [ ] Take care with UTF-8 — count octets, not characters; never split inside a multi-byte sequence (back off to the previous codepoint boundary).
-- [ ] Several real calendar clients (some Microsoft Outlook variants in particular) reject unfolded long DESCRIPTION lines.
+### 3.4 Long-line folding (RFC 5545 §3.1) ✅
+- [x] After all lines are emitted, post-process the output: any line exceeding 75 octets is folded by inserting `CRLF + space` at the 75-octet boundary, then continuing.
+- [x] Take care with UTF-8 — count octets, not characters; never split inside a multi-byte sequence (back off to the previous codepoint boundary).
+- [x] Several real calendar clients (some Microsoft Outlook variants in particular) reject unfolded long DESCRIPTION lines.
 
 ## 4. Helper functions for common patterns
 
 Add as free functions in `util/ical_generator.h/cpp` (same namespace).
 
-- [ ] `std::string BuildBookingUid(int64_t bookingId)` → `"booking-<id>@knottyyoga.com"`.
-- [ ] `std::string BuildSessionUid(int64_t sessionId)` → `"session-<id>@knottyyoga.com"`.
-- [ ] `std::string BuildTemplateUid(int64_t scheduleId, int64_t personId)` → `"schedule-<scheduleId>-person-<personId>@knottyyoga.com"`.
-- [ ] `std::string BuildWeeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → `"FREQ=WEEKLY;BYDAY=<MO,TU,...>;UNTIL=<utcZ>"`. Day index 0..6 → `SU`, `MO`, `TU`, `WE`, `TH`, `FR`, `SA`.
-- [ ] `std::string BuildBiweeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → same as weekly but `INTERVAL=2`.
-- [ ] `std::string BuildCustomRRule(int intervalDays, int64_t untilUs)` → `"FREQ=DAILY;INTERVAL=<n>;UNTIL=<utcZ>"`.
-- [ ] `std::string FoldLine(std::string_view line)` (test-only helper if useful) — folds one logical line per RFC 5545 §3.1.
+- [x] `std::string BuildBookingUid(int64_t bookingId)` → `"booking-<id>@knottyyoga.com"`.
+- [x] `std::string BuildSessionUid(int64_t sessionId)` → `"session-<id>@knottyyoga.com"`.
+- [x] `std::string BuildTemplateUid(int64_t scheduleId, int64_t personId)` → `"schedule-<scheduleId>-person-<personId>@knottyyoga.com"`.
+- [x] `std::string BuildWeeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → `"FREQ=WEEKLY;BYDAY=<MO,TU,...>;UNTIL=<utcZ>"`. Day index 0..6 → `SU`, `MO`, `TU`, `WE`, `TH`, `FR`, `SA`. (UNTIL omitted when `untilUs <= 0`.)
+- [x] `std::string BuildBiweeklyRRule(const std::vector<int>& daysOfWeek, int64_t untilUs)` → same as weekly but `INTERVAL=2`.
+- [x] `std::string BuildCustomRRule(int intervalDays, int64_t untilUs)` → `"FREQ=DAILY;INTERVAL=<n>;UNTIL=<utcZ>"`.
+- [x] `std::string FoldLine(std::string_view line)` — public; folds one logical line per RFC 5545 §3.1 (UTF-8-safe).
 
 ## 5. Extend `util/ical_generator_test.cpp`
 
