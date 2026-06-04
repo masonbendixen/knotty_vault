@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 5/23/2026
-Version: 0.1
+Last Updated: 6/4/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -54,12 +54,14 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ## Layering & Conventions
 
-This is a pure-library phase (no DB, no endpoints) with email-helper updates layered on top:
+Primarily a library phase, plus **one small DB column** (`bookings.calendar_sequence`, OQ-P4-1 resolved) and email-helper updates layered on top. Lowest layer first:
 
-1. `util/ical_generator.h/cpp` — struct + generator extensions.
-2. `util/ical_generator_test.cpp` — golden-text + behavior tests.
-3. Email helpers (`business_logic/scheduling/*_mail.cpp`, `business_logic/payment/*_mail.cpp`) — wire the new fields.
-4. Endpoint tests — assert UID + STATUS appear in queued mail attachments.
+1. `db_schema/bookings.*` + `create_database.cpp` — the `bookings.calendar_sequence` column (§8).
+2. `sql_util/table_helpers/bookings.*` — read + increment the sequence.
+3. `util/ical_generator.h/cpp` — struct + generator extensions.
+4. `util/ical_generator_test.cpp` — golden-text + behavior tests.
+5. Email helpers (`business_logic/scheduling/*_mail.cpp`, `business_logic/payment/*_mail.cpp`) — wire the new fields.
+6. Endpoint tests — assert UID + STATUS appear in queued mail attachments.
 
 No frontend work in this phase.
 
@@ -92,7 +94,7 @@ Additive only — do not rename or repurpose existing fields.
 ## 3. Extend `GenerateICalendar` in `util/ical_generator.cpp`
 
 ### 3.1 Single-event path (existing function)
-- [ ] Emit `UID:<uid>\r\n` after the `BEGIN:VEVENT`.
+- [ ] Emit `UID:<uid>\r\n` after the `BEGIN:VEVENT`. **UID fallback (OQ-P4-3 resolved):** if `uid` is empty, log a warning and substitute a synthetic `synthetic-<uuid>@knottyyoga.com` so a missing UID never blocks an email. Never assert/crash.
 - [ ] Emit `DTSTAMP:<now_utc>\r\n` — `now()` in `YYYYMMDDTHHMMSSZ` UTC form. RFC 5545 mandatory.
 - [ ] Emit `SEQUENCE:<sequence>\r\n` after DTSTAMP.
 - [ ] If `status` non-empty: emit `STATUS:<status>\r\n`.
@@ -106,6 +108,11 @@ Additive only — do not rename or repurpose existing fields.
 - [ ] If any event has a non-empty `timezone` AND a non-empty `rrule`, emit one `VTIMEZONE` block per distinct `timezone` value before the first VEVENT (de-dup the set).
 
 ### 3.3 VTIMEZONE block emission
+> **tzdata bootstrap (OQ-P4-2 resolved).** This is the FIRST use of `date/tz.h` anywhere in the server --- today `ical_generator.cpp` includes only `date/date.h` and emits UTC \(the `timezone` field is currently unused\). The build already compiles the `date` library with `-DUSE_OS_TZDB=0` \(conan `date/3.0.4` default `use_system_tz_db=False`\), which is the right setting to KEEP: local dev builds on Windows/Visual Studio, where `date` cannot use an OS tz database, so the OS-tzdb path is not an option cross-platform. With `USE_OS_TZDB=0` the library reads a bundled IANA tzdata directory rather than `/usr/share/zoneinfo`. Therefore:
+> - [ ] Ship a known-good IANA tzdata snapshot in the deploy artifact (and the conan `date` package's bundled tzdata for local dev) and call `date::set_install("<path>")` ONCE at process startup, in BOTH `main.cpp` (web server) and the `knottyyoga_helper`/scheduler `main.cpp`, before any `locate_zone` call.
+> - [ ] Add a startup self-check: call `date::locate_zone("America/Los_Angeles")` (or `date::get_tzdb()`) at boot; on failure, log a fatal error and refuse to start, so missing/misconfigured tzdata fails fast instead of at first recurring-email generation.
+> - [ ] Dockerfile / ECS task definition: `COPY` the tzdata directory into the image at the `set_install` path. Do NOT rely on the host `/usr/share/zoneinfo` (ignored under `USE_OS_TZDB=0`). This avoids a runtime network dependency (no `HAS_REMOTE_API` download path).
+> - [ ] Generator robustness: if `locate_zone(tz)` throws for an unknown/missing zone at emit time, fall back to the existing UTC `DTSTART:<utcZ>`/`DTEND:<utcZ>` form (and skip `VTIMEZONE`) rather than failing the email.
 - [ ] Helper function `EmitVTimezone(const std::string& ianaTz, int64_t referenceUs, std::ostream& out)`.
 - [ ] Use the existing `date` library plus the time-zone DB (`date/tz.h`) to look up DST transitions in the window `[referenceUs - 1y, referenceUs + 2y]`.
 - [ ] Emit `STANDARD` and `DAYLIGHT` sub-blocks with `DTSTART`, `TZOFFSETFROM`, `TZOFFSETTO`, `TZNAME`, and `RRULE:FREQ=YEARLY;...` for the recurring transitions. For zones without DST (e.g. `America/Phoenix`), emit only `STANDARD`.
@@ -133,7 +140,8 @@ Add as free functions in `util/ical_generator.h/cpp` (same namespace).
 
 Golden-text tests are the easiest to read and review.
 
-- [ ] Test: an all-default event (regression). Expect the today-equivalent output plus the new `DTSTAMP`, `UID:""` (omitted if empty — pick policy), `SEQUENCE:0`. Decide: omit UID line when empty OR emit `UID:` blank line? Spec says UID is mandatory. Recommend: REJECT generation with empty UID via a `assert`/log warning so we catch unset UIDs at dev time. Update existing call sites to always set UID via helpers.
+- [ ] Test: an all-default event (regression). Expect the today-equivalent output plus the new `DTSTAMP`, `SEQUENCE:0`, and (per OQ-P4-3) a synthetic `UID:synthetic-<uuid>@knottyyoga.com` line. Assert the UID line is present and matches the `synthetic-…@knottyyoga.com` shape (not an exact byte match, since the uuid varies). Call sites still set a real UID via the §4 helpers; the synthetic value is only the safety net.
+- [ ] Test (OQ-P4-3 fallback): an event with empty `uid` emits a `UID:synthetic-…@knottyyoga.com` line and logs a warning — generation still succeeds.
 - [ ] Test: status `"CANCELLED"` emits `STATUS:CANCELLED`.
 - [ ] Test: weekly RRULE: `BuildWeeklyRRule({2}, until)` → expected RRULE string; full output contains exactly one `RRULE:` line.
 - [ ] Test: multi-event overload with three events emits one VCALENDAR wrapping three VEVENTs.
@@ -157,7 +165,7 @@ Golden-text tests are the easiest to read and review.
 - [ ] `BookingCancellationMail` — emit a CANCELLED `.ics` with:
   - same UID as the original booking confirmation (so the calendar client matches it)
   - `status = "CANCELLED"`
-  - `sequence = "1"` (or higher; centralize via a `bookings.calendar_sequence` column if we expect multiple updates — see open questions)
+  - `sequence` = the booking's **incremented** `calendar_sequence` (OQ-P4-1 resolved — see §8). Bump `bookings.calendar_sequence` as part of the cancellation, then read it back so the `.ics` carries an accurate, monotonically-increasing `SEQUENCE` the calendar client will accept.
 - [ ] `SessionCancellationMail` — one cancellation `.ics` per attendee with the matching UID.
 - [ ] `WaitlistPromotionMail` — fresh `BuildBookingUid(newBookingId)` + `status = "CONFIRMED"`.
 - [ ] `ProviderCancelledSessionMail` / `ProviderChangeClientMail` (provider-side cancellation paths) — `STATUS:CANCELLED` where appropriate.
@@ -178,9 +186,17 @@ Golden-text tests are the easiest to read and review.
 - [ ] `book_event_test.cpp` already covers the success path. Add an assertion that the captured outbound mail has a `text/calendar` attachment with a non-empty UID.
 - [ ] Cancellation endpoint test asserts the `STATUS:CANCELLED` attachment.
 
-## 8. No DB / no endpoint changes
+## 8. Database: `bookings.calendar_sequence` (OQ-P4-1 resolved — add it)
 
-- [ ] Confirm we don't need a `bookings.calendar_sequence` column for Phase 4. If a single update beyond the initial confirmation suffices, `sequence = "1"` for any update is enough. If we expect multiple updates (rescheduled booking → cancelled → re-confirmed → re-cancelled), add the column. See open questions.
+Add a single column to `bookings`, incremented on every calendar-affecting change so each emitted `.ics` carries an accurate, monotonically-increasing `SEQUENCE`. (Lowest layer — do this first.)
+
+- [ ] `db_schema/bookings.h/.cpp`: add `calendar_sequence` column constant + DDL, `INT NOT NULL DEFAULT 0`.
+- [ ] `create_database.cpp`: admin column metadata for the new column — `PopulateAdminColumnDataInfo` (number, readonly) + `PopulateAdminColumnFriendlyNames` ("Calendar Sequence"). (No new table, so no top-level/nested/permission rows needed — `bookings` is already registered.)
+- [ ] `sql_util/table_helpers/bookings.*`: a method to read the current `calendar_sequence` and one to increment it (returns the new value), plus a test in `bookings`'s table-helper test for the increment.
+- [ ] Initial confirmation emails send `sequence = "0"` (the default); each subsequent update/cancellation increments first, then emits the new value.
+- [ ] Test the increment is monotonic across confirm → cancel (and confirm → cancel → re-confirm if that path exists).
+
+No other DB or endpoint schema changes.
 
 ## 9. Frontend
 
@@ -192,14 +208,11 @@ Golden-text tests are the easiest to read and review.
 - [ ] Sending a multi-event bundle via the new overload (used by Phase 6) produces a single VCALENDAR that Apple/Google parse without errors.
 - [ ] An event with `RRULE` + `timezone=America/Los_Angeles` shows the correct local time year-round in a calendar app (i.e. DST transitions are handled).
 
-## 11. Open Questions
+## 11. Open Questions — ALL RESOLVED (2026-06-04)
 
-- **OQ-P4-1.** Should `bookings` get a `calendar_sequence INT NOT NULL DEFAULT 0` column we increment on each update, so the email helper always sends an accurate `SEQUENCE`? Recommended: yes — small risk to add the column; saves a class of "calendar client ignored my update because the sequence didn't move" bugs.
-	- Mason- I'll go with your recommendation.
-- **OQ-P4-2.** Where should the `date` library's tzdata live in production? If the tz-aware library reads tzdata files from disk, ensure the AWS task definition mounts /usr/share/zoneinfo or includes the equivalent. Verify the existing service does this for the scheduler.
-	- Mason- What would you recommend?
-- **OQ-P4-3.** For unset UID at call sites — assert + crash, log + skip emission, or fall back to a synthetic random UID? Recommended: log + fall back to `synthetic-<uuid>@knottyyoga.com` so a missing UID never blocks an email. Add a regression test for the fallback.
-	- Mason- I'll go with your recommendation.
+- [x] **OQ-P4-1 (resolved — yes, add the column).** `bookings` gets `calendar_sequence INT NOT NULL DEFAULT 0`, incremented on each calendar-affecting change so the email helper always sends an accurate `SEQUENCE`. Implemented per §8 (schema + admin metadata + table-helper increment); consumed in §6.2. Mason: "I'll go with your recommendation."
+- [x] **OQ-P4-2 (resolved — keep `USE_OS_TZDB=0` + bundle tzdata via `set_install`).** Recommendation (Mason deferred to me): the build already uses `-DUSE_OS_TZDB=0` (conan `date` default), which we KEEP because local dev builds on Windows where the OS-tzdb path doesn't exist — so we cannot switch to `use_system_tz_db=True` without breaking Windows. Under `USE_OS_TZDB=0` the library reads a bundled IANA tzdata directory (NOT `/usr/share/zoneinfo`), so: ship a tzdata snapshot in the deploy artifact, `date::set_install("<path>")` at startup in both `main.cpp` and the helper/scheduler `main.cpp`, add a boot-time `locate_zone` self-check that fails fast, `COPY` the tzdata into the container image, and fall back to the UTC form if a zone can't be resolved at emit time. Full work items in §3.3. (No runtime network/remote-download path.)
+- [x] **OQ-P4-3 (resolved — log + synthetic fallback).** An unset UID at emit time logs a warning and substitutes `synthetic-<uuid>@knottyyoga.com`; never assert/crash, never skip the email. Call sites still set a real UID via the §4 helpers. Regression test in §5. Mason: "I'll go with your recommendation."
 
 ## 12. Cross-References
 
