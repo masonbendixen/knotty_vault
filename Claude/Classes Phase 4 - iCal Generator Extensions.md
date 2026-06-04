@@ -195,8 +195,11 @@ Golden-text tests are the easiest to read and review.
 ## 11. Open Questions
 
 - **OQ-P4-1.** Should `bookings` get a `calendar_sequence INT NOT NULL DEFAULT 0` column we increment on each update, so the email helper always sends an accurate `SEQUENCE`? Recommended: yes — small risk to add the column; saves a class of "calendar client ignored my update because the sequence didn't move" bugs.
+	- Mason- I'll go with your recommendation.
 - **OQ-P4-2.** Where should the `date` library's tzdata live in production? If the tz-aware library reads tzdata files from disk, ensure the AWS task definition mounts /usr/share/zoneinfo or includes the equivalent. Verify the existing service does this for the scheduler.
+	- Mason- What would you recommend?
 - **OQ-P4-3.** For unset UID at call sites — assert + crash, log + skip emission, or fall back to a synthetic random UID? Recommended: log + fall back to `synthetic-<uuid>@knottyyoga.com` so a missing UID never blocks an email. Add a regression test for the fallback.
+	- Mason- I'll go with your recommendation.
 
 ## 12. Cross-References
 
