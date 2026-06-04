@@ -288,12 +288,14 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ## 7. Admin Metadata
 
-- [ ] `skill_levels` → `admin_top_level_tables`.
-- [ ] `skill_level_assignments` → `admin_nested_tables` under `people` keyed by `person_id`.
+> ✅ Done in `create_database.cpp`. **Prod-only seed path** — the test harness's `SetupAllTables()` runs DDL + stored procs only, never the `PopulateAdmin*` functions, so the admin-metadata tables are empty in unit tests (same as §2.4 photo support and the index/seed functions). No harness-testable surface; verified at DB-creation time. This is what makes the skill catalog **actually creatable** via the generic admin CRUD UI (admin portal → Skill Levels → Add), which Phases 1–6 depend on.
+- [x] `skill_levels` → `admin_top_level_tables` (`PopulateAdminTopLevelTables`).
+- [x] `skill_level_assignments` → `admin_top_level_tables` (allow-list) **and** `admin_nested_tables` under `people` (`PopulateAdminNestedTables`).
 - [~] ~~`class_skill_requirements` → `admin_nested_tables`~~ — superseded per §1.4 (no such table).
-- [ ] Permissions: all gated by `manage_skills`.
-- [ ] Column data info, friendly names, table friendly names, display templates.
-- [ ] Photo support in `photo_support_tables`.
+- [x] Permissions: both tables gated by `manage_skills` (id 10) in `PopulateAdminTablePermissions`.
+- [x] Column data info (`PopulateAdminColumnDataInfo`): all editable columns for both tables (code/name/description/sort_order/is_active; person/skill/assigned_by/assigned/note/removed_*); created/updated marked readonly. Column friendly names (`PopulateAdminColumnFriendlyNames`). Table friendly names (`PopulateAdminTableFriendlyNames`: "Skill Levels" / "Skill Level Assignments"). Display templates (`PopulateAdminTableDisplayTemplates`: `{name}` / `{person_id} — {skill_level_id}`).
+- [x] Photo support in `photo_support_tables` — done in §2.4 (`skill_levels` registered), so the admin form's photo upload works for skill badges.
+- [x] Note: the `class_requirement_group_literals.skill_level_id` admin column metadata was already present (added in §1.4), so authoring a skill literal through the generic CRUD / requirements editor already works.
 
 ## 8. Tests-Required Summary
 
