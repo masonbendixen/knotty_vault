@@ -225,31 +225,32 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ## 5. Endpoints
 
-### 5.1 Public / logged-in endpoints
-- [ ] `endpoints/get_skill_levels.h/cpp` + test:
-  - `GET /api/skill_levels` — list **active only** (`is_active=true`) skill levels with photo URLs (resolved OQ-P3-2). Test the active-filter explicitly.
-- [ ] `endpoints/get_skill_level_detail.h/cpp` + test:
-  - `GET /api/skill_levels/<id>` — single detail.
-- [ ] `endpoints/get_my_skills.h/cpp` + test:
-  - `GET /api/me/skills` — logged-in user's active skill assignments + assigned dates.
+### 5.1 Public / logged-in endpoints ✅
+- [x] `endpoints/get_skill_levels.h/cpp` + test:
+  - `GET /api/skill_levels` (public) — list **active only** (`is_active=true`) skill levels, ordered by `sort_order`; each item carries `has_photo` (frontend builds `/api/scaled_photo/skill_levels/<id>`). Tests: empty, active-only filter + ordering explicitly.
+- [x] `endpoints/get_skill_level_detail.h/cpp` + test:
+  - `GET /api/skill_levels/<id>` (public) — single detail; returns the row regardless of `is_active` (so a class detail page can resolve a deactivated prerequisite's name). Tests: found, 404 missing, 400 zero-id, inactive-still-returned.
+- [x] `endpoints/get_my_skills.h/cpp` + test:
+  - `GET /api/me/skills` (login required) — the logged-in user's active grants (excludes revoked). Tests: 401 anon, active-excluding-revoked, empty.
 
-### 5.2 Staff endpoints
-- [ ] `endpoints/staff_get_person_skills.h/cpp` + test:
-  - `GET /api/staff/person/<id>/skills` — gated by `manage_skills` or `staff` role.
-- [ ] `endpoints/staff_assign_skill.h/cpp` + test:
-  - `POST /api/staff/person/<id>/skill/<skillId>` body `{ note?: string }`.
-- [ ] `endpoints/staff_revoke_skill.h/cpp` + test:
-  - `DELETE /api/staff/person/<id>/skill/<skillId>` body `{ reason: string }`.
+### 5.2 Staff endpoints ✅
+- [x] `endpoints/staff_get_person_skills.h/cpp` + test:
+  - `GET /api/staff/person/<id>/skills` — gated by `manage_skills`. Tests: 401 anon, 403 no-permission, 200 with skills, 400 zero-id.
+- [x] `endpoints/staff_assign_skill.h/cpp` + test:
+  - `POST /api/staff/person/<id>/skill/<skillId>` body `{ note?: string }`, gated by `manage_skills`; assigner = session person id. Idempotent. Tests: 403, success, idempotent (no dup), 404 missing-skill, 404 missing-person, 400 zero-ids.
+- [x] `endpoints/staff_revoke_skill.h/cpp` + test:
+  - `DELETE /api/staff/person/<id>/skill/<skillId>` body `{ reason?: string }`, gated by `manage_skills`; returns `{ revoked: bool }` (idempotent no-op when no active grant). Tests: 403, revokes active grant, no-op, 400 zero-ids.
+  - Note: assign (POST) and revoke (DELETE) share the path with different methods — verified Crow supports this (cf. `admin_card_actions.cpp` GET+POST on one path).
 
 ### 5.3 Admin endpoints for class requirements — `[~]` SUPERSEDED (do not build)
 > ❌ **Superseded per §1.4.** Class skill requirements are authored through the existing **requirement-group editor endpoints** (from the permission-based-access redesign), adding/removing skill literals on a group. No skill-specific admin endpoints are added.
 - [~] ~~`endpoints/admin_set_class_skill_requirement.h/cpp`~~
 - [~] ~~`endpoints/admin_remove_class_skill_requirement.h/cpp`~~
-- [ ] **If the requirement-group editor endpoints do not yet expose a skill-literal field**, extend them (and their tests) to accept `skill_level_id` on a literal. Verify against the redesign's existing endpoint before adding anything new.
+- [x] **No new endpoint needed.** Per `admin_class_requirements_list.h`, requirement-group literal writes already reuse the **generic admin CRUD endpoints** against `class_requirement_group_literals` (gated by `manage_class_schedule`); `skill_level_id` is just a nullable column on that table, so authoring a skill literal is an `add_item`/`delete_item` call. The remaining wiring is the **admin column metadata** for `skill_level_id` (§7), not an endpoint.
 
-### 5.4 Routing + permission
-- [ ] All registered in `web_app.cpp`.
-- [ ] New permission `manage_skills` introduced. Add to `Studio Manager` and `Staff` roles; admin already has the master set.
+### 5.4 Routing + permission ✅
+- [x] All six registered in `web_app.cpp` (includes + reference variables).
+- [x] New permission `manage_skills` introduced (`db_schema/permissions.h::kPermissionManageSkills`), seeded in `create_database.cpp` `PopulatePermissions` (id 10) and granted to the **admin** and **Studio Manager** roles in `PopulateRolePermissions`. (There is no distinct "Staff" role in the current model — staff endpoints elsewhere gate on the `staff_access` permission; skill management gets its own `manage_skills` granted to the manager-tier roles. Admin inherits via its master set.)
 
 ## 6. Frontend
 
@@ -297,9 +298,9 @@ Skill-level photos hook into the existing `photo_support_tables` whitelist.
 
 ## 8. Tests-Required Summary
 
-- [ ] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) plus partial-unique-index regression. (`class_skill_requirements` helper dropped per §1.4.)
+- [x] Table helpers: two new `*_test.cpp` files (`skill_levels`, `skill_level_assignments`) ✅ (§3). (Partial-unique-index is prod-only per §2.2; `class_skill_requirements` helper dropped per §1.4.)
 - [x] Business logic (Phase 4): `skill_level_helper_test.cpp` (assign/revoke/idempotency/read-skills/catalog reads) + `skill_key_value_table_test.cpp` (conversions) ✅. `class_access_helper_test.cpp` skill-literal branch ✅ (§1.4). `booking_helper_test.cpp` reject/override branches ✅ (OQ-P3-3 option a — block missing skill, allow when held, staff override + audit, recurring blocked / recurring override). `book_event_test.cpp` 403 + override-success + override-without-permission ✅.
-- [ ] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error per memory `error_response_status_codes.md`). Plus tests for any skill-literal extension to the existing requirement-group editor endpoint (§5.3).
+- [x] Endpoint tests for all six new endpoints (3 public/logged-in §5.1 + 3 staff §5.2; success + permission-denied + validation-error) ✅. §5.3 needs no endpoint (generic CRUD), so no extra endpoint test.
 - [ ] Frontend specs for `my-skills`, class-detail skill section, person-skills staff page, and the requirements-editor skill-literal picker (§6.4).
 - [ ] `ServerAccess.mock.spec.ts` updated.
 - [ ] Seed data: two demo skill levels with photos pending upload, one demo requirement modeled as a skill literal in a requirement group on the "Aerial 101" class.
