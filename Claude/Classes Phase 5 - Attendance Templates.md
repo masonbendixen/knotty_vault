@@ -254,49 +254,48 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [x] **No `ThreadPool` needed:** the confirmation + digest emails are sent **synchronously** inside the business logic (matching `PaymentHelper`/`SessionCancellationHelper`), so tests don't need `ThreadPool::Shutdown()`. Endpoint tests inject `TestMailHelper` and assert on `GetMailHelper()->GetMessages()`.
 - [x] Shared inline test fixture (`endpoints/template_test_fixture.h`) provides `LoginUser` + `CreateRecurringSlot` to keep the nine `_test.cpp` files self-contained without duplicating setup.
 
-## 6. Frontend
+## 6. Frontend  — **DONE except §6.2 (calendar overlay, deferred).**
+
+> Routing note: the account area is mounted at `/my/*` (not `/my/account/*`), so the pages live at `/my/my-schedule` and `/my/today`. The plan's `pages/home/today-classes` / `pages/portal/staff` paths were reconciled to the actual `pages/account/` and `pages/staff/` locations.
 
 ### 6.1 My Schedule page — eligible-classes grid
-- [ ] `ui/src/app/pages/account/my-schedule/my-schedule.component.*/.spec.ts`.
-- [ ] Weekly grid (7 columns × time-of-day rows) of eligible classes with checkboxes.
-- [ ] Checking → calls `addTemplateEntry`; unchecking → `removeTemplateEntry`.
-- [ ] **(OQ-P5-2)** A facility filter chip; default shows all facilities.
-- [ ] **(OQ-P5-3)** Render template entries the user no longer qualifies for (`currently_eligible=false`) with a "no longer eligible" badge (kept, not auto-removed); stale-slot entries (`slot_exists=false`) prompt "this slot no longer exists — pick a new one".
-- [ ] Empty state for "no eligible classes yet — talk to staff about a skill evaluation or upgrade your membership".
+- [x] `ui/src/app/pages/account/my-schedule/my-schedule.component.*` + `.spec.ts`.
+- [x] Day-column grid of eligible slots with checkboxes (clearer than a fixed time-row grid).
+- [x] Checking → `addTemplateEntry`; unchecking → `removeTemplateEntry` (optimistic + rollback).
+- [x] **(OQ-P5-2)** Facility filter chips; default "All facilities".
+- [x] **(OQ-P5-3)** "Kept on your schedule" section badges `currently_eligible=false` entries "No longer eligible" and `slot_exists=false` entries "this time slot no longer exists — pick a new one".
+- [x] Empty state ("no eligible classes yet — talk to staff…").
 
-### 6.2 Calendar overlay
-- [ ] In the existing `pages/calendar/` views, render template-attending classes with a filled fill, one-off addition with a star icon, exception-skip with strike-through + tooltip showing the note.
-- [ ] Spec coverage for all three states.
+### 6.2 Calendar overlay — **DEFERRED**
+- [ ] Render template-attending / one-off / skip states in the existing `pages/calendar/` views. Deferred: it requires integrating into the existing calendar component (not yet explored) and is the least self-contained piece. Tracked as a follow-up; everything else in §6 is independent of it.
 
 ### 6.3 Homepage today-classes feed
-- [ ] `ui/src/app/pages/home/today-classes/today-classes.component.*/.spec.ts`.
-- [ ] List of today's classes — checked rows for template/one-off, unchecked rows for eligible-not-claimed.
-- [ ] Click to flip state via `setException(eventSessionId, true)` or `setException(false)`.
-- [ ] Inline "I can't make it" button → opens dialog with optional note field.
-- [ ] Optimistic UI updates with rollback on error.
+- [x] `ui/src/app/pages/account/today-classes/today-classes.component.*` + `.spec.ts` (placed in the account area since there's no logged-in home dashboard; reachable from the account dashboard + `/my/today`).
+- [x] List of today's occurrences — checkmark + highlight when attending, strike-through when skipping.
+- [x] "I'll be there" → `setException(slot, occ, true)`; "I can't make it" → dialog → `setException(slot, occ, false, note)`. Slot+occurrence keyed (reconciled from `eventSessionId`).
+- [x] Optimistic UI with rollback on error.
 
 ### 6.4 Exception-note dialog
-- [ ] `exception-note-dialog.component.*/.spec.ts` — input field + save + cancel.
+- [x] `today-classes/exception-note-dialog.component.*` + `.spec.ts` — note textarea + save/cancel; returns `{ note }`.
 
 ### 6.5 Instructor staff portal — exception notes
-- [ ] `ui/src/app/pages/portal/staff/exception-notes/exception-notes.component.*/.spec.ts`.
-- [ ] Lists fresh notes from members for sessions this instructor is teaching this week.
+- [x] `ui/src/app/pages/staff/exception-notes/exception-notes.component.*` + `.spec.ts`; route `/staff/exception-notes` + staff-dashboard "Student Notes" tile. Pulls the last 7 days via `getInstructorExceptionNotes`.
 
 ### 6.6 `ServerAccess` extensions
-- [ ] `getEligibleSchedules(facilityId?)`, `getTemplate()`, `addTemplateEntry(classScheduleSlotId)`, `removeTemplateEntry(classScheduleSlotId)`, `setException(classScheduleSlotId, occurrenceDateUs, attending, note?)`, `removeException(classScheduleSlotId, occurrenceDateUs)`, `getTodayClasses(facilityId?)`, `getInstructorExceptionNotes(from, to)`. (Slot+occurrence keys + optional `facilityId` per the redesign note + OQ-P5-2.)
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [x] All eight methods added to the interface + `ServerAccessNetwork` (with boolean/`instructor_names` normalization) + `ServerAccessProxy` + `ServerAccessMock`.
+- [x] `ServerAccess.mock.spec.ts` — added an "attendance templates" describe block (eligible, idempotent add, ineligible reject, remove, exception upsert/remove, today-feed state, instructor-notes window, 401-when-logged-out).
 
 ### 6.7 Types
-- [ ] `ui/src/app/shared/types/template.types.ts`: `EligibleSchedule`, `TemplateEntry`, `TemplateException`, `TodayClassEntry`, `InstructorExceptionNote`.
+- [x] `ui/src/app/shared/types/template.types.ts`: `EligibleSchedule`, `TemplateEntry`, `TemplateException`, `PersonTemplate`, `TodayClassEntry`, `InstructorExceptionNote`, `AddTemplateEntryResult`. Re-exported from `shared/types/ServerAccess.ts`.
 
-## 7. Admin Metadata
+### 6.8 Bespoke admin support page (Mason's request)
+- [x] `ui/src/app/pages/manage/attendance-templates/attendance-templates-admin.component.*` + `.spec.ts`; route `/manage/attendance-templates` + manage-dashboard "Attendance Templates" tile. Read-only browser that lists every template (via the generic CRUD `getTableRows`) with expandable entries + exceptions per template.
 
-- [ ] Three new tables nested as follows:
-  - `attendance_templates` → top-level (admin can list all templates), permission `manage_users` or `admin`.
-  - `attendance_template_entries` → nested under `attendance_templates` keyed by `template_id`.
-  - `attendance_template_exceptions` → nested under `attendance_templates` keyed by `template_id`.
-- [ ] Column data info, friendly names, table friendly names, display templates.
-- [ ] Generally admins won't edit these directly; nesting is mostly for support / debugging.
+## 7. Admin Metadata — **DONE**
+
+- [x] All three tables registered in `create_database.cpp`: `PopulateAllowedTables` (generic CRUD allow-list), `PopulateAdminTopLevelTables` (all three), `PopulateAdminNestedTables` (entries + exceptions nest under templates), `PopulateAdminTablePermissions` (gated on `manage_class_schedule`, id 9).
+- [x] `PopulateAdminColumnDataInfo`, `PopulateAdminColumnFriendlyNames`, `PopulateAdminTableFriendlyNames`, `PopulateAdminTableDisplayTemplates` for all three tables (number/bool/date/text edit types; FK display templates).
+- [x] Both the generic CRUD "Manage Data" support AND the bespoke §6.8 page are available. (These Populate* seeders run only in the real DB-creation path, so a DB reset via `knottyyoga_database_helper` is needed to pick them up.)
 
 ## 8. Scheduled job integration
 
