@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 5/23/2026
-Version: 0.1
+Last Updated: 6/4/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -319,9 +319,12 @@ Should be able to:
 
 ## 11. Open Questions
 
-- **OQ-P5-1.** When a class schedule is deactivated (Phase 1), should existing template entries be auto-deleted? Recommended: yes, atomic with deactivation; otherwise stale entries pile up. The user is not emailed about the auto-delete — they'll just see the class disappear from their grid.
+- **OQ-P5-1.** When a class schedule is deactivated (Phase 1), should existing template entries be auto-deleted? Recommended: yes, atomic with deactivation; otherwise stale entries pile up. The user is not emailed about the auto-delete — they'll just see the class disappear from their grid
+		- Mason - I'll go with your recommendation.
 - **OQ-P5-2.** Across multiple facilities, should `eligible_schedules` and `today_classes` filter by the user's "home" facility, or surface all facilities? Recommended: all facilities by default; UI offers a filter chip. The studio is single-facility today but the model supports multi.
+	- Mason- I'll go with your recommendation.
 - **OQ-P5-3.** When a user's membership lapses, do their template entries get auto-deleted? Recommended: no — leave them; if they renew within N days the template is still there. UI shows entries with "no longer eligible" badge for any schedule whose permission they don't currently hold.
+	- Mason- I'll go with your recommendation.
 
 ## 12. Cross-References
 
