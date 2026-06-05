@@ -96,10 +96,18 @@ Lowest layer first:
 - [x] Same-day predecessor (SL-11) auto-cancel: if a user cancels a paid booking on the predecessor class, the dependent booking is silently cancelled (SL-11 lives in `BookingHelper`, not in this phase — but the homepage display in this phase must respect it for consistency).
 
 ### 1.4 Email cadence
-- [x] On template add: one confirmation email with recurring RRULE iCal (Phase 4 BuildWeeklyRRule).
+- [x] On template add: one confirmation email with recurring RRULE iCal (Phase 4 `BuildWeeklyRRule` / `BuildTemplateUid`). **Phase 4 note:** the `.ics` recurring entry uses the UTC `DTSTART`+`RRULE` form (Phase 4's VTIMEZONE/DST work was deferred). If we want DST-correct local recurrence, decide between (a) finishing Phase 4 §3.3 VTIMEZONE, or (b) emitting **bounded per-occurrence VEVENTs** (concrete UTC instants, no VTIMEZONE) via the Phase 4 multi-event overload. See §1.6.
 - [x] On template remove: NO email (silent).
 - [x] On exception (skip): NO email; the note goes to the instructor's staff portal feed + daily digest per N-7.
 - [x] On exception (one-off add): NO email; shows up in the next Sunday digest (Phase 6).
+
+### 1.5 Template lifecycle (OQ-P5-1 / -3 resolved 2026-06-04)
+- [x] **Class deactivation → cascade delete (OQ-P5-1).** When a class (or its active instance) is deactivated in Phase 1, delete that class's template **entries + exceptions** atomically with the deactivation. No email. Hooked into the Phase-1 deactivation business logic; do NOT scatter the delete into the deactivation endpoint (layering).
+- [x] **Slot deleted on impl edit / product migration → surface as stale** (redesign note) — narrower than deactivation; the entry's slot FK row is gone, so the user portal shows "this slot no longer exists — pick a new one". (Distinct from OQ-P5-1: deactivation is a soft `is_active=false` on the class and would NOT cascade via FK, so it needs the explicit hook above; a hard slot delete is the stale-surface case.)
+- [x] **Membership lapse → keep entries, badge them (OQ-P5-3).** No deletion; `GetTemplateForPerson` decorates each entry with `currentlyEligible` (re-evaluated via the live `ClassAccessHelper` gate). A renewal restores eligibility with zero user action.
+
+### 1.6 Recurring-`.ics` shape — OPEN sub-decision (deferred from Phase 4)
+- [ ] Decide whether the template-add `.ics` uses (a) a single open-ended `RRULE` VEVENT (needs Phase 4 §3.3 VTIMEZONE for DST correctness — currently UTC-anchored, so it drifts an hour across DST), or (b) **bounded per-occurrence VEVENTs** for the next N weeks via the Phase 4 multi-event overload (DST-correct, no VTIMEZONE, but re-sent/extended periodically). Recommendation: **(b)** — simpler, DST-correct, and lets us drop Phase 4 §3.3 entirely. Confirm before §4.2 is built.
 
 ## 2. Database Schema
 
@@ -162,13 +170,14 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 
 ### 4.1 Eligible-classes resolver
 - [ ] `struct EligibleScheduleInfo { int64_t classScheduleId; int64_t classId; std::string className; std::string classPhotoUrl; int64_t facilityId; std::string facilityName; std::vector<int> daysOfWeek; int64_t startTimeMinutes; int64_t durationMinutes; bool onTemplate; std::string subtitle; }`.
-- [ ] `std::vector<EligibleScheduleInfo> GetEligibleSchedulesForPerson(Transaction&, int64_t personId)`. Algorithm:
-  1. Pull active class_schedules (joined to active classes).
-  2. Filter to schedules whose product the user has booking permission for (M-6, via `CatalogHelper::ResolveBestPriceForPerson` returning `isIncluded=true`).
-  3. Filter further by skill requirements: call `SkillLevelHelper::PersonMeetsClassRequirements(personId, classId)`; drop schedules where `meetsAll=false`.
-  4. Decorate with `onTemplate` boolean and (Phase 13) tag list.
-  5. Order by day-of-week + start-time-minutes for the weekly grid.
-- [ ] Tests cover: member with included class, member missing skill, member without permission.
+- [ ] `std::vector<EligibleScheduleInfo> GetEligibleSchedulesForPerson(Transaction&, int64_t personId, std::optional<int64_t> facilityId = {})`. Algorithm:
+  1. Pull active class_schedule **slots** (joined up to active class_schedules → instances → classes), per the redesign note (bind on the stable slot, not the impl).
+  2. **Single unified access check (Phase 3 §1.4):** `Scheduling::ClassAccessHelper::CheckAccess(classId, personId)` — this already AND-combines membership permission, skill literals, and attendance-threshold permissions (closure-expanded). Keep only slots whose class the viewer can access (`allowed=true`). *(Replaces the old separate `CatalogHelper::ResolveBestPriceForPerson` + the superseded `SkillLevelHelper::PersonMeetsClassRequirements` steps — both folded into the one gate by Phase 3.)*
+  3. Restrict to **recurring** (membership-included) classes per §1.1 — templates don't apply to paid workshops/series.
+  4. **(OQ-P5-2)** Include **all facilities** by default; when `facilityId` is provided, narrow to that facility.
+  5. Decorate with `onTemplate` (slot id ∈ the user's `attendance_template_entries`) and (Phase 13) tag list.
+  6. Order by day-of-week + start-time-minutes for the weekly grid.
+- [ ] Tests cover: member with included class (eligible), member missing skill (gate blocks), member without permission (gate blocks), and the `facilityId` filter narrowing.
 
 ### 4.2 Template entry add / remove
 - [ ] `AddTemplateEntry(Transaction&, personId, scheduleId)`:
@@ -181,7 +190,9 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
   1. Find template, delete the entry row.
   2. No email.
   3. Return `{ok=true}`.
-- [ ] Tests: add idempotent, add rejected when ineligible, remove no-op when not present, stale-slot surfaced when the slot no longer exists.
+- [ ] **`GetTemplateForPerson(Transaction&, personId)`** → `{ entries: [...], exceptions: [...] }` where each entry carries `currentlyEligible` (OQ-P5-3): re-evaluate the entry's class against `ClassAccessHelper::CheckAccess` so the UI can badge "no longer eligible" after a membership lapse WITHOUT deleting the row. Also flags `slotExists=false` for stale slots (redesign note).
+- [ ] **`DeleteTemplateEntriesForClass(Transaction&, classId)`** (OQ-P5-1): deletes all template entries + exceptions whose slot belongs to `classId`. **Called from the Phase-1 class/instance *deactivation* business logic** (not the endpoint), atomic with the deactivation, no email. (A class deactivation is a soft `is_active=false`, so it won't cascade through the slot FK — hence this explicit sweep. A hard slot delete is the separate stale-surface case, §1.5.)
+- [ ] Tests: add idempotent, add rejected when ineligible, remove no-op when not present, stale-slot surfaced, `currentlyEligible=false` after a permission is revoked, `DeleteTemplateEntriesForClass` removes entries + exceptions for the class.
 
 ### 4.3 Per-instance exception
 - [ ] `SetException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs, attending, note)`:
@@ -196,7 +207,7 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 
 ### 4.5 Homepage feed
 - [ ] `struct TodayClassEntry { int64_t eventSessionId; int64_t classId; std::string className; std::string classPhotoUrl; int64_t startUs; int64_t endUs; std::string facilityName; std::string roomName; std::vector<std::string> instructorNames; bool onTemplate; bool exceptionAttending; bool exceptionSkipping; std::string exceptionNote; std::string perInstanceNote; }`.
-- [ ] `std::vector<TodayClassEntry> GetTodayClassesForPerson(Transaction&, int64_t personId, int64_t nowUs, std::string_view ianaTz)`. Algorithm:
+- [ ] `std::vector<TodayClassEntry> GetTodayClassesForPerson(Transaction&, int64_t personId, int64_t nowUs, std::string_view ianaTz, std::optional<int64_t> facilityId = {})`. **(OQ-P5-2)** all facilities by default; `facilityId` narrows. Algorithm:
   1. Compute today's date in `ianaTz`.
   2. **Derive** today's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` for the facility day window (each carries its `class_schedule_slot_id` + `occurrence_date_us`; a persisted `event_sessions` row may or may not exist).
   3. Filter to occurrences whose slot is eligible for the user (eligibility resolver from 4.1).
@@ -221,13 +232,14 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 ## 5. Endpoints
 
 ### 5.1 User endpoints
-- [ ] `GET /api/me/eligible_schedules` → list of `EligibleScheduleInfo`.
-- [ ] `GET /api/me/template` → `{ entries: [...], exceptions: [...] }`.
-- [ ] `POST /api/me/template/entry` body `{ schedule_id }`.
-- [ ] `DELETE /api/me/template/entry/<scheduleId>`.
-- [ ] `POST /api/me/template/exception` body `{ event_session_id, attending, note? }`.
-- [ ] `DELETE /api/me/template/exception/<eventSessionId>`.
-- [ ] `GET /api/me/today_classes` → list of `TodayClassEntry` (facility ID query param if user belongs to multiple facilities — default to "all").
+> Per the redesign note the binding key is `class_schedule_slot_id` + `occurrence_date_us` (not `schedule_id` / `event_session_id`) — the §2/§3 schema already uses these; reconcile the endpoint param names to slot+occurrence when implementing.
+- [ ] `GET /api/me/eligible_schedules?facility_id=<id>` → list of `EligibleScheduleInfo`. **(OQ-P5-2)** `facility_id` optional; all facilities when omitted.
+- [ ] `GET /api/me/template` → `{ entries: [...], exceptions: [...] }`, each entry carrying `currently_eligible` + `slot_exists` (OQ-P5-3 badge / stale-slot).
+- [ ] `POST /api/me/template/entry` body `{ class_schedule_slot_id }`.
+- [ ] `DELETE /api/me/template/entry/<classScheduleSlotId>`.
+- [ ] `POST /api/me/template/exception` body `{ class_schedule_slot_id, occurrence_date_us, attending, note? }`.
+- [ ] `DELETE /api/me/template/exception/<classScheduleSlotId>/<occurrenceDateUs>`.
+- [ ] `GET /api/me/today_classes?facility_id=<id>` → list of `TodayClassEntry`. **(OQ-P5-2)** `facility_id` optional; all facilities when omitted.
 
 ### 5.2 Instructor staff portal endpoint
 - [ ] `GET /api/staff/me/exception_notes?from=<us>&to=<us>` → list of `InstructorExceptionNote`. Permission: `staff` role.
@@ -246,6 +258,8 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [ ] `ui/src/app/pages/account/my-schedule/my-schedule.component.*/.spec.ts`.
 - [ ] Weekly grid (7 columns × time-of-day rows) of eligible classes with checkboxes.
 - [ ] Checking → calls `addTemplateEntry`; unchecking → `removeTemplateEntry`.
+- [ ] **(OQ-P5-2)** A facility filter chip; default shows all facilities.
+- [ ] **(OQ-P5-3)** Render template entries the user no longer qualifies for (`currently_eligible=false`) with a "no longer eligible" badge (kept, not auto-removed); stale-slot entries (`slot_exists=false`) prompt "this slot no longer exists — pick a new one".
 - [ ] Empty state for "no eligible classes yet — talk to staff about a skill evaluation or upgrade your membership".
 
 ### 6.2 Calendar overlay
@@ -267,7 +281,7 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [ ] Lists fresh notes from members for sessions this instructor is teaching this week.
 
 ### 6.6 `ServerAccess` extensions
-- [ ] `getEligibleSchedules()`, `getTemplate()`, `addTemplateEntry(scheduleId)`, `removeTemplateEntry(scheduleId)`, `setException(eventSessionId, attending, note?)`, `removeException(eventSessionId)`, `getTodayClasses()`, `getInstructorExceptionNotes(from, to)`.
+- [ ] `getEligibleSchedules(facilityId?)`, `getTemplate()`, `addTemplateEntry(classScheduleSlotId)`, `removeTemplateEntry(classScheduleSlotId)`, `setException(classScheduleSlotId, occurrenceDateUs, attending, note?)`, `removeException(classScheduleSlotId, occurrenceDateUs)`, `getTodayClasses(facilityId?)`, `getInstructorExceptionNotes(from, to)`. (Slot+occurrence keys + optional `facilityId` per the redesign note + OQ-P5-2.)
 - [ ] Update `ServerAccess.mock.spec.ts`.
 
 ### 6.7 Types
@@ -298,6 +312,9 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
   - exception upsert flips between attending/skipping
   - today_classes returns the right onTemplate / exception state
   - instructor exception-notes view filters by staffing rows
+  - **(OQ-P5-1)** `DeleteTemplateEntriesForClass` removes entries + exceptions on class deactivation
+  - **(OQ-P5-2)** `facilityId` filter narrows eligible_schedules / today_classes; omitted → all facilities
+  - **(OQ-P5-3)** an entry stays after the permission is revoked, with `currentlyEligible=false` (not deleted)
 - [ ] Endpoint tests for all eight new endpoints.
 - [ ] Frontend specs: my-schedule, calendar overlay, today-classes, exception dialog, instructor exception notes, mock service.
 - [ ] Manual-testing-helper commands: `add_template_entry <person_id> <schedule_id>`, `simulate_exception_note <person_id> <event_session_id> <note>`, `send_instructor_digest <instructor_person_id>`.
@@ -317,14 +334,11 @@ Should be able to:
 - [ ] Click "I can't make it this Monday" → exception dialog → enter "out of town" → save. Homepage row turns to struck-through; an `attendance_template_exception(attending=false, note='out of town')` is created.
 - [ ] The assigned instructor sees the note the next morning in their staff-portal exception-notes page AND in the daily digest email.
 
-## 11. Open Questions
+## 11. Open Questions — ALL RESOLVED (2026-06-04)
 
-- **OQ-P5-1.** When a class schedule is deactivated (Phase 1), should existing template entries be auto-deleted? Recommended: yes, atomic with deactivation; otherwise stale entries pile up. The user is not emailed about the auto-delete — they'll just see the class disappear from their grid
-		- Mason - I'll go with your recommendation.
-- **OQ-P5-2.** Across multiple facilities, should `eligible_schedules` and `today_classes` filter by the user's "home" facility, or surface all facilities? Recommended: all facilities by default; UI offers a filter chip. The studio is single-facility today but the model supports multi.
-	- Mason- I'll go with your recommendation.
-- **OQ-P5-3.** When a user's membership lapses, do their template entries get auto-deleted? Recommended: no — leave them; if they renew within N days the template is still there. UI shows entries with "no longer eligible" badge for any schedule whose permission they don't currently hold.
-	- Mason- I'll go with your recommendation.
+- [x] **OQ-P5-1 (resolved — yes, cascade-delete).** When a class is deactivated (Phase 1 sets `classes.is_active=false`; the redesign's narrower slot-delete on impl-edit is handled separately by stale-slot surfacing), its template **entries AND exceptions** are deleted atomically with the deactivation, no email — the class simply disappears from the user's grid. Wired as a hook in the Phase-1 class/instance deactivation path (§1.5 + §4.2). Mason: "I'll go with your recommendation."
+- [x] **OQ-P5-2 (resolved — all facilities, UI filter chip).** `eligible_schedules` and `today_classes` surface ALL facilities by default; the endpoints accept an optional `facility_id` filter and the UI offers a filter chip. Single-facility today, but the model is multi-facility-ready. Mason: "I'll go with your recommendation."
+- [x] **OQ-P5-3 (resolved — keep entries, badge them).** A membership lapse does NOT delete template entries — they survive so a renewal restores the template. `GET /api/me/template` decorates each entry with `currentlyEligible` (re-evaluated against the live access gate); the UI shows a "no longer eligible" badge for entries whose permission/skill the user no longer holds. Mason: "I'll go with your recommendation."
 
 ## 12. Cross-References
 
