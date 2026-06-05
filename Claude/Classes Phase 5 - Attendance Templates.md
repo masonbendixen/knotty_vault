@@ -170,68 +170,65 @@ Lowest layer first:
 
 ## 4. Business Logic — `AttendanceTemplateHelper`
 
-Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`.
+Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`. **DONE.**
+
+> **Reconciliations made at implementation (carry into §5/§6):**
+> - All params are `class_schedule_slot_id` (+ `occurrence_date_us`), never `schedule_id`/`event_session_id`.
+> - `EligibleScheduleInfo` is **slot-level** (one row per day/time slot, single `dayOfWeek`), not schedule-level with a `daysOfWeek[]` — the grid renders a checkbox per slot.
+> - Class photo is a `classHasPhoto` **bool** (matching `ScheduleSlotView`), not a `classPhotoUrl` — the frontend builds the URL.
+> - §4.6 keys instructor notes off the **slot's `instructor_person_id`** (the recurring teacher), NOT `event_session_staffing` rows — most templated occurrences are lazy (no persisted `event_sessions` row), so a staffing join would miss them. The window filters on `created_us` (when the student wrote the note) per the plan's algorithm.
+> - **Supporting table-helper additions (with tests):** `ClassScheduleSlots::GetSlotsByInstructor`; `AttendanceTemplateEntries::DeleteEntriesForSlot`; `AttendanceTemplateExceptions::DeleteExceptionsForSlot` + `GetExceptionsForSlotByCreated`.
 
 ### 4.1 Eligible-classes resolver
-- [ ] `struct EligibleScheduleInfo { int64_t classScheduleId; int64_t classId; std::string className; std::string classPhotoUrl; int64_t facilityId; std::string facilityName; std::vector<int> daysOfWeek; int64_t startTimeMinutes; int64_t durationMinutes; bool onTemplate; std::string subtitle; }`.
-- [ ] `std::vector<EligibleScheduleInfo> GetEligibleSchedulesForPerson(Transaction&, int64_t personId, std::optional<int64_t> facilityId = {})`. Algorithm:
+- [x] `struct EligibleScheduleInfo` — **slot-level** (`classScheduleSlotId`, `classScheduleId`, `classId`, `className`, `classHasPhoto`, `facilityId`, `facilityName`, `dayOfWeek`, `startTimeMinutes`, `durationMinutes`, `onTemplate`, `subtitle`).
+- [x] `std::vector<EligibleScheduleInfo> GetEligibleSchedulesForPerson(Transaction&, int64_t personId, std::optional<int64_t> facilityId = {})`. Algorithm:
   1. Pull active class_schedule **slots** (joined up to active class_schedules → instances → classes), per the redesign note (bind on the stable slot, not the impl).
   2. **Single unified access check (Phase 3 §1.4):** `Scheduling::ClassAccessHelper::CheckAccess(classId, personId)` — this already AND-combines membership permission, skill literals, and attendance-threshold permissions (closure-expanded). Keep only slots whose class the viewer can access (`allowed=true`). *(Replaces the old separate `CatalogHelper::ResolveBestPriceForPerson` + the superseded `SkillLevelHelper::PersonMeetsClassRequirements` steps — both folded into the one gate by Phase 3.)*
   3. Restrict to **recurring** (membership-included) classes per §1.1 — templates don't apply to paid workshops/series.
   4. **(OQ-P5-2)** Include **all facilities** by default; when `facilityId` is provided, narrow to that facility.
   5. Decorate with `onTemplate` (slot id ∈ the user's `attendance_template_entries`) and (Phase 13) tag list.
   6. Order by day-of-week + start-time-minutes for the weekly grid.
-- [ ] Tests cover: member with included class (eligible), member missing skill (gate blocks), member without permission (gate blocks), and the `facilityId` filter narrowing.
+- [x] Tests cover: member with included (open) class eligible, member without the gating permission blocked / granted member allowed, and the `facilityId` filter narrowing.
 
 ### 4.2 Template entry add / remove
-- [ ] `AddTemplateEntry(Transaction&, personId, scheduleId)`:
-  1. Validate eligibility (must be in `GetEligibleSchedulesForPerson`); reject otherwise with `NOT_ELIGIBLE`.
+- [x] `AddTemplateEntry(Transaction&, personId, classScheduleSlotId)` → `AddTemplateEntryResult {ok, errorCode, templateEntryId}`:
+  1. `INVALID_SLOT` if the slot row doesn't exist; eligibility = "slot appears in `GetEligibleSchedulesForPerson`" else `NOT_ELIGIBLE`.
   2. `GetOrCreateTemplateForPerson`, then `AttendanceTemplateEntries::AddEntry` (idempotent).
-  3. Build a recurring iCal using `BuildTemplateUid(scheduleId, personId)` + `BuildWeeklyRRule(daysOfWeek, untilUs=min(schedule.effective_to, +1y))`.
-  4. Queue a confirmation email via `MailHelper` with the `.ics` attachment.
-  5. Return `{ok=true, templateEntryId}`.
-- [ ] `RemoveTemplateEntry(Transaction&, personId, classScheduleSlotId)`:
-  1. Find template, delete the entry row.
-  2. No email.
-  3. Return `{ok=true}`.
-- [ ] **`GetTemplateForPerson(Transaction&, personId)`** → `{ entries: [...], exceptions: [...] }` where each entry carries `currentlyEligible` (OQ-P5-3): re-evaluate the entry's class against `ClassAccessHelper::CheckAccess` so the UI can badge "no longer eligible" after a membership lapse WITHOUT deleting the row. Also flags `slotExists=false` for stale slots (redesign note).
-- [ ] **`DeleteTemplateEntriesForClass(Transaction&, classId)`** (OQ-P5-1): deletes all template entries + exceptions whose slot belongs to `classId`. **Called from the Phase-1 class/instance *deactivation* business logic** (not the endpoint), atomic with the deactivation, no email. (A class deactivation is a soft `is_active=false`, so it won't cascade through the slot FK — hence this explicit sweep. A hard slot delete is the separate stale-surface case, §1.5.)
-- [ ] Tests: add idempotent, add rejected when ineligible, remove no-op when not present, stale-slot surfaced, `currentlyEligible=false` after a permission is revoked, `DeleteTemplateEntriesForClass` removes entries + exceptions for the class.
+  3. Recurring iCal via `BuildTemplateUid(classScheduleId, personId)` + `BuildWeeklyRRule({dayOfWeek}, untilUs=now+1y)`; DTSTART = first derived occurrence within 14 days.
+  4. Queue the confirmation email via `MailHelper` with the `.ics` (only when mail is configured AND the entry is newly added — a re-add sends nothing).
+- [x] `RemoveTemplateEntry(Transaction&, personId, classScheduleSlotId)` — finds the template, deletes the entry row, no email; no-op (returns true) when the person has no template.
+- [x] **`GetTemplateForPerson`** → `PersonTemplateView { templateId, entries[], exceptions[] }`; each entry carries `currentlyEligible` (OQ-P5-3, re-evaluated against `ClassAccessHelper::CheckAccess`) and `slotExists` (redesign §1.5 stale-slot).
+- [x] **`DeleteTemplateEntriesForClass(Transaction&, classId)`** (OQ-P5-1): sweeps all instances → impls → slots of the class and deletes every template's entries **and** exceptions on those slots. To be called from the Phase-1 deactivation business logic (no email).
+- [x] Tests: add idempotent + no duplicate email, add rejected when ineligible (`NOT_ELIGIBLE`) / invalid slot (`INVALID_SLOT`), remove no-op when no template, stale-slot surfaced, `currentlyEligible=false` after the permission is revoked (entry kept), `DeleteTemplateEntriesForClass` removes entries + exceptions.
 
 ### 4.3 Per-instance exception
-- [ ] `SetException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs, attending, note)`:
-  1. Resolve template; if none yet, `GetOrCreateTemplateForPerson`.
-  2. UPSERT the exception row keyed by (`template_id`, `class_schedule_slot_id`, `occurrence_date_us`).
-  3. No email; the note flows to the instructor via the staff portal feed (5.3 / N-7).
-- [ ] `RemoveException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)` — delete row.
+- [x] `SetException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs, attending, note)` → exception row id. Auto-creates the template (`GetOrCreateTemplateForPerson`), then UPSERTs keyed by (`template_id`, `class_schedule_slot_id`, `occurrence_date_us`). No email.
+- [x] `RemoveException(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)` — deletes the row; no-op when the person has no template.
 
 ### 4.4 Derived-occurrence evaluation (NO materialization hook)
-- [ ] There is no materialization, so there is no hook. "Is this on my template?" is computed by evaluating the user's template-entry slots against the **derived** occurrences for the requested week via `ClassScheduleHelper::GetDerivedSessionsForRange`, then overlaying `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`).
-- [ ] Add a unit test that derives a future week's occurrences and asserts a templated user's homepage feed shows the slot's occurrence as checked, and that a skip-exception flips it to unchecked.
+- [x] No materialization hook. `onTemplate` is computed by matching the user's template-entry slot ids against the **derived** occurrences (`ClassScheduleHelper::GetDerivedSessionsForRange`), then overlaying `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`). Implemented inside §4.5.
+- [x] Covered by `TodayClassesReflectsTemplateAndException`: derives the day's occurrence, asserts checked when templated, and a skip-exception flips `exceptionSkipping`.
 
 ### 4.5 Homepage feed
-- [ ] `struct TodayClassEntry { int64_t eventSessionId; int64_t classId; std::string className; std::string classPhotoUrl; int64_t startUs; int64_t endUs; std::string facilityName; std::string roomName; std::vector<std::string> instructorNames; bool onTemplate; bool exceptionAttending; bool exceptionSkipping; std::string exceptionNote; std::string perInstanceNote; }`.
-- [ ] `std::vector<TodayClassEntry> GetTodayClassesForPerson(Transaction&, int64_t personId, int64_t nowUs, std::string_view ianaTz, std::optional<int64_t> facilityId = {})`. **(OQ-P5-2)** all facilities by default; `facilityId` narrows. Algorithm:
+- [x] `struct TodayClassEntry` — adds `classScheduleSlotId` + `occurrenceDateUs` (+ keeps `eventSessionId` = persisted id or 0), `classHasPhoto` bool, `classId`, `className`, `startUs`/`endUs`, `facilityId`/`facilityName`, `locationRoomId`/`roomName`, `instructorNames[]`, `onTemplate`, `exceptionAttending`/`exceptionSkipping`/`exceptionNote`, `perInstanceNote` (blank, Phase 13).
+- [x] `std::vector<TodayClassEntry> GetTodayClassesForPerson(Transaction&, int64_t personId, int64_t nowUs, std::string_view ianaTz, std::optional<int64_t> facilityId = {})`. **(OQ-P5-2)** all facilities by default; `facilityId` narrows. Algorithm:
   1. Compute today's date in `ianaTz`.
   2. **Derive** today's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` for the facility day window (each carries its `class_schedule_slot_id` + `occurrence_date_us`; a persisted `event_sessions` row may or may not exist).
   3. Filter to occurrences whose slot is eligible for the user (eligibility resolver from 4.1).
   4. Set `onTemplate` by matching the occurrence's `class_schedule_slot_id` against the user's `attendance_template_entries`.
   5. Overlay `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`) to set `exceptionAttending` / `exceptionSkipping` / `exceptionNote`.
   6. Left-join any persisted `event_sessions` per-instance note (when Phase 13 / CS-7 adds it; Phase 5 leaves blank).
-  7. Return sorted by `startUs`.
-- [ ] Tests cover: templated session checked, non-templated eligible session unchecked, exception-skip displayed struck-through.
+  7. Return sorted by `startUs`. (Exception overlay reflects only the viewer's own exception; cancelled occurrences are dropped.)
+- [x] Tests cover: templated occurrence checked, non-templated eligible occurrence unchecked, exception-skip flips `exceptionSkipping`, and the `facilityId` filter narrows.
 
 ### 4.6 Instructor exception-notes view
-- [ ] `struct InstructorExceptionNote { int64_t eventSessionId; int64_t personId; std::string personName; bool attending; std::string note; int64_t createdUs; }`.
-- [ ] `std::vector<InstructorExceptionNote> GetExceptionNotesForInstructorPerson(Transaction&, int64_t instructorPersonId, int64_t fromUs, int64_t toUs)`. Joins:
-  - `event_session_staffing` rows where `person_id = instructorPersonId AND role IN ('instructor', 'lead instructor')`.
-  - To `attendance_template_exceptions WHERE event_session_id IN (those sessions) AND created_us BETWEEN fromUs AND toUs`.
-- [ ] Used by:
-  - Staff portal page (5.3) — "Notes from your students this week".
-  - Daily digest job (N-7) — collects fresh notes from the last 24h and emails the instructor.
+- [x] `struct InstructorExceptionNote { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t personId; std::string personName; bool attending; std::string note; int64_t createdUs; }` (slot+occurrence keyed, reconciled from `eventSessionId`).
+- [x] `std::vector<InstructorExceptionNote> GetExceptionNotesForInstructorPerson(Transaction&, int64_t instructorPersonId, int64_t fromUs, int64_t toUs)`. Reconciled join (see §4 note): the instructor's **slots** (`ClassScheduleSlots::GetSlotsByInstructor`) → `attendance_template_exceptions` on those slots created in `[fromUs, toUs)` → resolve the noting person via `template_id → attendance_templates.person_id`. Newest-first.
+- [x] Used by: staff portal page (5.2) + daily digest job (5.3 / N-7).
+- [x] Test: filters to the instructor's own slots only, by `created_us` window.
 
 ### 4.7 KeyValueTable conversions
-- [ ] Add converters for `EligibleScheduleInfo`, `TodayClassEntry`, `InstructorExceptionNote` in `scheduling_key_value_table.h/.cpp`.
+- [x] Added converters (+ array variants) for `EligibleScheduleInfo`, `TemplateEntryView`, `TemplateExceptionView`, `TodayClassEntry`, `InstructorExceptionNote` in `scheduling_key_value_table.h/.cpp`. (`PersonTemplateView` is composed by the endpoint: `template_id` + nested `entries[]`/`exceptions[]` arrays, matching the `ClassDetail`/`RequirementGroup` nesting pattern.)
 
 ## 5. Endpoints
 
