@@ -111,39 +111,41 @@ Lowest layer first:
 
 ## 2. Database Schema
 
+> **Implementation deviation (slot FK).** §2.2/§2.3 below say `class_schedule_slot_id ... REFERENCES class_schedule_slots(id)`, but the implemented schema makes `class_schedule_slot_id` a **plain `BIGINT` with NO foreign key** (via `AddColumnSimple`). Rationale matches `predecessor_class_schedule_slot_id`: when an impl is edited or a product migrated its slots are hard-deleted; a FK would block that delete (or force a cascade that silently drops the entry). With no FK the slot delete proceeds and the entry/exception survives as **stale**, which the user portal surfaces as "this slot no longer exists — pick a new one" (§1.5). `template_id` keeps its FK to `attendance_templates`.
+
 ### 2.1 `attendance_templates` table
-- [ ] `db_schema/attendance_templates.h/.cpp`:
+- [x] `db_schema/attendance_templates.h/.cpp`:
   - `id BIGSERIAL PK`
-  - `person_id BIGINT NOT NULL UNIQUE REFERENCES people(id)`  — one template per person
+  - `person_id BIGINT NOT NULL UNIQUE REFERENCES people(id)`  — one template per person (FK + `AddUniqueConstraint`)
   - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us`, `updated_us`
 
 ### 2.2 `attendance_template_entries` table
-- [ ] `db_schema/attendance_template_entries.h/.cpp`:
+- [x] `db_schema/attendance_template_entries.h/.cpp`:
   - `id BIGSERIAL PK`
   - `template_id BIGINT NOT NULL REFERENCES attendance_templates(id)`
-  - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — bind to the stable-identity slot, NOT the impl
+  - `class_schedule_slot_id BIGINT NOT NULL` — plain BIGINT, **no FK** (see deviation note); binds to the stable-identity slot, NOT the impl
   - `created_us`
   - `UNIQUE (template_id, class_schedule_slot_id)`
-- [ ] Index on (`template_id`) for "all my entries" reads.
-- [ ] Index on (`class_schedule_slot_id`) for "who has this slot on their template?" reads (instructor view).
+- [x] Index on (`template_id`) for "all my entries" reads (`CreateAttendanceTemplateEntriesIndexes`, prod-only path).
+- [x] Index on (`class_schedule_slot_id`) for "who has this slot on their template?" reads (instructor view).
 
 ### 2.3 `attendance_template_exceptions` table
-- [ ] `db_schema/attendance_template_exceptions.h/.cpp`:
+- [x] `db_schema/attendance_template_exceptions.h/.cpp`:
   - `id BIGSERIAL PK`
   - `template_id BIGINT NOT NULL REFERENCES attendance_templates(id)`
-  - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — the slot the exception applies to
+  - `class_schedule_slot_id BIGINT NOT NULL` — plain BIGINT, **no FK** (see deviation note); the slot the exception applies to
   - `occurrence_date_us BIGINT NOT NULL` — the specific day (the occurrence usually has no persisted `event_sessions` row, so we key off the derived-occurrence identity, NOT `event_session_id`)
   - `attending BOOLEAN NOT NULL` — false = "skip this instance"; true = "one-off add"
   - `note TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
   - `UNIQUE (template_id, class_schedule_slot_id, occurrence_date_us)`
-- [ ] Index on (`class_schedule_slot_id`, `occurrence_date_us`) for instructor's "exception notes for my class today" view.
+- [x] Index on (`class_schedule_slot_id`, `occurrence_date_us`) for instructor's "exception notes for my class today" view (`CreateAttendanceTemplateExceptionsIndexes`, prod-only path).
 
 ### 2.4 Wire into DB init
-- [ ] `make_database_info.cpp` adds three `Make*Table()` calls after `class_schedules`, `event_sessions`, `people`.
-- [ ] `create_database.cpp` `CreateTables()` adds three `CreateTable()` calls.
-- [ ] CMakeLists for `db_schema/` and `sql_util/table_helpers/`.
+- [x] `make_database_info.cpp` adds three `Make*Table()` calls (after `MakeBookingRequirementOverridesTable`; templates → entries → exceptions, parent-before-children) + the three includes.
+- [x] `create_database.cpp` `CreateTables()` adds three `CreateTable()` calls + the two `CreateXxxIndexes()` calls + the three includes.
+- [x] `db_schema/CMakeLists.txt` lists all six `.h/.cpp` files. (Table-helper CMake entries land with §3.)
 
 ## 3. Table Helpers
 
