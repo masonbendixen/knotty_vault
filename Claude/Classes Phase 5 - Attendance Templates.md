@@ -233,25 +233,26 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 ## 5. Endpoints
 
 ### 5.1 User endpoints
-> Per the redesign note the binding key is `class_schedule_slot_id` + `occurrence_date_us` (not `schedule_id` / `event_session_id`) — the §2/§3 schema already uses these; reconcile the endpoint param names to slot+occurrence when implementing.
-- [ ] `GET /api/me/eligible_schedules?facility_id=<id>` → list of `EligibleScheduleInfo`. **(OQ-P5-2)** `facility_id` optional; all facilities when omitted.
-- [ ] `GET /api/me/template` → `{ entries: [...], exceptions: [...] }`, each entry carrying `currently_eligible` + `slot_exists` (OQ-P5-3 badge / stale-slot).
-- [ ] `POST /api/me/template/entry` body `{ class_schedule_slot_id }`.
-- [ ] `DELETE /api/me/template/entry/<classScheduleSlotId>`.
-- [ ] `POST /api/me/template/exception` body `{ class_schedule_slot_id, occurrence_date_us, attending, note? }`.
-- [ ] `DELETE /api/me/template/exception/<classScheduleSlotId>/<occurrenceDateUs>`.
-- [ ] `GET /api/me/today_classes?facility_id=<id>` → list of `TodayClassEntry`. **(OQ-P5-2)** `facility_id` optional; all facilities when omitted.
+> Per the redesign note the binding key is `class_schedule_slot_id` + `occurrence_date_us` (not `schedule_id` / `event_session_id`) — implemented with slot+occurrence keys throughout. Each endpoint is one `.cpp` (+`.h`+`_test.cpp`); response arrays are wrapped as `{ "items": [...] }` via `SqlUtil::KeyValueTableArrayToJson`. **DONE.**
+- [x] `GET /api/me/eligible_schedules?facility_id=<id>` → `{items:[EligibleSchedule]}`. `facility_id` optional (OQ-P5-2).
+- [x] `GET /api/me/template` → `{ template_id, entries:[…], exceptions:[…] }`; entries carry `currently_eligible` + `slot_exists`.
+- [x] `POST /api/me/template/entry` body `{ class_schedule_slot_id }` → `{ok, template_entry_id}`. Constructs the helper **with mail** so the confirmation `.ics` goes out. `NOT_ELIGIBLE`→403, `INVALID_SLOT`→404, missing field→400.
+- [x] `DELETE /api/me/template/entry/<int>` → `{ok}` (no-op when no template).
+- [x] `POST /api/me/template/exception` body `{ class_schedule_slot_id, occurrence_date_us, attending, note? }` → `{exception_id}`.
+- [x] `DELETE /api/me/template/exception/<int>/<int>` → `{ok}`.
+- [x] `GET /api/me/today_classes?facility_id=<id>&tz=<iana>` → `{items:[TodayClassEntry]}`. **Reconciliation:** the endpoint resolves "now" from `now_us()` and takes the studio IANA timezone via an optional `tz` query param (default `UTC`); `facility_id` optional (OQ-P5-2).
 
 ### 5.2 Instructor staff portal endpoint
-- [ ] `GET /api/staff/me/exception_notes?from=<us>&to=<us>` → list of `InstructorExceptionNote`. Permission: `staff` role.
+- [x] `GET /api/staff/me/exception_notes?from=<us>&to=<us>` → `{items:[InstructorExceptionNote]}`. Gated on `kPermissionStaffAccess` via `RequirePermission` (401 anon / 403 missing). `from`/`to` required (400 otherwise). Resolves the instructor as the logged-in `session.GetPersonId()`.
 
 ### 5.3 Daily digest scheduled job
-- [ ] `POST /api/admin/send_instructor_exception_digests` — idempotent, called daily by `knottyyoga_helper`. Iterates instructors with fresh notes in the past 24h and queues a digest email each. (See [[Scheduled Jobs]] for the helper pattern.)
+- [x] `POST /api/admin/send_instructor_exception_digests` → `{sent:N}`. Gated on `kPermissionManageClassSchedule`. Computes a 24h window from `now_us()` and calls `AttendanceTemplateHelper::SendInstructorExceptionDigests` (business logic owns the fan-out + mail). Not deduplicated (no sent-ledger — the daily cron passes one 24h window). **Supporting additions:** `AttendanceTemplateExceptions::GetExceptionsCreatedInWindow` (table helper, +test) and `instructor_exception_digest_mail.{h,cpp}` (FormatString + `NormalizeCrLf`, +test).
 
 ### 5.4 Routing + permissions
-- [ ] All new endpoints registered in `web_app.cpp`.
-- [ ] All user endpoints require logged-in session; gate on session.IsLoggedIn().
-- [ ] Async email queueing → make sure tests `ThreadPool::Shutdown()` before the next DB read.
+- [x] All nine endpoints registered in `web_app.cpp` (include + reference variable) and listed in `endpoints/CMakeLists.txt`.
+- [x] All `/api/me/*` endpoints gate on `session.IsLoggedIn()` → 401; staff/admin endpoints use `RequirePermission`.
+- [x] **No `ThreadPool` needed:** the confirmation + digest emails are sent **synchronously** inside the business logic (matching `PaymentHelper`/`SessionCancellationHelper`), so tests don't need `ThreadPool::Shutdown()`. Endpoint tests inject `TestMailHelper` and assert on `GetMailHelper()->GetMessages()`.
+- [x] Shared inline test fixture (`endpoints/template_test_fixture.h`) provides `LoginUser` + `CreateRecurringSlot` to keep the nine `_test.cpp` files self-contained without duplicating setup.
 
 ## 6. Frontend
 
