@@ -149,22 +149,24 @@ Lowest layer first:
 
 ## 3. Table Helpers
 
+> **Param reconciliation (done at implementation).** The §3 signatures originally said `scheduleId` / `eventSessionId`, but per the redesign note the binding key is `class_schedule_slot_id` (+ `occurrence_date_us` for exceptions) — which is what the §2 schema actually stores. The implemented helpers therefore take `classScheduleSlotId` / `occurrenceDateUs`, not `scheduleId` / `eventSessionId`. Bool values are stored as `true`/`false` literals (DbCrud allowed-keyword set) and read back as Postgres `t`/`f`.
+
 ### 3.1 `TableHelpers::AttendanceTemplates`
-- [ ] CRUD + `GetOrCreateTemplateForPerson(Transaction&, int64_t personId)` — idempotent fetch-or-create. Tests.
+- [x] `GetOrCreateTemplateForPerson(Transaction&, int64_t personId)` — idempotent fetch-or-create. Plus `GetTemplate(id)`, `GetTemplateForPerson(personId)`, `SetActive(id, bool)` (CRUD). Tests in `attendance_templates_test.cpp` (idempotency, per-person isolation, get-by-id/person, empty-when-none, active toggle).
 
 ### 3.2 `TableHelpers::AttendanceTemplateEntries`
-- [ ] `AddEntry(Transaction&, templateId, scheduleId)` — idempotent (no-op if exists).
-- [ ] `DeleteEntry(Transaction&, templateId, scheduleId)`.
-- [ ] `GetEntriesForTemplate(Transaction&, templateId)` → vector.
-- [ ] `GetTemplateIdsForSchedule(Transaction&, scheduleId)` → list of template IDs (for "who has this on their template" lookups; joins back to `attendance_templates → people` in business logic).
-- [ ] Tests for CRUD + idempotency + unique-constraint behavior.
+- [x] `AddEntry(Transaction&, templateId, classScheduleSlotId)` — idempotent (returns existing id, no duplicate; UNIQUE-guarded).
+- [x] `DeleteEntry(Transaction&, templateId, classScheduleSlotId)` — no-op when absent.
+- [x] `GetEntriesForTemplate(Transaction&, templateId)` → `KeyValueTableArray`, oldest first.
+- [x] `GetTemplateIdsForSlot(Transaction&, classScheduleSlotId)` → `std::vector<int64_t>` (reconciled from `GetTemplateIdsForSchedule`; "who has this slot on their template?" — joins back to `attendance_templates → people` in business logic).
+- [x] Tests in `attendance_template_entries_test.cpp` (add/get, idempotency, delete + no-op, reverse-lookup by slot, per-template isolation).
 
 ### 3.3 `TableHelpers::AttendanceTemplateExceptions`
-- [ ] `SetException(Transaction&, templateId, eventSessionId, attending, note)` — UPSERT.
-- [ ] `DeleteException(Transaction&, templateId, eventSessionId)`.
-- [ ] `GetExceptionsForTemplate(Transaction&, templateId, fromUs, toUs)`.
-- [ ] `GetExceptionsForSession(Transaction&, eventSessionId)` → list (for the instructor's "see who's skipping" view).
-- [ ] Tests.
+- [x] `SetException(Transaction&, templateId, classScheduleSlotId, occurrenceDateUs, attending, note)` — UPSERT (INSERT … ON CONFLICT … DO UPDATE, refreshes `updated_us`), returns row id.
+- [x] `DeleteException(Transaction&, templateId, classScheduleSlotId, occurrenceDateUs)` — no-op when absent.
+- [x] `GetExceptionsForTemplate(Transaction&, templateId, fromUs, toUs)` — half-open `[fromUs, toUs)` range on `occurrence_date_us`, ordered by occurrence then id.
+- [x] `GetExceptionsForSlotOccurrence(Transaction&, classScheduleSlotId, occurrenceDateUs)` → list across all templates (reconciled from `GetExceptionsForSession`; the instructor's "who's skipping / dropping in for this class" view).
+- [x] Tests in `attendance_template_exceptions_test.cpp` (insert, upsert-in-place, delete + no-op, half-open range, cross-template occurrence span, empty-when-none).
 
 ## 4. Business Logic — `AttendanceTemplateHelper`
 
