@@ -313,23 +313,13 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [x] Config secret **`instructor_digest_send_hour_local`** (default `9`) added to `secret_keys.h` + `secret_values.cpp`. The endpoint reads it + `default_studio_timezone`, computes the current studio-local hour via `extract(hour FROM now() AT TIME ZONE <tz>)`, and only sends when they match — so the hourly job delivers once a day at 9am local. `?force=1` bypasses the gate for manual/test sends; the response is `{sent, skipped}`.
 - [x] Tests: scheduler `BuildStandardJobs` (job present / disabled-when-0 / count), and endpoint tests — `ForceSendsDigest`, `SendsAtConfiguredHour` (sets the secret to the current `now()` studio hour → deterministic), `SkipsOutsideSendHour` (different hour → `sent=0, skipped=true`, no mail). 401/403 still gated by `manage_class_schedule`.
 
-## 9. Tests-Required Summary
+## 9. Tests-Required Summary — **DONE** (except the calendar-overlay spec, which is blocked on the deferred §6.2)
 
-- [ ] Table helper tests (CRUD + uniqueness + idempotency).
-- [ ] `attendance_template_helper_test.cpp`:
-  - eligible-classes filter correctness (member, non-member, missing skill)
-  - add template entry sends confirmation email with RRULE iCal containing the right UID and days-of-week
-  - re-add is idempotent (no duplicate email)
-  - remove no-op when not present
-  - exception upsert flips between attending/skipping
-  - today_classes returns the right onTemplate / exception state
-  - instructor exception-notes view filters by staffing rows
-  - **(OQ-P5-1)** `DeleteTemplateEntriesForClass` removes entries + exceptions on class deactivation
-  - **(OQ-P5-2)** `facilityId` filter narrows eligible_schedules / today_classes; omitted → all facilities
-  - **(OQ-P5-3)** an entry stays after the permission is revoked, with `currentlyEligible=false` (not deleted)
-- [ ] Endpoint tests for all eight new endpoints.
-- [ ] Frontend specs: my-schedule, calendar overlay, today-classes, exception dialog, instructor exception notes, mock service.
-- [ ] Manual-testing-helper commands: `add_template_entry <person_id> <schedule_id>`, `simulate_exception_note <person_id> <event_session_id> <note>`, `send_instructor_digest <instructor_person_id>`.
+- [x] Table helper tests (CRUD + uniqueness + idempotency) — `attendance_templates`/`_entries`/`_exceptions` + the later additions.
+- [x] `attendance_template_helper_test.cpp` — every bullet covered (eligibility filter, RRULE/UID confirmation email, idempotent re-add, remove no-op, exception upsert flip, today-feed state, instructor-notes filter — *reconciled to slot-instructor, not staffing rows*, `DeleteTemplateEntriesForClass`, facility filters, kept-but-flagged-after-revoke). Skill-gate path is covered transitively via `class_access_helper_test`.
+- [x] Endpoint tests for all endpoints (the eight §5 routes + the added `get_upcoming_classes` and `admin_attendance_templates`).
+- [~] Frontend specs: my-schedule, today-classes, exception dialog, instructor exception notes, mock service, upcoming-classes, admin browser — all done. **Calendar overlay spec deferred** with §6.2 itself.
+- [x] Manual-testing-helper commands (slot+occurrence reconciled): **`add_template_entry --person_id --slot_id`** (sends the confirmation email), **`simulate_exception_note --person_id --slot_id --occurrence_date|--occurrence_date_us --note --attending`**, **`send_instructor_digest --instructor_person_id [--hours]`**. Added to `test_helper/commands/class_commands.cpp` (category "Attendance"). The digest command reuses a new public `AttendanceTemplateHelper::SendDigestToInstructor` (extracted from `SendInstructorExceptionDigests`, +unit test) so the CLI wraps already-tested logic.
 
 ## 10. Cross-Layer Acceptance Criteria
 

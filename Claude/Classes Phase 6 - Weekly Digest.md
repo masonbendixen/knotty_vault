@@ -48,11 +48,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Existing `MailHelper` + `FormatString` + `NormalizeCrLf` patterns (per CLAUDE.md).
 - Existing `knottyyoga_helper` daemon ([[Scheduled Jobs]]).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
-> The "this week's recurring class attendance" part of the digest CANNOT be a `SELECT FROM bookings` — membership-included template attendance creates no booking rows and no `event_sessions` rows (lazy model). The digest must:
-> - **Derive the week's templated occurrences.** Add `WeeklyDigestHelper::GetTemplateOccurrencesForWeek(personId, weekStartUs)` that, for each of the user's `attendance_template_entries` (slot-keyed), walks the week via `ClassScheduleHelper::GetDerivedSessionsForRange` to find the slot's occurrences, then overlays `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`) to drop skips and add one-offs.
-> - **Union with persisted paid bookings.** Workshops / series / intro / guest pass / events / services DO have persisted `event_sessions` + `bookings`; those come from the existing booking query. De-dupe by occurrence.
-> - The multi-VEVENT `.ics` is built from the unioned occurrence list. UID for a templated (booking-less) occurrence uses `BuildTemplateUid(classScheduleSlotId, personId)` + the occurrence date (Phase 4 helper, slot-keyed per the redesign); paid bookings use `BuildBookingUid`.
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+The "this week's recurring class attendance" part of the digest CANNOT be a `SELECT FROM bookings` — membership-included template attendance creates no booking rows and no `event_sessions` rows (lazy model). The digest must:
+- **Derive the week's templated occurrences.** Add `WeeklyDigestHelper::GetTemplateOccurrencesForWeek(personId, weekStartUs)` that, for each of the user's `attendance_template_entries` (slot-keyed), walks the week via `ClassScheduleHelper::GetDerivedSessionsForRange` to find the slot's occurrences, then overlays `attendance_template_exceptions` by (`class_schedule_slot_id`, `occurrence_date_us`) to drop skips and add one-offs.
+- **Union with persisted paid bookings.** Workshops / series / intro / guest pass / events / services DO have persisted `event_sessions` + `bookings`; those come from the existing booking query. De-dupe by occurrence.
+- The multi-VEVENT `.ics` is built from the unioned occurrence list. UID for a templated (booking-less) occurrence uses `BuildTemplateUid(classScheduleSlotId, personId)` + the occurrence date (Phase 4 helper, slot-keyed per the redesign); paid bookings use `BuildBookingUid`.
 
 **Outcome:**
 - New `user_notification_preferences` table with defaults.
@@ -259,8 +259,11 @@ A member opens `/my/account/notification-preferences`, clicks the calendar-feed 
 ## 11. Open Questions
 
 - **OQ-P6-1.** Digest should also include paid services / events (massage, etc.)? Recommended: yes, same surface; subtitle "Massage with Provider X — 60min".
+	- Mason- I'll go with your recommendation.
 - **OQ-P6-2.** When a user has zero rows for the week, should the digest still go out as "No classes scheduled — check the catalog"? Recommended: NO (empty digests are noise; the user isn't engaged so don't pester).
+	- Mason- I'll go with your recommendation.
 - **OQ-P6-3.** Should the iCal feed URL include the user's email for human readability (`/api/me/ical_feed/<email>.ics?token=...`) or stay opaque (`/api/me/ical_feed.ics?token=...`)? Recommended: opaque — emails change, tokens shouldn't depend on them.
+	- Mason- I'll go with your recommendation.
 
 ## 12. Cross-References
 
