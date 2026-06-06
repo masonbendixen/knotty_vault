@@ -256,7 +256,11 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 
 ## 6. Frontend  — **DONE except §6.2 (calendar overlay, deferred).**
 
-> Routing note: the account area is mounted at `/my/*` (not `/my/account/*`), so the pages live at `/my/my-schedule` and `/my/today`. The plan's `pages/home/today-classes` / `pages/portal/staff` paths were reconciled to the actual `pages/account/` and `pages/staff/` locations.
+> Routing note: the account area is mounted at `/my/*`, so the member page lives at `/my/my-schedule`. The plan's `pages/home/today-classes` / `pages/portal/staff` paths were reconciled to the actual `pages/account/` and `pages/staff/` locations.
+
+> **Consolidation (Mason's feedback): a single "My Schedule" page, two tabs.** The separate "Today's Classes" and "Plan My Classes" dashboard cards/routes were redundant. They're folded into **`/my/my-schedule`** as a `mat-tab-group`: **"My Weekly Plan"** (the eligible-classes grid + checkboxes + kept-entries) and **"Upcoming"** (the `UpcomingClassesComponent` embedded via `[embedded]="true"`, which lists the next 4 weeks day-by-day including today, with skip/drop-in controls). Account dashboard now shows one "My Schedule" card. `today-classes.component` is superseded (kept only because the shared `exception-note-dialog` lives in its folder).
+
+> **Planner bug fix:** `GetUpcomingClassesForPerson` evaluated eligibility at the *start of the range* (today's midnight); a class whose instance `valid_from` is later today was wrongly dropped, leaving the planner empty even though "My Weekly Plan" showed it. Now eligibility is evaluated at `NowUs(transaction)` (the per-day derivation still skips any days a class isn't active yet).
 
 ### 6.1 My Schedule page — eligible-classes grid
 - [x] `ui/src/app/pages/account/my-schedule/my-schedule.component.*` + `.spec.ts`.
