@@ -92,7 +92,7 @@ Lowest layer first:
 ## 2. Database Schema
 
 ### 2.1 `user_notification_preferences` table
-- [ ] `db_schema/user_notification_preferences.h/.cpp`:
+- [x] `db_schema/user_notification_preferences.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL UNIQUE REFERENCES people(id)`
   - `weekly_digest_enabled BOOLEAN NOT NULL DEFAULT TRUE`
@@ -102,16 +102,16 @@ Lowest layer first:
   - `created_us`, `updated_us`
 
 ### 2.2 `ical_feed_tokens` table
-- [ ] `db_schema/ical_feed_tokens.h/.cpp`:
+- [x] `db_schema/ical_feed_tokens.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL UNIQUE REFERENCES people(id)`
   - `token_hash TEXT NOT NULL`  — Argon2id or SHA-256 hash of the random token (consistent with `sessions.token_hash` pattern used elsewhere)
   - `created_us`, `last_used_us`, `revoked_us` (nullable)
-- [ ] Unique on `person_id` keeps it simple: one active token at a time. Regeneration = update the hash + invalidate the prior.
+- [x] Unique on `person_id` keeps it simple: one active token at a time. Regeneration = update the hash + invalidate the prior.
 
 ### 2.3 Wire into DB init
-- [ ] `make_database_info.cpp` + `create_database.cpp` `CreateTables()`.
-- [ ] CMakeLists.
+- [x] `make_database_info.cpp` + `create_database.cpp` `CreateTables()`.
+- [x] CMakeLists.
 
 ## 3. Table Helpers
 
