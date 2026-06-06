@@ -116,18 +116,23 @@ Lowest layer first:
 ## 3. Table Helpers
 
 ### 3.1 `TableHelpers::UserNotificationPreferences`
-- [ ] `GetOrCreateForPerson(Transaction&, personId)` — idempotent fetch-or-create with defaults.
-- [ ] `UpdatePreferences(Transaction&, personId, const KeyValueTable& updates)`.
-- [ ] `SetLastDigestSent(Transaction&, personId, sentUs)` — idempotency mutator.
-- [ ] `GetUsersDueForDigest(Transaction&, asOfUs)` → list of `personId` whose local Sunday-noon has just passed and `last_digest_sent_us < <this Sunday's local midnight in UTC>`.
-- [ ] Tests for fetch-or-create, update, due-list correctness.
+Files: `sql_util/table_helpers/user_notification_preferences.h/.cpp/_test.cpp`.
+- [x] `GetForPerson(Transaction&, personId)` → row or empty.
+- [x] `GetOrCreateForPerson(Transaction&, personId)` — idempotent fetch-or-create with defaults (returns the row `KeyValueTable`).
+- [x] `UpdatePreferences(Transaction&, personId, const KeyValueTable& updates)` — applies only the editable subset (`weekly_digest_enabled`, `digest_send_dow`, `digest_send_hour_local`); ignores protected keys; bumps `updated_us`; creates the row first if missing.
+- [x] `SetLastDigestSent(Transaction&, personId, sentUs)` — idempotency mutator (creates row first if missing).
+- [x] **`GetEnabledDigestPreferences(Transaction&)`** replaces the planned `GetUsersDueForDigest(asOfUs)` here. **Layering decision:** the precise "due right now?" test needs each user's *facility timezone* (not in this table) plus the per-week idempotency-window math. That belongs in business logic, so this table helper exposes only the SQL-expressible slice — every row with `weekly_digest_enabled = TRUE`, oldest-first — and `WeeklyDigestHelper::SendPendingDigests` (§4) applies the TZ gating + idempotency window over those candidates. The "due-list correctness" test moves to §4.
+- [x] Tests: fetch-or-create defaults, idempotency, update (editable + ignored-protected-keys), create-on-update-when-missing, set-last-sent, enabled-filter ordering.
 
 ### 3.2 `TableHelpers::ICalFeedTokens`
-- [ ] `GetOrCreateForPerson(Transaction&, personId)` — returns existing if not revoked, else creates.
-- [ ] `RegenerateToken(Transaction&, personId)` → returns the new raw token (only time it's exposed in cleartext).
-- [ ] `LookupPersonByToken(Transaction&, tokenString)` → personId or 0. Hashes the input and looks up.
-- [ ] `RecordUse(Transaction&, personId)` updates `last_used_us`.
-- [ ] Tests, including hash-mismatch returning 0.
+Files: `sql_util/table_helpers/ical_feed_tokens.h/.cpp/_test.cpp`.
+**Layering decision:** mirrors the email-verification split — the table helper is pure CRUD over the token **hash** only; it never generates a raw token or hashes one. Generating the random token + BLAKE2b hash (`AuthHelper`) lives in the business-logic layer (§4), exactly as email-verification token generation lives in `PersonHelper`, not in `TableHelpers::EmailVerifications`. (Table helpers must not depend upward on `business_logic/auth`.)
+- [x] `GetForPerson(Transaction&, personId)` → row (active or revoked) or empty.
+- [x] `CreateOrReplaceTokenHash(Transaction&, personId, tokenHash)` → replaces any prior row (regeneration), returns new id. Backs the business-logic `RegenerateToken`, which generates the raw token + hash and passes the hash here.
+- [x] `LookupPersonByTokenHash(Transaction&, tokenHash)` → personId or 0 (non-revoked only). Backs the business-logic `LookupPersonByToken`, which hashes the input first.
+- [x] `RevokeForPerson(Transaction&, personId)` → stamps `revoked_us` without deleting (added; supports revoke without regenerate).
+- [x] `RecordUse(Transaction&, personId)` updates `last_used_us`.
+- [x] Tests: round-trip create+lookup, hash-mismatch/empty → 0, regeneration replaces prior token (old hash → 0), revoke disables lookup but keeps row, regenerate-after-revoke reactivates, record-use stamps, per-person scoping.
 
 ## 4. Business Logic
 
