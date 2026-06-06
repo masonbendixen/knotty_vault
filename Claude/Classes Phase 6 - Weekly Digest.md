@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 5/23/2026
-Version: 0.1
+Last Updated: 6/5/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -141,12 +141,12 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
   2. Compute `weekStartUs` as the Monday 00:00 in that TZ; `weekEndUs` as Sunday 23:59:59 in that TZ.
   3. Templated occurrences: `GetTemplateOccurrencesForWeek(personId, weekStartUs)` — derives the week's occurrences for each template-entry slot (via `ClassScheduleHelper::GetDerivedSessionsForRange`), drops `attendance_template_exceptions.attending=false`, includes one-off `attending=true` additions. (NO `bookings` / `event_sessions` join for these — they're booking-less.)
   4. Add paid bookings: `bookings WHERE person_id=? AND purchase_id IS NOT NULL AND session start in window AND status IN ('confirmed', 'waitlisted')` (these have persisted `event_sessions`). De-dupe against step 3 by (`class_schedule_slot_id`, `occurrence_date_us`).
-  5. Add upcoming services / events the user has booked (existing `BookingHelper::GetBookingsForPerson` upcoming filter).
+  5. **(OQ-P6-1 — yes)** Add upcoming paid services / events the user has booked (existing `BookingHelper::GetBookingsForPerson` upcoming filter), same surface, each row subtitled e.g. "Massage with Provider X — 60min".
   6. Sort by `sessionStartUs`.
   7. Return.
 - [ ] `bool SendDigestForPerson(Transaction&, MailHelper*, int64_t personId, int64_t weekStartUs)`:
   1. Build the data.
-  2. If `rows.empty()` → skip (don't send empty digests).
+  2. **(OQ-P6-2 — no empty digests)** If `rows.empty()` → skip (don't send empty digests; don't pester a disengaged user).
   3. Format the HTML body via `FormatString` with a template constant; wrap with `NormalizeCrLf`.
   4. Build the combined iCal: vector of `ICalEvent` (one per row). Paid-booking rows use `BuildBookingUid(bookingId)`; templated booking-less rows use `BuildTemplateUid(classScheduleSlotId, personId)` + occurrence date. Call `GenerateICalendar(events)` from Phase 4.
   5. Queue email with `.ics` attachment.
@@ -190,7 +190,7 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 
 ### 5.3 Personal iCal feed endpoint
 - [ ] `endpoints/get_my_ical_feed.h/cpp` + test:
-  - `GET /api/me/ical_feed.ics?token=<...>` — public route (no session) gated on the token.
+  - **(OQ-P6-3 — opaque)** `GET /api/me/ical_feed.ics?token=<...>` — opaque path (NOT email-bearing); public route (no session) gated on the token.
   - Looks up token → personId; if invalid → 404 (NOT 401 — keep the URL low-information for crawlers).
   - Calls `PersonalICalFeedHelper::GenerateFeedForPerson(personId, now, now+90d)`.
   - Sets the iCal headers from §4.2.
@@ -256,14 +256,11 @@ A member opens `/my/account/notification-preferences`, clicks the calendar-feed 
 - [ ] Apple Calendar resolves the URL, shows the next 90 days of templated + paid sessions in a separate subscribed calendar.
 - [ ] Adding a new paid booking → within 1 hour the new event appears in the subscribed calendar.
 
-## 11. Open Questions
+## 11. Open Questions — ALL RESOLVED (2026-06-05)
 
-- **OQ-P6-1.** Digest should also include paid services / events (massage, etc.)? Recommended: yes, same surface; subtitle "Massage with Provider X — 60min".
-	- Mason- I'll go with your recommendation.
-- **OQ-P6-2.** When a user has zero rows for the week, should the digest still go out as "No classes scheduled — check the catalog"? Recommended: NO (empty digests are noise; the user isn't engaged so don't pester).
-	- Mason- I'll go with your recommendation.
-- **OQ-P6-3.** Should the iCal feed URL include the user's email for human readability (`/api/me/ical_feed/<email>.ics?token=...`) or stay opaque (`/api/me/ical_feed.ics?token=...`)? Recommended: opaque — emails change, tokens shouldn't depend on them.
-	- Mason- I'll go with your recommendation.
+- [x] **OQ-P6-1 (resolved — yes, include paid services/events).** The digest covers paid services / events (massage, etc.) on the same surface, each row subtitled e.g. "Massage with Provider X — 60min". Already reflected in §4.1 step 5 + the Phase Summary. Mason: "I'll go with your recommendation."
+- [x] **OQ-P6-2 (resolved — NO empty digests).** When a user has zero rows for the week, no digest is sent (empty digests are noise; don't pester a disengaged user). Already reflected in §4.1 `SendDigestForPerson` step 2. Mason: "I'll go with your recommendation."
+- [x] **OQ-P6-3 (resolved — opaque feed URL).** The iCal feed URL stays opaque (`/api/me/ical_feed.ics?token=...`), NOT email-bearing — emails change, tokens shouldn't depend on them. Already reflected in §5.3. Mason: "I'll go with your recommendation."
 
 ## 12. Cross-References
 
