@@ -307,10 +307,11 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [x] `PopulateAdminColumnDataInfo`, `PopulateAdminColumnFriendlyNames`, `PopulateAdminTableFriendlyNames`, `PopulateAdminTableDisplayTemplates` for all three tables (number/bool/date/text edit types; FK display templates).
 - [x] Both the generic CRUD "Manage Data" support AND the bespoke §6.8 page are available. (These Populate* seeders run only in the real DB-creation path, so a DB reset via `knottyyoga_database_helper` is needed to pick them up.)
 
-## 8. Scheduled job integration
+## 8. Scheduled job integration — **DONE**
 
-- [ ] Add daily 09:00-local job to `knottyyoga_helper`: calls `POST /api/admin/send_instructor_exception_digests`. Idempotent.
-- [ ] Job config secret `instructor_digest_send_hour_local` default 9.
+- [x] Registered `send_instructor_exception_digests` → `POST /api/admin/send_instructor_exception_digests` in the scheduler (`scheduled_job.cpp::BuildStandardJobs` + `JobIntervals::instructorDigestSeconds`, default **hourly** = 3600s, with a `--instructor_digest_interval` flag in `scheduler/main.cpp`). The scheduler is interval-based (no cron), so it runs hourly and the **endpoint self-gates** on the studio-local send hour.
+- [x] Config secret **`instructor_digest_send_hour_local`** (default `9`) added to `secret_keys.h` + `secret_values.cpp`. The endpoint reads it + `default_studio_timezone`, computes the current studio-local hour via `extract(hour FROM now() AT TIME ZONE <tz>)`, and only sends when they match — so the hourly job delivers once a day at 9am local. `?force=1` bypasses the gate for manual/test sends; the response is `{sent, skipped}`.
+- [x] Tests: scheduler `BuildStandardJobs` (job present / disabled-when-0 / count), and endpoint tests — `ForceSendsDigest`, `SendsAtConfiguredHour` (sets the secret to the current `now()` studio hour → deterministic), `SkipsOutsideSendHour` (different hour → `sent=0, skipped=true`, no mail). 401/403 still gated by `manage_class_schedule`.
 
 ## 9. Tests-Required Summary
 
