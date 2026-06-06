@@ -289,7 +289,8 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [x] `ui/src/app/shared/types/template.types.ts`: `EligibleSchedule`, `TemplateEntry`, `TemplateException`, `PersonTemplate`, `TodayClassEntry`, `InstructorExceptionNote`, `AddTemplateEntryResult`. Re-exported from `shared/types/ServerAccess.ts`.
 
 ### 6.8 Bespoke admin support page (Mason's request)
-- [x] `ui/src/app/pages/manage/attendance-templates/attendance-templates-admin.component.*` + `.spec.ts`; route `/manage/attendance-templates` + manage-dashboard "Attendance Templates" tile. Read-only browser that lists every template (via the generic CRUD `getTableRows`) with expandable entries + exceptions per template.
+- [x] `ui/src/app/pages/manage/attendance-templates/attendance-templates-admin.component.*` + `.spec.ts`; route `/manage/attendance-templates` + manage-dashboard "Attendance Templates" tile. Read-only browser: per template it shows the **member's name + email**, and each entry as **class name · day · time** (not raw slot ids); exceptions show class + occurrence date + skip/drop-in + note.
+- [x] Backed by a dedicated resolved endpoint **`GET /api/admin/attendance_templates`** (gated `manage_class_schedule`) → `AttendanceTemplateHelper::GetAllTemplatesForAdmin` (resolves person via `people` + per-slot class/day/time via `ResolveSlotContext`). Supporting: `AttendanceTemplates::GetAllTemplates` table helper, `AdminTemplateView`/`AdminTemplateEntryView`/`AdminTemplateExceptionView` structs + converters, `getAdminAttendanceTemplates()` across all 4 ServerAccess files. (Replaced the earlier raw `getTableRows` approach which only exposed ids.)
 
 ## 7. Admin Metadata — **DONE**
 
