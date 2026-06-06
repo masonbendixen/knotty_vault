@@ -275,6 +275,10 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 - [x] "I'll be there" → `setException(slot, occ, true)`; "I can't make it" → dialog → `setException(slot, occ, false, note)`. Slot+occurrence keyed (reconciled from `eventSessionId`).
 - [x] Optimistic UI with rollback on error.
 
+### 6.3b Multi-day planning feed (Mason's request)
+- [x] A member can mark skips / drop-ins **ahead of time** (e.g. before a vacation, or when reviewing their weekly email) instead of only same-day. `ui/src/app/pages/account/upcoming-classes/upcoming-classes.component.*` + `.spec.ts`; route `/my/upcoming` + account-dashboard "Plan My Classes" card. A scrollable list of the next 4 weeks **grouped by day** (sticky day headers), each occurrence with the same "I'll be there" / "I can't make it" + note-dialog controls and optimistic updates.
+- [x] Backend: `GET /api/me/upcoming_classes?from=&to=&facility_id=` → `AttendanceTemplateHelper::GetUpcomingClassesForPerson`. Refactored the today + upcoming feeds onto a shared `ResolveClassesInRange` core (derive eligible occurrences in a range, overlay onTemplate + the viewer's exceptions). Endpoint + business + (reused) `TodayClassEntry` shape; tests at both layers.
+
 ### 6.4 Exception-note dialog
 - [x] `today-classes/exception-note-dialog.component.*` + `.spec.ts` — note textarea + save/cancel; returns `{ note }`.
 
@@ -290,7 +294,8 @@ Place in `business_logic/scheduling/attendance_template_helper.h/.cpp/_test.cpp`
 
 ### 6.8 Bespoke admin support page (Mason's request)
 - [x] `ui/src/app/pages/manage/attendance-templates/attendance-templates-admin.component.*` + `.spec.ts`; route `/manage/attendance-templates` + manage-dashboard "Attendance Templates" tile. Read-only browser: per template it shows the **member's name + email**, and each entry as **class name · day · time** (not raw slot ids); exceptions show class + occurrence date + skip/drop-in + note.
-- [x] Backed by a dedicated resolved endpoint **`GET /api/admin/attendance_templates`** (gated `manage_class_schedule`) → `AttendanceTemplateHelper::GetAllTemplatesForAdmin` (resolves person via `people` + per-slot class/day/time via `ResolveSlotContext`). Supporting: `AttendanceTemplates::GetAllTemplates` table helper, `AdminTemplateView`/`AdminTemplateEntryView`/`AdminTemplateExceptionView` structs + converters, `getAdminAttendanceTemplates()` across all 4 ServerAccess files. (Replaced the earlier raw `getTableRows` approach which only exposed ids.)
+- [x] Backed by a dedicated resolved endpoint **`GET /api/admin/attendance_templates?q=<search>`** (gated `manage_class_schedule`) → `AttendanceTemplateHelper::GetAllTemplatesForAdmin(searchQuery)` (resolves person via `people` + per-slot class/day/time via `ResolveSlotContext`). Supporting: `AttendanceTemplates::GetAllTemplates` + `SearchTemplatesByPerson` table helpers, `AdminTemplateView`/`AdminTemplateEntryView`/`AdminTemplateExceptionView` structs + converters, `getAdminAttendanceTemplates(query?)` across all 4 ServerAccess files. (Replaced the earlier raw `getTableRows` approach which only exposed ids.)
+- [x] **Search-first UI (scales past a flat list):** a `mat-autocomplete` search box that queries members by **first name, last name, or email** (server-side `ILIKE`, capped at 25 suggestions); selecting a member shows their resolved template. No "list everyone" dump.
 
 ## 7. Admin Metadata — **DONE**
 
