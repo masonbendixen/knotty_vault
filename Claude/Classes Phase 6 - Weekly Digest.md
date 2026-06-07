@@ -136,49 +136,33 @@ Files: `sql_util/table_helpers/ical_feed_tokens.h/.cpp/_test.cpp`.
 
 ## 4. Business Logic
 
-### 4.1 `WeeklyDigestHelper`
+### 4.0 Prerequisite — Phase 4 iCal helper extension (DONE)
+- [x] Added `ICalGenerator::BuildTemplateOccurrenceUid(classScheduleSlotId, personId, occurrenceDateUs)` to `util/ical_generator.h/.cpp` (+ test). Slot-keyed, per-occurrence UID for the booking-less templated occurrences — the existing `BuildTemplateUid` is schedule-keyed and reserved for the single recurring-RRULE confirmation invite, so a new function avoids overloading its meaning. The redesign note's "`BuildTemplateUid(slot, person)` + date" is realized by this dedicated builder.
+- [x] Added `TableHelpers::Facilities::GetFirstActiveFacilityTimezone()` (+ tests) — the studio-default timezone fallback.
+
+### 4.1 `WeeklyDigestHelper` (DONE)
 Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 
-- [ ] `struct WeeklyDigestRow { int64_t sessionStartUs; int64_t sessionEndUs; std::string className; std::string facilityName; std::string roomName; std::vector<std::string> instructorNames; std::string subtitle; /* "Included — your template", "Paid: 6-Week Aerial 101", "One-off addition", "Guest pass for Friend" */ }`.
-- [ ] `struct WeeklyDigestData { int64_t personId; std::string personFirstName; std::string personEmail; std::string ianaTz; std::vector<WeeklyDigestRow> rows; }`.
-- [ ] `WeeklyDigestData BuildDigestForPerson(Transaction&, int64_t personId, int64_t weekStartUs)`. Algorithm:
-  1. Resolve user's primary facility timezone (or the first facility if multi).
-  2. Compute `weekStartUs` as the Monday 00:00 in that TZ; `weekEndUs` as Sunday 23:59:59 in that TZ.
-  3. Templated occurrences: `GetTemplateOccurrencesForWeek(personId, weekStartUs)` — derives the week's occurrences for each template-entry slot (via `ClassScheduleHelper::GetDerivedSessionsForRange`), drops `attendance_template_exceptions.attending=false`, includes one-off `attending=true` additions. (NO `bookings` / `event_sessions` join for these — they're booking-less.)
-  4. Add paid bookings: `bookings WHERE person_id=? AND purchase_id IS NOT NULL AND session start in window AND status IN ('confirmed', 'waitlisted')` (these have persisted `event_sessions`). De-dupe against step 3 by (`class_schedule_slot_id`, `occurrence_date_us`).
-  5. **(OQ-P6-1 — yes)** Add upcoming paid services / events the user has booked (existing `BookingHelper::GetBookingsForPerson` upcoming filter), same surface, each row subtitled e.g. "Massage with Provider X — 60min".
-  6. Sort by `sessionStartUs`.
-  7. Return.
-- [ ] `bool SendDigestForPerson(Transaction&, MailHelper*, int64_t personId, int64_t weekStartUs)`:
-  1. Build the data.
-  2. **(OQ-P6-2 — no empty digests)** If `rows.empty()` → skip (don't send empty digests; don't pester a disengaged user).
-  3. Format the HTML body via `FormatString` with a template constant; wrap with `NormalizeCrLf`.
-  4. Build the combined iCal: vector of `ICalEvent` (one per row). Paid-booking rows use `BuildBookingUid(bookingId)`; templated booking-less rows use `BuildTemplateUid(classScheduleSlotId, personId)` + occurrence date. Call `GenerateICalendar(events)` from Phase 4.
-  5. Queue email with `.ics` attachment.
-  6. Update `UserNotificationPreferences::SetLastDigestSent(personId, now)`.
-  7. Sync SQL before any `ThreadPool::Queue` (per memory `feedback_sync_sql_before_threadpool_queue.md`).
-- [ ] `int SendPendingDigests(Transaction&, MailHelper*, int64_t asOfUs)`:
-  - Calls `UserNotificationPreferences::GetUsersDueForDigest(asOfUs)`.
-  - For each user, computes the relevant `weekStartUs` and calls `SendDigestForPerson`.
-  - Returns the count sent.
-- [ ] Tests with `TestMailHelper`:
-  - Empty digest skipped.
-  - Templated session + one-off addition + paid booking all appear with correct subtitles.
-  - Exception-skip removes a templated session.
-  - `last_digest_sent_us` updated → re-running `SendPendingDigests(sameAsOfUs)` sends zero new mails.
-  - Multi-VEVENT iCal attachment has the right count + UIDs.
+- [x] `struct WeeklyDigestRow` — extended beyond the original sketch with `displayWhen` (pre-formatted local time, so the mail generator stays a pure string builder) and the UID-source fields `classScheduleSlotId` / `occurrenceDateUs` / `bookingId` (the `.ics` is built straight from the row list).
+- [x] `struct WeeklyDigestData { personId; personFirstName; personEmail; ianaTz; windowStartUs; windowEndUs; rows; }`.
+- [x] **Reuse decision:** templated occurrences come from `AttendanceTemplateHelper::GetUpcomingClassesForPerson` (Phase 5) — it already derives + decorates every eligible occurrence (className/facility/room/instructors/onTemplate/exception state) over a range. The digest filters that to `attendingViaTemplate = onTemplate && !exceptionSkipping` plus one-off `exceptionAttending` additions. No separate `GetTemplateOccurrencesForWeek` was needed.
+- [x] `ResolvePersonTimezone(tx, personId)` — template-slot facility → upcoming-booking facility → first active facility → "UTC". (No `people.facility_id` exists; a member's facility is inferred from activity.)
+- [x] `CollectRowsForWindow` / `BuildDigestForWindow` / `BuildDigestForPerson(weekStartUs)`. weekEnd = next local Monday (DST-aware via SQL `AT TIME ZONE`). Paid bookings via `BookingHelper::GetBookingsForPerson(upcoming)` (covers events **and** services, OQ-P6-1), de-duped vs templated by persisted `event_session_id` and by (start, className). Sorted by start.
+- [x] `static BuildICalEvents(data)` — one VEVENT per row; paid → `BuildBookingUid`, templated → `BuildTemplateOccurrenceUid`.
+- [x] `SendDigestForPerson(tx, personId, weekStartUs)` — empty-skip (OQ-P6-2), HTML+text bodies, `weekly_digest.ics` attachment, records `last_digest_sent_us`. Mail held as a constructor member (matching `AttendanceTemplateHelper`) rather than a `MailHelper*` param; no `ThreadPool::Queue` is used here (synchronous send), so the sync-SQL-before-queue rule doesn't apply.
+- [x] `SendPendingDigests(tx, asOfUs)` — iterates `UserNotificationPreferences::GetEnabledDigestPreferences`, computes each member's local **send anchor** (most recent past dow+hour in their tz) and previewed **week start** (next local Monday) via SQL tz math, and sends when `last_digest_sent_us < anchor`. **Marks the bucket with `asOfUs`** after each due member (sent or empty) → idempotent. (The original plan's `GetUsersDueForDigest` tz math lives here, in business logic, because it needs the facility timezone — see §3.1 layering note.)
+- [x] Tests with `TestMailHelper`: empty skipped; templated occurrence; one-off addition; exception-skip removes a templated occurrence; paid booking subtitle; union+sort; send-with-`.ics`; multi-VEVENT + booking/slot UIDs; `SendPendingDigests` sends-then-idempotent; disabled member skipped; before-send-time not due.
 
-### 4.2 `PersonalICalFeedHelper`
-- [ ] `business_logic/scheduling/personal_ical_feed_helper.h/.cpp/_test.cpp`.
-- [ ] `std::string GenerateFeedForPerson(Transaction&, int64_t personId, int64_t windowStartUs, int64_t windowEndUs)`:
-  - Reuses `BuildDigestForPerson` logic to assemble the row set, but over a longer window (default: today + 90 days).
-  - Returns the multi-VEVENT iCal text.
-- [ ] Headers to set on the response: `Content-Type: text/calendar; charset=utf-8`, `X-PUBLISHED-TTL: PT1H`, `Cache-Control: max-age=3600`, `Refresh-Interval;value=PT1H`.
+### 4.2 `PersonalICalFeedHelper` (DONE)
+- [x] `business_logic/scheduling/personal_ical_feed_helper.h/.cpp/_test.cpp`.
+- [x] `GenerateFeedForPerson(tx, personId, windowStartUs, windowEndUs)` — reuses `WeeklyDigestHelper::BuildDigestForWindow` over a long window (`kDefaultWindowUs` = 90 days) and returns the multi-VEVENT iCal text.
+- [ ] Headers (`Content-Type: text/calendar`, `X-PUBLISHED-TTL: PT1H`, `Cache-Control: max-age=3600`) — set by the §5.3 endpoint, not the helper.
+- [x] Tests: empty → valid event-less VCALENDAR; templated+paid in a 1-week window → 2 VEVENTs with both UID forms; 90-day window → many occurrences; exception-skip respected.
 
-### 4.3 Email template
-- [ ] `business_logic/scheduling/weekly_digest_mail.h/.cpp` — template constants for HTML body and plain-text fallback. Use `FormatString` with `{placeholder}` substitution per CLAUDE.md.
-- [ ] Plain-text section lists rows in `Tue Mar 5  6:00–7:00pm  Vinyasa Flow (Studio A) — Instructor Sara` format.
-- [ ] Test: golden-text comparison.
+### 4.3 Email template (DONE)
+- [x] `business_logic/scheduling/weekly_digest_mail.h/.cpp` — `GenerateWeeklyDigestHtmlBody` + `GenerateWeeklyDigestTextBody`, `FormatString` template constants, `NormalizeCrLf` on both bodies.
+- [x] Plain-text rows: `Tue Mar 5  6:00-7:00pm  Vinyasa Flow (Studio A) - Instructor Sara` (ASCII hyphens to keep golden tests encoding-safe; room name falls back to facility name).
+- [x] Test: substring/golden assertions on both bodies + CRLF + room-fallback + greeting-only-when-empty.
 
 ## 5. Endpoints
 
