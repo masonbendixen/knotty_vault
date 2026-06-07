@@ -123,7 +123,10 @@ Lowest layer first:
 - [x] `price_kind` surfaced in reads (the `SELECT *` getters already return it) and writes (`AddProductPrice` gained a trailing `priceKind` param, default `kProductPriceKindStandard`).
 - [x] `GetSeriesPricesForProduct(tx, productId, asOfUs)` → `std::vector<SeriesTierPrice>` (new struct: `permissionId` tier + `currency` + optional `seriesTotalCents`/`perInstanceBaseCents`). Resolves the effective active price schedule at `asOfUs` (CTE: most-recent active schedule with `valid_from_us <= asOfUs` and `valid_to_us` open), then pivots the `series_total`/`per_instance_base` rows per tier with `MAX(CASE …)` (the extended unique constraint guarantees ≤1 row per (permission, kind)). Empty when no schedule is effective or the product has no series prices.
 - [x] Tests: price_kind default, explicit two-rows-per-tier round-trip (validates the extended unique constraint), `GetSeriesPricesForProduct` per-tier (full + partial tier, standard price ignored, NULLS-FIRST order), empty-before-schedule / no-series-prices.
-- [ ] **Deferred to §4:** filtering the *best-price* path (`GetBestProductPriceByProductSchedulePermissions` / `CatalogHelper::ResolveBestPriceForPerson`) by `price_kind` so a series product's cheap `per_instance_base` row isn't mistaken for a standard price. Belongs with the §4 `priceKind` arg on `ResolveBestPriceForPerson` (business logic). No impact today — every existing product is `'standard'`.
+- [~] **Deferred to §4 → sidestepped:** filtering the *best-price* path (`GetBestProductPriceByProductSchedulePermissions` / `CatalogHelper::ResolveBestPriceForPerson`) by `price_kind` so a series product's cheap `per_instance_base` row isn't mistaken for a standard price. **§4 resolves series pricing through a dedicated `ClassSeriesHelper::ResolvePerInstanceCents` (over `GetSeriesPricesForProduct`), so the generic best-price path is never asked for a series product** — the `priceKind` arg on `ResolveBestPriceForPerson` was not needed and remains unbuilt. No impact today — every existing product is `'standard'`; revisit if the generic catalog ever has to render series products.
+
+### 3.1b NEW `TableHelpers::ClassSeriesInstances` (DONE — added during §4)
+- [x] §3 didn't originally list a CRUD wrapper for `class_series_instances`, but the no-SQL-in-business-logic rule requires one. Added `sql_util/table_helpers/class_series_instances.h/.cpp/_test.cpp`: `AddClassSeriesInstance`, `GetClassSeriesInstance`, `GetByClassInstanceId` (empty when none — e.g. workshops), `UpdateClassSeriesInstance` (bumps `updated_us`), `DeleteClassSeriesInstance`. Registered in `table_helpers/CMakeLists.txt`. Tests cover add/get, null policy fields, get-by-instance, the UNIQUE(class_instance_id) constraint, and update/delete.
 
 ### 3.2 Extend `TableHelpers::EventSessions` (DONE)
 - [x] `series_purchase_id` surfaced in reads (`SELECT *` getters) and writable via the existing generic `UpdateEventSession` (no dedicated setter needed).
@@ -135,15 +138,15 @@ Lowest layer first:
 ### 4.1 `ClassSeriesHelper` (`business_logic/scheduling/`)
 Files: `class_series_helper.h/.cpp/_test.cpp`.
 
-- [ ] `struct CreateSeriesInstanceRequest { ... }` — the `class_id` (an existing `kind='series'` class), the run window, the `kind='class_series'` product, the base impl + slots, and the `class_series_instances` fields (min_attendees, min_by_us, min_not_met_policy, prorated_signups_allowed).
-- [ ] `struct CreateSeriesInstanceResult { int64_t classInstanceId; int64_t productId; std::string errorCode; }`. (No `sessionIds` — occurrences are derived, not pre-created.)
-- [ ] `CreateSeriesInstance(Transaction&, const CreateSeriesInstanceRequest&)`:
+- [x] `struct CreateSeriesInstanceRequest { ... }` — the `class_id` (an existing `kind='series'` class), the run window, the `kind='class_series'` product, the base impl + slots, and the `class_series_instances` fields (min_attendees, min_by_us, min_not_met_policy, prorated_signups_allowed).
+- [x] `struct CreateSeriesInstanceResult { int64_t classInstanceId; int64_t productId; std::string errorCode; }`. (No `sessionIds` — occurrences are derived, not pre-created.)
+- [x] `CreateSeriesInstance(Transaction&, const CreateSeriesInstanceRequest&)`:
   1. Create the `class_instances` row (delegate to `ClassInstanceHelper::CreateInstance`) + the `class_series_instances` augmentation row.
   2. Create the base impl + slots (delegate to `ClassScheduleHelper::CreateImplementation` + slot adds) under the instance.
   3. Ensure the product has a `per_instance_base` price for each allowed tier — else return `MISSING_TIER_PRICING`. (No materialization — occurrences derive.)
   4. Return.
 
-- [ ] `BookFullSeries(Transaction&, personId, classInstanceId)`:
+- [x] `BookFullSeries(Transaction&, personId, classInstanceId)`: *(payment processed separately by checkout, matching `BookingHelper::BookEvent`; confirmation email deferred to the payment step — see §4 implementation note)*
   0. **Reject duplicate enrollment** (resolved OQ-P7-3): if the person already has an active (`status='confirmed'`) booking for ANY occurrence of this run, return `ALREADY_BOOKED`. This blocks a full-series buy after the user already joined via the prorated path mid-week; admin resolves the overlap manually.
   1. Derive the run's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange(classId, instance.valid_from_us, instance.valid_to_us)` → `occurrences`.
   2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × occurrences.size()`.
@@ -153,20 +156,20 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
   6. Send a confirmation email with a multi-VEVENT iCal (one VEVENT per occurrence).
   7. Return `{ok, purchaseId, bookingIds}`.
 
-- [ ] `BookProratedRemainingSeries(Transaction&, personId, classInstanceId, joinDateUs)`:
+- [x] `BookProratedRemainingSeries(Transaction&, personId, classInstanceId, joinDateUs)`:
   0. **Reject duplicate enrollment** (resolved OQ-P7-3, symmetric with `BookFullSeries`): if the person already has an active booking for any occurrence of this run, return `ALREADY_BOOKED`.
   1. Derive occurrences with `occurrence start > joinDateUs` → `remaining`.
   2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × remaining.size()`.
   3. Same purchase + payment + ensure-occurrence + per-occurrence booking creation as `BookFullSeries`, restricted to `remaining`.
   4. Return.
 
-- [ ] `CancelSeriesInstance(Transaction&, classInstanceId, adminPersonId, reason)`:
+- [x] `CancelSeriesInstance(Transaction&, classInstanceId, adminPersonId, reason)`: *(refunds each occurrence's 1/N share via `RefundHelper::ProcessPartialRefundCents` rather than reusing `SessionCancellationHelper::CancelSession`, which would 100%-refund the shared series purchase once per session and double-refund)*
   1. Find all persisted `event_sessions` for this run via `series_purchase_id` (use `GetSessionsForSeriesPurchase` for each purchase tied to the instance) — these are the ensured paid occurrences.
   2. For each: call `SessionCancellationHelper::CancelSession` (refund + cancellation email per Phase 2 rules: paid bookings get full refund, zero-money bookings get capacity release only).
   3. Mark `class_instances.is_active=false` for the run.
   4. Send a "series cancelled" admin alert if any attendees had been booked.
 
-- [ ] `CheckMinAttendees(Transaction&, classInstanceId, asOfUs)`:
+- [x] `CheckMinAttendees(Transaction&, classInstanceId, asOfUs)`: *(admin_decides writes an `admin_alerts` row feeding the existing digest; no `admin_alert_recipients` table exists yet and no "min-not-met-pending" column was added — re-alert dedup deferred to avoid premature schema churn)*
   1. Load the `class_series_instances` augmentation. Skip if `min_attendees IS NULL` OR `asOfUs < min_by_us`.
   2. Count distinct `bookings.person_id` across the run's purchased occurrences with `status='confirmed'`.
   3. If count < `min_attendees`:
@@ -175,12 +178,12 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
      - `admin_decides` → write an `admin_alerts` row + queue an email to `admin_alert_recipients`. Mark the instance "min-not-met-pending" so we don't alert again.
 
 ### 4.2 Refund integration (existing `RefundHelper`)
-- [ ] Verify Phase 2's session-cancellation flow already issues correct refunds for series bookings. Add a regression test that cancelling one session of a series-bound purchase refunds 1/N of the original purchase total (where N = total series instances at purchase time, NOT remaining today).
-- [ ] **Decision (resolved OQ-P7-2): ship partial-refund-per-`purchase_item` in Phase 7.** The cancel-one-session-of-a-series case requires it, so we do NOT defer to Phase 12+. If the existing `RefundHelper` only refunds at purchase-level granularity, extend it to support partial refunds keyed on `purchase_item` (refund 1/N of the line total per cancelled session, N = total series instances at purchase time). Add tests for the per-item partial-refund path.
+- [x] Verify Phase 2's session-cancellation flow already issues correct refunds for series bookings. Add a regression test that cancelling one session of a series-bound purchase refunds 1/N of the original purchase total (where N = total series instances at purchase time, NOT remaining today). *(covered by `RefundHelperTest::PartialRefundCentsRefundsOneOfN` + `ClassSeriesHelperTest::CancelOneSessionRefundsOneOfN`)*
+- [x] **Decision (resolved OQ-P7-2): ship partial-refund-per-`purchase_item` in Phase 7.** The cancel-one-session-of-a-series case requires it, so we do NOT defer to Phase 12+. If the existing `RefundHelper` only refunds at purchase-level granularity, extend it to support partial refunds keyed on `purchase_item` (refund 1/N of the line total per cancelled session, N = total series instances at purchase time). Add tests for the per-item partial-refund path. *(added `RefundHelper::ProcessPartialRefundCents` — cents-based, capped at remaining paid; refactored the shared refund-recording tail into `RecordRefund`. The series purchase carries one `purchase_item` quantity=N unit=per_instance, so per-item granularity = per-occurrence 1/N.)*
 
 ### 4.3 KeyValueTable conversions
-- [ ] `SeriesInfoToKeyValueTable(...)` — combines schedule + sessions count + per-tier pricing summary for the catalog card.
-- [ ] `BookSeriesResultToKeyValueTable(...)`.
+- [x] `SeriesInfoToKeyValueTable(...)` — combines schedule + sessions count + per-tier pricing summary for the catalog card. *(added `SeriesInfo` struct + converter in `scheduling_key_value_table.h/.cpp`; the producer that fills `SeriesInfo` from the DB is catalog/detail work, §5/§7.)*
+- [x] `BookSeriesResultToKeyValueTable(...)`.
 
 ## 5. Endpoints
 
