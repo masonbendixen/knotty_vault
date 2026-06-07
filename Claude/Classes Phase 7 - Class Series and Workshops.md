@@ -117,17 +117,18 @@ Lowest layer first:
 ### 2.4 Wire into DB init (DONE)
 - [x] `make_database_info.cpp` (include + `MakeClassSeriesInstancesTable` after `MakeClassInstancesTable`) and `create_database.cpp` `CreateTables()` (include + `CreateTable(kClassSeriesInstancesTable)` after `class_instances`). Verified FK creation order on **both** the test `SetupAllTables` batch (insertion order: `purchases`@173 < `event_sessions`@206; `class_instances` < `class_series_instances`) and the real `CreateTables` (`purchases`@203 < `event_sessions`@237; `class_instances`@231 < new table). `db_schema/CMakeLists.txt` updated.
 
-## 3. Table Helpers
+## 3. Table Helpers (DONE)
 
-### 3.1 Extend `TableHelpers::ProductPrices`
-- [ ] Surface `price_kind` in reads + writes.
-- [ ] `GetSeriesPricesForProduct(Transaction&, productId, asOfUs)` → returns the (tier, series_total, per_instance_base) tuples.
-- [ ] Tests.
+### 3.1 Extend `TableHelpers::ProductPrices` (DONE)
+- [x] `price_kind` surfaced in reads (the `SELECT *` getters already return it) and writes (`AddProductPrice` gained a trailing `priceKind` param, default `kProductPriceKindStandard`).
+- [x] `GetSeriesPricesForProduct(tx, productId, asOfUs)` → `std::vector<SeriesTierPrice>` (new struct: `permissionId` tier + `currency` + optional `seriesTotalCents`/`perInstanceBaseCents`). Resolves the effective active price schedule at `asOfUs` (CTE: most-recent active schedule with `valid_from_us <= asOfUs` and `valid_to_us` open), then pivots the `series_total`/`per_instance_base` rows per tier with `MAX(CASE …)` (the extended unique constraint guarantees ≤1 row per (permission, kind)). Empty when no schedule is effective or the product has no series prices.
+- [x] Tests: price_kind default, explicit two-rows-per-tier round-trip (validates the extended unique constraint), `GetSeriesPricesForProduct` per-tier (full + partial tier, standard price ignored, NULLS-FIRST order), empty-before-schedule / no-series-prices.
+- [ ] **Deferred to §4:** filtering the *best-price* path (`GetBestProductPriceByProductSchedulePermissions` / `CatalogHelper::ResolveBestPriceForPerson`) by `price_kind` so a series product's cheap `per_instance_base` row isn't mistaken for a standard price. Belongs with the §4 `priceKind` arg on `ResolveBestPriceForPerson` (business logic). No impact today — every existing product is `'standard'`.
 
-### 3.2 Extend `TableHelpers::EventSessions`
-- [ ] Surface `series_purchase_id` in reads.
-- [ ] `GetSessionsForSeriesPurchase(Transaction&, purchaseId)` — used by cancel-series path.
-- [ ] Tests.
+### 3.2 Extend `TableHelpers::EventSessions` (DONE)
+- [x] `series_purchase_id` surfaced in reads (`SELECT *` getters) and writable via the existing generic `UpdateEventSession` (no dedicated setter needed).
+- [x] `GetSessionsForSeriesPurchase(tx, seriesPurchaseId)` → sessions ordered by `start_time_us ASC, id ASC`.
+- [x] Tests: lookup returns only matching sessions in start order (unrelated purchase → empty); `series_purchase_id` is NULL by default, then surfaces in reads + the lookup after `UpdateEventSession`.
 
 ## 4. Business Logic
 
