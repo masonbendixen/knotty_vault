@@ -167,29 +167,30 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 ## 5. Endpoints
 
 ### 5.1 Admin send-digests endpoint
-- [ ] `endpoints/admin_send_weekly_digests.h/cpp` + test:
-  - `POST /api/admin/send_weekly_digests` — calls `WeeklyDigestHelper::SendPendingDigests(now)`. Returns `{ sent_count: N }`. Idempotent.
-  - Permission: `admin` (service account inherits it).
+### 5.0 Prerequisite — iCal feed token business logic (DONE)
+- [x] `business_logic/scheduling/ical_feed_token_helper.h/.cpp/_test.cpp` — `ICalFeedTokenHelper`. Owns random-token generation + BLAKE2b hashing (`AuthHelper`), storing only the hash via `TableHelpers::ICalFeedTokens` (hash at rest). `RegenerateToken` (raw, once), `LookupPersonByToken` (hash + lookup; 0 on malformed/unknown/revoked, base64-decode wrapped in try/catch), `RecordUse`. This is the §3/§4 "token gen in business logic, not the table helper" decision finally realized. Tests: round-trip, regenerate invalidates prior, malformed/unknown → 0, per-person scoping, record-use stamps.
 
-### 5.2 User preferences endpoints
-- [ ] `endpoints/get_my_notification_preferences.h/cpp` + test:
-  - `GET /api/me/notification_preferences` → preferences row.
-- [ ] `endpoints/update_my_notification_preferences.h/cpp` + test:
-  - `PUT /api/me/notification_preferences` body `{ weekly_digest_enabled?, digest_send_dow?, digest_send_hour_local? }`.
+### 5.1 Admin send-digests endpoint (DONE)
+- [x] `endpoints/admin_send_weekly_digests.h/cpp` + test:
+  - `POST /api/admin/send_weekly_digests` — `WeeklyDigestHelper::SendPendingDigests(now)`. Returns `{ sent_count }`. Idempotent.
+  - **Permission: `manage_class_schedule`** (there is no standalone `admin` permission — admin is a role; the scheduler service account already holds `manage_class_schedule` for the instructor-digest job, so reusing it is consistent and the service account inherits it).
+  - Tests: 401 anonymous, 403 without permission, sends + idempotent second run (real-now timing — a member with a Monday template entry always has an occurrence in the previewed week).
 
-### 5.3 Personal iCal feed endpoint
-- [ ] `endpoints/get_my_ical_feed.h/cpp` + test:
-  - **(OQ-P6-3 — opaque)** `GET /api/me/ical_feed.ics?token=<...>` — opaque path (NOT email-bearing); public route (no session) gated on the token.
-  - Looks up token → personId; if invalid → 404 (NOT 401 — keep the URL low-information for crawlers).
-  - Calls `PersonalICalFeedHelper::GenerateFeedForPerson(personId, now, now+90d)`.
-  - Sets the iCal headers from §4.2.
-  - Records `last_used_us`.
-- [ ] `endpoints/regenerate_ical_feed_token.h/cpp` + test:
-  - `POST /api/me/ical_feed/regenerate` — returns the new raw `webcal://...` URL.
-- [ ] Note: the `webcal://` URL is constructed client-side by replacing `https://` with `webcal://` on the URL the API returns.
+### 5.2 User preferences endpoints (DONE)
+- [x] `endpoints/get_my_notification_preferences.h/cpp` + test:
+  - `GET /api/me/notification_preferences` → the row via `SqlUtil::KeyValueTableToJson` (raw DB values — bool as `"t"`/`"f"`, ints as strings, matching the rest of the CRUD path; the §7 frontend maps these). Auto-creates with defaults. Tests: 401, defaults.
+- [x] `endpoints/update_my_notification_preferences.h/cpp` + test:
+  - `PUT /api/me/notification_preferences` body `{ weekly_digest_enabled?, digest_send_dow?, digest_send_hour_local? }`. Range-validates dow 0–6 / hour 0–23 (400 on violation), applies only editable keys, returns the updated row. Tests: 401, full update, partial update, dow + hour range rejections.
 
-### 5.4 Routing
-- [ ] All registered in `web_app.cpp`.
+### 5.3 Personal iCal feed endpoint (DONE)
+- [x] `endpoints/get_my_ical_feed.h/cpp` + test:
+  - **(OQ-P6-3 — opaque)** `GET /api/me/ical_feed.ics?token=<...>` — public route (no session), token-gated. Writes raw `text/calendar` directly (not the JSON wrapper). Invalid/missing token → 404. Calls `PersonalICalFeedHelper::GenerateFeedForPerson(personId, now, now + 90d)`. Headers: `Content-Type: text/calendar; charset=utf-8`, `X-PUBLISHED-TTL: PT1H`, `Cache-Control: max-age=3600`. Records `last_used_us`. Tests: missing/invalid → 404, valid → 200 + calendar, content has VEVENTs.
+- [x] `endpoints/regenerate_ical_feed_token.h/cpp` + test:
+  - `POST /api/me/ical_feed/regenerate` — returns `{ token, feed_path }` (the raw token + `"/api/me/ical_feed.ics?token=<token>"`). The token is URL-safe unpadded base64, so no escaping needed. Tests: 401, returns token+path that resolves on the feed, regeneration invalidates the prior token.
+- [x] Note: the absolute `webcal://` URL is built client-side from `feed_path` + the page origin (the server doesn't know its public host). §5 returns the path; §7 assembles the URL.
+
+### 5.4 Routing (DONE)
+- [x] All five registered in `web_app.cpp` (includes + reference vars) and added to `endpoints/CMakeLists.txt` (sources + tests).
 
 ## 6. Scheduled job integration
 
