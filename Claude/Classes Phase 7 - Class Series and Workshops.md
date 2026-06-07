@@ -98,31 +98,24 @@ Lowest layer first:
 ### 1.3 Per-instance base price source
 - [ ] Series products have TWO prices per tier: a "full series" price and a "per-instance base" price. Store both in `product_prices` and disambiguate via a new `price_kind` column (`'series_total'` vs `'per_instance_base'`). Pro-rating uses `per_instance_base × remaining`. Document this in 2.2.
 
-## 2. Database Schema
+## 2. Database Schema (DONE)
 
-### 2.1 New `class_series_instances` table (augments `class_instances` 1:1)
-- [ ] `db_schema/class_series_instances.h/.cpp`:
-  - `id BIGSERIAL PK`
-  - `class_instance_id BIGINT NOT NULL UNIQUE REFERENCES class_instances(id)` — 1:1 augmentation
-  - `min_attendees BIGINT` NULL
-  - `min_by_us BIGINT` NULL
-  - `min_not_met_policy TEXT` NULL (`'auto_cancel_refund' | 'proceed' | 'admin_decides'`, CHECK at app layer)
-  - `prorated_signups_allowed BOOLEAN NOT NULL DEFAULT FALSE`
-  - `created_us`, `updated_us`
-- [ ] The run's window (`valid_from_us`/`valid_to_us`) and product live on the parent `class_instances` row (Phase 1) — NOT duplicated here. `is_series` / `series_*` no longer exist on `class_schedules`.
-- [ ] Index on (`class_instance_id`).
+### 2.1 New `class_series_instances` table (augments `class_instances` 1:1) (DONE)
+- [x] `db_schema/class_series_instances.h/.cpp`: `id` PK, `class_instance_id` (FK → class_instances, **UNIQUE** → 1:1 + index), `min_attendees`/`min_by_us` (nullable BIGINT), `min_not_met_policy` (nullable TEXT; allowed-value constants `kSeriesMinNotMetPolicy*` in the header — app-layer CHECK, matching the codebase's no-DB-CHECK convention), `prorated_signups_allowed` (BOOL NOT NULL DEFAULT FALSE), `created_us`/`updated_us`.
+- [x] Run window + product live on the parent `class_instances` (not duplicated). `is_series`/`series_*` are not added to `class_schedules`.
+- [x] Index on `class_instance_id` is provided by the UNIQUE constraint (no separate `CREATE INDEX` needed — same as `attendance_templates`).
 
-### 2.2 New `product_prices.price_kind` column
-- [ ] Add `price_kind TEXT NOT NULL DEFAULT 'standard' CHECK (price_kind IN ('standard','series_total','per_instance_base'))`.
-- [ ] Standard products keep `price_kind='standard'`. Class-series products have two rows per tier — one `series_total`, one `per_instance_base`.
-- [ ] Update `CatalogHelper::ResolveBestPriceForPerson` to accept a `priceKind` arg (default `'standard'`).
+### 2.2 New `product_prices.price_kind` column (DONE)
+- [x] Added `price_kind TEXT NOT NULL DEFAULT 'standard'` + value constants `kProductPriceKind{Standard,SeriesTotal,PerInstanceBase}`. CHECK is enforced at the app layer (the schema builder has no CHECK support).
+- [x] **Extended the unique constraint** to include `price_kind` (renamed `uq_product_prices_..._variant_kind`) so a series product can hold both a `series_total` and a `per_instance_base` row for the same (product, schedule, permission, variant) tuple. Without this the two-rows-per-tier requirement would violate the old constraint.
+- [ ] `CatalogHelper::ResolveBestPriceForPerson` `priceKind` arg → deferred to §3/§4 (business-logic layer), not §2.
 
-### 2.3 `event_sessions.series_purchase_id`
-- [ ] Add `series_purchase_id BIGINT` NULL `REFERENCES purchases(id)` — marks instances tied to a paid series purchase. Used by the cancellation path to find sibling sessions.
-- [ ] Index on `series_purchase_id`.
+### 2.3 `event_sessions.series_purchase_id` (DONE)
+- [x] Added nullable FK `series_purchase_id → purchases(id)`.
+- [x] Partial index `event_sessions_series_purchase_idx` (WHERE series_purchase_id IS NOT NULL) added to `CreateEventSessionsIndexes`.
 
-### 2.4 Wire into DB init
-- [ ] `make_database_info.cpp` + `create_database.cpp` updates.
+### 2.4 Wire into DB init (DONE)
+- [x] `make_database_info.cpp` (include + `MakeClassSeriesInstancesTable` after `MakeClassInstancesTable`) and `create_database.cpp` `CreateTables()` (include + `CreateTable(kClassSeriesInstancesTable)` after `class_instances`). Verified FK creation order on **both** the test `SetupAllTables` batch (insertion order: `purchases`@173 < `event_sessions`@206; `class_instances` < `class_series_instances`) and the real `CreateTables` (`purchases`@203 < `event_sessions`@237; `class_instances`@231 < new table). `db_schema/CMakeLists.txt` updated.
 
 ## 3. Table Helpers
 
