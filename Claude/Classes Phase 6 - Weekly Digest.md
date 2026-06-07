@@ -202,24 +202,28 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 - [x] No config secrets needed — defaults in the DB columns suffice.
 - [x] Tests (`scheduled_job_test.cpp`): job present with correct POST path, interval propagated from config, can be disabled with `0`. Updated the existing job-count assertions (13→14) and the all-zeros `JobIntervals` aggregates in `scheduled_job_test.cpp`, `scheduler_test.cpp`, and `scheduler_config_test.cpp` (the new field's default-member-initializer would otherwise re-enable it under aggregate init).
 
-## 7. Frontend
+## 7. Frontend (DONE)
 
-### 7.1 Notification preferences page
-- [ ] `ui/src/app/pages/account/notification-preferences/notification-preferences.component.*/.spec.ts`.
-- [ ] Toggle for weekly digest; day-of-week picker; hour-of-day picker (per memory `feedback_date_time_pickers.md` — hour-of-day uses a real hour picker, not a free text field).
-- [ ] Mat-card border per memory `feedback_mat_card_border.md`; back nav per memory `feedback_account_page_layout.md`.
+### 7.1 Notification preferences page (DONE)
+- [x] `ui/src/app/pages/account/notification-preferences/notification-preferences.component.{ts,html,scss,spec.ts}` (standalone, separate template/style files).
+- [x] `mat-slide-toggle` for the weekly digest; **day-of-week `mat-select`** (Sunday–Saturday) and **hour-of-day `mat-select`** (12:00 AM–11:00 PM — a real picker, not free text, per `feedback_date_time_pickers.md`).
+- [x] Mat-card border `1px solid #d1d5db` (`feedback_mat_card_border.md`); back-nav `← Back to account` + `din-condensed-bold` title (`feedback_account_page_layout.md`).
+- [x] Route `/my/notification-preferences` added to `account.routes.ts`; a "Notifications" dashboard card added to the account landing page (`profile/user.component`), with its spec updated (card count 10→11 + nav test).
+- [x] Spec uses `ServerAccessProxy(mock)` + `SERVER_ACCESS_TOKEN` + `RouterTestingModule` + `NoopAnimationsModule`: loads defaults, 7 day / 24 hour options, save-persists, load-error, regenerate-builds-webcal, regenerate-error.
 
-### 7.2 Calendar feed panel
-- [ ] On the preferences page (or a separate `/my/account/calendar-feed` page), show the user's `webcal://...` URL with copy-to-clipboard button + "Regenerate URL" action.
-- [ ] Explanatory text: "Paste this into Google Calendar / Apple Calendar / Outlook to subscribe. Your calendar will auto-update as your bookings change."
-- [ ] Spec.
+### 7.2 Calendar feed panel (DONE)
+- [x] On the same preferences page: a "Subscribe to your calendar" card with a Generate/Regenerate button, the `webcal://…` URL, and a copy-to-clipboard button. Because the token is hashed at rest, the URL is only shown right after (re)generation (documented in the panel copy).
+- [x] Explanatory text about pasting into Google/Apple/Outlook + auto-update.
+- [x] The absolute `webcal://` URL is built client-side: `window.location.origin + feed_path`, then `https?://` → `webcal://`.
 
-### 7.3 `ServerAccess` extensions
-- [ ] `getMyNotificationPreferences()`, `updateMyNotificationPreferences(prefs)`, `regenerateICalFeedToken()`, `getMyICalFeedUrl()` (returns the URL with token in query string).
-- [ ] Update `ServerAccess.mock.spec.ts`.
+### 7.3 `ServerAccess` extensions (DONE)
+- [x] `getMyNotificationPreferences()`, `updateMyNotificationPreferences(prefs)`, `regenerateICalFeedToken()` added to all five layers (types interface, proxy, `ServerAccessNetwork`, `ServerAccessMock`).
+- [x] **`getMyICalFeedUrl()` dropped** — there's no server endpoint to fetch an existing token (hash at rest), so the panel builds the URL from `regenerateICalFeedToken()`'s `feed_path`. Documented.
+- [x] `ServerAccessNetwork.getMyNotificationPreferences` normalizes the API's `"t"`/`"f"` bool to a real boolean (the GET returns the raw row via `KeyValueTableToJson`).
+- [x] `ServerAccess.mock.spec.ts` extended: prefs defaults/401, update applies+persists/omitted-fields/range-rejections, regenerate returns+rotates+401.
 
-### 7.4 Types
-- [ ] `ui/src/app/shared/types/notification.types.ts`: `NotificationPreferences`, `ICalFeedInfo`.
+### 7.4 Types (DONE)
+- [x] `ui/src/app/shared/types/notification.types.ts`: `NotificationPreferences`, `UpdateNotificationPreferences`, `ICalFeedInfo`.
 
 ## 8. Admin Metadata (DONE)
 

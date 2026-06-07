@@ -150,6 +150,7 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
   4. Return.
 
 - [ ] `BookFullSeries(Transaction&, personId, classInstanceId)`:
+  0. **Reject duplicate enrollment** (resolved OQ-P7-3): if the person already has an active (`status='confirmed'`) booking for ANY occurrence of this run, return `ALREADY_BOOKED`. This blocks a full-series buy after the user already joined via the prorated path mid-week; admin resolves the overlap manually.
   1. Derive the run's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange(classId, instance.valid_from_us, instance.valid_to_us)` → `occurrences`.
   2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × occurrences.size()`.
   3. Create a `purchase` row + one `purchase_item` for the series product.
@@ -159,6 +160,7 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
   7. Return `{ok, purchaseId, bookingIds}`.
 
 - [ ] `BookProratedRemainingSeries(Transaction&, personId, classInstanceId, joinDateUs)`:
+  0. **Reject duplicate enrollment** (resolved OQ-P7-3, symmetric with `BookFullSeries`): if the person already has an active booking for any occurrence of this run, return `ALREADY_BOOKED`.
   1. Derive occurrences with `occurrence start > joinDateUs` → `remaining`.
   2. Resolve `per_instance_base` for the user's best tier → `perInstanceCents`; `totalCents = perInstanceCents × remaining.size()`.
   3. Same purchase + payment + ensure-occurrence + per-occurrence booking creation as `BookFullSeries`, restricted to `remaining`.
@@ -180,7 +182,7 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 ### 4.2 Refund integration (existing `RefundHelper`)
 - [ ] Verify Phase 2's session-cancellation flow already issues correct refunds for series bookings. Add a regression test that cancelling one session of a series-bound purchase refunds 1/N of the original purchase total (where N = total series instances at purchase time, NOT remaining today).
-- [ ] If the existing logic only refunds at purchase-level granularity, extend `RefundHelper` to support partial refunds per `purchase_item`. Otherwise leave as full-series refund on `CancelSeries`.
+- [ ] **Decision (resolved OQ-P7-2): ship partial-refund-per-`purchase_item` in Phase 7.** The cancel-one-session-of-a-series case requires it, so we do NOT defer to Phase 12+. If the existing `RefundHelper` only refunds at purchase-level granularity, extend it to support partial refunds keyed on `purchase_item` (refund 1/N of the line total per cancelled session, N = total series instances at purchase time). Add tests for the per-item partial-refund path.
 
 ### 4.3 KeyValueTable conversions
 - [ ] `SeriesInfoToKeyValueTable(...)` — combines schedule + sessions count + per-tier pricing summary for the catalog card.
@@ -263,12 +265,21 @@ Daily auto-cancel job runs at 03:00 local, finds a series past `series_min_by_us
 
 ## 11. Open Questions
 
-- **OQ-P7-1.** When prorated mid-series booking creates fewer bookings than the original purchaser's full-series count, do downstream reports key off "instances purchased" vs "instances attended"? Define both columns explicitly when reporting.
-	- Mason- Can't we show both? Can you explain downstream reports?
-- **OQ-P7-2.** If `RefundHelper` only does full-purchase refunds today, do we ship partial-refund-per-purchase-item in Phase 7 or leave that to Phase 12+? Recommended: ship in Phase 7 — the cancel-one-session-of-a-series case needs it.
-	- Mason- I'll go with your recommendation.
-- **OQ-P7-3.** Should `BookFullSeries` reject the booking if the user already has an active booking for any series instance (e.g. they came via the prorated path mid-week)? Recommended: yes, return `ALREADY_BOOKED`; admin can resolve manually.
-	- Mason- I'll go with your recommendation.
+All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into §4.2 and §4.1 respectively. OQ-P7-1 is answered below — and yes, we can (and will) show both.
+
+- **OQ-P7-1. — RESOLVED: show both columns.**
+	- **Mason asked:** "Can't we show both? Can you explain downstream reports?"
+	- **What "downstream reports" means here.** "Downstream reports" are the admin/staff-facing summaries we build *on top of* the series booking data — they don't add new booking behavior, they just read and aggregate it. For series specifically there are three that care about the purchased-vs-attended distinction:
+		1. **Enrollment / roster report** — per series run, who is signed up and how many session-slots each person holds. A full-series buyer holds N slots; a prorated mid-series joiner holds only their *remaining* slots (e.g. 4 of 6). This is the report the instructor prints before a session and the one the auto-cancel min-attendees job conceptually counts against.
+		2. **Attendance report** — per session, who actually checked in. Driven by the attendance-tracking records (Phase 2), NOT by how many slots were purchased. Someone can hold 6 slots but attend 4.
+		3. **Revenue / reconciliation report** — per series run, money collected. Keys off `purchase` / `purchase_item` totals (full-series total vs prorated sums), independent of attendance.
+	- **The original concern.** Because a prorated join produces fewer `bookings` than a full-series buy, a naïve count of `bookings` conflates "how many sessions did this person pay to be in" with "how many sessions did this person show up to." If a single report column silently mixed the two, enrollment, attendance, and revenue numbers would disagree and nobody would know which is "right."
+	- **Answer — show both, as two explicit, separately-labelled columns.** We do not pick one. Every series report that lists a person carries:
+		- **`instances_purchased`** — count of `bookings` rows tied to that person's series `purchase` for the run (full = N at purchase time; prorated = remaining-at-join). Derived from `bookings` joined to the series `purchase_id`.
+		- **`instances_attended`** — count of attendance/check-in records for that person across the run's occurrences. Derived from the Phase 2 attendance data, never from the booking count.
+	- These are always rendered as distinct labelled columns (never summed into one "sessions" number), so enrollment, attendance, and revenue each read the column they actually mean. No schema change is required for this — both are aggregations over existing `bookings` + attendance tables; it's a reporting/query concern, surfaced when the series reporting views are built (a later reporting phase, not blocking Phase 7 implementation).
+- **OQ-P7-2. — RESOLVED (Mason: "go with your recommendation").** Ship partial-refund-per-`purchase_item` in Phase 7. Folded into §4.2.
+- **OQ-P7-3. — RESOLVED (Mason: "go with your recommendation").** `BookFullSeries` (and, symmetrically, `BookProratedRemainingSeries`) reject with `ALREADY_BOOKED` when the user already holds an active booking for any occurrence of the run; admin resolves manually. Folded into §4.1.
 
 ## 12. Cross-References
 
