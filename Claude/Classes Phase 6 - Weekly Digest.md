@@ -228,8 +228,8 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 ## 8. Admin Metadata (DONE)
 
 All in `database_helper/create_database.cpp` (data seeding; no per-row unit tests, consistent with the Phase 5 attendance metadata).
-- [x] `user_notification_preferences` → `PopulateAllowedTables` + `PopulateAdminNestedTables` (nests under `people` via its `person_id` FK).
-- [x] `ical_feed_tokens` → same; plus **`token_hash` redacted** in `PopulateAdminColumnRedactions` (alongside `password_hash` / `device_tokens.secret_hash` / `email_verifications.token_hash`).
+- [x] `user_notification_preferences` → `PopulateAllowedTables` + **`PopulateAdminTopLevelTables`** + `PopulateAdminNestedTables`. **Dual registration is required**: `admin_column_data_info` / `admin_column_friendly_names` / `admin_table_friendly_names` all FK to `admin_top_level_tables.name`, so a table that has any of that metadata must be top-level even when it also nests (the "nested" flag is only a UI hint). Missing the top-level row throws `fk_admin_column_data_info_table_name`.
+- [x] `ical_feed_tokens` → same dual registration; plus **`token_hash` redacted** in `PopulateAdminColumnRedactions` (alongside `password_hash` / `device_tokens.secret_hash` / `email_verifications.token_hash`).
 - [x] **Admin-only** (no `admin_table_permissions` mapping): the plan's `manage_users` permission doesn't exist, and these hold personal preferences + a security token — so only full admins reach them via CRUD (same "no mapping = admin-only" pattern as `permission_implications`).
 - [x] Column data info, column friendly names, table friendly names, and FK display templates added for both tables so the admin support browser renders them cleanly. `token_hash` / `last_*`/timestamps shown read-only.
 
