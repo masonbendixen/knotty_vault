@@ -178,7 +178,7 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 
 ### 5.2 User preferences endpoints (DONE)
 - [x] `endpoints/get_my_notification_preferences.h/cpp` + test:
-  - `GET /api/me/notification_preferences` → the row via `SqlUtil::KeyValueTableToJson` (raw DB values — bool as `"t"`/`"f"`, ints as strings, matching the rest of the CRUD path; the §7 frontend maps these). Auto-creates with defaults. Tests: 401, defaults.
+  - `GET /api/me/notification_preferences` → the row via `SqlUtil::KeyValueTableToJson`. Note its coercion: integer-looking strings become JSON **numbers** (`digest_send_dow`, `digest_send_hour_local`, `last_digest_sent_us`, ids), while the Postgres bool stays the **string** `"t"`/`"f"` (the §7 frontend maps `"t"`→true). Auto-creates with defaults. Tests: 401, defaults.
 - [x] `endpoints/update_my_notification_preferences.h/cpp` + test:
   - `PUT /api/me/notification_preferences` body `{ weekly_digest_enabled?, digest_send_dow?, digest_send_hour_local? }`. Range-validates dow 0–6 / hour 0–23 (400 on violation), applies only editable keys, returns the updated row. Tests: 401, full update, partial update, dow + hour range rejections.
 
