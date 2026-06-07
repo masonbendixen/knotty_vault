@@ -192,10 +192,15 @@ Files: `business_logic/scheduling/weekly_digest_helper.h/.cpp/_test.cpp`.
 ### 5.4 Routing (DONE)
 - [x] All five registered in `web_app.cpp` (includes + reference vars) and added to `endpoints/CMakeLists.txt` (sources + tests).
 
-## 6. Scheduled job integration
+## 6. Scheduled job integration (DONE)
 
-- [ ] Add hourly job to `knottyyoga_helper`: `POST /api/admin/send_weekly_digests`. Hourly cadence is fine because the endpoint is idempotent and `GetUsersDueForDigest` filters precisely. Helper logs the returned `sent_count`.
-- [ ] No config secrets needed — defaults in the DB column suffice.
+- [x] Added the `send_weekly_digests` job to the scheduler (`knottyyoga_helper`): `POST /api/admin/send_weekly_digests`, hourly. Wired across the three standard places:
+  - `scheduler/scheduler_config.h` — `JobIntervals::weeklyDigestSeconds = 3600` (hourly).
+  - `scheduler/scheduled_job.cpp` `BuildStandardJobs` — `AppendIfEnabled(... "send_weekly_digests", "/api/admin/send_weekly_digests", weeklyDigestSeconds)`.
+  - `scheduler/main.cpp` — `--weekly_digest_interval` ABSL flag (default 3600), wired into `BuildConfigFromFlags` + the startup `LogConfigSummary`.
+- [x] Hourly cadence is correct because the endpoint is idempotent and `SendPendingDigests` gates each member on their own facility-local send time (the original plan's `GetUsersDueForDigest` logic, now in business logic per §3.1/§4.1). `0` disables the job.
+- [x] No config secrets needed — defaults in the DB columns suffice.
+- [x] Tests (`scheduled_job_test.cpp`): job present with correct POST path, interval propagated from config, can be disabled with `0`. Updated the existing job-count assertions (13→14) and the all-zeros `JobIntervals` aggregates in `scheduled_job_test.cpp`, `scheduler_test.cpp`, and `scheduler_config_test.cpp` (the new field's default-member-initializer would otherwise re-enable it under aggregate init).
 
 ## 7. Frontend
 
