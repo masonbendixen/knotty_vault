@@ -50,15 +50,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Existing `BookingHelper`, `RefundHelper`, voucher infrastructure ([[Vouchers and Refunds]]).
 - Existing scheduled jobs daemon ([[Scheduled Jobs]]).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.5a
-> This phase was written against "a series is a `class_schedule` with `is_series=true`". The redesign **replaces that entirely.** The new model:
-> - **A series is a `classes` row of `kind='series'`** (shared marketing identity — name / description / photo) **with one `class_instances` row per run** ("Fall 2026", "Spring 2027"). The instance carries the run's `valid_from_us`/`valid_to_us`, its `product_id` (`kind='class_series'`), and the schedule lives in the instance's `class_schedules` impl(s) + slots.
-> - **`class_series_instances` (NEW table, this phase)** is a 1:1 augmentation of `class_instances` carrying the series-bundle fields that used to be planned on `class_schedules`: `min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`. (Per L-5 / OQ-CSI-16. The `is_series` / `series_*` columns no longer exist on `class_schedules` — §2.1 below is rewritten.)
-> - **Holiday overrides during a run** (Mason's Labor Day Monday) are higher-priority empty/edited impls under the same instance — they reduce the derived-occurrence count, which feeds pricing.
-> - **Pricing = (count of derived occurrences in the instance's window) × (per-tier `per_instance_base`).** The "full series total" is computed, not stored separately — though the `price_kind` split in §2.2 is still useful for an explicit per-instance base vs an optional flat override. Derive occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` over the instance window.
-> - **A series purchase eagerly ensures `event_sessions` rows** for every derived occurrence (paid bookings can't be lazy — real money) via `ClassScheduleHelper::EnsureSessionExists`, setting `series_purchase_id` on each. The min-attendees auto-cancel job operates on those persisted rows.
-> - **Workshops** are the same shape, simpler: `classes.kind='workshop'` + one `class_instances` per run + `kind='workshop'` product + a single-slot bounded impl, NO `class_series_instances` augmentation.
-> Throughout this doc, read "series `class_schedule` / `scheduleId`" as "series `class_instances` / `classInstanceId`", and "materialize series sessions" as "ensure occurrence rows at purchase". The §4 helper signatures are reframed accordingly below.
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.5a
+This phase was written against "a series is a `class_schedule` with `is_series=true`". The redesign **replaces that entirely.** The new model:
+- **A series is a `classes` row of `kind='series'`** (shared marketing identity — name / description / photo) **with one `class_instances` row per run** ("Fall 2026", "Spring 2027"). The instance carries the run's `valid_from_us`/`valid_to_us`, its `product_id` (`kind='class_series'`), and the schedule lives in the instance's `class_schedules` impl(s) + slots.
+- **`class_series_instances` (NEW table, this phase)** is a 1:1 augmentation of `class_instances` carrying the series-bundle fields that used to be planned on `class_schedules`: `min_attendees`, `min_by_us`, `min_not_met_policy`, `prorated_signups_allowed`. (Per L-5 / OQ-CSI-16. The `is_series` / `series_*` columns no longer exist on `class_schedules` — §2.1 below is rewritten.)
+- **Holiday overrides during a run** (Mason's Labor Day Monday) are higher-priority empty/edited impls under the same instance — they reduce the derived-occurrence count, which feeds pricing.
+- **Pricing = (count of derived occurrences in the instance's window) × (per-tier `per_instance_base`).** The "full series total" is computed, not stored separately — though the `price_kind` split in §2.2 is still useful for an explicit per-instance base vs an optional flat override. Derive occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange` over the instance window.
+- **A series purchase eagerly ensures `event_sessions` rows** for every derived occurrence (paid bookings can't be lazy — real money) via `ClassScheduleHelper::EnsureSessionExists`, setting `series_purchase_id` on each. The min-attendees auto-cancel job operates on those persisted rows.
+- **Workshops** are the same shape, simpler: `classes.kind='workshop'` + one `class_instances` per run + `kind='workshop'` product + a single-slot bounded impl, NO `class_series_instances` augmentation.
+Throughout this doc, read "series `class_schedule` / `scheduleId`" as "series `class_instances` / `classInstanceId`", and "materialize series sessions" as "ensure occurrence rows at purchase". The §4 helper signatures are reframed accordingly below.
 
 **Outcome:**
 - Admin creates a series run as a `class_instances` row (under a `kind='series'` class) + its `class_series_instances` augmentation + base impl; this phase wires the booking + purchase model on top.
@@ -201,7 +201,7 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 ## 7. Frontend
 
 ### 7.1 Catalog series cards
-- [ ] Class catalog cards distinguish series by the `kind='series'` badge, and list upcoming runs ("X sessions starting <date>", per-tier price) per instance.
+- [ ] Class catalog cards distinguish series by the `kind='series'` badge, and list upcoming runs ("X sessions starting {date}", per-tier price) per instance.
 - [ ] Spec.
 
 ### 7.2 Series detail page
@@ -264,8 +264,11 @@ Daily auto-cancel job runs at 03:00 local, finds a series past `series_min_by_us
 ## 11. Open Questions
 
 - **OQ-P7-1.** When prorated mid-series booking creates fewer bookings than the original purchaser's full-series count, do downstream reports key off "instances purchased" vs "instances attended"? Define both columns explicitly when reporting.
+	- Mason- Can't we show both? Can you explain downstream reports?
 - **OQ-P7-2.** If `RefundHelper` only does full-purchase refunds today, do we ship partial-refund-per-purchase-item in Phase 7 or leave that to Phase 12+? Recommended: ship in Phase 7 — the cancel-one-session-of-a-series case needs it.
+	- Mason- I'll go with your recommendation.
 - **OQ-P7-3.** Should `BookFullSeries` reject the booking if the user already has an active booking for any series instance (e.g. they came via the prorated path mid-week)? Recommended: yes, return `ALREADY_BOOKED`; admin can resolve manually.
+	- Mason- I'll go with your recommendation.
 
 ## 12. Cross-References
 
