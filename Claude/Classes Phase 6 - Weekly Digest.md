@@ -233,14 +233,15 @@ All in `database_helper/create_database.cpp` (data seeding; no per-row unit test
 - [x] **Admin-only** (no `admin_table_permissions` mapping): the plan's `manage_users` permission doesn't exist, and these hold personal preferences + a security token — so only full admins reach them via CRUD (same "no mapping = admin-only" pattern as `permission_implications`).
 - [x] Column data info, column friendly names, table friendly names, and FK display templates added for both tables so the admin support browser renders them cleanly. `token_hash` / `last_*`/timestamps shown read-only.
 
-## 9. Tests-Required Summary
+## 9. Tests-Required Summary (DONE — all covered by tests written in §3–§7; no new work)
 
-- [ ] Table helper tests for both new tables.
-- [ ] `weekly_digest_helper_test.cpp`: empty skipped, full digest, exception-skip, paid booking, idempotency.
-- [ ] `personal_ical_feed_helper_test.cpp`: 90-day window, exception-skip respected, includes both templated + paid items.
-- [ ] Endpoint tests for all five new endpoints (`admin_send_weekly_digests`, `get/update_my_notification_preferences`, `get_my_ical_feed`, `regenerate_ical_feed_token`).
-- [ ] Mail helper test: assert HTML body + plain-text body + attachment count + filename `weekly_digest.ics`.
-- [ ] Frontend specs for preferences page, calendar-feed panel, mock service.
+- [x] Table helper tests for both new tables → `sql_util/table_helpers/user_notification_preferences_test.cpp` (8) + `ical_feed_tokens_test.cpp` (8). (§3)
+- [x] `weekly_digest_helper_test.cpp`: empty skipped, full digest (templated + one-off + paid), exception-skip, paid booking, send-with-`.ics`, multi-VEVENT, idempotency, disabled, before-send-time. (§4)
+- [x] `personal_ical_feed_helper_test.cpp`: empty calendar, 1-week templated+paid, 90-day many-occurrences, exception-skip respected. (§4)
+- [x] Endpoint tests for all five endpoints: `admin_send_weekly_digests_test.cpp`, `get_my_notification_preferences_test.cpp`, `update_my_notification_preferences_test.cpp`, `get_my_ical_feed_test.cpp`, `regenerate_ical_feed_token_test.cpp`. (§5)
+- [x] Mail test (split, correctly): `weekly_digest_mail_test.cpp` asserts the HTML + plain-text bodies (the generator is pure — no attachment); the `weekly_digest.ics` filename + VEVENT/attachment counts are asserted in `weekly_digest_helper_test.cpp` (`SendDigestSendsWithIcsAttachment`, `SendDigestMultipleVeventsAndUids`). (§4)
+- [x] Frontend specs: `notification-preferences.component.spec.ts` (preferences page **and** calendar-feed panel) + extended `ServerAccess.mock.spec.ts` (mock service). Plus `ical_feed_token_helper_test.cpp` for the §5 token business logic and the `BuildTemplateOccurrenceUid` / `GetFirstActiveFacilityTimezone` unit tests. (§7 / §4 / §5)
+- Also added (beyond the original list): `ical_feed_token_helper_test.cpp` (token gen/lookup/rotation), `ical_generator_test.cpp` `BuildTemplateOccurrenceUid` case, `facilities_test.cpp` `GetFirstActiveFacilityTimezone` cases.
 
 ## 10. Cross-Layer Acceptance Criteria
 
