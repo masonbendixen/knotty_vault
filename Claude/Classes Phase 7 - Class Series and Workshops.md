@@ -203,38 +203,32 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 ## 7. Frontend
 
+> **§7 backend prerequisite (built this pass):** the series detail UI needs a *reader* for per-run data (occurrence count + viewer-resolved per-instance/total price + min policy), which §4.3 deferred ("producer is §5/§7 work"). Added `ClassSeriesHelper::GetUpcomingSeriesRuns(tx, classId, personId, asOfUs)` → `vector<SeriesInfo>` + `SeriesInfosToKeyValueTableArray` + **`GET /api/class_series_runs/<classId>`** (public; pricing resolves for the logged-in viewer or public). Helper + endpoint tests added. ServerAccess exposes it as `getSeriesRuns(classId)`.
+
 ### 7.1 Catalog series cards
-- [ ] Class catalog cards distinguish series by the `kind='series'` badge, and list upcoming runs ("X sessions starting {date}", per-tier price) per instance.
-- [ ] Spec.
+- [~] **Deferred.** Badging series in the public catalog needs `classes.kind` on `ClassCatalogEntry`, which the catalog endpoint (`ClassCatalogHelper`/converter/type) does not currently surface — a backend change out of scope for this pass. The series experience is reachable today via the class-detail page (§7.2), which self-detects a series by calling `getSeriesRuns` and rendering the run section when runs exist (no `kind` needed). Follow-up: add `kind` to the catalog entry + a badge.
 
-### 7.2 Series detail page
-- [ ] New `series-detail.component.*/.spec.ts` (or extension of class-detail when `classes.kind='series'`). For a series class, lists upcoming runs (instances); selecting a run shows its detail.
-- [ ] Sections: hero photo + name; "What you get: 6 sessions Mon/Wed 7-8pm starting July 1" (derived occurrence count for the run); per-tier pricing (your tier highlighted); min-attendees warning if `class_series_instances.min_attendees` set and current count < threshold; "Buy full series" CTA / "Join from this week — prorated $X" CTA depending on date.
-- [ ] BC-5 non-refundable banner.
-
-### 7.3 Booking flow
-- [ ] Series-booking flow uses existing Square Web SDK checkout path; no new payment component.
-- [ ] On success: thank-you screen + "Sessions added to your calendar" with link to my-bookings.
+### 7.2 Series detail page + ### 7.3 Booking flow
+- [x] Implemented as an **extension of `class-detail`** (per the plan's "or extension" option). On load it calls `getSeriesRuns(classId)`; when runs come back it renders a **Series Runs** section: per run the name, "N sessions · {date range}", resolved **full-series total** + **per-session** price, a **min-attendees warning** when `min_attendees` is set, the **non-refundable banner**, and CTAs. Logged-out viewers see "Log in to book". `class-detail.component.{ts,html,scss}` + extended `.spec.ts` (renders section, price, min warning, login-gated, books full series → success message, friendly error on failure, prorated CTA once the run has started).
+- [x] Booking calls `bookSeries(classInstanceId, joinDateUs?)` — full when not started, **prorated** ("Join from today") once started and `prorated_signups_allowed`. On success it shows "Booked! N sessions added — pay at checkout to confirm". *(Payment remains the existing `purchase_pay_card` step, matching `BookEvent`; a dedicated thank-you screen wiring into the checkout/my-bookings link is the remaining polish.)*
 
 ### 7.4 My-bookings series rollup
-- [ ] My-bookings page renders series purchases as a single parent row with expandable child sessions list.
-- [ ] Spec.
+- [~] **Deferred.** There is no existing `my-bookings` page component in the repo to extend (the `getMyBookings` reader exists but is not yet surfaced as its own rollup page). Folds into whenever that page is built.
 
 ### 7.5 Admin series-create form
-- [ ] Builds on Phase 1's instance + impl editors: creating a run under a `kind='series'` class reveals the `class_series_instances` fields (min attendees + min-by date + min-not-met policy radio buttons) and a per-tier `per_instance_base` price matrix. The run window comes from the instance; the schedule from its base impl + slots. (No `is_series` toggle — the class's `kind` already determines this.)
-- [ ] Spec.
+- [~] **Deferred (data layer ready).** `createSeriesInstance(req)` is wired end-to-end (interface + proxy + network + mock + mock specs) and the endpoint is live, so a series run can be created via the API today. The dedicated admin form (min-attendees / min-by date / policy radios + per-tier `per_instance_base` price matrix, built on Phase 1's instance+impl editors in `manage/class-schedules`) is the remaining UI piece.
 
 ### 7.6 `ServerAccess` extensions
-- [ ] `createSeriesInstance(req)`, `bookSeries(classInstanceId, joinDateUs?)`, `checkSeriesMinAttendees(classInstanceId)`, `cancelSeries(classInstanceId, reason)`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [x] `getSeriesRuns(classId)`, `createSeriesInstance(req)`, `bookSeries(classInstanceId, joinDateUs?)`, `checkSeriesMinAttendees(classInstanceId, asOfUs?)`, `cancelSeries(classInstanceId, reason)` — added to the interface, `ServerAccessProxy`, `ServerAccessNetwork` (with string→bool normalization), and `ServerAccessMock`.
+- [x] `ServerAccess.mock.spec.ts` — new `describe('class series')` block: getSeriesRuns, create (success + INVALID_WINDOW/INVALID_MIN_NOT_MET_POLICY + 401), book (full/prorated/ALREADY_BOOKED/INSTANCE_NOT_FOUND/401), check-min (skip-before-deadline + admin_alerted), cancel (+401).
 
 ### 7.7 Types
-- [ ] `series.types.ts`: `SeriesSummary`, `SeriesDetail`, `SeriesPricing`, `BookSeriesResult`.
+- [x] `series.types.ts`: `SeriesRun`, `SeriesSlotInput`, `CreateSeriesInstanceRequest`/`Response`, `BookSeriesResult`, `CheckMinAttendeesResult`, `CancelSeriesResult`.
 
 ## 8. Admin Metadata
 
-- [ ] No new top-level tables (uses Phase 1's `class_schedules`).
-- [ ] `product_prices.price_kind` shows up in the admin column data info with friendly name "Price Kind" and a dropdown editor for the three values.
+- [x] No new top-level tables.
+- [x] `product_prices.price_kind` shows up in the admin column data info with friendly name "Price Kind" and a dropdown editor for the three values — added the column-data-info row, the friendly name, a new `product_price_kind` enum (standard / series_total / per_instance_base) and the column binding in `create_database.cpp`.
 
 ## 9. Tests-Required Summary
 
