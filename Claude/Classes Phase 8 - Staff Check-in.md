@@ -53,12 +53,12 @@ Per P-5: staff is the only role that records attendance. NO kiosk / self-check-i
 - Existing `BookingHelper` (waitlist, status flags).
 - Existing `EventReminderHelper` pattern for hourly job (`FinalizeAttendance`).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
-> Small but load-bearing under the lazy model: **check-in is recording trigger #6.** A membership-included class occurrence usually has NO persisted `event_sessions` row when staff opens the check-in screen — it's derived. So:
-> - The check-in screen opens against a **derived occurrence** identified by (`class_schedule_slot_id`, `occurrence_date_us`), not necessarily an existing `event_session_id`.
-> - Checking someone in calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` first (idempotent — returns the existing row if a prior check-in / note already created it), then creates the `booking` with `checked_in_us` set + `purchase_id IS NULL`.
-> - The pre-pop "template attendees" list joins `attendance_template_entries` by **`class_schedule_slot_id`** (slot-keyed, per the Phase 5 redesign), minus skip-exceptions keyed by (`class_schedule_slot_id`, `occurrence_date_us`).
-> - The "last-4-weeks attendance" lookup still joins via the denormalized `event_sessions.class_id` (only persisted/attended rows have that, which is exactly what we want).
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+Small but load-bearing under the lazy model: **check-in is recording trigger #6.** A membership-included class occurrence usually has NO persisted `event_sessions` row when staff opens the check-in screen — it's derived. So:
+- The check-in screen opens against a **derived occurrence** identified by (`class_schedule_slot_id`, `occurrence_date_us`), not necessarily an existing `event_session_id`.
+- Checking someone in calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` first (idempotent — returns the existing row if a prior check-in / note already created it), then creates the `booking` with `checked_in_us` set + `purchase_id IS NULL`.
+- The pre-pop "template attendees" list joins `attendance_template_entries` by **`class_schedule_slot_id`** (slot-keyed, per the Phase 5 redesign), minus skip-exceptions keyed by (`class_schedule_slot_id`, `occurrence_date_us`).
+- The "last-4-weeks attendance" lookup still joins via the denormalized `event_sessions.class_id` (only persisted/attended rows have that, which is exactly what we want).
 
 **Outcome:**
 - Staff portal: per-session check-in page with autocomplete + pre-pop list.
