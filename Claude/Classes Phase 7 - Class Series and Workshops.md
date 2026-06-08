@@ -187,10 +187,12 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 ## 5. Endpoints
 
-- [ ] `POST /api/admin/class_series_instance` — creates a series run (`class_instances` + `class_series_instances` augmentation + base impl) under a `kind='series'` class. Permission `manage_class_schedule`. Endpoint test.
-- [ ] `POST /api/book_class_series/<classInstanceId>` body `{ join_date_us?: int64 }` — server decides full vs prorated based on `join_date_us` vs the instance's `valid_from_us`. Returns purchase + bookings. Endpoint test (full + prorated, payment success + failure).
-- [ ] `POST /api/admin/series/<classInstanceId>/check_min_attendees` — manual run, also invoked by scheduler. Permission `manage_class_schedule`. Endpoint test.
-- [ ] `POST /api/admin/series/<classInstanceId>/cancel` body `{ reason }` — explicit admin-cancel endpoint. Permission `manage_class_schedule`. Endpoint test (verifies refunds queued for each paid attendee + cancellation iCal with `STATUS:CANCELLED`).
+- [x] `POST /api/admin/class_series_instance` — creates a series run (`class_instances` + `class_series_instances` augmentation + base impl) under a `kind='series'` class. Permission `manage_class_schedule`. Endpoint test. *(`admin_class_series_instance_create.h/.cpp/_test.cpp`; parses a `slots` array; tests cover 403/400-missing-field/400-missing-pricing/200+persist.)*
+- [x] `POST /api/book_class_series/<classInstanceId>` body `{ join_date_us?: int64 }` — server decides full vs prorated based on `join_date_us` vs the instance's `valid_from_us`. Returns purchase + bookings. *(`book_class_series.h/.cpp/_test.cpp`; tests cover 401/full/prorated/409-already-booked/404. Payment is a separate step — `purchase_pay_card` — matching `BookEvent`, so there is no inline "payment success/failure" here; the prorated path is gated on `prorated_signups_allowed`, added to `BookProratedRemainingSeries` with error `PRORATION_NOT_ALLOWED`.)*
+- [x] `POST /api/admin/series/<classInstanceId>/check_min_attendees` — manual run, also invoked by scheduler. Permission `manage_class_schedule`. Endpoint test. *(`admin_series_check_min_attendees.h/.cpp/_test.cpp`; optional `as_of_us` body (defaults to now); tests cover 403/skip/admin_alerted/auto_cancelled+deactivated/404.)*
+- [x] `POST /api/admin/series/<classInstanceId>/cancel` body `{ reason }` — explicit admin-cancel endpoint. Permission `manage_class_schedule`. Endpoint test (verifies refunds queued for each paid attendee~~ + cancellation iCal with `STATUS:CANCELLED`~~). *(`admin_series_cancel.h/.cpp/_test.cpp`; tests cover 403/400-missing-reason/404/200 with a simulated payment asserting `refunds_processed == N` and the purchase fully refunded + run deactivated. Cancellation iCal is deferred with the booking/confirmation email work — see §4 note.)*
+
+**§5 wiring:** all four registered in `web_app.cpp` (includes + reference vars) and `endpoints/CMakeLists.txt` (sources + tests). Result→JSON conversions (`CreateSeriesInstanceResult` / `CheckMinAttendeesResult` / `CancelSeriesResult` ToKeyValueTable) were added to `scheduling_key_value_table.h/.cpp` with tests (kept out of the endpoint files per the layering rule).
 
 ## 6. Scheduled Jobs
 
