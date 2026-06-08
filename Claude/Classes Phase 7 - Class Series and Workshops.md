@@ -230,7 +230,20 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 - [x] No new top-level tables.
 - [x] `product_prices.price_kind` shows up in the admin column data info with friendly name "Price Kind" and a dropdown editor for the three values — added the column-data-info row, the friendly name, a new `product_price_kind` enum (standard / series_total / per_instance_base) and the column binding in `create_database.cpp`.
 
-## 9. Tests-Required Summary
+# Mason- Issues Noted
+- I don’t know that we should have slot generation in the Add series run
+- When I try and add a class instance that is a single day to essentially say that the studio is closed that day, nothing happens and I see:
+	- (2026-06-08 21:43:39) [INFO    ] Request: 127.0.0.1:4088 000002BC01509150 HTTP/1.1 POST /api/admin/class_schedule
+	- (2026-06-08 21:43:39) [ERROR   ] ErrorResponse 400 Bad Request: INVALID_WINDOW
+- I added the class for the series and it doesn’t show up as an option under Our classes or show up for All Classes. When I go to our schedule and scroll forward to the next month where the series is scheduled, the classes show up but it should still show up even if it is not this month. Actually, it doesn’t show up even if I make it start this month.
+- When I created a series run, I initially had it start in July. When I would view our schedule, the class would show up when I would scroll forward to that week in July. When I went back and edited the series to now start in June and went and looked at our schedule, the classes in June don’t show up so the edit didn’t change anything.
+- Can I add another class schedule in a class instance for a series that essentially “cancels” one instance of a class and have that reflect in the paymentWhen I am creating a class schedule and do the from date and set a date in the next month, when I choose the valid to date, the calendar control defaults to this month. I’d like it to move forward to the same month as the valid to
+- In the pricing grid for a product for permissions, the column width for each permission is too narrow so it is essentially eligible. I think there are two issues here:
+	- Instead of having a grid with permissions on top with narrow columns and then row for price schedules, I think it would be better to have the rows be permissions and the columns be price schedules since there are far fewer price schedules
+	- I don’t think that every permission should show up for pricing. I think we should add a table that shows which permissions are available for pricing and only show those permissions in the places where we do class restrictions and pricing. Some public permissions table.
+
+
+## 10. Tests-Required Summary
 
 - [ ] Table helper tests for `price_kind` round-trip + `GetSeriesPricesForProduct`.
 - [ ] `class_series_helper_test.cpp` covering all five methods + the three `series_min_not_met_policy` branches.
@@ -239,7 +252,7 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 - [ ] Frontend specs for series-detail, my-bookings series rollup, admin series-create form, mock service.
 - [ ] Manual-testing-helper commands: `create_series <...>`, `book_series <person_id> <schedule_id>`, `simulate_series_under_min <schedule_id>`.
 
-## 10. Cross-Layer Acceptance Criteria
+## 11. Cross-Layer Acceptance Criteria
 
 A gold member buys a 6-week aerial series the day before it starts:
 - [ ] One `purchase` row + one `purchase_item` at gold-tier full-series price.
@@ -258,7 +271,7 @@ Admin cancels the series at week 3 due to low enrollment:
 Daily auto-cancel job runs at 03:00 local, finds a series past `series_min_by_us` with policy `auto_cancel_refund`:
 - [ ] Series auto-cancelled, refunds issued, attendees emailed.
 
-## 11. Open Questions
+## 12. Open Questions
 
 All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into §4.2 and §4.1 respectively. OQ-P7-1 is answered below — and yes, we can (and will) show both.
 
@@ -276,7 +289,7 @@ All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into �
 - **OQ-P7-2. — RESOLVED (Mason: "go with your recommendation").** Ship partial-refund-per-`purchase_item` in Phase 7. Folded into §4.2.
 - **OQ-P7-3. — RESOLVED (Mason: "go with your recommendation").** `BookFullSeries` (and, symmetrically, `BookProratedRemainingSeries`) reject with `ALREADY_BOOKED` when the user already holds an active booking for any occurrence of the run; admin resolves manually. Folded into §4.1.
 
-## 12. Cross-References
+## 13. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 7.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 4 - iCal Generator Extensions]].
