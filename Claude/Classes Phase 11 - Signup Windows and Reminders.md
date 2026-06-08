@@ -168,9 +168,9 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 ### 7.4 Types
 - [ ] `signup-reminder.types.ts`: `SignupReminderInfo`.
 
-## 8. Admin Metadata
+## 8. Admin Metadata (inspection only)
 
-- [ ] `signup_open_reminders` → `admin_nested_tables` under `people` keyed by `person_id`. Permission `admin`. Generally not user-facing.
+- [ ] `signup_open_reminders` → `admin_nested_tables` under `people` keyed by `person_id`. Permission `admin`. This table is **system/user-generated** — rows are created by the user's §7.1 "🔔 Remind me" button and consumed/cancelled by the cron + booking-dedupe paths. There is no admin *authoring* workflow here, so registering it purely for inspection in Manage Data is appropriate (per memory `feedback_manage_data_is_debug_only.md`); it must NOT become a flow where staff hand-create reminder rows.
 
 ## 9. Tests-Required Summary
 

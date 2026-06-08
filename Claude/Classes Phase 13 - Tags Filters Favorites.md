@@ -97,21 +97,28 @@ Lowest layer first per CLAUDE.md.
 ### 2.4 Endpoints
 - [ ] `GET /api/class_tags` → list active. Public.
 - [ ] `GET /api/classes?tag_id=<id>` — extend existing endpoint with filter param.
-- [ ] Admin CRUD via generic CRUD endpoints (just metadata setup).
+- [ ] **Admin tag-vocabulary CRUD = bespoke, NOT Manage Data.** Managing the controlled vocabulary (create/edit/retire tags, set name/color/sort_order/is_active) is a real admin workflow, so it gets a dedicated "Manage Tags" UI (§2.5) — never the Manage Data generic table editor (memory `feedback_manage_data_is_debug_only.md`). Add:
+  - `GET /api/admin/class_tags` → all tags incl. inactive. Permission `manage_class_schedule`. Endpoint test.
+  - `POST /api/admin/class_tag` body `{ code, name, color, sort_order, is_active }` → create. Endpoint test (403 / 400-dup-code / 200+persist).
+  - `PUT /api/admin/class_tag/<id>` → update. `DELETE /api/admin/class_tag/<id>` → soft-delete (`is_active=false`). Endpoint tests.
+  - (Implementation note: these MAY be the generic CRUD REST endpoints called *from the bespoke §2.5 Manage Tags page* — the accepted Phase 1 `class-requirements-editor` pattern — but the **authoring surface must be the bespoke page, not the Manage Data editor**.)
+  - Tag **assignment** to a class is already bespoke via the §2.5 class-edit multi-select (writes `class_tag_assignments`).
 
 ### 2.5 Frontend
 - [ ] Class catalog gains a tag-filter chip row at the top.
 - [ ] Calendar event chips use tag color.
 - [ ] Class detail page lists tags.
-- [ ] Admin class-edit form: multi-select of tags.
-- [ ] `ServerAccess`: `getClassTags()`, updated `getClasses(filter)`. Update `ServerAccess.mock.spec.ts`.
+- [ ] **New bespoke "Manage Tags" admin page** `manage/class-tags/class-tags-admin.component.*/.spec.ts`, modeled on `manage/skills/skills-admin.component`: a table of tags with inline create/edit/delete, a color picker for `color`, `sort_order` ordering, and an active/inactive toggle. Wired to the §2.4 admin tag endpoints. Reachable from the Manage dashboard. (This is the workflow that replaces "go to Manage Data → class_tags".)
+- [ ] Admin class-edit form (`manage/class-schedules/dialogs/class-form-dialog`): multi-select of tags (writes `class_tag_assignments` for the class).
+- [ ] `ServerAccess`: `getClassTags()`, `getAdminClassTags()`, `createClassTag(req)`, `updateClassTag(id, req)`, `deleteClassTag(id)`, `setClassTags(classId, tagIds)`, updated `getClasses(filter)`. Update `ServerAccess.mock.spec.ts` for every new method.
 
-### 2.6 Admin metadata
-- [ ] `class_tags` → top-level. Permission `manage_class_schedule`.
-- [ ] `class_tag_assignments` → nested under `classes` keyed by `class_id`.
+### 2.6 Admin metadata (debug-only fallback — NOT the authoring workflow)
+> Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is the §2.5 Manage Tags page. The registration below is a debug/inspection escape hatch only.
+- [ ] `class_tags` → top-level. Permission `manage_class_schedule`. (Inspection / debug only; authoring lives in Manage Tags.)
+- [ ] `class_tag_assignments` → nested under `classes` keyed by `class_id`. (Inspection / debug only; assignment lives in the class-edit multi-select.)
 
 ### 2.7 Tests
-- [ ] Helpers + endpoint tests + frontend specs.
+- [ ] Helpers + endpoint tests (incl. the bespoke admin `class_tag` GET/POST/PUT/DELETE: 403 / dup-code / persist) + frontend specs (incl. the **Manage Tags page spec** and the class-edit tag multi-select spec) + `ServerAccess.mock.spec.ts` cases.
 
 ## 3. Favorite Instructors
 
@@ -146,8 +153,8 @@ Lowest layer first per CLAUDE.md.
 - [ ] Per-user notification preference toggle: "Email me when a favorite instructor is teaching" (already lives in Phase 6's preferences page; extend).
 - [ ] `ServerAccess`: `addFavoriteInstructor`, `removeFavoriteInstructor`, `getMyFavoriteInstructors`. Update mock.
 
-### 3.6 Admin metadata
-- [ ] `user_favorite_instructors` → nested under `people` keyed by `person_id`. Permission `admin`.
+### 3.6 Admin metadata (inspection only)
+- [ ] `user_favorite_instructors` → nested under `people` keyed by `person_id`. Permission `admin`. This table is **user-generated** (rows created by the §3.5 favorite heart, removed by the user) — there is no admin authoring workflow to build, so registering it purely for inspection in Manage Data is appropriate (per `feedback_manage_data_is_debug_only.md`).
 
 ### 3.7 Tests
 - [ ] Helper + endpoint + frontend specs + mail-helper assertion that fan-out queues exactly one email per follower per change with the 24h dedupe respected.

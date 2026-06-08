@@ -159,7 +159,15 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 
 - [ ] `POST /api/admin/session/<id>/suggest_pricing` body `{ target_attendees, tiers: [permission_id...] }` → list of suggestions. Permission `manage_class_schedule`. Endpoint test.
 - [ ] `GET /api/admin/session/<id>/cost_revenue` → `SessionCostRevenueReport`. Permission `manage_class_schedule`. Endpoint test.
-- [ ] Admin CRUD for `specialty_instructor_costs` + `instructor_class_preferences` uses the generic CRUD endpoints once metadata is registered.
+
+#### Specialty-cost authoring endpoints (bespoke — NOT generic CRUD / Manage Data)
+> **Manage Data is debug-only** (memory `feedback_manage_data_is_debug_only.md`). Hiring a specialty instructor and setting their pay rate is a core admin workflow, so it gets a bespoke `/manage` flow with dedicated endpoints — never "go to Manage Data and add a row." The endpoints below are thin (parse → `SpecialtyCostHelper` / table helper → KeyValueTable→JSON) per the layering rule.
+- [ ] `GET /api/admin/class_instance/<id>/specialty_costs` → list the specialty-cost rows for a run (with resolved instructor name + active `price_schedule` window). Permission `manage_class_schedule`. Endpoint test.
+- [ ] `POST /api/admin/specialty_cost` body `{ class_instance_id, class_schedule_slot_id?, instructor_person_id, base_rate_cents, per_student_bonus_cents, bonus_threshold_count?, notes }` — creates the cost row (and its backing `price_schedule` row, mirroring how product pricing snapshots roll forward). Returns the created row. Permission `manage_class_schedule`. Endpoint test (403 / 400-missing-field / 200+persist).
+- [ ] `PUT /api/admin/specialty_cost/<id>` — opens a new `price_schedule` window for a rate change (roll-forward, per SI-6 / P-2) rather than mutating history. Endpoint test.
+- [ ] `DELETE /api/admin/specialty_cost/<id>` — soft-delete / close the cost. Endpoint test.
+- [ ] `GET /api/admin/instructor/<id>/class_preferences` + `POST /api/admin/instructor_class_preference` (body `{ instructor_person_id, class_id, min_attendees?, max_attendees?, notes }`) + `PUT`/`DELETE` — bespoke CRUD for `instructor_class_preferences`. Permission `manage_class_schedule`. Endpoint tests at each verb.
+- [ ] These authoring endpoints live in `endpoints/` as thin handlers delegating to `SpecialtyCostHelper` + the two table helpers; conversions go in `scheduling_key_value_table.*`. (Implementation note: they MAY instead be served by the generic CRUD REST endpoints called *from the bespoke §6 forms* — the established Phase 1 `class-requirements-editor` pattern — but the **authoring UI must be the bespoke `/manage` surface below, never the Manage Data table editor**.)
 
 ## 6. Frontend
 
@@ -170,18 +178,30 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
   - "Suggest pricing" button → opens a dialog with target-attendees input + allowed-tiers multiselect → calls the suggest-pricing endpoint → displays table of suggestions per tier.
 - [ ] Specs.
 
-### 6.2 `ServerAccess` extensions
+### 6.2 Specialty-cost authoring on the run (bespoke Manage UI — NOT Manage Data)
+> Authoring specialty-instructor pay is done in the dedicated `/manage` portal, mirroring the Phase 7 `series-run-form-dialog` on **Manage Products ▸ Class Schedules**. The Manage Data generic editor is debug-only and must never be the path an admin uses to set up a specialty instructor's rate.
+- [ ] On **Manage Products ▸ Class Schedules**, when a run (`class_instances`) is selected, add a **"Specialty instructor cost"** section/dialog: instructor picker (people filtered to the `instructor` permission), base-rate + per-student-bonus (money inputs), optional bonus-threshold, optional per-slot scope (the slots of the run), notes. Save → `POST /api/admin/specialty_cost`; edit → `PUT` (roll-forward new rate); remove → `DELETE`. List existing cost rows for the run with their active window.
+- [ ] New `specialty-cost-form-dialog.component.*/.spec.ts` under `manage/class-schedules/dialogs/` (sibling of `series-run-form-dialog`). Spec covers defaults, money formatting, per-slot scope toggle, validation paths, and the normalized save result. Use money inputs + date pickers per `feedback_date_time_pickers.md`; mat-card border + RouterTestingModule per `feedback_account_page_layout.md`.
+
+### 6.3 Instructor class-preferences authoring (bespoke Manage UI — NOT Manage Data)
+- [ ] On **Manage ▸ Instructors** (`manage/instructors/instructors-admin.component`), add a **"Class preferences"** section per instructor: a small editable table of `(class, min_attendees, max_attendees, notes)` rows backed by the §5 `instructor_class_preference` endpoints (add/edit/delete inline). This replaces the generic-CRUD path the doc previously assumed.
+- [ ] Extend `instructors-admin.component.spec.ts` (or a new `instructor-class-preferences` sub-component spec) covering add/edit/remove + validation.
+
+### 6.4 `ServerAccess` extensions
 - [ ] `suggestPricingForSession(sessionId, targetAttendees, tiers)`, `getSessionCostRevenue(sessionId)`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [ ] `getSpecialtyCostsForRun(classInstanceId)`, `createSpecialtyCost(req)`, `updateSpecialtyCost(id, req)`, `deleteSpecialtyCost(id)`.
+- [ ] `getInstructorClassPreferences(instructorPersonId)`, `createInstructorClassPreference(req)`, `updateInstructorClassPreference(id, req)`, `deleteInstructorClassPreference(id)`.
+- [ ] Update `ServerAccess.mock.spec.ts` (per memory `feedback_always_test.md` — every new `ServerAccess` method needs a mock-spec case).
 
-### 6.3 Types
-- [ ] `specialty-cost.types.ts`: `PricingSuggestion`, `SessionCostRevenueReport`.
+### 6.5 Types
+- [ ] `specialty-cost.types.ts`: `PricingSuggestion`, `SessionCostRevenueReport`, `SpecialtyCost`, `CreateSpecialtyCostRequest`, `InstructorClassPreference`, `CreateInstructorClassPreferenceRequest`.
 
-## 7. Admin Metadata
+## 7. Admin Metadata (debug-only fallback — NOT the authoring workflow)
 
-- [ ] `specialty_instructor_costs` → `admin_top_level_tables`. Permission `manage_class_schedule`.
-- [ ] `instructor_class_preferences` → `admin_top_level_tables`. Permission `manage_class_schedule`.
-- [ ] Friendly names, column data info, display templates.
+> Per memory `feedback_manage_data_is_debug_only.md`: the real authoring workflow for both tables is the bespoke `/manage` UI in §6. The Manage Data registration below is a **debug / raw-data escape hatch only** — it must never be the path an admin uses to set up a specialty cost or instructor preference. Registering the tables is still required so the generic CRUD endpoints (if the bespoke forms reuse them) accept the table and so the rows are inspectable.
+- [ ] `specialty_instructor_costs` → `admin_top_level_tables`. Permission `manage_class_schedule`. (Inspection / debug only.)
+- [ ] `instructor_class_preferences` → `admin_top_level_tables`. Permission `manage_class_schedule`. (Inspection / debug only.)
+- [ ] Friendly names, column data info, display templates — so the rows render legibly in the debug editor; money columns get the cents edit type.
 
 ## 8. Tests-Required Summary
 
@@ -190,8 +210,8 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
   - Pay computation with / without bonus, with / without threshold.
   - Pricing suggestions cover break-even for member, profit margin for non-member.
   - Cost vs revenue reports include only paid attendees in revenue.
-- [ ] Endpoint tests.
-- [ ] Frontend specs.
+- [ ] Endpoint tests — suggest_pricing, cost_revenue, AND the bespoke authoring endpoints (`specialty_cost` GET/POST/PUT/DELETE, `instructor_class_preference` GET/POST/PUT/DELETE): 403 / validation / persist at each verb.
+- [ ] Frontend specs — session-detail panels, **`specialty-cost-form-dialog` spec**, **instructor class-preferences spec**, and the `ServerAccess.mock.spec.ts` cases for every new mock method.
 
 ## 9. Cross-Layer Acceptance Criteria
 

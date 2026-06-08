@@ -78,9 +78,10 @@ Lowest layer first per item; each item respects the standard layering and tests 
   - `UNIQUE (event_session_id, permission_id)`
 - [ ] Business logic: extend `CatalogHelper::ResolveBestPriceForPerson` to first look up `event_session_price_overrides` for the specific session; if any match the user's permission set, use the lowest of those. Falls back to `product_prices` otherwise.
 - [ ] Existing bookings are grandfathered (per parent OQ-41) — the override only affects future bookings.
-- [ ] Endpoints: admin CRUD on `event_session_price_overrides` via generic CRUD endpoints.
-- [ ] Frontend: extend the admin event-session-detail page with a "Price override" section.
-- [ ] Tests at all layers.
+- [ ] Endpoints: **bespoke admin CRUD, NOT the Manage Data generic editor** (memory `feedback_manage_data_is_debug_only.md`). Setting a one-off session price is a real admin workflow and is done from the §below "Price override" section on event-session-detail. Add `GET /api/admin/event_session/<id>/price_overrides`, `POST /api/admin/event_session_price_override`, `PUT`/`DELETE /api/admin/event_session_price_override/<id>` (permission `manage_class_schedule`; thin handlers → table helper → KeyValueTable). (These MAY be backed by the generic CRUD REST endpoints called from the bespoke section — the accepted Phase 1 `class-requirements-editor` pattern — but the authoring surface is the bespoke section, never the Manage Data table editor.)
+- [ ] Frontend: extend the admin event-session-detail page with a bespoke "Price override" section (per-tier price rows: add/edit/delete inline, money inputs) — this is the workflow; do not send admins to Manage Data.
+- [ ] Admin metadata: registering `event_session_price_overrides` for Manage Data is a debug/inspection fallback only (money column gets the cents edit type), never the authoring path.
+- [ ] Tests at all layers (incl. the bespoke endpoints' 403 / validation / persist, the price-override section spec, and the `ServerAccess.mock.spec.ts` cases).
 
 ## 3. M-14 Partner / Friend Multi-Attendee Booking
 
