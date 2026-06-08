@@ -196,8 +196,10 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 ## 6. Scheduled Jobs
 
-- [ ] Add daily 03:00 local job in `knottyyoga_helper`: iterates active series instances and POSTs `/api/admin/series/<classInstanceId>/check_min_attendees` for each. Idempotent.
-- [ ] Skip instances whose `class_series_instances.min_by_us` is far in the future (saves load); cron passes a "today" date so the endpoint can short-circuit.
+- [x] Add daily job in `knottyyoga_helper`: ~~iterates active series instances and POSTs `/api/admin/series/<classInstanceId>/check_min_attendees` for each~~. *(The scheduler is a dumb HTTP cron with no DB access — every existing job (e.g. `send_weekly_digests`) POSTs a single endpoint that fans out server-side. So §6 adds **one** job `run_series_min_attendees_check` (daily, 86400s) → `POST /api/admin/run_series_min_attendees_check`, which enumerates active runs via `ClassSeriesInstances::GetActiveSeriesClassInstanceIds` and calls `ClassSeriesHelper::RunMinAttendeesCheckForActiveRuns` → `CheckMinAttendees` per run. Idempotent. Wired in `scheduler_config.h` (`seriesMinAttendeesSeconds`), `main.cpp` (`--series_min_attendees_interval` flag + log summary), and `scheduled_job.cpp`.)* The per-instance `/api/admin/series/<id>/check_min_attendees` endpoint from §5 remains for manual admin runs. The "03:00 local" time is approximated by a daily interval (the scheduler is interval-based, like all existing jobs).
+- [x] Skip instances whose `class_series_instances.min_by_us` is far in the future. *(Handled by `CheckMinAttendees` itself — it returns `checked=false` when `asOf < min_by_us`, so far-future runs take no action. The endpoint uses `now` (or an optional `as_of_us` body so the cron can pass "today"). The active-runs query already excludes ended runs (`valid_to_us <= asOf`); far-future runs are considered-but-skipped rather than query-filtered, matching the self-gating pattern of the weekly/instructor digests.)*
+
+**§6 tests:** table-helper test for `GetActiveSeriesClassInstanceIds` (active+ongoing only); `ClassSeriesHelper` sweep tests (due-vs-future skip across two classes; auto-cancel path); `RunMinAttendeesSummaryToKeyValueTable` converter test; endpoint test (403 + 200 sweep); scheduler `scheduled_job_test` updated (job count 14→15, disable/propagate cases for the new job).
 
 ## 7. Frontend
 
