@@ -247,42 +247,42 @@ Files: `class_series_helper.h/.cpp/_test.cpp`.
 
 Distilled from **Mason- Issues Noted** above. Each is a discrete work item; tags: **[bug]** broken behavior, **[enh]** improvement, **[q]** decision needed before building. Respect layering (lowest layer first) and add tests per item.
 
-### 9.1 Series/workshop classes don't appear in the catalog [bug]
-- [ ] A `kind='series'` class with a run does **not** show under **Our Classes** / **All Classes** — even when the run starts this month. Only **Our Schedule** shows it (when you scroll to the run's week), because that view derives from the run window, not the catalog.
-- [ ] Root cause: the catalog (`ClassCatalogHelper::GetClassesVisibleToPerson`) only includes a class with an instance **active at `now`** (`GetActiveInstance(classId, now)`); a series whose run is upcoming (or starts later this month) has no currently-active instance, so it's filtered out.
-- [ ] Fix: include classes with an **upcoming** run (active + not-yet-ended as of `now`, like `GetUpcomingInstances`) instead of "covers now"; keep the access-gate filter. Decide whether the catalog card shows the run window / "starts {date}".
-- [ ] Tests: catalog includes a series whose only run is future-dated; still excludes a class with no runs.
+### 9.1 Series/workshop classes don't appear in the catalog [bug] ✅ DONE
+- [x] A `kind='series'` class with a run does **not** show under **Our Classes** / **All Classes** — even when the run starts this month. Only **Our Schedule** shows it (when you scroll to the run's week), because that view derives from the run window, not the catalog.
+- [x] Root cause: the catalog (`ClassCatalogHelper::GetClassesVisibleToPerson`) only includes a class with an instance **active at `now`** (`GetActiveInstance(classId, now)`); a series whose run is upcoming (or starts later this month) has no currently-active instance, so it's filtered out.
+- [x] Fix: `GetClassesVisibleToPerson` now uses `classInstances_.GetUpcomingInstances(classId, now)` (active + not-yet-ended) instead of `GetActiveInstance`; access-gate filter kept.
+- [x] Tests: `GetClassesVisibleToPersonIncludesFutureRun` (catalog includes a series whose only run is future-dated); existing exclude-no-instance test still passes.
 
-### 9.2 Editing a series run's window doesn't move the schedule [bug]
-- [ ] Editing a run's start (e.g. July → June) did not move the derived sessions — **Our Schedule** still showed July, not June.
-- [ ] Root cause: the run's **implementation** (`class_schedules`) window is separate from the instance window. "Add series run" sets the impl `valid_from` to the run start, but later editing the **instance** doesn't update the impl, so occurrences still derive from the stale impl window (and the augmentation min dates may also need to move).
-- [ ] Fix: a series-run edit must keep the base implementation's `valid_from/valid_to` (and slot applicability) in sync with the instance window — likely a dedicated "edit series run" path rather than the generic instance edit.
-- [ ] Tests: edit a run window → `GetDerivedSessionsForRange` reflects the new window.
+### 9.2 Editing a series run's window doesn't move the schedule [bug] ✅ DONE
+- [x] Editing a run's start (e.g. July → June) did not move the derived sessions — **Our Schedule** still showed July, not June.
+- [x] Root cause: the run's **implementation** (`class_schedules`) window is separate from the instance window. Editing the instance didn't update the impl.
+- [x] Fix: `ClassSeriesHelper::UpdateSeriesRunWindow` updates the instance window AND syncs every base impl (those spanning the old run window) via `UpdateImplementation` (which sweeps now-orphaned future sessions, blocked if any carry a booking). New `PUT /api/admin/class_series_instance/<int>` endpoint; frontend `openEditInstance` chains `updateSeriesRunWindow` for series runs.
+- [x] Tests: `UpdateSeriesRunWindowExtendsDerivedSessions` / `...Shrinks...` / invalid-window / unknown-instance; endpoint test `AdminClassSeriesInstanceUpdateTest`; KVT + mock + mock-spec + manage-component spec.
 
-### 9.3 Single-day "studio closed" implementation rejected (INVALID_WINDOW) [bug]
-- [ ] Adding a single-day `class_schedule` to mark the studio closed fails: `POST /api/admin/class_schedule → 400 INVALID_WINDOW`, and the UI shows **nothing** (the 400 isn't surfaced).
-- [ ] Root cause: impl-window validation requires `valid_to > valid_from` strictly; a one-day window has `to == from`.
-- [ ] Fix (backend): allow a single-day implementation (treat `valid_to == valid_from` as an inclusive one-day window) **or** add a dedicated "close this day" / holiday-override action that builds the empty higher-priority impl.
-- [ ] Fix (frontend): surface backend 400s (INVALID_WINDOW, etc.) in the schedule dialogs instead of silently no-op'ing.
-- [ ] Interacts with 9.5 (holiday override reduces occurrence count → partial refund).
+### 9.3 Single-day "studio closed" implementation rejected (INVALID_WINDOW) [bug] ✅ DONE
+- [x] Adding a single-day `class_schedule` to mark the studio closed fails: `POST /api/admin/class_schedule → 400 INVALID_WINDOW`, and the UI shows **nothing** (the 400 isn't surfaced).
+- [x] Root cause: impl-window validation requires `valid_to > valid_from` strictly; a one-day window has `to == from`.
+- [x] Fix (backend): `CreateImplementation` now normalizes `valid_to == valid_from` to an inclusive one-day window (`valid_from + 1 day`); only `valid_to < valid_from` is rejected.
+- [x] Fix (frontend): `class-schedule-manage` subscribes now use `{next, error}` with `httpErrorDetail` so backend 400 `detail` is surfaced in the schedule/slot/instance/series-run dialogs.
+- [x] Interacts with 9.5 (single-day impl now allowed for overrides).
 
-### 9.4 "Valid to" datepicker should open on the "valid from" month [enh]
-- [ ] When "valid from" is in a future month, opening the "valid to" picker shows the **current** month; it should open on the same month as "valid from".
-- [ ] Fix: bind `[startAt]` on the "valid to" `mat-datepicker` to the "valid from" value in the instance-form, schedule-form, and series-run-form dialogs.
+### 9.4 "Valid to" datepicker should open on the "valid from" month [enh] ✅ DONE
+- [x] When "valid from" is in a future month, opening the "valid to" picker shows the **current** month; it should open on the same month as "valid from".
+- [x] Fix: bound `[startAt]="validFrom"` on the "valid to" `mat-datepicker` in the instance-form, schedule-form, and series-run-form dialogs.
 
-### 9.5 Per-occurrence cancellation within a run → partial refund [bug] (RESOLVED — Mason)
+### 9.5 Per-occurrence cancellation within a run → partial refund [bug] (RESOLVED — Mason) ✅ DONE
 **Decision (Mason):** trigger a **partial refund**. When a day has to be removed from a run (studio maintenance, instructor out of town), the enrolled students must be refunded for that occurrence.
-- [ ] Provide an admin action to cancel a single occurrence of a run — implemented as a higher-priority **empty/override implementation** under the instance covering that day (per the redesign's holiday-override model), which drops that date from the derived-occurrence set.
-- [ ] On removing an occurrence that has **paid** bookings, cancel those bookings and **partial-refund 1/N** of each affected series purchase via `RefundHelper::ProcessPartialRefundCents` (reuse the §4.2 per-occurrence path), email the attendees, and release capacity.
-- [ ] Future (unsold) pricing for the run automatically reflects the reduced occurrence count (pricing already derives from `GetDerivedSessionsForRange`); no separate pricing change needed.
-- [ ] Tests: removing one occurrence of a paid run refunds 1/N to each attendee, cancels just that session's bookings, and the derived count drops by one.
-- Note: depends on 9.3 (single-day implementations must be allowed for the override).
+- [x] Admin action to cancel a single occurrence: `ClassSeriesHelper::CancelSeriesOccurrence(classInstanceId, occurrenceDateUs, reason)` derives the day's occurrences, persists each (if lazy) via `EnsureSessionExists`, and marks the session(s) cancelled. `POST /api/admin/series/<int>/cancel_occurrence`. (Implemented by cancelling the persisted occurrence rather than an empty override impl — same user-visible result, consistent with the full-run cancel path.) The run stays active.
+- [x] On removing an occurrence with **paid** bookings, cancel those bookings and **partial-refund 1/N** via `RefundHelper::ProcessPartialRefundCents` (shared `CancelSessionAndBookings` helper, factored out of `CancelSeriesInstance`), email attendees, release capacity (decrement booked count).
+- [x] Future (unsold) pricing reflects the reduced occurrence count automatically (pricing derives from `GetDerivedSessionsForRange`).
+- [x] Frontend: `cancel-occurrence-dialog` (date + reason) reached from a per-run "Cancel a session date" action in `class-schedule-manage`; `cancelSeriesOccurrence` added across ServerAccess interface/proxy/network/mock.
+- [x] Tests: `CancelOccurrenceRefundsOneOfNAndKeepsRunActive`, `...WithoutBookingsPersistsCancelledSession`, `...RejectsUnknownInstance`; endpoint test `AdminSeriesCancelOccurrenceTest`; dialog spec, manage-component specs, mock spec.
 
-### 9.6 "Add series run" should NOT generate slots [enh] (RESOLVED — Mason: Option B)
+### 9.6 "Add series run" should NOT generate slots [enh] (RESOLVED — Mason: Option B) ✅ DONE
 **Decision (Mason):** Option B — runs commonly need multiple schedules, so one-shot slot entry over-simplifies. The "Add series run" dialog should create **only** the `class_instances` row + `class_series_instances` augmentation + a base implementation (no slots). The admin then authors slots (and any additional impls / holiday overrides) via the existing slot + implementation editors under the run.
-- [ ] Remove the slot editor from `series-run-form-dialog` (drop `slots` from the form + result); have `createSeriesInstance` create just instance + augmentation + base impl.
-- [ ] Confirm the existing implementation/slot editors are reachable for a series run's instance in `class-schedule-manage` (they should be — series runs are ordinary `class_instances`); document the two-step flow.
-- [ ] Update the affected specs (dialog spec, manage component, mock) for the no-slots shape.
+- [x] Removed the slot editor from `series-run-form-dialog` (dropped `slots`/facilities/rooms from the form, data, and result); `createSeriesInstance` is called without slots, so it creates just instance + augmentation + base impl (the backend still accepts slots for the API/tests).
+- [x] The existing implementation/slot editors under a series run's instance in `class-schedule-manage` are unchanged (series runs are ordinary `class_instances`) — the two-step flow is: create the run, then add slots via the run's slot editor (hinted in the dialog).
+- [x] Updated specs: dialog spec (no-slots shape), manage-component spec (`openAddSeriesRun` without slots + error handler), mock tolerates missing slots.
 
 > The original pricing-grid item (transpose + pricing-eligible permissions) was split out to its own **§10** at Mason's request — a larger work item to do after the rest of §9.
 
