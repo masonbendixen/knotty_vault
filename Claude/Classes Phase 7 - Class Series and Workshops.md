@@ -264,29 +264,45 @@ Distilled from **Mason- Issues Noted** above. Each is a discrete work item; tags
 - [ ] Root cause: impl-window validation requires `valid_to > valid_from` strictly; a one-day window has `to == from`.
 - [ ] Fix (backend): allow a single-day implementation (treat `valid_to == valid_from` as an inclusive one-day window) **or** add a dedicated "close this day" / holiday-override action that builds the empty higher-priority impl.
 - [ ] Fix (frontend): surface backend 400s (INVALID_WINDOW, etc.) in the schedule dialogs instead of silently no-op'ing.
-- [ ] Interacts with 9.6 (holiday override reduces occurrence count → pricing).
+- [ ] Interacts with 9.5 (holiday override reduces occurrence count → partial refund).
 
 ### 9.4 "Valid to" datepicker should open on the "valid from" month [enh]
 - [ ] When "valid from" is in a future month, opening the "valid to" picker shows the **current** month; it should open on the same month as "valid from".
 - [ ] Fix: bind `[startAt]` on the "valid to" `mat-datepicker` to the "valid from" value in the instance-form, schedule-form, and series-run-form dialogs.
 
-### 9.5 Pricing grid layout + permission scope [enh]
-- [ ] (a) **Transpose** the product pricing matrix: rows = permissions (tiers), columns = price schedules (far fewer schedules), so columns aren't too narrow to read.
-- [ ] (b) Don't show **every** permission in pricing. Introduce a "pricing-eligible / public permissions" set (a table, or a flag on `permissions`) marking which permissions are offered for pricing **and** class restrictions, and only show those in the pricing matrix and the class-requirements editor.
-- [ ] Backend: new table/flag + table helper + a read endpoint for the eligible set. Frontend: pricing matrix + requirements editor consume it.
-- Mason- This is a pretty large work item. I'd like to wrap up all the other stuff and then do this separately so please move this to it's own section 10 and move the existing 10 and all the following sections down one.
+### 9.5 Per-occurrence cancellation within a run → partial refund [bug] (RESOLVED — Mason)
+**Decision (Mason):** trigger a **partial refund**. When a day has to be removed from a run (studio maintenance, instructor out of town), the enrolled students must be refunded for that occurrence.
+- [ ] Provide an admin action to cancel a single occurrence of a run — implemented as a higher-priority **empty/override implementation** under the instance covering that day (per the redesign's holiday-override model), which drops that date from the derived-occurrence set.
+- [ ] On removing an occurrence that has **paid** bookings, cancel those bookings and **partial-refund 1/N** of each affected series purchase via `RefundHelper::ProcessPartialRefundCents` (reuse the §4.2 per-occurrence path), email the attendees, and release capacity.
+- [ ] Future (unsold) pricing for the run automatically reflects the reduced occurrence count (pricing already derives from `GetDerivedSessionsForRange`); no separate pricing change needed.
+- [ ] Tests: removing one occurrence of a paid run refunds 1/N to each attendee, cancels just that session's bookings, and the derived count drops by one.
+- Note: depends on 9.3 (single-day implementations must be allowed for the override).
 
-### 9.6 Per-occurrence cancellation within a run, reflected in pricing/refunds [q]
-- [ ] Mason: *"Can I add another class schedule in a class instance for a series that essentially 'cancels' one instance of a class and have that reflect in the payment?"* The redesign envisioned holiday overrides as higher-priority empty impls that reduce the derived-occurrence count (and thus the series total).
-- [ ] Decide the policy: does removing an occurrence **after** purchase trigger a partial refund (per the §4.2 per-occurrence path)? Does it affect already-sold runs or only future pricing? Then implement.
-- Mason- Let's trigger a partial refund. If I end up needing to remove a day from a series because there is studio maintenance or the instructor will be out of town, students should be refunded.
+### 9.6 "Add series run" should NOT generate slots [enh] (RESOLVED — Mason: Option B)
+**Decision (Mason):** Option B — runs commonly need multiple schedules, so one-shot slot entry over-simplifies. The "Add series run" dialog should create **only** the `class_instances` row + `class_series_instances` augmentation + a base implementation (no slots). The admin then authors slots (and any additional impls / holiday overrides) via the existing slot + implementation editors under the run.
+- [ ] Remove the slot editor from `series-run-form-dialog` (drop `slots` from the form + result); have `createSeriesInstance` create just instance + augmentation + base impl.
+- [ ] Confirm the existing implementation/slot editors are reachable for a series run's instance in `class-schedule-manage` (they should be — series runs are ordinary `class_instances`); document the two-step flow.
+- [ ] Update the affected specs (dialog spec, manage component, mock) for the no-slots shape.
 
-### 9.7 Should "Add series run" generate slots at all? [q]
-- [ ] Mason: *"I don't know that we should have slot generation in the Add series run."*
-- [ ] Option A: keep slot entry in the dialog (one-stop run creation). Option B: the dialog creates only the instance + augmentation + base impl, and the admin authors slots via the existing slot editor under the run (consistent with recurring classes).
-- [ ] Decide; if B, remove the slot editor from `series-run-form-dialog` and document the two-step flow.
+> The original pricing-grid item (transpose + pricing-eligible permissions) was split out to its own **§10** at Mason's request — a larger work item to do after the rest of §9.
 
-## 10. Tests-Required Summary
+## 10. Pricing Grid Layout & Permission Scope
+
+Split out of §9.7 at Mason's request — a larger, standalone work item to tackle **after** the rest of §9. Touches the product pricing UI plus a new "which permissions are offered for pricing/restrictions" concept used across pricing and class-access editors.
+
+### 10.1 Transpose the product pricing matrix [enh]
+- [ ] In `product-detail` (Manage Products), flip the pricing matrix so **rows = permissions (tiers)** and **columns = price schedules**. There are far fewer schedules than permissions, so this gives readable column widths (the current permissions-as-columns layout is too narrow).
+- [ ] Keep the inline click-to-edit behavior, the `per_instance_base` vs `standard` price-kind handling (Class Series products), and variant handling.
+- [ ] Update the `product-detail` spec for the transposed layout.
+
+### 10.2 Restrict which permissions appear in pricing + class restrictions [enh]
+- [ ] Not every permission should be offered for pricing or class access. Introduce a **pricing/eligible (public) permissions** set — a dedicated table (e.g. `pricing_permissions`) or a boolean flag on `permissions` — marking which permissions are surfaced in admin pricing and class-restriction pickers.
+- [ ] Backend (lowest layer first): schema (table or column) → table helper → a read endpoint returning the eligible permission set → wire into DB init / admin metadata.
+- [ ] Frontend: the pricing matrix (10.1) and the class-requirements editor (`class-requirements-editor`) consume the eligible set instead of listing all permissions.
+- [ ] Admin authoring of the eligible set must live in a dedicated **/manage** page (NOT Manage Data), per the Manage-Data-is-debug-only rule.
+- [ ] Tests: only flagged permissions appear in the pricing matrix + requirements editor; eligible-set CRUD.
+
+## 11. Tests-Required Summary
 
 - [ ] Table helper tests for `price_kind` round-trip + `GetSeriesPricesForProduct`.
 - [ ] `class_series_helper_test.cpp` covering all five methods + the three `series_min_not_met_policy` branches.
@@ -295,7 +311,7 @@ Distilled from **Mason- Issues Noted** above. Each is a discrete work item; tags
 - [ ] Frontend specs for series-detail, my-bookings series rollup, admin series-create form, mock service.
 - [ ] Manual-testing-helper commands: `create_series <...>`, `book_series <person_id> <schedule_id>`, `simulate_series_under_min <schedule_id>`.
 
-## 11. Cross-Layer Acceptance Criteria
+## 12. Cross-Layer Acceptance Criteria
 
 A gold member buys a 6-week aerial series the day before it starts:
 - [ ] One `purchase` row + one `purchase_item` at gold-tier full-series price.
@@ -314,7 +330,7 @@ Admin cancels the series at week 3 due to low enrollment:
 Daily auto-cancel job runs at 03:00 local, finds a series past `series_min_by_us` with policy `auto_cancel_refund`:
 - [ ] Series auto-cancelled, refunds issued, attendees emailed.
 
-## 12. Open Questions
+## 13. Open Questions
 
 All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into §4.2 and §4.1 respectively. OQ-P7-1 is answered below — and yes, we can (and will) show both.
 
@@ -332,7 +348,7 @@ All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into �
 - **OQ-P7-2. — RESOLVED (Mason: "go with your recommendation").** Ship partial-refund-per-`purchase_item` in Phase 7. Folded into §4.2.
 - **OQ-P7-3. — RESOLVED (Mason: "go with your recommendation").** `BookFullSeries` (and, symmetrically, `BookProratedRemainingSeries`) reject with `ALREADY_BOOKED` when the user already holds an active booking for any occurrence of the run; admin resolves manually. Folded into §4.1.
 
-## 13. Cross-References
+## 14. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 7.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 4 - iCal Generator Extensions]].
