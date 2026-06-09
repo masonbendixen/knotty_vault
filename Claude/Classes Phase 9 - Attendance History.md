@@ -47,8 +47,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Phase 1 (event_sessions has the denormalized `class_id` + `class_schedule_slot_id` + `occurrence_date_us`).
 - Phase 8 (bookings populate with `checked_in_us` / `status='attended'` for membership-included classes).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
-> Minimal. Attendance history reads **only persisted `event_sessions` rows** — and under the lazy model, a row exists precisely when something was recorded against it (check-in, etc.), which is exactly the set of attended occurrences we want. No derived-session computation is needed here. Filters key off the denormalized `event_sessions.class_id` (not a `class_schedule_id`, which no longer lives on `event_sessions`).
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+Minimal. Attendance history reads **only persisted `event_sessions` rows** — and under the lazy model, a row exists precisely when something was recorded against it (check-in, etc.), which is exactly the set of attended occurrences we want. No derived-session computation is needed here. Filters key off the denormalized `event_sessions.class_id` (not a `class_schedule_id`, which no longer lives on `event_sessions`).
 
 **Outcome:**
 - `GET /api/me/attendance_history` with year / month / class / instructor filters + pagination.
@@ -202,6 +202,7 @@ A member with 18 months of attendance:
 ## 7. Open Questions
 
 - **OQ-P9-1.** Should we count distinct dates or distinct bookings? A member who attended 5 classes on the same day has 5 bookings. Recommended: distinct bookings — they're 5 separate experiences.
+	- Mason- I'll go with your recommendation.
 - **OQ-P9-2.** Year/month dropdowns: populate from the user's earliest attendance date to today, or fixed range (last 5 years)? Recommended: from earliest to today, computed server-side and returned as part of the metadata block alongside `distinct_class_ids`.
 
 ## 8. Cross-References
