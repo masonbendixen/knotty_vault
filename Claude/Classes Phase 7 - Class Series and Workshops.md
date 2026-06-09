@@ -320,7 +320,8 @@ Found live-testing the cart series purchase. The booking is created correctly, b
 
 ### 11.3 Series confirmation email shows only the first date + no calendar file [bug] ✅ DONE
 - [x] The series confirmation email showed just the first session's date and carried no `.ics`.
-- [x] Fix (business logic): `booking_confirmation_mail` gained a `sessionLines` field — when there's more than one occurrence the body renders a **"Sessions (N)"** list of every date + time instead of the single Date/Time lines. `PaymentHelper::SendBookingConfirmationEmailIfApplicable` now gathers **all** confirmed event bookings on the purchase (not just the first), lists every occurrence, attaches an `.ics` with **one VEVENT per occurrence** (`GenerateICalendar(vector)`), and titles it "Series Booking Confirmation". Single-event bookings are unchanged.
+- [x] Fix (business logic): `booking_confirmation_mail` gained a `sessionLines` field — when there's more than one occurrence the body renders a **"Sessions (N)"** list of every date + time instead of the single Date/Time lines. `PaymentHelper::SendBookingConfirmationEmailIfApplicable` now gathers **all** confirmed event bookings on the purchase (not just the first), lists every occurrence, and titles it "Series Booking Confirmation". Single-event bookings are unchanged.
+- [x] Calendar attachment: **one single-event `.ics` per session** (`booking.ics`, `booking-2.ics`, …), NOT a single multi-VEVENT file. Gmail only reliably parses a single VEVENT per calendar file — a multi-VEVENT `.ics` failed to render ("couldn't understand the attachment"). This matches how the cart bundle email already attaches per-booking calendars.
 - [x] Both paths covered: the immediate Book-and-Pay flow pays via `purchase_pay_card` → `PaymentHelper` (above); the **cart flow also pays via `purchase_pay_card`**, so it gets the same proper email. To avoid an incomplete duplicate, `cart_checkout` now **skips series line items** in its own per-item email loop (they have no single `event_session_id`).
 - [x] Tests: `booking_confirmation_mail_test` (multi-session list), `payment_helper_test` (3-session series purchase → "Series Booking Confirmation" email with "Sessions (3)" and a 3-VEVENT `.ics`).
 
@@ -338,7 +339,7 @@ Found live-testing the cart series purchase. The booking is created correctly, b
 A gold member buys a 6-week aerial series the day before it starts:
 - [ ] One `purchase` row + one `purchase_item` at gold-tier full-series price.
 - [ ] Six `bookings` rows, all tied to the same `purchase_id`.
-- [ ] One confirmation email with a multi-VEVENT `.ics` (6 events).
+- [ ] One confirmation email listing all 6 sessions, with one single-event `.ics` per session attached (Gmail can't parse a multi-VEVENT file — see §11.3).
 - [ ] Each `event_sessions.series_purchase_id` is set.
 
 A silver member joins after week 2 has happened:
