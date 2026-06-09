@@ -118,17 +118,17 @@ Lowest layer first:
   - `class_checkin_history_weeks` = `4` (`kClassCheckinHistoryWeeks`) — used by the pre-pop list
 - [x] Test: `secrets_helper_test.cpp` `ClassCheckinConfigDefaultsLoaded` asserts all three resolve to their defaults.
 
-## 3. Table Helpers
+## 3. Table Helpers ✅ DONE
 
-### 3.1 Extend `TableHelpers::Bookings`
-- [ ] `GetRecentCheckedInPersonsForSchedule(Transaction&, int64_t classScheduleId, int64_t fromUs, int64_t toUs)` → list of `(person_id, last_checked_in_us)` joining `bookings` ↔ `event_sessions`. Used to seed the pre-pop list.
-- [ ] `GetBookingsForSession(Transaction&, int64_t eventSessionId)` — already present from Phase 1 / [[Scheduling thin slice]]; verify it exposes `checked_in_us`, `status`, `is_walkin`.
-- [ ] `MarkCheckedIn(Transaction&, int64_t bookingId, int64_t staffPersonId, int64_t nowUs)` — sets `checked_in_us=nowUs`, `status='attended'`, appends to `notes` ("checked-in by staffPerson").
-- [ ] `MarkNoShow(Transaction&, int64_t bookingId, int64_t nowUs)` — sets `status='no_show'`. No-op if already attended.
-- [ ] Tests.
+### 3.1 Extend `TableHelpers::Bookings` ✅
+- [x] `GetRecentCheckedInPersonsForClass(Transaction&, int64_t classId, int64_t fromUs, int64_t toUs)` → list of `(person_id, last_checked_in_us)` joining `bookings` ↔ `event_sessions` on the denormalized `event_sessions.class_id`. Used to seed the pre-pop list. **Naming note:** implemented as `...ForClass` (keyed by `class_id`), not the doc's original `...ForSchedule` — per the Class Schedule Redesign only persisted/attended `event_sessions` carry `class_id`, which is exactly the join we want, and §4.2's history step already calls `GetRecentCheckedInPersonsForClass(classId, ...)`.
+- [x] `GetBookingsForSession` — already present as `GetBookingsBySession` (SELECT * in `bookings.cpp`), so it exposes `checked_in_us`, `status`, `is_walkin`. Verified.
+- [x] `MarkCheckedIn(Transaction&, int64_t bookingId, int64_t staffPersonId, int64_t nowUs)` — sets `checked_in_us=nowUs`, `status='attended'`, appends `"Checked in by person <staffPersonId>"` to `notes` (CASE-guarded so the first line isn't prefixed with a blank), bumps `updated_us`.
+- [x] `MarkNoShow(Transaction&, int64_t bookingId, int64_t nowUs)` — sets `status='no_show'`, bumps `updated_us`. No-op when already attended (`WHERE status <> 'attended' AND checked_in_us IS NULL`).
+- [x] Tests — `bookings_test.cpp`: `MarkCheckedInSetsAttendedAndAppendsNote` (single + double check-in note append), `MarkNoShowOnlyAffectsUncheckedBookings` (confirmed→no_show; attended→no-op), `GetRecentCheckedInPersonsForClassDedupesAndFilters` (per-person latest via MAX, window filtering, NULL-check-in excluded, other-class excluded).
 
-### 3.2 Reuse `TableHelpers::AttendanceTemplateEntries`
-- [ ] `GetTemplateIdsForSchedule` already exists (Phase 5). Re-used here.
+### 3.2 Reuse `TableHelpers::AttendanceTemplateEntries` ✅
+- [x] Reuse target is `GetTemplateIdsForSlot` (Phase 5) — template entries are keyed by `class_schedule_slot_id`, so the doc's `GetTemplateIdsForSchedule` name maps to the existing slot-keyed reader. No new code needed.
 
 ## 4. Business Logic — `ClassCheckinHelper`
 

@@ -108,8 +108,8 @@ Lowest layer first per CLAUDE.md.
 
 ### 2.5 Frontend
 - [ ] Class catalog gains a tag-filter chip row at the top.
-- [ ] Calendar event chips use tag color.
-- [ ] Class detail page lists tags.
+- [ ] Calendar event chips use **the first tag's color** — the lowest-`sort_order` tag from `GetTagsForClass` (resolved OQ-P13-1). A class with no tags uses the default chip color. Spec asserts a multi-tag class renders the first tag's color.
+- [ ] Class detail page lists tags (all of them, in `sort_order`).
 - [ ] **New bespoke "Manage Tags" admin page** `manage/class-tags/class-tags-admin.component.*/.spec.ts`, modeled on `manage/skills/skills-admin.component`: a table of tags with inline create/edit/delete, a color picker for `color`, `sort_order` ordering, and an active/inactive toggle. Wired to the §2.4 admin tag endpoints. Reachable from the Manage dashboard. (This is the workflow that replaces "go to Manage Data → class_tags".)
 - [ ] Admin class-edit form (`manage/class-schedules/dialogs/class-form-dialog`): multi-select of tags (writes `class_tag_assignments` for the class).
 - [ ] `ServerAccess`: `getClassTags()`, `getAdminClassTags()`, `createClassTag(req)`, `updateClassTag(id, req)`, `deleteClassTag(id)`, `setClassTags(classId, tagIds)`, updated `getClasses(filter)`. Update `ServerAccess.mock.spec.ts` for every new method.
@@ -132,9 +132,17 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
   - `notify_on_schedule_change BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us`
   - `UNIQUE (person_id, instructor_person_id)`
+- [ ] `db_schema/favorite_instructor_notifications.h/.cpp` — **sent-log so the daily first-appearance job fires once per appearance (resolved OQ-P13-2)** and stays idempotent across reruns:
+  - `id BIGSERIAL PK`
+  - `person_id BIGINT NOT NULL REFERENCES people(id)` — the follower
+  - `instructor_person_id BIGINT NOT NULL REFERENCES people(id)`
+  - `class_id BIGINT NOT NULL REFERENCES classes(id)` — the class the instructor newly appeared on
+  - `notified_us BIGINT NOT NULL`
+  - `UNIQUE (person_id, instructor_person_id, class_id)` — one "new appearance" email per follower per (instructor, class).
 
 ### 3.2 Table helper
 - [ ] `TableHelpers::UserFavoriteInstructors` + tests.
+- [ ] `TableHelpers::FavoriteInstructorNotifications` + tests — `HasNotified(Transaction&, personId, instructorPersonId, classId)` and `RecordNotified(...)` (idempotent on the UNIQUE constraint), backing the §3.3 first-appearance dedupe.
 
 ### 3.3 Business logic
 - [ ] In `business_logic/scheduling/favorite_instructor_helper.h/.cpp`:
@@ -143,11 +151,16 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
   - `GetFavoriteInstructorIdsForPerson(Transaction&, personId)`.
   - `GetFollowersOfInstructor(Transaction&, instructorPersonId)` — used to fan out notifications.
 - [ ] Hook into Phase 10's `InstructorSubstitutionHelper` and `ShiftChangeHelper`: after a substitution / shift-trade execution, fan out a notification email to each follower of the new instructor: "Maya is teaching Vinyasa Flow this Tuesday — a class you might love." Throttle: at most one email per (follower, instructor) per 24h.
+- [ ] **First-appearance fan-out (resolved OQ-P13-2):** `int NotifyNewScheduleAppearances(Transaction&, MailHelper*, int64_t nowUs)` — the daily-job entry point:
+  1. Find instructor↔class pairs that newly appear on the **upcoming** schedule: classes whose active `class_instances`/`class_schedules` impls (or `event_session_staffing` rows for future sessions) assign an instructor and were created/changed since the prior run (scan a "since last run" window; the sent-log makes exact windowing non-critical).
+  2. For each such (instructor, class): for each follower from `GetFollowersOfInstructor` with `notify_on_schedule_change=true`, skip if `FavoriteInstructorNotifications::HasNotified(follower, instructor, class)`; else queue "{Instructor} is now teaching {Class} — a class you might love", `RecordNotified(...)`, and respect the same at-most-one-per-(follower,instructor)-per-24h throttle as the substitution path.
+  3. Return the count sent. Idempotent: a second run the same day sends nothing new (sent-log + throttle).
 
 ### 3.4 Endpoints
 - [ ] `POST /api/me/favorite_instructor/<personId>` — add. Endpoint test.
 - [ ] `DELETE /api/me/favorite_instructor/<personId>` — remove.
 - [ ] `GET /api/me/favorite_instructors` — list.
+- [ ] `POST /api/admin/send_favorite_instructor_schedule_alerts` — cron-callable, idempotent; runs `NotifyNewScheduleAppearances(now)`. Permission `admin`. Endpoint test (403 + 200 sends-once-then-no-op).
 
 ### 3.5 Frontend
 - [ ] Add a "favorite" heart icon on instructor profile pages (3.6 / §4 below) + on class-detail instructor-list rows.
@@ -157,9 +170,14 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
 
 ### 3.6 Admin metadata (inspection only)
 - [ ] `user_favorite_instructors` → nested under `people` keyed by `person_id`. Permission `admin`. This table is **user-generated** (rows created by the §3.5 favorite heart, removed by the user) — there is no admin authoring workflow to build, so registering it purely for inspection in Manage Data is appropriate (per `feedback_manage_data_is_debug_only.md`).
+- [ ] `favorite_instructor_notifications` → nested under `people` keyed by `person_id`. Permission `admin`. **System-generated** sent-log (written by the §3.8 daily job); inspection only — never hand-authored.
 
 ### 3.7 Tests
-- [ ] Helper + endpoint + frontend specs + mail-helper assertion that fan-out queues exactly one email per follower per change with the 24h dedupe respected.
+- [ ] Helper + endpoint + frontend specs + mail-helper assertion that the substitution/shift-trade fan-out queues exactly one email per follower per change with the 24h dedupe respected.
+- [ ] **First-appearance (resolved OQ-P13-2):** `NotifyNewScheduleAppearances` queues one email per follower when a favorited instructor newly appears on a class's upcoming schedule; a second same-day run sends nothing (sent-log + 24h throttle); a follower with `notify_on_schedule_change=false` gets none; `FavoriteInstructorNotifications::HasNotified`/`RecordNotified` idempotency.
+
+### 3.8 Scheduled job (resolved OQ-P13-2)
+- [ ] Add a **daily** job to `knottyyoga_helper`: `POST /api/admin/send_favorite_instructor_schedule_alerts`. Idempotent; wired in the three standard places (`scheduler/scheduled_job.cpp` `BuildStandardJobs` via `AppendIfEnabled`, a `JobIntervals::favoriteInstructorAlertSeconds` default 86400s, and a `--favorite_instructor_alert_interval` flag in `scheduler/main.cpp`). Per the existing interval-cron pattern, the endpoint self-gates / is idempotent rather than relying on an exact time. Update `scheduled_job_test` (job count + disable/propagate cases for the new job).
 
 ## 4. Extended Instructor Profile Pages
 
@@ -187,17 +205,19 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
 
 - [ ] Admin creates tags "yoga", "aerial", "partner-acro" with distinct colors. Assigns "yoga" to Vinyasa Flow, "aerial" to Aerial 101, "partner-acro" to Partner Acro - All Levels and Partner Acro - Intermediate.
 - [ ] Calendar shows yellow chip for yoga, purple for aerial, teal for partner-acro.
+- [ ] A class tagged both "yoga" (sort_order 1) and "partner-acro" (sort_order 3) shows the **yoga** color on its calendar chip — the lowest-sort_order tag wins (resolved OQ-P13-1).
 - [ ] Catalog filter "partner-acro" returns the two partner-acro classes.
 - [ ] Phase 5's SL-10 monthly-attendance rule "≥ 4 partner-acro in last month → grants acro_club" now correctly identifies the partner-acro classes via tag membership.
 - [ ] User favorites instructor "Sara"; when admin substitutes Sara into a new Wednesday class, follower receives a notification email next day; if Sara substitutes into a second class within 24h, NO second email (dedupe).
+- [ ] Admin newly schedules Sara to teach a brand-new Friday class; the next daily run emails her followers "Sara is now teaching {Class}" once; subsequent daily runs send nothing for that same appearance (resolved OQ-P13-2).
 - [ ] Visiting `/instructors/<sara-id>` shows her bio, photo, list of classes she teaches, next 4 weeks of sessions.
 
 ## 6. Open Questions
 
-- **OQ-P13-1.** When a class has multiple tags, which color drives the calendar chip? Recommended: the first (lowest sort_order) tag's color; alternatively split the chip visually (a tiny multi-color stripe) — probably overkill. Start with first-tag's-color.
-	- Mason- I'll go with your recommendation.
-- **OQ-P13-2.** Should favorite-instructor notifications also fire on the *first time* a favorite is on the upcoming schedule (not just substitutions)? Recommended: yes — extend Phase 13 fan-out to also fire when a new `class_schedule` is created with the instructor assigned. Daily job rather than per-event.
-	- Mason- I'll go with your recommendation.
+Both resolved (Mason, 2026-06-09: "go with your recommendation") and folded into the plan above (§1.1 Locked-in + the cited sections).
+
+- **OQ-P13-1. — RESOLVED.** Multi-tag calendar chip uses the lowest-`sort_order` tag's single solid color (no multi-color stripe); `GetTagsForClass` returns `sort_order`-ordered tags. Folded into §1.1, §2.2, §2.5, §5.
+- **OQ-P13-2. — RESOLVED.** Favorite-instructor notifications also fire on the **first appearance** of a favorited instructor on the upcoming schedule, via a **daily job** (`NotifyNewScheduleAppearances` → `POST /api/admin/send_favorite_instructor_schedule_alerts`), deduped once per (follower, instructor, class) by a new `favorite_instructor_notifications` sent-log plus the existing 24h throttle. Folded into §1.1, §3.1–3.4, §3.6–3.8, §5.
 
 ## 7. Cross-References
 
