@@ -290,17 +290,17 @@ Distilled from **Mason- Issues Noted** above. Each is a discrete work item; tags
 
 Split out of §9.7 at Mason's request — a larger, standalone work item to tackle **after** the rest of §9. Touches the product pricing UI plus a new "which permissions are offered for pricing/restrictions" concept used across pricing and class-access editors.
 
-### 10.1 Transpose the product pricing matrix [enh]
-- [ ] In `product-detail` (Manage Products), flip the pricing matrix so **rows = permissions (tiers)** and **columns = price schedules**. There are far fewer schedules than permissions, so this gives readable column widths (the current permissions-as-columns layout is too narrow).
-- [ ] Keep the inline click-to-edit behavior, the `per_instance_base` vs `standard` price-kind handling (Class Series products), and variant handling.
-- [ ] Update the `product-detail` spec for the transposed layout.
+### 10.1 Transpose the product pricing matrix [enh] ✅ DONE
+- [x] In `product-detail` (Manage Products), flipped the pricing matrix so **rows = tiers** (a "Standard" row + one per eligible permission) and **columns = price schedules** (far fewer, so they read better as columns). Same transpose applied to the booking-window matrix.
+- [x] Kept inline click-to-edit (`getPrice`/`onCellClick`/`isEditing` are unchanged — they still key on `(scheduleId, permissionId, variantId)`), the `per_instance_base` vs `standard` price-kind handling, and variant handling (variants become an outer grouping: a header row per variant, then tier rows × schedule columns).
+- [x] Updated the `product-detail` spec for the transposed layout + added an eligible-tiers render test.
 
-### 10.2 Restrict which permissions appear in pricing + class restrictions [enh]
-- [ ] Not every permission should be offered for pricing or class access. Introduce a **pricing/eligible (public) permissions** set — a dedicated table (e.g. `pricing_permissions`) or a boolean flag on `permissions` — marking which permissions are surfaced in admin pricing and class-restriction pickers.
-- [ ] Backend (lowest layer first): schema (table or column) → table helper → a read endpoint returning the eligible permission set → wire into DB init / admin metadata.
-- [ ] Frontend: the pricing matrix (10.1) and the class-requirements editor (`class-requirements-editor`) consume the eligible set instead of listing all permissions.
-- [ ] Admin authoring of the eligible set must live in a dedicated **/manage** page (NOT Manage Data), per the Manage-Data-is-debug-only rule.
-- [ ] Tests: only flagged permissions appear in the pricing matrix + requirements editor; eligible-set CRUD.
+### 10.2 Restrict which permissions appear in pricing + class restrictions [enh] ✅ DONE
+- [x] Chose a **boolean flag on `permissions`** (`is_pricing_eligible`) over a side table — simpler and sufficient for both pricing and class-access pickers.
+- [x] Backend (lowest layer first): schema column (`db_schema/permissions`, NOT NULL default false) → table helper (`GetPricingEligiblePermissions` + `SetPricingEligible`, with tests) → DB-init seeding (gold_member + platinum_fitness flagged true; staff/manage_* stay false) → admin metadata (column data info "Offered for Pricing"). **No new read endpoint needed** — the flag rides the generic CRUD read both consumers already use, and the authoring page toggles it via generic `updateItem` (allowed because `permissions` is already a CRUD table).
+- [x] Frontend: the pricing matrix + booking-window matrix (`eligiblePermissions`/`tierRows`) and the class-requirements editor consume only the eligible set (with a no-column fallback so older mocks still work).
+- [x] Admin authoring lives on a dedicated **/manage/membership-tiers** page (Membership Tiers — checkbox per permission → `updateItem`), reached from a Manage dashboard card. NOT the Manage Data editor.
+- [x] Tests: permissions table-helper (flag toggles + filters), product-detail (eligible tiers only), class-requirements editor (eligible filter), membership-tiers component (load + toggle + error).
 
 ## 11. Booking Visibility & Confirmation UX Follow-Ups (found 2026-06-09)
 
