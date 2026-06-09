@@ -257,8 +257,11 @@ The next morning at 11pm window-close:
 ## 11. Open Questions
 
 - **OQ-P8-1.** When a check-in pushes the session over capacity (membership-included flow), do we hard-block, soft-warn the staff, or silently exceed? Recommended: soft-warn but allow — the studio is membership-based and capacity is aspirational for recurring classes; staff judgment wins. For paid offerings (workshops / series) where capacity is real, hard-block with `SESSION_FULL`.
+	- Mason- I'll go with your recommendation.
 - **OQ-P8-2.** Should walk-in account creation require any contact info (email at minimum) or accept name-only? Recommended: name-only is fine for check-in; capture email as a "Save for future" optional field.
+	- Mason- I'd like name and email for everyone.
 - **OQ-P8-3.** Where does the staff portal expose the per-instance exception notes (Phase 5 N-7)? Recommended: a small panel on the check-in screen showing notes from members who marked attending=false for this session.
+	- Mason- I'll go with your recommendation.
 
 ## 12. Cross-References
 
