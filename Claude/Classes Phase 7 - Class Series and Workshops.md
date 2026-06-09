@@ -306,12 +306,11 @@ Split out of §9.7 at Mason's request — a larger, standalone work item to tack
 
 Found live-testing the cart series purchase. The booking is created correctly, but it's hard to *see* the individual sessions afterward, and the confirmation email is unhelpful. Respect layering and add tests per item.
 
-### 11.1 My Bookings doesn't surface the individual session dates [bug/enh]
-- [ ] A purchased series shows only the rollup summary — "8 sessions · Jul 1, 2026 – Jul 29, 2026" — so a member can't tell *which* dates they're booked for.
-- [ ] Current state: `my-events` already groups a series purchase into an expandable `mat-expansion-panel` whose child cards render each session via `formatTimeRange` (which includes the date). So the per-occurrence dates exist (each child `UserBooking` carries `start_time_us` — that's how `seriesDateRange` builds the range) but they're hidden behind a non-obvious expander.
-- [ ] Fix (frontend): make the per-session dates discoverable — expand the series panel by default (or add an obvious "view sessions" affordance) and render an ordered, readable list of each occurrence's date + time inside the group; consider showing the **next** upcoming session date in the collapsed summary instead of only the range.
-- [ ] Verify cart-booked series populate per-session `start_time_us` in `getMyBookings` (they should, since the range already renders).
-- [ ] Tests: `my-events.component.spec` asserts each session's date renders for an expanded series group.
+### 11.1 My Bookings doesn't surface the individual session dates [bug] ✅ DONE
+- [x] A purchased series showed only the rollup summary — "8 sessions · Jul 1, 2026 – Jul 29, 2026" — and the panel **could not be expanded at all** (clicking did nothing), so a member could not see *which* dates they're booked for.
+- [x] Real root cause: `upcomingGroups` was a **getter** returning freshly-built `BookingGroup` objects every change-detection pass, and the `*ngFor` had no `trackBy`. Clicking the header triggered CD → new object identities → Angular destroyed + recreated every `mat-expansion-panel` → the new panel defaulted to collapsed, so it snapped shut instantly and appeared unclickable. (The earlier note that it was merely a "non-obvious expander" was wrong — it was genuinely broken.)
+- [x] Fix (frontend): compute the rollup **once per load** into a stored field (set in the `getMyBookings('upcoming')` subscribe), add `trackBy: trackGroup` (keyed by `group.key`) so panel instances persist across CD, and give each series group a two-way-bound `expanded` flag that **defaults to open** so the session dates show immediately while staying collapsible. Each child card already renders the date+time via `formatTimeRange`.
+- [x] Tests: `my-events.component.spec` — series rollup opens by default and renders all session cards; the groups array + group instance stay identity-stable across change detection (so expand/collapse persists).
 
 ### 11.2 Booked series sessions don't appear in My Schedule [bug]
 - [ ] A purchased series run never shows up under **My Schedule**.
