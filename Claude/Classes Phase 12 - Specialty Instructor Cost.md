@@ -47,8 +47,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Phase 7 (series + per-instance-base pricing in product_prices; `class_series_instances`).
 - Existing `price_schedules` infrastructure ([[Payment Design Document]]).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
-> A specialty instructor is hired for a specific **run**, so cost keys off **`class_instance_id`**, not a flat `class_schedule_id`. And there is no materialization, so the rate-snapshot moves to **ensure-time**: when an occurrence `event_sessions` row is ensured (booking / check-in / sub), `EnsureSessionExists` (or a small hook it calls) stamps `event_sessions.specialty_instructor_cost_id` from the active cost row for the occurrence's instance. Optional per-slot cost override if the specialty teacher only covers some days of the run. Rate changes still roll forward via `price_schedules` (P-2).
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+A specialty instructor is hired for a specific **run**, so cost keys off **`class_instance_id`**, not a flat `class_schedule_id`. And there is no materialization, so the rate-snapshot moves to **ensure-time**: when an occurrence `event_sessions` row is ensured (booking / check-in / sub), `EnsureSessionExists` (or a small hook it calls) stamps `event_sessions.specialty_instructor_cost_id` from the active cost row for the occurrence's instance. Optional per-slot cost override if the specialty teacher only covers some days of the run. Rate changes still roll forward via `price_schedules` (P-2).
 
 **Outcome:**
 - `specialty_instructor_costs` table tied to a run via `class_instance_id` + `price_schedule_id`, NOT per flat schedule (parent SI-1 / SI-6).
@@ -225,7 +225,9 @@ Admin sets up a "Hands Balancing Workshop" with specialty instructor "Visiting M
 ## 10. Open Questions
 
 - **OQ-P12-1.** Should the pricing-assistant accept a target *profit margin* per tier instead of a flat "members break-even, non-members 50%"? Recommended: hard-coded for now; if admin wants more flexibility, add a `non_member_profit_margin_pct` secret and a "profit_margin_pct" input on the dialog. Defer until requested.
+	- Mason- I want this to be configurable.
 - **OQ-P12-2.** When the rate snapshot in `event_sessions.specialty_instructor_cost_id` references a cost row whose `price_schedule` is no longer active, payroll calculations should still use the snapshot. Add a regression test.
+	- Mason- Is there a question here?
 
 ## 11. Cross-References
 
