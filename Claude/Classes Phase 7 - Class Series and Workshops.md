@@ -302,7 +302,31 @@ Split out of §9.7 at Mason's request — a larger, standalone work item to tack
 - [ ] Admin authoring of the eligible set must live in a dedicated **/manage** page (NOT Manage Data), per the Manage-Data-is-debug-only rule.
 - [ ] Tests: only flagged permissions appear in the pricing matrix + requirements editor; eligible-set CRUD.
 
-## 11. Tests-Required Summary
+## 11. Booking Visibility & Confirmation UX Follow-Ups (found 2026-06-09)
+
+Found live-testing the cart series purchase. The booking is created correctly, but it's hard to *see* the individual sessions afterward, and the confirmation email is unhelpful. Respect layering and add tests per item.
+
+### 11.1 My Bookings doesn't surface the individual session dates [bug/enh]
+- [ ] A purchased series shows only the rollup summary — "8 sessions · Jul 1, 2026 – Jul 29, 2026" — so a member can't tell *which* dates they're booked for.
+- [ ] Current state: `my-events` already groups a series purchase into an expandable `mat-expansion-panel` whose child cards render each session via `formatTimeRange` (which includes the date). So the per-occurrence dates exist (each child `UserBooking` carries `start_time_us` — that's how `seriesDateRange` builds the range) but they're hidden behind a non-obvious expander.
+- [ ] Fix (frontend): make the per-session dates discoverable — expand the series panel by default (or add an obvious "view sessions" affordance) and render an ordered, readable list of each occurrence's date + time inside the group; consider showing the **next** upcoming session date in the collapsed summary instead of only the range.
+- [ ] Verify cart-booked series populate per-session `start_time_us` in `getMyBookings` (they should, since the range already renders).
+- [ ] Tests: `my-events.component.spec` asserts each session's date renders for an expanded series group.
+
+### 11.2 Booked series sessions don't appear in My Schedule [bug]
+- [ ] A purchased series run never shows up under **My Schedule**.
+- [ ] Root cause: My Schedule's "My Weekly Plan" tab lists *eligible recurring-class slots* (`getEligibleSchedules`) and the "Upcoming" tab (`upcoming-classes`) lists *template-derived recurring occurrences* (`getUpcomingClasses`). Neither reads the member's **booked** `event_sessions`, so a paid series run (and one-off event bookings) are invisible there — they live only under My Bookings.
+- [ ] Fix: include the member's booked sessions (series + events) in the Upcoming view — either merge `getMyBookings('upcoming')` event sessions into the planner timeline, or add a distinct "Booked" lane/section. Booked series sessions are read-only here (already paid; not attendance-template toggles).
+- [ ] Decide the visual treatment so booked sessions are distinguishable from planned recurring-class slots.
+- [ ] Tests: the upcoming/my-schedule spec shows a booked series occurrence.
+
+### 11.3 Series confirmation email shows only the first date + no calendar file [bug]
+- [ ] The series confirmation email shows just the first session's date and carries no `.ics`, so attendees can't see the full schedule or add it to a calendar. (This is what §13's acceptance already calls for — "one confirmation email with a multi-VEVENT `.ics`" — but it isn't implemented for series.)
+- [ ] Fix (business logic): the series confirmation must (a) render the full **ordered list of every session's date + time** in the body, and (b) attach an `.ics` with **one VEVENT per occurrence** (reuse the Phase 4 `ICalGenerator` multi-event support). Resolve the run's sessions by `series_purchase_id`, not a single `event_session_id`.
+- [ ] Applies to **both** confirmation paths: the immediate Book-and-Pay flow (`PaymentHelper` after `purchase_pay_card`) and the cart flow (`cart_checkout` — its per-item iCal loop matches by `event_session_id`, which a series line doesn't carry, so series get no calendar today).
+- [ ] Tests: mail test asserts the series email body lists N dates and the generated `.ics` contains N VEVENTs.
+
+## 12. Tests-Required Summary
 
 - [ ] Table helper tests for `price_kind` round-trip + `GetSeriesPricesForProduct`.
 - [ ] `class_series_helper_test.cpp` covering all five methods + the three `series_min_not_met_policy` branches.
@@ -311,7 +335,7 @@ Split out of §9.7 at Mason's request — a larger, standalone work item to tack
 - [ ] Frontend specs for series-detail, my-bookings series rollup, admin series-create form, mock service.
 - [ ] Manual-testing-helper commands: `create_series <...>`, `book_series <person_id> <schedule_id>`, `simulate_series_under_min <schedule_id>`.
 
-## 12. Cross-Layer Acceptance Criteria
+## 13. Cross-Layer Acceptance Criteria
 
 A gold member buys a 6-week aerial series the day before it starts:
 - [ ] One `purchase` row + one `purchase_item` at gold-tier full-series price.
@@ -330,7 +354,7 @@ Admin cancels the series at week 3 due to low enrollment:
 Daily auto-cancel job runs at 03:00 local, finds a series past `series_min_by_us` with policy `auto_cancel_refund`:
 - [ ] Series auto-cancelled, refunds issued, attendees emailed.
 
-## 13. Open Questions
+## 14. Open Questions
 
 All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into §4.2 and §4.1 respectively. OQ-P7-1 is answered below — and yes, we can (and will) show both.
 
@@ -348,7 +372,7 @@ All three open questions are now resolved. OQ-P7-2 and OQ-P7-3 are folded into �
 - **OQ-P7-2. — RESOLVED (Mason: "go with your recommendation").** Ship partial-refund-per-`purchase_item` in Phase 7. Folded into §4.2.
 - **OQ-P7-3. — RESOLVED (Mason: "go with your recommendation").** `BookFullSeries` (and, symmetrically, `BookProratedRemainingSeries`) reject with `ALREADY_BOOKED` when the user already holds an active booking for any occurrence of the run; admin resolves manually. Folded into §4.1.
 
-## 14. Cross-References
+## 15. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 7.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 4 - iCal Generator Extensions]].
