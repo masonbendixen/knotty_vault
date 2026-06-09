@@ -100,22 +100,23 @@ Lowest layer first:
 - [x] Applies to **paid** bookings only — sets `status='no_show'` if `checked_in_us IS NULL`.
 - [x] Membership-included classes don't have advance bookings, so there's nothing to mark `no_show` for them — they're tracked implicitly via reliability metrics (Phase 16 / R-1).
 
-## 2. Database Schema
+## 2. Database Schema ✅ DONE
 
-### 2.1 Confirm reused fields
-- [ ] `bookings.checked_in_us BIGINT` NULL — already present from [[Scheduling thin slice]].
-- [ ] `bookings.is_walkin BOOLEAN` — already present.
-- [ ] `bookings.notes TEXT` — already present (used here for "staff override reason" and walk-in info).
-- [ ] `bookings.status TEXT` — must accept `'attended'` and `'no_show'` (already supported).
+### 2.1 Confirm reused fields ✅
+- [x] `bookings.checked_in_us BIGINT` NULL — present (`db_schema/bookings.h` `kBookingsCheckedInUs`).
+- [x] `bookings.is_walkin BOOLEAN` — present (`kBookingsIsWalkin`).
+- [x] `bookings.notes TEXT` — present (`kBookingsNotes`); used here for staff-override reason + walk-in info.
+- [x] `bookings.status TEXT` — plain TEXT column (no enum/CHECK constraint), so it already accepts `'attended'` and `'no_show'`.
 
-### 2.2 No new tables
-- [ ] Verified — Phase 8 is pure business-logic + endpoint + UI work.
+### 2.2 No new tables ✅
+- [x] Verified — Phase 8 is pure business-logic + endpoint + UI work. No `db_schema` table additions.
 
-### 2.3 Config secrets
-- [ ] Add to `config_secrets` defaults (seeded in `create_database.cpp`):
-  - `class_checkin_window_before_minutes` = `60`
-  - `class_checkin_window_after_minutes` = `180`
-  - `class_checkin_history_weeks` = `4` (used by the pre-pop list)
+### 2.3 Config secrets ✅
+- [x] Added via the standard two-file secrets mechanism (`util/secrets/secret_keys.h` + `secret_values.cpp` `FillInSecretsStringView`), which both seeds `config_secrets` on first run (`create_database.cpp` pulls these defaults) **and** auto-loads them into the test secrets helper:
+  - `class_checkin_window_before_minutes` = `60` (`kClassCheckinWindowBeforeMinutes`)
+  - `class_checkin_window_after_minutes` = `180` (`kClassCheckinWindowAfterMinutes`)
+  - `class_checkin_history_weeks` = `4` (`kClassCheckinHistoryWeeks`) — used by the pre-pop list
+- [x] Test: `secrets_helper_test.cpp` `ClassCheckinConfigDefaultsLoaded` asserts all three resolve to their defaults.
 
 ## 3. Table Helpers
 
