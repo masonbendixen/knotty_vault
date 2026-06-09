@@ -87,6 +87,9 @@ Lowest layer first:
 - [x] No homepage check-in badge (rejected — see Alternatives Considered).
 - [x] No kiosk / self-check-in (P-5).
 - [x] Instructor change is NOT emailed (homepage display only) — confirmed Phase 10.
+- [x] **Over-capacity check-in (resolved OQ-P8-1):** membership-included flow **soft-warns but allows** (capacity is aspirational for recurring classes; staff judgment wins) — `CheckInResult.overCapacityWarning=true`, no error. Paid offerings (workshops / series) enforce real capacity as `SESSION_FULL` **at purchase time** (other phases), so there is no over-capacity new-booking-on-check-in path for them.
+- [x] **Walk-in contact info (resolved OQ-P8-2):** walk-in person creation requires **both name AND email** (Mason: "name and email for everyone"). Email is NOT optional — reject with a validation error if missing.
+- [x] **Per-instance exception notes (resolved OQ-P8-3):** the check-in screen shows a small panel of notes from members who marked `attending=false` for this occurrence (Phase 5 N-7); the GET check-in endpoint surfaces them.
 
 ### 1.2 Check-in window
 - [x] Default −60min before / +180min after session end.
@@ -146,7 +149,7 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
 
 ### 4.3 Check-in action
 - [ ] `struct CheckInRequest { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t personId; int64_t staffPersonId; bool skillOverride; std::string overrideReason; }`. (Identifies the occurrence by slot + date; the `event_sessions` row may not exist yet.)
-- [ ] `struct CheckInResult { bool ok; int64_t eventSessionId; int64_t bookingId; bool createdNewBooking; std::string errorCode; }`.
+- [ ] `struct CheckInResult { bool ok; int64_t eventSessionId; int64_t bookingId; bool createdNewBooking; bool overCapacityWarning; std::string errorCode; }`. (`overCapacityWarning` is the resolved OQ-P8-1 soft-warn signal — the check-in still succeeds.)
 - [ ] `CheckIn(Transaction&, const CheckInRequest&)`:
   1. Verify `IsCheckinOpen` (compute occurrence start from the slot + date) → else `CHECKIN_NOT_OPEN`.
   2. `eventSessionId = ClassScheduleHelper::EnsureSessionExists(classScheduleSlotId, occurrenceDateUs)` (idempotent — recording trigger #6).
@@ -155,12 +158,13 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
   5. If none exists:
      - Verify the user is eligible for the class (membership-included via `CatalogHelper`) → else `NOT_ELIGIBLE`.
      - Verify skill requirements: if missing AND `skillOverride=true` AND staff has `manage_classes`, append override reason to `bookings.notes`; else `MISSING_SKILL_REQUIREMENTS`.
-     - Verify capacity: query `event_sessions.booked_count + 1 ≤ capacity`; if not → `SESSION_FULL` (staff can still proceed via a separate flow, see CI-6 in parent + open questions).
+     - Check capacity (resolved OQ-P8-1 — **soft-warn, do not block**): if `event_sessions.booked_count + 1 > capacity`, set `overCapacityWarning=true` but still proceed (this branch is membership-included — verified above — where capacity is aspirational and staff judgment wins). No `SESSION_FULL` error here; paid-offering capacity is enforced at purchase time in other phases.
      - Create new `booking` with `purchase_id = NULL`, `checked_in_us = now`, `status = 'attended'`, `is_walkin = false`. Increment `event_sessions.booked_count`.
-     - Return `createdNewBooking=true`.
+     - Return `createdNewBooking=true` (with `overCapacityWarning` set if over capacity).
 
 - [ ] `WalkInCheckIn(Transaction&, eventSessionId, walkInPersonRequest, staffPersonId)`:
-  - If `walkInPersonRequest.personId == 0` (no existing person), create a `people` row using the existing person-creation pattern with `is_walkin=true` and just `firstName/lastName/(optional email)`.
+  - `walkInPersonRequest` carries `firstName`, `lastName`, **and `email` (all required — resolved OQ-P8-2)**. Validate all three are non-empty (and `email` is well-formed) → else `MISSING_WALKIN_CONTACT_INFO`. No name-only walk-ins.
+  - If `walkInPersonRequest.personId == 0` (no existing person), create a `people` row using the existing person-creation pattern with `is_walkin=true` and `firstName/lastName/email`.
   - Then call `CheckIn` with `is_walkin=true`.
 
 - [ ] `UndoCheckIn(Transaction&, eventSessionId, personId, staffPersonId)`:
@@ -176,17 +180,21 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
   3. For each `booking WHERE event_session_id=? AND status='confirmed' AND checked_in_us IS NULL AND purchase_id IS NOT NULL`: set `status='no_show'`. Return count.
 - [ ] Walks all eligible sessions in a separate sweep method `FinalizePendingSessions(Transaction&, nowUs, SecretsHelper&)` — used by the hourly job.
 
-### 4.5 KeyValueTable conversions
-- [ ] `CheckinCandidateToKeyValueTable(...)`, `CheckInResultToKeyValueTable(...)`.
+### 4.5 Per-instance exception notes (resolved OQ-P8-3)
+- [ ] `struct ExceptionNote { int64_t personId; std::string firstName; std::string lastName; std::string note; }`.
+- [ ] `std::vector<ExceptionNote> GetExceptionNotesForOccurrence(Transaction&, int64_t classScheduleSlotId, int64_t occurrenceDateUs)` — reads `attendance_template_exceptions` rows for this (`class_schedule_slot_id`, `occurrence_date_us`) where `attending=false` and `note` is non-empty, joined to `people` for display names. Surfaced by the GET check-in endpoint (§5.1) and rendered as the small notes panel on the check-in screen (§7.1). Reuse the existing `TableHelpers::AttendanceTemplateExceptions` reader (Phase 5) — no SQL in business logic.
+
+### 4.6 KeyValueTable conversions
+- [ ] `CheckinCandidateToKeyValueTable(...)`, `CheckInResultToKeyValueTable(...)` (include `over_capacity_warning`), `ExceptionNoteToKeyValueTable(...)`.
 
 ## 5. Endpoints
 
 ### 5.1 Staff endpoints
-- [ ] `GET /api/staff/checkin/<eventSessionId>` → `{ window_open, session_info, candidates: [...] }`. Permission `staff` OR `manage_classes`. Endpoint test.
+- [ ] `GET /api/staff/checkin/<eventSessionId>` → `{ window_open, session_info, candidates: [...], exception_notes: [...] }`. `exception_notes` comes from `GetExceptionNotesForOccurrence` (resolved OQ-P8-3). Permission `staff` OR `manage_classes`. Endpoint test (asserts exception notes returned for an occurrence with an `attending=false` note).
 - [ ] `POST /api/staff/checkin/<eventSessionId>/person/<personId>` body `{ skill_override?, override_reason? }`. Returns `CheckInResult`. Endpoint test.
 - [ ] `DELETE /api/staff/checkin/<eventSessionId>/person/<personId>` → undo. Endpoint test.
 - [ ] `POST /api/staff/people/search?q=...` — autocomplete. Permission `staff`. Endpoint test (reuse if existing; otherwise create).
-- [ ] `POST /api/staff/checkin/<eventSessionId>/walkin` body `{ first_name, last_name, email? }` → creates the person + check-in atomically. Endpoint test.
+- [ ] `POST /api/staff/checkin/<eventSessionId>/walkin` body `{ first_name, last_name, email }` — **all three required** (resolved OQ-P8-2) → creates the person + check-in atomically; returns 400 `MISSING_WALKIN_CONTACT_INFO` if any is missing or `email` is malformed. Endpoint test (success + missing-email validation error).
 
 ### 5.2 Admin/scheduler endpoint
 - [ ] `POST /api/admin/finalize_class_attendance` — runs `FinalizePendingSessions(now)` over all sessions in the last 48h. Idempotent. Permission `admin`. Endpoint test.
@@ -208,19 +216,21 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
 - [ ] Lists today's sessions for the staff member's facility (sorted by start time); click into one → check-in screen for that session.
 - [ ] On the check-in screen:
   - Session header: class name, room, instructor, current attended count / capacity, window open/closed badge.
+  - **Exception-notes panel** (resolved OQ-P8-3): a small collapsible panel listing members who marked `attending=false` for this occurrence and their notes, from the GET endpoint's `exception_notes`. Hidden when empty.
   - Search bar at top with autocomplete (≥2 chars; debounced; uses `/api/staff/people/search`).
   - Pre-pop list grouped by source (Template Attendees, Paid Bookings, Recent Attendees) with checkboxes for "Attended" — click flips state via API.
-  - "Add walk-in" button → dialog with first/last/email fields.
+  - "Add walk-in" button → dialog with **first / last / email fields, all required** (resolved OQ-P8-2 — email is required, not optional; disable submit and show a field error until a valid email is entered).
   - Yellow-flag chip next to anyone with missing skill requirements; clicking "Check in anyway" pops a reason-required confirmation dialog.
+  - When a check-in returns `over_capacity_warning` (resolved OQ-P8-1), the check-in still succeeds; surface a non-blocking toast/badge ("Over capacity — checked in anyway").
 - [ ] Optimistic UI updates with rollback on error.
-- [ ] Spec covers all four flows: regular check-in, walk-in, skill-override, undo.
+- [ ] Spec covers all flows: regular check-in, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel render**, and the **over-capacity soft-warn** toast.
 
 ### 7.2 `ServerAccess` extensions
-- [ ] `getCheckinList(eventSessionId)`, `checkInPerson(eventSessionId, personId, skillOverride?, overrideReason?)`, `undoCheckIn(eventSessionId, personId)`, `walkInCheckin(eventSessionId, firstName, lastName, email?)`, `searchPeople(query)`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [ ] `getCheckinList(eventSessionId)` (response now includes `exceptionNotes`), `checkInPerson(eventSessionId, personId, skillOverride?, overrideReason?)` (result includes `overCapacityWarning`), `undoCheckIn(eventSessionId, personId)`, `walkInCheckin(eventSessionId, firstName, lastName, email)` (**email required — resolved OQ-P8-2**), `searchPeople(query)`.
+- [ ] Update `ServerAccess.mock.spec.ts` (incl. a walk-in case that rejects a missing/blank email, and the exception-notes + over-capacity-warning fields).
 
 ### 7.3 Types
-- [ ] `checkin.types.ts`: `CheckinCandidate`, `CheckInResult`, `CheckinSessionInfo`.
+- [ ] `checkin.types.ts`: `CheckinCandidate`, `CheckInResult` (with `overCapacityWarning`), `CheckinSessionInfo`, `ExceptionNote`, and a `CheckinListResponse` that carries `exceptionNotes`.
 
 ## 8. Admin Metadata
 
@@ -233,13 +243,15 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
   - Pre-pop list combines template + paid + history correctly without duplicates.
   - Check-in creates booking for membership-included class with `purchase_id=NULL`.
   - Check-in on existing paid booking sets `checked_in_us`.
-  - Walk-in flow creates person + booking.
+  - Walk-in flow creates person + booking **with email persisted**; **rejects when email is missing/blank (`MISSING_WALKIN_CONTACT_INFO`)** (resolved OQ-P8-2).
+  - Over-capacity membership check-in **succeeds with `overCapacityWarning=true`** and no error (resolved OQ-P8-1).
+  - `GetExceptionNotesForOccurrence` returns the `attending=false` notes for the occurrence, excludes empty notes (resolved OQ-P8-3).
   - Skill override requires `manage_classes`; rejects without permission.
   - Undo deletes walk-in booking; resets `checked_in_us` for paid.
   - `FinalizeAttendance` marks `no_show` on paid + unchecked.
-- [ ] Endpoint tests for all six endpoints (success + permission-denied + validation-error).
-- [ ] Frontend spec for check-in page covering search, pre-pop, walk-in, skill-override, undo.
-- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last>`, `finalize_attendance`.
+- [ ] Endpoint tests for all six endpoints (success + permission-denied + validation-error), incl. the walk-in **missing-email 400** and the GET endpoint returning `exception_notes`.
+- [ ] Frontend spec for check-in page covering search, pre-pop, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel**, and the **over-capacity soft-warn** toast.
+- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`.
 
 ## 10. Cross-Layer Acceptance Criteria
 
@@ -248,20 +260,21 @@ Tuesday 6:55pm (5min before session start of "Vinyasa Flow at Studio A 7-8pm"):
 - [ ] The pre-pop list shows: 3 template attendees, 0 paid bookings (it's membership-included), and 5 recent-history attendees (last 4 weeks).
 - [ ] Staff checks in template attendee #1 → creates a `booking` with `purchase_id=NULL`, `checked_in_us=now`, `status='attended'`, `event_sessions.booked_count++`.
 - [ ] Staff types "Jor" → autocomplete returns "Jordan Smith" (recent history). Staff clicks → booking created + checked in.
-- [ ] Walk-in "Maya Patel" (not in system) → person created + booking created + checked in with `is_walkin=true`.
+- [ ] Walk-in "Maya Patel" (not in system) → staff must enter **name and email** (both required); person created + booking created + checked in with `is_walkin=true`. Submitting without an email is blocked with a field error.
 - [ ] Tries to check in "Alex" who has a skill requirement they don't meet → yellow flag appears; "Check in anyway" → reason dialog → submit → booking created with override note. Reject if staff lacks `manage_classes`.
+- [ ] The check-in screen shows an exception-notes panel: "Priya — out sick this week" because Priya marked `attending=false` with that note for this occurrence.
+- [ ] The membership-included session is already at capacity; staff checks in one more walk-in → check-in succeeds with a non-blocking "Over capacity — checked in anyway" toast (no `SESSION_FULL` block).
 
 The next morning at 11pm window-close:
 - [ ] Hourly `finalize_class_attendance` job runs; for a separate paid workshop where 2 attendees never checked in, those bookings flip to `status='no_show'`.
 
 ## 11. Open Questions
 
-- **OQ-P8-1.** When a check-in pushes the session over capacity (membership-included flow), do we hard-block, soft-warn the staff, or silently exceed? Recommended: soft-warn but allow — the studio is membership-based and capacity is aspirational for recurring classes; staff judgment wins. For paid offerings (workshops / series) where capacity is real, hard-block with `SESSION_FULL`.
-	- Mason- I'll go with your recommendation.
-- **OQ-P8-2.** Should walk-in account creation require any contact info (email at minimum) or accept name-only? Recommended: name-only is fine for check-in; capture email as a "Save for future" optional field.
-	- Mason- I'd like name and email for everyone.
-- **OQ-P8-3.** Where does the staff portal expose the per-instance exception notes (Phase 5 N-7)? Recommended: a small panel on the check-in screen showing notes from members who marked attending=false for this session.
-	- Mason- I'll go with your recommendation.
+All three resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Locked-in + the cited sections).
+
+- **OQ-P8-1. — RESOLVED (Mason: "go with your recommendation").** Over-capacity membership-included check-in **soft-warns but allows** (`CheckInResult.overCapacityWarning`, no error); paid-offering capacity stays a real `SESSION_FULL` enforced at purchase time. Folded into §1.1, §4.3, §7.1, §9, §10.
+- **OQ-P8-2. — RESOLVED (Mason: "name and email for everyone").** Walk-in person creation requires **both name AND email** — email is NOT optional; reject with `MISSING_WALKIN_CONTACT_INFO` if missing/malformed. Folded into §1.1, §4.3, §5.1, §7.1–7.3, §9, §10.
+- **OQ-P8-3. — RESOLVED (Mason: "go with your recommendation").** A small exception-notes panel on the check-in screen shows notes from members who marked `attending=false` for the occurrence, via `GetExceptionNotesForOccurrence` + the GET endpoint's `exception_notes`. Folded into §1.1, §4.5, §5.1, §7.1–7.3, §9, §10.
 
 ## 12. Cross-References
 
