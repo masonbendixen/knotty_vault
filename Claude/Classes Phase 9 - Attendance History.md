@@ -72,6 +72,8 @@ No new DB tables; no new table helpers (uses existing `bookings`, `event_session
 - [x] Status filter defaults to `'attended'` only (members usually want to see what they've done; `no_show` and `cancelled` rows are noise by default; UI offers a "Show all" toggle).
 - [x] Pagination defaults: 25 per page; client supplies `offset` and `limit`.
 - [x] Sort: most recent first.
+- [x] **Count distinct bookings, not distinct dates (resolved OQ-P9-1).** A member who attended 5 classes on one day sees 5 rows / counts as 5 — each is a separate experience. This is the natural per-`bookings`-row model already in §2 (one `AttendanceHistoryRow` per `bookings` row; `GetTotalCount` counts bookings), so no de-duplication by date anywhere.
+- [x] **Year/month dropdown range = earliest attendance → today, computed server-side (resolved OQ-P9-2).** The endpoint returns the user's earliest attendance moment in the metadata block alongside `distinct_class_ids`; the UI builds the year list from that to the current year (no fixed "last 5 years" window).
 
 ### 1.2 Filter semantics
 - [x] `year` and `month` filter the session's date in **facility-local TZ** (NOT UTC). Justification: a 11pm Pacific session on March 31 reads as March, not April UTC.
@@ -118,10 +120,11 @@ struct AttendanceHistoryRow {
 ```
 
 ### 2.3 Methods
-- [ ] `int64_t GetTotalCount(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — count query.
-- [ ] `std::vector<AttendanceHistoryRow> GetHistory(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — the paginated read.
+- [ ] `int64_t GetTotalCount(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — count query. Counts `bookings` rows (distinct bookings, **not** distinct dates — resolved OQ-P9-1); 5 same-day attendances count as 5.
+- [ ] `std::vector<AttendanceHistoryRow> GetHistory(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — the paginated read (one row per `bookings` row).
 - [ ] `std::vector<int64_t> GetDistinctInstructorIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown.
 - [ ] `std::vector<int64_t> GetDistinctClassIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown.
+- [ ] `std::optional<int64_t> GetEarliestAttendanceUs(Transaction&, int64_t personId)` — `MIN(event_sessions.start_time_us)` across the person's bookings (resolved OQ-P9-2); feeds the year-dropdown range. `nullopt` when the member has no attendance yet. The UI converts this to a year using the facility-local TZ, consistent with §1.2's TZ-aware year/month filtering.
 
 ### 2.4 SQL strategy
 Single query with conditional WHERE clauses. Joins:
@@ -156,6 +159,8 @@ LIMIT :limit OFFSET :offset
   - `includeNoShow=false` excludes no-shows by default.
   - Pagination correct (offset 0 / limit 10 returns most-recent 10; offset 10 returns the next 10).
   - Sort: most recent first.
+  - Five same-day attendances count as 5 rows / `GetTotalCount`==5 (distinct bookings, not distinct dates — resolved OQ-P9-1).
+  - `GetEarliestAttendanceUs` returns the `MIN(start_time_us)` across the person's bookings, and `nullopt` for a member with no attendance (resolved OQ-P9-2).
 
 ## 3. Endpoints
 
@@ -163,7 +168,7 @@ LIMIT :limit OFFSET :offset
 - [ ] `endpoints/get_my_attendance_history.h/cpp` + test:
   - `GET /api/me/attendance_history?year=&month=&class_id=&instructor_id=&include_no_show=&include_cancelled=&offset=&limit=`.
   - Permission: logged-in session.
-  - Returns `{ total_count, rows: [...], distinct_class_ids, distinct_instructor_ids }` — the distinct lists drive the filter dropdowns.
+  - Returns `{ total_count, rows: [...], distinct_class_ids, distinct_instructor_ids, earliest_attendance_us }` — the distinct lists drive the FK filter dropdowns; `earliest_attendance_us` (null when no attendance) drives the year-dropdown range (resolved OQ-P9-2).
   - Use `crow::query_string` for query params (per memory).
 
 ## 4. Frontend
@@ -171,6 +176,7 @@ LIMIT :limit OFFSET :offset
 ### 4.1 Attendance history page
 - [ ] `ui/src/app/pages/account/attendance-history/attendance-history.component.*/.spec.ts`.
 - [ ] Layout: filter row at top (year picker, month picker, class FK picker, instructor FK picker, "Show no-shows" toggle), then a Material table, then a Material paginator.
+- [ ] **Year dropdown** is populated from `earliest_attendance_us` (its facility-local year) up to the current year — not a fixed "last 5 years" range (resolved OQ-P9-2). When `earliest_attendance_us` is null (no attendance), the year filter is empty/disabled and the empty state shows.
 - [ ] Filter values feed query params; pagination state preserved on back-navigation.
 - [ ] Empty state: "You haven't attended any classes yet. Browse the catalog at /classes."
 - [ ] Mat-card border + back-nav + RouterTestingModule per memory `feedback_account_page_layout.md`.
@@ -179,16 +185,16 @@ LIMIT :limit OFFSET :offset
 
 ### 4.2 `ServerAccess` extension
 - [ ] `getMyAttendanceHistory(filter): Observable<AttendanceHistoryResponse>`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [ ] Update `ServerAccess.mock.spec.ts` (mock returns `earliestAttendanceUs` in the metadata; a no-attendance case returns null).
 
 ### 4.3 Types
-- [ ] `attendance-history.types.ts`: `AttendanceHistoryFilter`, `AttendanceHistoryRow`, `AttendanceHistoryResponse`.
+- [ ] `attendance-history.types.ts`: `AttendanceHistoryFilter`, `AttendanceHistoryRow`, `AttendanceHistoryResponse` (the response carries `earliestAttendanceUs: number | null` alongside `distinctClassIds` / `distinctInstructorIds`).
 
 ## 5. Tests-Required Summary
 
-- [ ] Business logic test cases enumerated in 2.6.
-- [ ] Endpoint test cases (filter combos, pagination, validation-errors).
-- [ ] Component spec for filter UI + paginator + empty state + mock service.
+- [ ] Business logic test cases enumerated in 2.6 (incl. distinct-bookings count + `GetEarliestAttendanceUs`).
+- [ ] Endpoint test cases (filter combos, pagination, validation-errors, and `earliest_attendance_us` present in metadata / null when no attendance).
+- [ ] Component spec for filter UI + paginator + empty state + mock service, incl. the year dropdown built from `earliestAttendanceUs` (and disabled/empty when null).
 
 ## 6. Cross-Layer Acceptance Criteria
 
@@ -201,9 +207,10 @@ A member with 18 months of attendance:
 
 ## 7. Open Questions
 
-- **OQ-P9-1.** Should we count distinct dates or distinct bookings? A member who attended 5 classes on the same day has 5 bookings. Recommended: distinct bookings — they're 5 separate experiences.
-	- Mason- I'll go with your recommendation.
-- **OQ-P9-2.** Year/month dropdowns: populate from the user's earliest attendance date to today, or fixed range (last 5 years)? Recommended: from earliest to today, computed server-side and returned as part of the metadata block alongside `distinct_class_ids`.
+Both resolved (Mason, 2026-06-09: "go with your recommendation") and folded into the plan above (§1.1 Locked-in + the cited sections).
+
+- **OQ-P9-1. — RESOLVED.** Count **distinct bookings**, not distinct dates — 5 same-day attendances are 5 rows / count as 5. This is the existing per-`bookings`-row model; no date de-dup anywhere. Folded into §1.1, §2.3, §2.6, §5.
+- **OQ-P9-2. — RESOLVED.** Year/month dropdown range runs from the user's **earliest attendance → today**, computed server-side: `GetEarliestAttendanceUs` → `earliest_attendance_us` in the endpoint metadata block → the UI builds the year list from it (null = no attendance → empty/disabled). Folded into §1.1, §2.3, §3.1, §4.1–4.3, §2.6, §5.
 
 ## 8. Cross-References
 

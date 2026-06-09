@@ -47,12 +47,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Phase 4 (cancellation `.ics` with STATUS:CANCELLED).
 - Existing `SessionCancellationHelper`, `ShiftChangeHelper`, `scheduling_exceptions` infra ([[Provider Portal]], [[Event Polish- Scheduling Should Have Items]]).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.7, L-8/L-9
-> This phase changes substantially:
-> - **Per-class scheduling exceptions are GONE as a separate mechanism.** A class doesn't run on a date because a higher-priority impl says so (a "Memorial Day" impl with that day's slot removed, or an empty closure impl). There is no `scheduling_exceptions` cascade for *classes*. The `scheduling_exceptions` table stays in use for **service sessions** only — untouched here.
-> - **No global "studio closed" lever (L-9).** Even on a closure day a workshop may run under its own class. Closures are per-class empty high-priority impls. This phase ships the **"close these N classes for this window" class-multiselect batch UI** (deferred OQ-CSI-4), backed by `ClassClosureHelper::CloseClassesForRange(classIds, fromUs, toUs)` which creates an empty high-priority impl under each selected class's active instance.
-> - **Ensure-on-action invariant.** Every per-occurrence write — single cancel, instructor sub, shift-trade approval — first calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` (the occurrence usually has no persisted row under the lazy model), then performs the cancel / staffing write.
-> - **Instructor substitution** operates on the ensured `event_sessions` row's `event_session_staffing` (overriding the slot's default `instructor_person_id`). Per ST-4, NO attendee email — the new instructor surfaces on the homepage / calendar only.
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]] §1.7, L-8/L-9
+This phase changes substantially:
+- **Per-class scheduling exceptions are GONE as a separate mechanism.** A class doesn't run on a date because a higher-priority impl says so (a "Memorial Day" impl with that day's slot removed, or an empty closure impl). There is no `scheduling_exceptions` cascade for *classes*. The `scheduling_exceptions` table stays in use for **service sessions** only — untouched here.
+- **No global "studio closed" lever (L-9).** Even on a closure day a workshop may run under its own class. Closures are per-class empty high-priority impls. This phase ships the **"close these N classes for this window" class-multiselect batch UI** (deferred OQ-CSI-4), backed by `ClassClosureHelper::CloseClassesForRange(classIds, fromUs, toUs)` which creates an empty high-priority impl under each selected class's active instance.
+- **Ensure-on-action invariant.** Every per-occurrence write — single cancel, instructor sub, shift-trade approval — first calls `ClassScheduleHelper::EnsureSessionExists(slotId, occurrenceDateUs)` (the occurrence usually has no persisted row under the lazy model), then performs the cancel / staffing write.
+- **Instructor substitution** operates on the ensured `event_sessions` row's `event_session_staffing` (overriding the slot's default `instructor_person_id`). Per ST-4, NO attendee email — the new instructor surfaces on the homepage / calendar only.
 
 **Outcome:**
 - Class closures handled via empty high-priority impls; a batch class-multiselect UI creates them in one action. Workshops on closed dates are unaffected.
@@ -189,7 +189,7 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 - [ ] Spec update.
 
 ### 6.5 Homepage display of substitute instructor
-- [ ] Phase 5's today-classes feed already loads `event_session_staffing` for each session — when an instructor changes (substitution OR shift trade), this list reflects the change on next render. Add a subtle "Substitute: <new name>" chip when the staffing row's `notes` field starts with "Substituted by".
+- [ ] Phase 5's today-classes feed already loads `event_session_staffing` for each session — when an instructor changes (substitution OR shift trade), this list reflects the change on next render. Add a subtle "Substitute: {new name}" chip when the staffing row's `notes` field starts with "Substituted by".
 - [ ] Spec.
 
 ### 6.6 `ServerAccess` extensions
@@ -234,8 +234,11 @@ Instructor-initiated shift trade (Sara wants Tina to take next Tuesday's class):
 ## 10. Open Questions
 
 - **OQ-P10-1.** When admin substitutes an instructor for a session that's part of a series, do we substitute just that one instance, or the rest of the series? Recommended: just that one instance — admin manually substitutes others if needed; safer than implicit cascade.
+	- Mason- I'll go with your recommendation.
 - **OQ-P10-2.** For the "who's teaching what" grid, should the date range default to "this week" or "next 30 days"? Recommended: "next 30 days" — gives admin operational visibility for planning ahead.
+	- Mason- I'll go with your recommendation.
 - **OQ-P10-3.** Class shift-trade with paid attendees (workshops / series) — does the affected-count gate require admin approval, similar to the provider path? Recommended: yes, mirror the existing provider behavior (`shift_change_booking_block_days` secret).
+	- Mason- For this one, I don't feel like swapping fitness instructors is anywhere near as invasive or open to refund as massage. I don't think we need to gate this like with do with massage providers. Let's just let 
 
 ## 11. Cross-References
 
