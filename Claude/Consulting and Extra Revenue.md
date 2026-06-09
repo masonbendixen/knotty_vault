@@ -55,6 +55,11 @@ Rough US ballpark rates — adjust for market/remote. Anchor **high**; first-tim
 
 The fastest cash with the least time commitment is the top combo: **expert-network calls + chair massage + warm-network outreach.** The highest *upside* is a fractional/retainer relationship or a productized AI-enablement offering.
 
+Mason- Notes to follow up on:
+- Washington Software Alliance
+- Claude- can you give me ideas for contracting firms?
+- Mara- Raining Virtue - Jon Flemming is the owner / CEO. Mara will send an introduction email.
+
 ## 3. The AI-accelerated engineering angle (develop this — it's your strongest, most timely play)
 
 Almost every eng org in 2026 is flailing at "how do we actually get value from AI coding tools." You have a rare combo: senior credibility **and** a real, working methodology (spec-driven development in Obsidian, Claude Code, structured planning docs — exactly what you're doing on this project). Productize it:
