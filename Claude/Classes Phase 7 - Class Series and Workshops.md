@@ -312,18 +312,17 @@ Found live-testing the cart series purchase. The booking is created correctly, b
 - [x] Fix (frontend): compute the rollup **once per load** into a stored field (set in the `getMyBookings('upcoming')` subscribe), add `trackBy: trackGroup` (keyed by `group.key`) so panel instances persist across CD, and give each series group a two-way-bound `expanded` flag that **defaults to open** so the session dates show immediately while staying collapsible. Each child card already renders the date+time via `formatTimeRange`.
 - [x] Tests: `my-events.component.spec` — series rollup opens by default and renders all session cards; the groups array + group instance stay identity-stable across change detection (so expand/collapse persists).
 
-### 11.2 Booked series sessions don't appear in My Schedule [bug]
-- [ ] A purchased series run never shows up under **My Schedule**.
-- [ ] Root cause: My Schedule's "My Weekly Plan" tab lists *eligible recurring-class slots* (`getEligibleSchedules`) and the "Upcoming" tab (`upcoming-classes`) lists *template-derived recurring occurrences* (`getUpcomingClasses`). Neither reads the member's **booked** `event_sessions`, so a paid series run (and one-off event bookings) are invisible there — they live only under My Bookings.
-- [ ] Fix: include the member's booked sessions (series + events) in the Upcoming view — either merge `getMyBookings('upcoming')` event sessions into the planner timeline, or add a distinct "Booked" lane/section. Booked series sessions are read-only here (already paid; not attendance-template toggles).
-- [ ] Decide the visual treatment so booked sessions are distinguishable from planned recurring-class slots.
-- [ ] Tests: the upcoming/my-schedule spec shows a booked series occurrence.
+### 11.2 Booked series sessions don't appear in My Schedule [bug] ✅ DONE
+- [x] A purchased series run never showed up under **My Schedule**.
+- [x] Root cause: My Schedule's "My Weekly Plan" tab lists *eligible recurring-class slots* (`getEligibleSchedules`) and the "Upcoming" tab (`upcoming-classes`) lists *template-derived recurring occurrences* (`getUpcomingClasses`). Neither read the member's **booked** `event_sessions`.
+- [x] Fix: `upcoming-classes` now `forkJoin`s `getMyBookings('upcoming')` alongside the planner and renders a distinct, read-only **"Your booked sessions"** section above the planner — confirmed event/series bookings only (services + non-confirmed filtered out), sorted by start time, each with a green "Booked" badge. The empty state only shows when there are neither planned classes nor booked sessions.
+- [x] Tests: `upcoming-classes.component.spec` (booked section lists confirmed event sessions, excludes services/cancelled, suppresses the empty state); `my-schedule` spec mock updated with `getMyBookings`.
 
-### 11.3 Series confirmation email shows only the first date + no calendar file [bug]
-- [ ] The series confirmation email shows just the first session's date and carries no `.ics`, so attendees can't see the full schedule or add it to a calendar. (This is what §13's acceptance already calls for — "one confirmation email with a multi-VEVENT `.ics`" — but it isn't implemented for series.)
-- [ ] Fix (business logic): the series confirmation must (a) render the full **ordered list of every session's date + time** in the body, and (b) attach an `.ics` with **one VEVENT per occurrence** (reuse the Phase 4 `ICalGenerator` multi-event support). Resolve the run's sessions by `series_purchase_id`, not a single `event_session_id`.
-- [ ] Applies to **both** confirmation paths: the immediate Book-and-Pay flow (`PaymentHelper` after `purchase_pay_card`) and the cart flow (`cart_checkout` — its per-item iCal loop matches by `event_session_id`, which a series line doesn't carry, so series get no calendar today).
-- [ ] Tests: mail test asserts the series email body lists N dates and the generated `.ics` contains N VEVENTs.
+### 11.3 Series confirmation email shows only the first date + no calendar file [bug] ✅ DONE
+- [x] The series confirmation email showed just the first session's date and carried no `.ics`.
+- [x] Fix (business logic): `booking_confirmation_mail` gained a `sessionLines` field — when there's more than one occurrence the body renders a **"Sessions (N)"** list of every date + time instead of the single Date/Time lines. `PaymentHelper::SendBookingConfirmationEmailIfApplicable` now gathers **all** confirmed event bookings on the purchase (not just the first), lists every occurrence, attaches an `.ics` with **one VEVENT per occurrence** (`GenerateICalendar(vector)`), and titles it "Series Booking Confirmation". Single-event bookings are unchanged.
+- [x] Both paths covered: the immediate Book-and-Pay flow pays via `purchase_pay_card` → `PaymentHelper` (above); the **cart flow also pays via `purchase_pay_card`**, so it gets the same proper email. To avoid an incomplete duplicate, `cart_checkout` now **skips series line items** in its own per-item email loop (they have no single `event_session_id`).
+- [x] Tests: `booking_confirmation_mail_test` (multi-session list), `payment_helper_test` (3-session series purchase → "Series Booking Confirmation" email with "Sessions (3)" and a 3-VEVENT `.ics`).
 
 ## 12. Tests-Required Summary
 

@@ -39,7 +39,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ## Phase Summary
 
-**Should-have.** Per-permission advance-booking days at the product level (uses existing `product_booking_windows`). Users see future class series / workshops / intro / guest-pass-eligible sessions outside their booking window with a "Sign-ups open on <date>" hint. Users can click "Remind me when sign-ups open" → row added to `signup_open_reminders` → daily cron picks up and emails the user on the open date.
+**Should-have.** Per-permission advance-booking days at the product level (uses existing `product_booking_windows`). Users see future class series / workshops / intro / guest-pass-eligible sessions outside their booking window with a "Sign-ups open on {date}" hint. Users can click "Remind me when sign-ups open" → row added to `signup_open_reminders` → daily cron picks up and emails the user on the open date.
 
 **Important scope note:** signup windows mostly apply to **paid** offerings (workshops, series, intro). Recurring class attendance is membership-included with no advance booking (Phase 5 + Phase 8), so windows are irrelevant there.
 
@@ -50,8 +50,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 - Existing `product_booking_windows` infra ([[Event Polish- Scheduling Should Have Items]]).
 - Scheduled jobs daemon ([[Scheduled Jobs]]).
 
-> ### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
-> Small. "Future sessions outside your booking window" are **derived** (most have no persisted `event_sessions` row) — enumerate them via `ClassScheduleHelper::GetDerivedSessionsForRange`. The per-permission advance window comes from the **active `class_instances` row's product** (`product_booking_windows`), not from a flat schedule. A `signup_open_reminders` row keys off the occurrence identity (`class_schedule_slot_id`, `occurrence_date_us`) rather than an `event_session_id`, since the occurrence usually isn't persisted until someone books it (which then ensures the row).
+### Class Schedule Redesign Impact (2026-05-28) — see [[Class Schedule Implementations Redesign]]
+Small. "Future sessions outside your booking window" are **derived** (most have no persisted `event_sessions` row) — enumerate them via `ClassScheduleHelper::GetDerivedSessionsForRange`. The per-permission advance window comes from the **active `class_instances` row's product** (`product_booking_windows`), not from a flat schedule. A `signup_open_reminders` row keys off the occurrence identity (`class_schedule_slot_id`, `occurrence_date_us`) rather than an `event_session_id`, since the occurrence usually isn't persisted until someone books it (which then ensures the row).
 
 **Outcome:**
 - Catalog / calendar shows "Sign-ups open on Jul 15" for sessions outside the user's window.
@@ -77,6 +77,8 @@ Lowest layer first:
 - [x] Per-product overrides via existing `product_booking_windows` table (parent OQ-13).
 - [x] "Best window" recomputed live at booking time (parent OQ-14).
 - [x] Reminder de-dup: when a user successfully books a session, mark pending reminders for that session cancelled (parent AW-5).
+- [x] **Series reminder = one email, multi-VEVENT iCal (resolved OQ-P11-1).** A series run gets a single "sign-ups open" email (NOT one per instance), but it carries an `.ics` attachment with **one VEVENT per upcoming instance** of the run (reusing the Phase 7 series-confirmation / Phase 4 iCal pattern). A single workshop/intro occurrence gets a one-VEVENT `.ics`.
+- [x] **Scope: class offerings only (resolved OQ-P11-2).** Reminders cover class series / workshops / intro / guest-pass-eligible sessions. Non-class events and bookable services that have advance windows are **out of scope for Phase 11** — extend opportunistically later.
 
 ## 2. Database Schema
 
@@ -128,10 +130,13 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 ### 4.3 Sending pending reminders
 - [ ] `int SendPendingReminders(Transaction&, MailHelper*, int64_t nowUs)`:
   1. `GetPendingReadyToSend(nowUs)`.
-  2. For each: format email "Sign-ups are open for {className} on {date}". Queue via MailHelper.
+  2. For each pending reminder, resolve the occurrence's product/class via the slot's active `class_instances` row and build the email (resolved OQ-P11-1):
+     - **Series run** (`classes.kind='series'`): a **single** email — subject/body list the series as one line (name + start + end + per-instance schedule summary), and attach a **multi-VEVENT `.ics`** with one VEVENT per upcoming instance of the run. Derive the run's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange(classId, runStartUs, runEndUs)` and emit the iCal with the existing Phase 7 series-confirmation / Phase 4 multi-VEVENT generator. **One email per series, not per instance.**
+     - **Single workshop / intro occurrence**: body "Sign-ups are open for {className} on {date}" + a **one-VEVENT `.ics`** for that occurrence.
+     - Wrap the body with `NormalizeCrLf()` (mailio CRLF rule) and queue via `MailHelper`.
   3. `MarkNotified`.
   4. Return count.
-- [ ] Tests with `TestMailHelper`.
+- [ ] Tests with `TestMailHelper`: a series reminder queues exactly **one** email whose `.ics` contains **N VEVENTs** (N = upcoming instances); a single-workshop reminder queues one email with a one-VEVENT `.ics`.
 
 ### 4.4 Booking-side dedupe
 - [ ] In `BookingHelper::BookEvent` (and the series-booking flow), after creating the booking, call `SignupOpenReminders::CancelReminder(personId, eventSessionId)` — no-op if no pending reminder.
@@ -153,7 +158,7 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 ## 7. Frontend
 
 ### 7.1 Catalog / calendar future-session hint
-- [ ] In the existing class / series / workshop card render, if the user's window is closed for this session, show "Sign-ups open <local-date>" chip + a "🔔 Remind me" button.
+- [ ] In the existing class / series / workshop card render, if the user's window is closed for this session, show "Sign-ups open {local-date}" chip + a "🔔 Remind me" button.
 - [ ] Clicking the button calls `requestSignupReminder(eventSessionId)`. If `WINDOW_ALREADY_OPEN`, surface a toast "Sign-ups are already open for this session".
 - [ ] Spec.
 
@@ -179,6 +184,7 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
   - Request creates reminder at correct notifyAtUs.
   - Request rejects when window already open.
   - SendPendingReminders sends + marks notified.
+  - Series reminder sends **one** email with a multi-VEVENT `.ics` (N VEVENTs = upcoming instances); single-workshop reminder sends one email with a one-VEVENT `.ics` (resolved OQ-P11-1).
   - Booking the same session cancels pending reminder.
 - [ ] Endpoint tests.
 - [ ] Frontend specs.
@@ -188,13 +194,15 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
 A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 60 days:
 - [ ] Catalog shows "Sign-ups open <today + 18 days>" with a Remind-me button.
 - [ ] Click → reminder row created with `notify_at_us = session_start - 42 days`.
-- [ ] On day 18, the hourly cron emails: "Sign-ups are open for 6-Week Aerial 101 starting <date>".
+- [ ] On day 18, the hourly cron emails **one** "Sign-ups are open for 6-Week Aerial 101 starting {date}" email — carrying a multi-VEVENT `.ics` with one VEVENT per instance of the 6-week run (resolved OQ-P11-1), not six separate emails.
 - [ ] If user books before day 18, the reminder is cancelled and no email goes out.
 
 ## 11. Open Questions
 
-- **OQ-P11-1.** What does the reminder email look like for a series with N upcoming instances — list each, or just the series start date? Recommended: list the series as a single line with start + end + per-instance schedule summary; one email per series, not per instance.
-- **OQ-P11-2.** Should we also send reminders for non-class events / services that have advance windows? Recommended: out of scope for Phase 11 — extend opportunistically later.
+Both resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Locked-in + the cited sections).
+
+- **OQ-P11-1. — RESOLVED (Mason refines the recommendation).** One email per series (single line: name + start + end + per-instance schedule summary), **but it must carry a multi-VEVENT `.ics` with one VEVENT per instance** (reuse the Phase 7 / Phase 4 iCal generator). Single workshop/intro → one-VEVENT `.ics`. Folded into §1.1, §4.3, §9, §10.
+- **OQ-P11-2. — RESOLVED (Mason: "go with your recommendation").** Reminders are class series / workshops / intro only; non-class events and bookable services are out of scope for Phase 11. Folded into §1.1.
 
 ## 12. Cross-References
 

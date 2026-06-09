@@ -80,8 +80,10 @@ Lowest layer first:
 
 ### 1.2 Locked-in
 - [x] Instructor substitution: NO refund (parent §2.14 ST-4) and NO email (parent OQ-19) — homepage + calendar display only.
+- [x] **Substitution affects a single occurrence only (resolved OQ-P10-1):** subbing an instructor for a session that's part of a series touches just that one instance — NO implicit cascade to the rest of the series. Admin manually subs the other instances if needed (safer than an implicit cascade).
 - [x] Admin single-session cancellation: full refund for paid bookings, capacity-release-only for zero-money bookings (parent SE-5 + Phase 2 refund pro-rating).
 - [x] Class shift trade: no `free_cancel_until_us` extension (different from services — parent ST-5).
+- [x] **Class shift trades are NOT admin-gated (resolved OQ-P10-3):** unlike the massage/provider path, class shift trades do NOT require admin approval even when there are confirmed paid attendees (workshops / series). Swapping a fitness instructor is far less invasive than swapping a massage provider and carries no refund exposure (per the no-`free_cancel` rule above). Target acceptance executes the swap immediately; the `shift_change_booking_block_days` secret and the affected-count review gate do NOT apply to class shifts.
 
 ## 2. Database Schema
 
@@ -134,15 +136,16 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
   3. Update `person_id` to the new instructor; append a substitution note ("Substituted by adminPerson reason: ...") to `event_session_staffing.notes` (add the column if missing — `event_session_staffing.notes TEXT`).
   4. NO emails sent (per parent OQ-19 / ST-4). Homepage / calendar reflect the new instructor on next render (overriding the slot default).
   5. Return ok.
-- [ ] Tests.
+- [ ] **Single occurrence only (resolved OQ-P10-1):** `Substitute` operates on exactly the one `(classScheduleSlotId, occurrenceDateUs)` passed in — even when that occurrence belongs to a series run, it does NOT cascade to the run's other instances. Subbing the rest is a separate per-occurrence call by the admin.
+- [ ] Tests (incl. a series-occurrence sub that leaves the sibling occurrences' staffing untouched).
 
 ### 4.4 Extend `ShiftChangeHelper` for class assignments
 - [ ] Add overload methods that take `event_session_staffing_id` instead of `provider_availability_id`.
 - [ ] `CreateClassShiftChangeRequest(Transaction&, request_type, requesting_person_id, target_person_id, event_session_staffing_id, notes)` — creates a `shift_change_requests` row with `event_session_staffing_id` set.
-- [ ] `RespondToClassShiftRequest(...)` — same as service path but operates on `event_session_staffing`.
-- [ ] `ReviewClassShiftRequest(...)` — admin approval if affected_bookings > 0; same audit semantics as service path.
+- [ ] `RespondToClassShiftRequest(...)` — same as service path but operates on `event_session_staffing`. **When the target accepts, it executes the swap immediately (resolved OQ-P10-3) — there is NO admin-approval gate, even when the session has confirmed paid attendees.** It calls `ExecuteClassShiftChange` directly.
+- [ ] **No `ReviewClassShiftRequest` for class shifts (resolved OQ-P10-3).** The affected-count → admin-approval gate and the `shift_change_booking_block_days` secret apply to the **service/provider** path only; class shift trades skip review entirely. (Do not add an admin review path for class shifts.)
 - [ ] `ExecuteClassShiftChange(...)` — reassigns `event_session_staffing.person_id`. NO `free_cancel_until_us` set on attendee bookings (parent ST-5). NO emails to attendees (parent OQ-19).
-- [ ] Tests including the audit path with bookings present.
+- [ ] Tests: target-accept executes the swap with paid attendees present and **without** any admin review step; audit note recorded; no free-cancel / no email.
 
 ### 4.5 Admin "who's teaching what"
 - [ ] Read-only in `business_logic/scheduling/staffing_helper.h/.cpp` (already exists from [[Scheduling thin slice]]). Add:
@@ -161,7 +164,7 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 ### 5.2 Provider portal class-shift-trade
 - [ ] `POST /api/provider/class_shift_change_request` body `{ request_type, target_person_id, event_session_staffing_id, notes }`. Permission `provider` (existing). Endpoint test.
 - [ ] Extend the existing `GET /api/provider/my_shift_requests` to include class-shift requests (filter by `event_session_staffing_id IS NOT NULL`).
-- [ ] Extend `POST /api/provider/respond_shift_request/:id` and `POST /api/admin/review_shift_request/:id` to handle the class-shift variant via the new `ShiftChangeHelper` overloads.
+- [ ] Extend `POST /api/provider/respond_shift_request/:id` to handle the class-shift variant via the new `ShiftChangeHelper` overloads — **target acceptance executes the swap immediately (resolved OQ-P10-3)**. Do NOT extend `POST /api/admin/review_shift_request/:id` for class shifts: there is no admin-review step for them (the admin review endpoint stays service-path only). Endpoint test asserts an accept with paid attendees executes without a review call.
 
 ### 5.3 Admin "who's teaching what"
 - [ ] `GET /api/admin/instructor_load?facility_id=&date_from=&date_to=`. Permission new `view_admin_instructor_load`. Endpoint test.
@@ -183,6 +186,7 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 ### 6.3 Admin "who's teaching what" grid
 - [ ] `ui/src/app/pages/portal/manage/instructor-load/instructor-load.component.*/.spec.ts`.
 - [ ] Date range picker + facility filter; table with instructor name + session count + attendee count.
+- [ ] **Default date range = "next 30 days" (resolved OQ-P10-2)** — on first load the picker is pre-filled today → today+30d (forward-looking operational visibility for planning), and the grid loads that range before the admin touches the picker. Spec asserts the default range.
 
 ### 6.4 Provider portal extension
 - [ ] In the existing `shift-requests` provider-portal page, surface class-shift requests alongside service-shift requests. Visually distinguish (chip "Class") via the `event_session_staffing_id` presence.
@@ -208,8 +212,8 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 - [ ] Table helper tests for the `shift_change_requests.event_session_staffing_id` column.
 - [ ] `scheduling_exception_helper_test.cpp` extension: cascade to class sessions for facility-wide closures.
 - [ ] `session_cancellation_helper_test.cpp` extension: mixed paid + zero-money attendees handled.
-- [ ] `instructor_substitution_helper_test.cpp` new.
-- [ ] `shift_change_helper_test.cpp` extension: class-shift variant; no email; no free-cancel offering.
+- [ ] `instructor_substitution_helper_test.cpp` new — incl. a series-occurrence sub that does NOT cascade to sibling occurrences (resolved OQ-P10-1).
+- [ ] `shift_change_helper_test.cpp` extension: class-shift variant; no email; no free-cancel offering; **target-accept executes immediately with paid attendees present and no admin-review step (resolved OQ-P10-3)**.
 - [ ] `staffing_helper_test.cpp` extension: `GetInstructorLoad` correctness.
 - [ ] Endpoint tests for all three new endpoints + extensions to existing shift-trade endpoints.
 - [ ] Frontend specs for scheduling-exceptions update, substitution dialog, instructor-load grid, provider-shift class variant, homepage substitute chip, mock service.
@@ -228,17 +232,16 @@ Admin substitutes Sara → Maya for the Tuesday 7pm Vinyasa:
 
 Instructor-initiated shift trade (Sara wants Tina to take next Tuesday's class):
 - [ ] Sara files request via provider portal → `shift_change_requests` row created with `event_session_staffing_id=...`.
-- [ ] Tina accepts → admin reviews if there are confirmed paid attendees (workshops/series only); otherwise auto-approves.
-- [ ] On approval: `event_session_staffing.person_id = tinaId`; no free-cancel email to attendees; no compensation email; homepage reflects.
+- [ ] Tina accepts → the swap executes **immediately, with no admin-review step — even if the session has confirmed paid attendees** (resolved OQ-P10-3).
+- [ ] On execution: `event_session_staffing.person_id = tinaId`; no free-cancel email to attendees; no compensation email; homepage reflects.
 
 ## 10. Open Questions
 
-- **OQ-P10-1.** When admin substitutes an instructor for a session that's part of a series, do we substitute just that one instance, or the rest of the series? Recommended: just that one instance — admin manually substitutes others if needed; safer than implicit cascade.
-	- Mason- I'll go with your recommendation.
-- **OQ-P10-2.** For the "who's teaching what" grid, should the date range default to "this week" or "next 30 days"? Recommended: "next 30 days" — gives admin operational visibility for planning ahead.
-	- Mason- I'll go with your recommendation.
-- **OQ-P10-3.** Class shift-trade with paid attendees (workshops / series) — does the affected-count gate require admin approval, similar to the provider path? Recommended: yes, mirror the existing provider behavior (`shift_change_booking_block_days` secret).
-	- Mason- For this one, I don't feel like swapping fitness instructors is anywhere near as invasive or open to refund as massage. I don't think we need to gate this like with do with massage providers. Let's just let 
+All three resolved (Mason, 2026-06-09) and folded into the plan above (§1.2 Locked-in + the cited sections).
+
+- **OQ-P10-1. — RESOLVED (Mason: "go with your recommendation").** Substitution touches the single passed-in occurrence only — no cascade to the rest of a series; admin subs others manually if needed. Folded into §1.2, §4.3, §8.
+- **OQ-P10-2. — RESOLVED (Mason: "go with your recommendation").** The "who's teaching what" grid defaults to a forward-looking **next-30-days** range. Folded into §6.3.
+- **OQ-P10-3. — RESOLVED (Mason departs from the recommendation): NO admin gate on class shift trades.** Swapping a fitness instructor is far less invasive than swapping a massage provider and carries no refund exposure, so class shift trades are NOT gated even with confirmed paid attendees — "just let people swap shifts." Target acceptance executes immediately; the `shift_change_booking_block_days` secret + affected-count review gate stay service/provider-path only. Folded into §1.2, §4.4, §5.2, §8, §9.
 
 ## 11. Cross-References
 
