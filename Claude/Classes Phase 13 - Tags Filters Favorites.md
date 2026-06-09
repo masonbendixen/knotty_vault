@@ -67,6 +67,8 @@ Lowest layer first per CLAUDE.md.
 ### 1.1 Locked-in
 - [x] Controlled vocabulary (parent OQ-32) — `class_tags` table with admin CRUD, tag references via primary keys.
 - [x] Tags applied to `classes` (NOT `class_schedules`) — color-coding and filtering happens at the class level.
+- [x] **Multi-tag calendar chip color = first tag's color (resolved OQ-P13-1).** When a class has multiple tags, the calendar/catalog chip uses the color of the **lowest-`sort_order`** tag (a single solid color; no multi-color stripe). `GetTagsForClass` returns tags ordered by `sort_order ASC` so "first tag" is well-defined.
+- [x] **Favorite-instructor notifications also fire on first appearance (resolved OQ-P13-2).** Beyond Phase 10 substitutions/shift-trades, a follower is also notified the **first time** a favorited instructor newly appears on the upcoming schedule (a new `class_schedules` impl / staffing assignment). This is driven by a **daily job**, not per-event, and fires once per (follower, instructor, class) appearance (see §3.3/§3.8).
 
 ## 2. Class Tags
 
@@ -88,7 +90,7 @@ Lowest layer first per CLAUDE.md.
 
 ### 2.2 Table helpers
 - [ ] `TableHelpers::ClassTags` + tests.
-- [ ] `TableHelpers::ClassTagAssignments` + tests; method `GetTagsForClass(Transaction&, int64_t classId)` → list of `ClassTagInfo`.
+- [ ] `TableHelpers::ClassTagAssignments` + tests; method `GetTagsForClass(Transaction&, int64_t classId)` → list of `ClassTagInfo`, **ordered by `class_tags.sort_order ASC, id ASC`** so the first element is the chip-color tag (resolved OQ-P13-1). Test asserts the order.
 
 ### 2.3 Business logic
 - [ ] Extend `ClassCatalogHelper` to surface tag list on every `ClassCatalogEntry` and `ClassDetail`.
@@ -113,7 +115,7 @@ Lowest layer first per CLAUDE.md.
 - [ ] `ServerAccess`: `getClassTags()`, `getAdminClassTags()`, `createClassTag(req)`, `updateClassTag(id, req)`, `deleteClassTag(id)`, `setClassTags(classId, tagIds)`, updated `getClasses(filter)`. Update `ServerAccess.mock.spec.ts` for every new method.
 
 ### 2.6 Admin metadata (debug-only fallback — NOT the authoring workflow)
-> Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is the §2.5 Manage Tags page. The registration below is a debug/inspection escape hatch only.
+Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is the §2.5 Manage Tags page. The registration below is a debug/inspection escape hatch only.
 - [ ] `class_tags` → top-level. Permission `manage_class_schedule`. (Inspection / debug only; authoring lives in Manage Tags.)
 - [ ] `class_tag_assignments` → nested under `classes` keyed by `class_id`. (Inspection / debug only; assignment lives in the class-edit multi-select.)
 
@@ -193,7 +195,9 @@ Lowest layer first per CLAUDE.md.
 ## 6. Open Questions
 
 - **OQ-P13-1.** When a class has multiple tags, which color drives the calendar chip? Recommended: the first (lowest sort_order) tag's color; alternatively split the chip visually (a tiny multi-color stripe) — probably overkill. Start with first-tag's-color.
+	- Mason- I'll go with your recommendation.
 - **OQ-P13-2.** Should favorite-instructor notifications also fire on the *first time* a favorite is on the upcoming schedule (not just substitutions)? Recommended: yes — extend Phase 13 fan-out to also fire when a new `class_schedule` is created with the instructor assigned. Daily job rather than per-event.
+	- Mason- I'll go with your recommendation.
 
 ## 7. Cross-References
 
