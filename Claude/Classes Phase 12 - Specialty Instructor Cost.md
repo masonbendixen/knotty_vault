@@ -75,6 +75,8 @@ Lowest layer first:
 - [x] Cost rows reference a `price_schedule_id` so rate changes roll forward via a new schedule row (parent SI-6 / P-2 / OQ-42).
 - [x] Per-instructor / per-class-type max attendees in a separate `instructor_class_preferences` table (parent OQ-23).
 - [x] Occurrences snapshot the rate when their `event_sessions` row is **ensured** (no materialization step — redesign).
+- [x] **Profit margin is configurable (resolved OQ-P12-1).** The pricing-assistant margin is NOT hard-coded. It comes from a `non_member_profit_margin_pct` config secret (default 50%) and can be overridden per request from the Suggest-pricing dialog — globally and/or per tier. (Mason: "I want this to be configurable.")
+- [x] **The snapshot rate is authoritative for payroll (resolved OQ-P12-2).** `ComputeInstructorPayCents` always reads the cost row referenced by `event_sessions.specialty_instructor_cost_id`, even after that cost's `price_schedule` window has closed — pay is computed from the rate in effect when the occurrence was ensured, never the current live rate. (This was never really an open question — it's a requirement; covered by the §8 regression test.)
 
 ## 2. Database Schema
 
@@ -113,6 +115,9 @@ Lowest layer first:
 ### 2.5 Wire into DB init
 - [ ] `make_database_info.cpp` + `create_database.cpp`.
 
+### 2.6 Config secret (resolved OQ-P12-1)
+- [ ] Seed `non_member_profit_margin_pct` in the `config_secrets` defaults (in `create_database.cpp`), default `50` (percent). This is the fallback the pricing assistant uses when the Suggest-pricing request supplies no per-tier / request-level margin override. Read via `SecretsHelper` in §4.2 (no secrets lookup inside table helpers).
+
 ## 3. Table Helpers
 
 ### 3.1 `TableHelpers::SpecialtyInstructorCosts`
@@ -135,15 +140,16 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
   4. Return `pay`.
 
 ### 4.2 Pricing assistant
-- [ ] `struct PricingSuggestion { int64_t permissionId; std::string permissionName; int64_t suggestedPriceCents; std::string rationale; }`.
-- [ ] `struct PricingSuggestionRequest { int64_t classScheduleId; int64_t targetAttendees; std::vector<int64_t> allowedPermissionIds; }`.
-- [ ] `std::vector<PricingSuggestion> SuggestPricesForBreakeven(Transaction&, const PricingSuggestionRequest&)`:
-  1. Load active specialty cost for the schedule.
-  2. Compute total cost at the target attendee count: `totalCost = ComputeInstructorPayCents(at attendees=target)`.
-  3. For each tier in `allowedPermissionIds`:
-     - If `tier` is a member tier (you can detect this via the permission's existing-membership-grant linkage; if the user holds an active membership granting that permission, they should "cover cost" only — break-even price = `totalCost / target`).
-     - If `tier` is a non-member tier: profit margin applied (parameterize via secret `non_member_profit_margin_pct` default 50%) → `suggestedPriceCents = (totalCost / target) × (1 + margin)`.
-  4. Return suggestions with rationale strings ("Break-even for Gold tier at 8 attendees: $X").
+- [ ] `struct PricingSuggestion { int64_t permissionId; std::string permissionName; int64_t suggestedPriceCents; double appliedMarginPct; std::string rationale; }`. (`appliedMarginPct` echoes the margin actually used for that tier so the UI can show it.)
+- [ ] `struct PricingSuggestionRequest { int64_t classScheduleId; int64_t targetAttendees; std::vector<int64_t> allowedPermissionIds; std::optional<double> profitMarginPct; std::map<int64_t, double> perTierMarginPct; }`. **Margin is configurable (resolved OQ-P12-1):** `perTierMarginPct[permissionId]` wins if present, else the request-level `profitMarginPct`, else the `non_member_profit_margin_pct` secret default (§2.6). Member tiers ignore margin (they break even).
+- [ ] `std::vector<PricingSuggestion> SuggestPricesForBreakeven(Transaction&, const PricingSuggestionRequest&, const SecretsHelper&)`:
+  1. Resolve the default margin from the `non_member_profit_margin_pct` secret (default 50%).
+  2. Load active specialty cost for the schedule.
+  3. Compute total cost at the target attendee count: `totalCost = ComputeInstructorPayCents(at attendees=target)`.
+  4. For each tier in `allowedPermissionIds`:
+     - If `tier` is a member tier (you can detect this via the permission's existing-membership-grant linkage; if the user holds an active membership granting that permission, they should "cover cost" only — break-even price = `totalCost / target`; `appliedMarginPct = 0`).
+     - If `tier` is a non-member tier: resolve the effective margin (`perTierMarginPct` → request `profitMarginPct` → secret default) → `suggestedPriceCents = (totalCost / target) × (1 + margin)`; record `appliedMarginPct`.
+  5. Return suggestions with rationale strings that name the margin used ("Break-even for Gold tier at 8 attendees: $X" / "Non-member at 8 attendees with 50% margin: $Y").
 
 ### 4.3 Cost / revenue report
 - [ ] `struct SessionCostRevenueReport { int64_t eventSessionId; int64_t attendeeCount; int64_t paidAttendeeCount; int64_t instructorPayCents; int64_t revenueCents; int64_t marginCents; }`.
@@ -157,7 +163,7 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 
 ## 5. Endpoints
 
-- [ ] `POST /api/admin/session/<id>/suggest_pricing` body `{ target_attendees, tiers: [permission_id...] }` → list of suggestions. Permission `manage_class_schedule`. Endpoint test.
+- [ ] `POST /api/admin/session/<id>/suggest_pricing` body `{ target_attendees, tiers: [permission_id...], profit_margin_pct?, per_tier_margin_pct?: { permission_id: pct } }` → list of suggestions (each echoing `applied_margin_pct`). The margin fields are optional; when omitted the server falls back to the `non_member_profit_margin_pct` secret (resolved OQ-P12-1). Permission `manage_class_schedule`. Endpoint test (incl. a request that overrides the margin and asserts the suggested price reflects it, and one that omits it and falls back to the secret default).
 - [ ] `GET /api/admin/session/<id>/cost_revenue` → `SessionCostRevenueReport`. Permission `manage_class_schedule`. Endpoint test.
 
 #### Specialty-cost authoring endpoints (bespoke — NOT generic CRUD / Manage Data)
@@ -175,8 +181,8 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 - [ ] On the admin session-detail page (likely under `portal/manage/event-session-detail/`), add:
   - "Specialty cost" panel: shows rate + bonus + computed pay at current attendee count.
   - "Cost vs revenue" panel: revenue, cost, margin.
-  - "Suggest pricing" button → opens a dialog with target-attendees input + allowed-tiers multiselect → calls the suggest-pricing endpoint → displays table of suggestions per tier.
-- [ ] Specs.
+  - "Suggest pricing" button → opens a dialog with target-attendees input + allowed-tiers multiselect + a **profit-margin input** (pre-filled from the `non_member_profit_margin_pct` secret default, editable; optional per-tier margin override) → calls the suggest-pricing endpoint → displays table of suggestions per tier, showing the `applied_margin_pct` used for each (resolved OQ-P12-1).
+- [ ] Specs (incl. editing the margin re-queries and the per-tier suggestion price changes accordingly).
 
 ### 6.2 Specialty-cost authoring on the run (bespoke Manage UI — NOT Manage Data)
 > Authoring specialty-instructor pay is done in the dedicated `/manage` portal, mirroring the Phase 7 `series-run-form-dialog` on **Manage Products ▸ Class Schedules**. The Manage Data generic editor is debug-only and must never be the path an admin uses to set up a specialty instructor's rate.
@@ -188,13 +194,13 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 - [ ] Extend `instructors-admin.component.spec.ts` (or a new `instructor-class-preferences` sub-component spec) covering add/edit/remove + validation.
 
 ### 6.4 `ServerAccess` extensions
-- [ ] `suggestPricingForSession(sessionId, targetAttendees, tiers)`, `getSessionCostRevenue(sessionId)`.
+- [ ] `suggestPricingForSession(sessionId, targetAttendees, tiers, profitMarginPct?, perTierMarginPct?)`, `getSessionCostRevenue(sessionId)`.
 - [ ] `getSpecialtyCostsForRun(classInstanceId)`, `createSpecialtyCost(req)`, `updateSpecialtyCost(id, req)`, `deleteSpecialtyCost(id)`.
 - [ ] `getInstructorClassPreferences(instructorPersonId)`, `createInstructorClassPreference(req)`, `updateInstructorClassPreference(id, req)`, `deleteInstructorClassPreference(id)`.
 - [ ] Update `ServerAccess.mock.spec.ts` (per memory `feedback_always_test.md` — every new `ServerAccess` method needs a mock-spec case).
 
 ### 6.5 Types
-- [ ] `specialty-cost.types.ts`: `PricingSuggestion`, `SessionCostRevenueReport`, `SpecialtyCost`, `CreateSpecialtyCostRequest`, `InstructorClassPreference`, `CreateInstructorClassPreferenceRequest`.
+- [ ] `specialty-cost.types.ts`: `PricingSuggestion` (incl. `appliedMarginPct`), `PricingSuggestionRequest` (incl. optional `profitMarginPct` + `perTierMarginPct`), `SessionCostRevenueReport`, `SpecialtyCost`, `CreateSpecialtyCostRequest`, `InstructorClassPreference`, `CreateInstructorClassPreferenceRequest`.
 
 ## 7. Admin Metadata (debug-only fallback — NOT the authoring workflow)
 
@@ -209,6 +215,8 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 - [ ] `specialty_cost_helper_test.cpp`:
   - Pay computation with / without bonus, with / without threshold.
   - Pricing suggestions cover break-even for member, profit margin for non-member.
+  - **Configurable margin (resolved OQ-P12-1):** request-level `profitMarginPct` override changes the non-member suggestion; per-tier `perTierMarginPct` wins over the request-level value; omitting both falls back to the `non_member_profit_margin_pct` secret; member tiers ignore margin. `appliedMarginPct` is echoed per suggestion.
+  - **Snapshot authoritative (resolved OQ-P12-2):** `ComputeInstructorPayCents` uses the snapshotted cost row even when its `price_schedule` window has closed / a newer rate is active — regression test asserts pay reflects the old snapshot rate, not the live one.
   - Cost vs revenue reports include only paid attendees in revenue.
 - [ ] Endpoint tests — suggest_pricing, cost_revenue, AND the bespoke authoring endpoints (`specialty_cost` GET/POST/PUT/DELETE, `instructor_class_preference` GET/POST/PUT/DELETE): 403 / validation / persist at each verb.
 - [ ] Frontend specs — session-detail panels, **`specialty-cost-form-dialog` spec**, **instructor class-preferences spec**, and the `ServerAccess.mock.spec.ts` cases for every new mock method.
@@ -219,14 +227,16 @@ Admin sets up a "Hands Balancing Workshop" with specialty instructor "Visiting M
 - [ ] Materializing the workshop session snapshots `specialty_instructor_cost_id`.
 - [ ] At 10 attendees: pay = $400 + 4×$25 = $500.
 - [ ] Suggested member price (gold tier, 8 target) = $400/8 = $50 break-even.
-- [ ] Suggested non-member price = $50 × 1.5 = $75 (with 50% margin).
+- [ ] Suggested non-member price = $50 × 1.5 = $75 at the default 50% margin (from the `non_member_profit_margin_pct` secret); admin overrides the margin to 30% in the dialog → suggestion re-computes to $50 × 1.3 = $65, with `applied_margin_pct=30` shown (resolved OQ-P12-1).
 - [ ] Cost vs revenue at 10 attendees (8 gold @ $50, 2 non-member @ $75): revenue = 8×$50 + 2×$75 = $550; cost $500; margin $50.
+- [ ] A month later the rate is raised via a new `price_schedule` window; payroll for the already-ensured October sessions still computes at the **old** snapshotted $400 base, not the new rate (resolved OQ-P12-2).
 
 ## 10. Open Questions
 
-- **OQ-P12-1.** Should the pricing-assistant accept a target *profit margin* per tier instead of a flat "members break-even, non-members 50%"? Recommended: hard-coded for now; if admin wants more flexibility, add a `non_member_profit_margin_pct` secret and a "profit_margin_pct" input on the dialog. Defer until requested.
-	- Mason- I want this to be configurable.
-- **OQ-P12-2.** When the rate snapshot in `event_sessions.specialty_instructor_cost_id` references a cost row whose `price_schedule` is no longer active, payroll calculations should still use the snapshot. Add a regression test.
+Both resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Locked-in + the cited sections).
+
+- **OQ-P12-1. — RESOLVED (Mason: "I want this to be configurable").** Build it now (don't defer): a `non_member_profit_margin_pct` secret (default 50%) supplies the fallback, overridable per request and per tier from the Suggest-pricing dialog; each suggestion echoes the `applied_margin_pct`. Folded into §1.1, §2.6, §4.2, §5, §6.1, §6.4–6.5, §8, §9.
+- **OQ-P12-2. — RESOLVED (Mason: "Is there a question here?" — correct, it's a requirement, not a question).** The snapshot rate is authoritative: `ComputeInstructorPayCents` always reads the cost row referenced by `event_sessions.specialty_instructor_cost_id`, even after its `price_schedule` has closed. Folded into §1.1 (locked-in) with a regression test in §8 + acceptance check in §9.
 	- Mason- Is there a question here?
 
 ## 11. Cross-References
