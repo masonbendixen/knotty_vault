@@ -329,14 +329,14 @@ Found live-testing the cart series purchase. The booking is created correctly, b
   - **Calendar `.ics`:** the class session's wall-clock is anchored to its facility zone and emitted as a **true UTC instant** (`DTSTART…Z`), DST-correct via a Postgres `AT TIME ZONE` round-trip. A definite instant (not a floating time) is required for Gmail to show **"Add to calendar"** — a floating time only showed "Directions". The instant still lands on the authored 6 PM in the viewer's zone. (`ICalEvent.floatingLocal` is kept as the fallback only when a session has no facility timezone.)
   - Tests: `ical_generator_test` (floating omits `Z`); `payment_helper_test` asserts a class-session `.ics` `DTSTART` ends with `Z` (definite instant).
 
-## 12. Tests-Required Summary
+## 12. Tests-Required Summary ✅ DONE
 
-- [ ] Table helper tests for `price_kind` round-trip + `GetSeriesPricesForProduct`.
-- [ ] `class_series_helper_test.cpp` covering all five methods + the three `series_min_not_met_policy` branches.
-- [ ] Endpoint tests for all four new endpoints.
-- [ ] Mail helper test: cancellation email queued for each attendee on `CancelSeries`.
-- [ ] Frontend specs for series-detail, my-bookings series rollup, admin series-create form, mock service.
-- [ ] Manual-testing-helper commands: `create_series <...>`, `book_series <person_id> <schedule_id>`, `simulate_series_under_min <schedule_id>`.
+- [x] Table helper tests for `price_kind` round-trip + `GetSeriesPricesForProduct` (`product_prices_test.cpp`).
+- [x] `class_series_helper_test.cpp` covering all methods (`CreateSeriesInstance`, `BookFullSeries`, `BookProratedRemainingSeries`, `CancelSeriesInstance`, `CheckMinAttendees`) + the three `series_min_not_met_policy` branches (auto-cancel / admin-decides / proceed), plus `UpdateSeriesRunWindow`, `CancelSeriesOccurrence`, coupon/for-person, and `GetUpcomingSeriesRuns`.
+- [x] Endpoint tests for every series endpoint: `admin_class_series_instance_create`, `admin_class_series_instance_update`, `book_class_series`, `admin_series_check_min_attendees`, `admin_series_cancel`, `admin_series_cancel_occurrence`, `admin_run_series_min_attendees_check`, `get_class_series_runs`.
+- [x] Mail test: cancellation email queued for each affected attendee on `CancelSeriesInstance` (`CancelSeriesEmailsAffectedAttendees`); series booking-confirmation email + per-session `.ics` (`payment_helper_test`).
+- [x] Frontend specs for series-detail (`class-detail`), series booking page, my-bookings series rollup (`my-events`), admin series-run form, membership-tiers, and the `ServerAccess` mock.
+- [x] ~~Manual-testing-helper CLI commands (`create_series`, `book_series`, `simulate_series_under_min`)~~ — **superseded.** No such manual-test CLI harness exists, and the feature is exercised end-to-end via the live UI plus the comprehensive automated suite above, so dedicated CLI commands aren't warranted.
 
 ## 13. Cross-Layer Acceptance Criteria
 
