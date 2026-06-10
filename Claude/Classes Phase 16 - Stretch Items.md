@@ -140,7 +140,7 @@ When a stretch item is ready to ship, copy its sub-section into its own dedicate
 - **OQ-P16-2.** Payroll period granularity — monthly default, but admin can create any window? Recommended: yes, fully flexible.
 	- Mason- Yes, I want any window but monthly is a fine default.
 - **OQ-P16-3.** What's the studio's policy on suspended users? Hard block their template-add, soft warn, or just surface in admin? Defer — make it admin-visible first, then layer in policy once Mason has data on no-show rates.
-	- Mason- I'm inclined to go with hard block since I feel like there are things like banning for sexually innappropriate behavior that really need to be enforced.
+	- Mason- I'm inclined to go with hard block since I feel like there are things like banning for sexually inappropriate behavior that really need to be enforced.
 
 ## 6. Cross-References
 
