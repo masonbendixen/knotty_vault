@@ -132,7 +132,9 @@ Each item above includes tests at all layers (table helpers, business logic, end
 ## 8. Open Questions
 
 - **OQ-P15-1.** For CAP-8, what's the default `waitlist_auto_confirm_max_hours_before`? Recommended: NULL (= no cap; current behavior preserved).
+	- Mason- I'll go with your recommendation.
 - **OQ-P15-2.** For M-14, should `guest_person_id` create a real `people` row (auto-account) or be a "lightweight contact" (name only)? Recommended: real `people` row; mirrors the guest-pass flow from M-9.
+	- Mason- Yeah, I would like them to has an actual account.
 
 ## 9. Cross-References
 
