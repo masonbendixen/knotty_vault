@@ -65,39 +65,69 @@ Per parent §2.17: track per-user "indicated attending but didn't attend" rate; 
 ### 1.3 Database
 - [ ] Optional materialized rollup table `person_reliability_rollups`:
   - `person_id BIGINT PK REFERENCES people(id)`
-  - `indicated_count_last_30d INT`
-  - `attended_count_last_30d INT`
+  - `indicated_count INT` — over the configured reliability window (resolved OQ-P16-1; window length is a secret, default 30 days, so the count is window-relative, not hard-coded to 30)
+  - `attended_count INT` — over the same window
   - `reliability_pct INT`  (0..100)
+  - `consecutive_no_shows INT`
+  - `window_days INT` — the window length this rollup was computed against (so the UI can label it)
   - `last_computed_us BIGINT`
 - [ ] Update via daily scheduled job.
+- [ ] **`person_suspensions` table (resolved OQ-P16-3 — enforced hard block):** backs both the R-5 auto-suspend and admin conduct bans.
+  - `id BIGSERIAL PK`
+  - `person_id BIGINT NOT NULL REFERENCES people(id)`
+  - `source TEXT NOT NULL` — allowed-value constants `kSuspensionSource{NoShowAuto,AdminConduct}` (app-layer CHECK)
+  - `reason TEXT NOT NULL DEFAULT ''`
+  - `starts_us BIGINT NOT NULL`
+  - `ends_us BIGINT NULL` — NULL = **indefinite** (conduct bans stay until an admin lifts them)
+  - `created_by_person_id BIGINT NULL REFERENCES people(id)` — the admin for conduct bans; NULL for the auto job
+  - `lifted_us BIGINT NULL`, `lifted_by_person_id BIGINT NULL REFERENCES people(id)`
+  - `created_us BIGINT NOT NULL`
+  - Partial index for the active-suspension lookup (`WHERE lifted_us IS NULL`).
 
 ### 1.4 Business logic
+- [ ] **Configurable window (resolved OQ-P16-1):** the reliability window length comes from a `reliability_window_days` config secret, **default 30** (seeded in `create_database.cpp`, read via `SecretsHelper`). `ComputeAllUsersAndRollup` resolves `fromUs = asOfUs - reliability_window_days × 86400_000_000` and stamps `window_days` on each rollup.
 - [ ] `ReliabilityHelper::ComputeReliabilityForPerson(personId, fromUs, toUs)`:
   1. Pull template entries → derive expected sessions in the window (excluding `attending=false` exceptions; including `attending=true` exceptions).
   2. Cross-reference against `bookings WHERE person_id=? AND checked_in_us BETWEEN fromUs AND toUs`.
   3. Compute `attended / indicated` → reliability_pct.
-- [ ] `ComputeAllUsersAndRollup(asOfUs)` — scheduled job entry point.
+- [ ] `ComputeAllUsersAndRollup(asOfUs, SecretsHelper&)` — scheduled job entry point; resolves the window from the secret.
 
 ### 1.5 R-3 Soft warning
 - [ ] When `reliability_pct < soft_warning_threshold` (configurable secret, default 50%), send a "We've noticed..." email at most once per 30 days per user.
 
-### 1.6 R-5 Consecutive no-show auto-suspend
-- [ ] Track consecutive no-shows in the rollup. If `consecutive_no_shows >= secret consecutive_no_show_cap` (default 3), suspend the user's ability to template-claim new entries for `suspend_days` (default 14). Membership-included class access via "just show up at the door" is unaffected.
+### 1.6 R-5 Consecutive no-show auto-suspend (hard block — resolved OQ-P16-3)
+- [ ] Track consecutive no-shows in the rollup. If `consecutive_no_shows >= secret consecutive_no_show_cap` (default 3), the daily job inserts a `person_suspensions` row with `source='no_show_auto'`, `ends_us = now + suspend_days × 86400_000_000` (`suspend_days` secret, default 14). This is a **hard block**, not a soft warning (Mason: hard block, since enforcement matters for conduct cases too). Idempotent: don't stack a second auto-suspension while one is already active.
+
+### 1.6b Admin conduct suspensions / bans (resolved OQ-P16-3)
+- [ ] Admins can impose a manual suspension/ban (`source='admin_conduct'`, `reason` required, `ends_us` optional → NULL = **indefinite**) for conduct issues (e.g., sexually inappropriate behavior) that "really need to be enforced." Admins can also lift any active suspension (`lifted_us`/`lifted_by_person_id`).
+- [ ] `SuspensionHelper` (`business_logic/scheduling/suspension_helper.h/.cpp/_test.cpp`): `SuspendPerson(tx, personId, source, reason, endsUs?, byPersonId?)`, `LiftSuspension(tx, suspensionId, byPersonId)`, `GetActiveSuspension(tx, personId, nowUs)` → optional row, `IsSuspended(tx, personId, nowUs)`. SQL lives in a `TableHelpers::PersonSuspensions` wrapper (no SQL in business logic).
+- [ ] Endpoints (bespoke, permission `admin`): `POST /api/admin/person/<id>/suspend` `{ reason, ends_us? }`, `POST /api/admin/person/<id>/lift_suspension/<suspensionId>`, `GET /api/admin/person/<id>/suspensions`. Endpoint tests (403 / 400-missing-reason / 200+persist / lift).
+
+### 1.6c Enforcement points (hard block — resolved OQ-P16-3)
+- [ ] A hard block means an active suspension stops the user from participating, not just from template-claiming. At each of these, call `SuspensionHelper::IsSuspended(personId, now)` first and reject with `USER_SUSPENDED` (surfacing the reason where appropriate):
+  - **Template-claim** new attendance-template entries (the original R-5 surface).
+  - **Booking** — `BookingHelper::BookEvent` and the series-booking flow.
+  - **Check-in** — `ClassCheckinHelper::CheckIn` (Phase 8), so a banned person can't be checked in either; staff sees the ban reason.
+- [ ] "Just show up at the door" for membership-included classes is **not** an escape hatch for a conduct ban — that's exactly the case Mason wants enforced, so check-in is gated too. (A no-show auto-suspension is the milder, time-boxed case; same enforcement path, it just expires on `ends_us`.)
 
 ### 1.7 Frontend
 - [ ] Admin user-detail page: reliability score badge + history sparkline.
-- [ ] User homepage: gentle nudge banner if reliability drops below 60%.
+- [ ] Admin user-detail page: a **Suspension** panel (resolved OQ-P16-3) — shows active suspension (source + reason + ends/indefinite), a "Suspend / ban" action (reason required, optional end date → blank = indefinite), and a "Lift" action; plus suspension history. Wired to the §1.6b endpoints.
+- [ ] User homepage: gentle nudge banner if reliability drops below 60%; a suspended user sees a clear "your account is suspended" notice with the reason.
+- [ ] Booking / check-in surfaces show the `USER_SUSPENDED` rejection cleanly (the user can't book; staff sees the ban reason at check-in).
+- [ ] Specs for the suspension panel + the suspended-user booking/check-in block.
 
 ### 1.8 Scheduled job
 - [ ] Daily 04:00 local: `POST /api/admin/compute_reliability_rollups`. Idempotent.
 
 ### 1.9 Tests
-- [ ] Helper tests for the rollup math; mail-helper assertion for the once-per-30d soft warning; suspension and lift via scheduled job.
+- [ ] Helper tests for the rollup math; **configurable window (resolved OQ-P16-1): changing `reliability_window_days` changes the counts and the stamped `window_days`**; mail-helper assertion for the once-per-30d soft warning.
+- [ ] Suspension tests (resolved OQ-P16-3): R-5 auto-suspend inserts a time-boxed `no_show_auto` row at the cap and doesn't stack; admin conduct ban with NULL `ends_us` is indefinite until lifted; `IsSuspended` true within window / false after `ends_us` / false once lifted; **enforcement** — a suspended user is hard-blocked at template-claim, `BookEvent`, AND `CheckIn` with `USER_SUSPENDED`; lifting restores access. Endpoint tests for suspend / lift / list.
 
 ## 2. Specialty Instructor Payroll (PR-1..PR-4 + SI-5)
 
 ### 2.1 Database
-- [ ] `payroll_periods` table — defines a payroll window (start_us, end_us, status). Admin creates one per period (e.g. monthly).
+- [ ] `payroll_periods` table — defines a payroll window (start_us, end_us, status). **Fully flexible: admin can create any window (resolved OQ-P16-2)** — weekly, bi-weekly, one-off — and **monthly is just the default** the create form pre-fills.
 - [ ] `payroll_entries` table — one row per (instructor, payroll_period, event_session) with computed pay snapshot.
 
 ### 2.2 Business logic
@@ -105,15 +135,15 @@ Per parent §2.17: track per-user "indicated attending but didn't attend" rate; 
 - [ ] `PayrollHelper::ExportCsv(periodId)` — flattens to a CSV blob.
 
 ### 2.3 Endpoints
-- [ ] `POST /api/admin/payroll/period` — create a period.
+- [ ] `POST /api/admin/payroll/period` — create a period with an arbitrary `{ start_us, end_us }` (resolved OQ-P16-2); when omitted, default to the current calendar month. The admin payroll page (§2.4) pre-fills the current month but lets the admin pick any window.
 - [ ] `POST /api/admin/payroll/period/<id>/compute` — run the computation.
 - [ ] `GET /api/admin/payroll/period/<id>/csv` — returns CSV.
 
 ### 2.4 Frontend
-- [ ] Admin payroll page: list of periods, "Compute", "Download CSV" actions.
+- [ ] Admin payroll page: list of periods, a "New period" action with start/end date pickers **pre-filled to the current month but freely editable to any window** (resolved OQ-P16-2), plus "Compute" and "Download CSV" actions.
 
 ### 2.5 Tests
-- [ ] Helper + endpoint + CSV golden-text comparison.
+- [ ] Helper + endpoint + CSV golden-text comparison; incl. an **arbitrary (non-monthly) window** period computing only the sessions inside it (resolved OQ-P16-2).
 
 ## 3. AR-6 Series Min-Attendees Risk Dashboard
 
@@ -135,12 +165,11 @@ When a stretch item is ready to ship, copy its sub-section into its own dedicate
 
 ## 5. Open Questions
 
-- **OQ-P16-1.** Reliability score window — 30 days vs 60 days vs configurable? Recommended: 30 days, configurable via secret.
-	- Mason- I like configurable. Default 30 days sounds good.
-- **OQ-P16-2.** Payroll period granularity — monthly default, but admin can create any window? Recommended: yes, fully flexible.
-	- Mason- Yes, I want any window but monthly is a fine default.
-- **OQ-P16-3.** What's the studio's policy on suspended users? Hard block their template-add, soft warn, or just surface in admin? Defer — make it admin-visible first, then layer in policy once Mason has data on no-show rates.
-	- Mason- I'm inclined to go with hard block since I feel like there are things like banning for sexually inappropriate behavior that really need to be enforced.
+All three resolved (Mason, 2026-06-09) and folded into the plan above (the cited item sections).
+
+- **OQ-P16-1. — RESOLVED (Mason: "configurable, default 30 days").** The reliability window is a `reliability_window_days` secret, default 30; rollup counts are window-relative and stamp `window_days`. Folded into §1.3, §1.4, §1.9.
+- **OQ-P16-2. — RESOLVED (Mason: "any window, monthly is a fine default").** `payroll_periods` accept arbitrary `{start_us, end_us}`; the create form pre-fills the current month but allows any window. Folded into §2.1, §2.3, §2.4, §2.5.
+- **OQ-P16-3. — RESOLVED (Mason departs from the "defer" recommendation): enforced HARD BLOCK.** Mason wants suspensions enforced — including admin-imposed conduct bans (e.g., sexually inappropriate behavior), which must be indefinite-until-lifted. Added a `person_suspensions` table + `SuspensionHelper`, made R-5 auto-suspend a hard block, added admin suspend/lift endpoints + UI, and gate **template-claim, booking, AND check-in** on `IsSuspended` (so "just show up at the door" can't bypass a ban). Folded into §1.3, §1.6, §1.6b, §1.6c, §1.7, §1.9.
 
 ## 6. Cross-References
 
