@@ -109,7 +109,8 @@ Lowest layer first:
 - [x] `bookings.status TEXT` — plain TEXT column (no enum/CHECK constraint), so it already accepts `'attended'` and `'no_show'`.
 
 ### 2.2 No new tables ✅
-- [x] Verified — Phase 8 is pure business-logic + endpoint + UI work. No `db_schema` table additions.
+- [x] Verified — Phase 8 adds no `db_schema` tables.
+- [x] **Schema fix surfaced during §4 (CI-4):** `bookings.purchase_id` and `bookings.purchase_item_id` were NOT NULL (`AddColumnForeignKeyRef`). Membership-included / walk-in check-in creates a booking with **no purchase**, so both were made nullable (`AddColumnForeignKeyRefNullable`, `db_schema/bookings.cpp`). Paid bookings still set them. (Caught by the §3 tests, which hit the not-null constraint.)
 
 ### 2.3 Config secrets ✅
 - [x] Added via the standard two-file secrets mechanism (`util/secrets/secret_keys.h` + `secret_values.cpp` `FillInSecretsStringView`), which both seeds `config_secrets` on first run (`create_database.cpp` pulls these defaults) **and** auto-loads them into the test secrets helper:
@@ -130,63 +131,37 @@ Lowest layer first:
 ### 3.2 Reuse `TableHelpers::AttendanceTemplateEntries` ✅
 - [x] Reuse target is `GetTemplateIdsForSlot` (Phase 5) — template entries are keyed by `class_schedule_slot_id`, so the doc's `GetTemplateIdsForSchedule` name maps to the existing slot-keyed reader. No new code needed.
 
-## 4. Business Logic — `ClassCheckinHelper`
+## 4. Business Logic — `ClassCheckinHelper` ✅ DONE
 
-Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp`.
+Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp` (16 tests).
 
-### 4.1 Window check
-- [ ] `bool IsCheckinOpen(Transaction&, int64_t eventSessionId, int64_t nowUs, const SecretsHelper&)` — pulls the window secrets and compares against `event_sessions.start_time_us` and `end_time_us`.
+**Cross-cutting reconciliations vs the original prose:**
+- **Secrets via DI, `now` from the DB.** The window/history config is injected once (`ClassCheckinHelper(DatabaseHelper, Secrets::SecretsHelperPtr)`), not threaded per-call as sketched. There's also a mail-less/secret-less `ClassCheckinHelper(DatabaseHelper)` ctor that falls back to the documented defaults (60/180/4). The action methods read `now` from `SELECT now_us()` internally, so `CheckIn`/`UndoCheckIn` take no clock; `IsCheckinOpen`/`FinalizeAttendance` keep an explicit `nowUs` so the job + tests stay deterministic.
+- **One access gate.** Under the permission-based access redesign, "eligible" and "skill requirements" are the SAME check (`ClassAccessHelper::CheckAccess`). A blocked new-booking returns `NOT_ELIGIBLE`; the single `skillOverride` flag (with a reason, by a staffer holding `manage_class_schedule`) overrides it and records `booking_requirement_overrides` via `RecordOverride`. There is no separate `MISSING_SKILL_REQUIREMENTS` path.
+- **New table-helper for the sweep.** `TableHelpers::EventSessions::GetClassSessionsEndingInWindow(from, to)` (+ test) added so `FinalizePendingSessions` finds candidates without SQL in business logic.
 
-### 4.2 Pre-pop list
-- [ ] `struct CheckinCandidate { int64_t personId; std::string firstName; std::string lastName; std::string email; std::string source; /* "template" | "paid_booking" | "history" */ bool alreadyCheckedIn; int64_t bookingId; /* 0 if no booking yet */ std::optional<int64_t> waitlistPosition; std::vector<int64_t> missingSkillLevelIds; }`.
-- [ ] `std::vector<CheckinCandidate> GetCheckinList(Transaction&, int64_t eventSessionId)`. Algorithm:
-  1. Load session → `classScheduleId`, `classId`, `startTimeUs`, `endTimeUs`.
-  2. (a) **Paid + waitlisted bookings already on the session** (only present if the occurrence row was already ensured): `bookings WHERE event_session_id = ?` (look up the persisted row by (`class_schedule_slot_id`, `occurrence_date_us`) first; may be absent) with `source='paid_booking'`.
-  3. (b) **Template attendees**: join `attendance_template_entries WHERE class_schedule_slot_id=?` → people, MINUS those with an `attendance_template_exceptions.attending=false` for this (`class_schedule_slot_id`, `occurrence_date_us`). Skip people already in (a). Source = `'template'`.
-  4. (c) **4-week history**: `GetRecentCheckedInPersonsForClass(classId, now-28d, now)` via the denormalized `event_sessions.class_id`. Skip people already in (a) or (b). Source = `'history'`.
-  5. Decorate each with `missingSkillLevelIds` from `SkillLevelHelper::PersonMeetsClassRequirements(personId, classId)` — UI shows a yellow flag.
-  6. Sort: alphabetical by lastName, firstName.
-  7. Return.
+### 4.1 Window check ✅
+- [x] `bool IsCheckinOpen(Transaction&, int64_t eventSessionId, int64_t nowUs)` — loads the session and tests `nowUs ∈ [start − before, end + after]` using the secret window (defaults 60/180). Test `IsCheckinOpenRespectsWindow` (boundaries + missing session).
 
-### 4.3 Check-in action
-- [ ] `struct CheckInRequest { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t personId; int64_t staffPersonId; bool skillOverride; std::string overrideReason; }`. (Identifies the occurrence by slot + date; the `event_sessions` row may not exist yet.)
-- [ ] `struct CheckInResult { bool ok; int64_t eventSessionId; int64_t bookingId; bool createdNewBooking; bool overCapacityWarning; std::string errorCode; }`. (`overCapacityWarning` is the resolved OQ-P8-1 soft-warn signal — the check-in still succeeds.)
-- [ ] `CheckIn(Transaction&, const CheckInRequest&)`:
-  1. Verify `IsCheckinOpen` (compute occurrence start from the slot + date) → else `CHECKIN_NOT_OPEN`.
-  2. `eventSessionId = ClassScheduleHelper::EnsureSessionExists(classScheduleSlotId, occurrenceDateUs)` (idempotent — recording trigger #6).
-  3. Look up an existing booking for `(eventSessionId, personId)`.
-  4. If exists → call `MarkCheckedIn`. Return.
-  5. If none exists:
-     - Verify the user is eligible for the class (membership-included via `CatalogHelper`) → else `NOT_ELIGIBLE`.
-     - Verify skill requirements: if missing AND `skillOverride=true` AND staff has `manage_classes`, append override reason to `bookings.notes`; else `MISSING_SKILL_REQUIREMENTS`.
-     - Check capacity (resolved OQ-P8-1 — **soft-warn, do not block**): if `event_sessions.booked_count + 1 > capacity`, set `overCapacityWarning=true` but still proceed (this branch is membership-included — verified above — where capacity is aspirational and staff judgment wins). No `SESSION_FULL` error here; paid-offering capacity is enforced at purchase time in other phases.
-     - Create new `booking` with `purchase_id = NULL`, `checked_in_us = now`, `status = 'attended'`, `is_walkin = false`. Increment `event_sessions.booked_count`.
-     - Return `createdNewBooking=true` (with `overCapacityWarning` set if over capacity).
+### 4.2 Pre-pop list ✅
+- [x] `struct CheckinCandidate` — `personId/firstName/lastName/email/source ("paid_booking"|"template"|"history")/alreadyCheckedIn/bookingId/waitlistPosition`. The plan's `missingSkillLevelIds` is replaced by the unified gate decoration: `bool meetsRequirements` + `std::vector<int64_t> failedRequirementGroupIds`.
+- [x] `GetCheckinList(Transaction&, eventSessionId)` — (a) non-cancelled bookings on the session (`paid_booking`); (b) `GetTemplateIdsForSlot` → people MINUS this-occurrence `attending=false` skips (`template`); (c) `GetRecentCheckedInPersonsForClass(classId, now − weeks, now)` (`history`); deduped by person, decorated with `CheckAccess`, sorted by last then first name. Tests `GetCheckinListMergesSourcesDedupesAndSkips` + `GetCheckinListFlagsFailedRequirements`.
 
-- [ ] `WalkInCheckIn(Transaction&, eventSessionId, walkInPersonRequest, staffPersonId)`:
-  - `walkInPersonRequest` carries `firstName`, `lastName`, **and `email` (all required — resolved OQ-P8-2)**. Validate all three are non-empty (and `email` is well-formed) → else `MISSING_WALKIN_CONTACT_INFO`. No name-only walk-ins.
-  - If `walkInPersonRequest.personId == 0` (no existing person), create a `people` row using the existing person-creation pattern with `is_walkin=true` and `firstName/lastName/email`.
-  - Then call `CheckIn` with `is_walkin=true`.
+### 4.3 Check-in action ✅
+- [x] `struct CheckInRequest { classScheduleSlotId; occurrenceDateUs; personId; staffPersonId; skillOverride; overrideReason; }` / `struct CheckInResult { ok; eventSessionId; bookingId; createdNewBooking; overCapacityWarning; errorCode; }`.
+- [x] `CheckIn` — window check from slot+date (`CHECKIN_NOT_OPEN`), `EnsureSessionExists`, existing-booking → `MarkCheckedIn`, else access gate (`NOT_ELIGIBLE` unless overridden), soft-warn capacity (OQ-P8-1), create `purchase_id=NULL` attended booking + increment `booked_count`. Tests: open-class create, existing→attended (no double-count), closed window, invalid slot, gated-block, gated-override-allowed, override-ignored-without-permission, over-capacity-soft-warn.
+- [x] `WalkInCheckIn(Transaction&, eventSessionId, WalkInRequest, staffPersonId)` — requires non-empty name + well-formed email (`MISSING_WALKIN_CONTACT_INFO`), reuses an existing person by email or creates one, then checks in with `is_walkin=true`. (`is_walkin` lives on `bookings`, not `people` — the plan's "people.is_walkin" was a mis-statement; there is no such column.) Tests: create+check-in, missing/malformed email, reuse-by-email.
+- [x] `UndoCheckIn` — a **purchase-less** booking (walk-in OR membership-included; broadened from the plan's "is_walkin AND purchase_id NULL" since membership check-in is `is_walkin=false, purchase_id=NULL` yet was still created by the check-in) is deleted + `booked_count` decremented; a paid booking is reset to `confirmed` with `checked_in_us` cleared and an audit note. Tests: delete-membership, reset-paid, false-when-no-booking.
 
-- [ ] `UndoCheckIn(Transaction&, eventSessionId, personId, staffPersonId)`:
-  1. Find the booking.
-  2. If `is_walkin=true AND purchase_id IS NULL` → soft-delete the booking entirely (decrement `booked_count`).
-  3. Otherwise reset `checked_in_us=NULL`, `status='confirmed'` (or `'waitlisted'`).
-  4. Audit-trail entry in `bookings.notes`.
+### 4.4 Finalize attendance (hourly job) ✅
+- [x] `int FinalizeAttendance(Transaction&, eventSessionId, nowUs)` — returns 0 before `end + after`; else flips every `confirmed` + unchecked + PAID booking to `no_show` (membership/walk-in purchase-less rows are left alone). Idempotent. Test `FinalizeAttendanceMarksUncheckedPaidNoShow`.
+- [x] `int FinalizePendingSessions(Transaction&, nowUs)` — sweeps `GetClassSessionsEndingInWindow(now − 48h, now)` and finalizes each. Test `FinalizePendingSessionsSweepsRecentlyEnded` (in-window finalized, out-of-window skipped).
 
-### 4.4 Finalize attendance (hourly job)
-- [ ] `int FinalizeAttendance(Transaction&, int64_t eventSessionId, int64_t nowUs, const SecretsHelper&)`:
-  1. Compute the post-window cutoff = `event_sessions.end_time_us + class_checkin_window_after_minutes * 60_000_000`.
-  2. If `nowUs < cutoff` → return 0 (too early).
-  3. For each `booking WHERE event_session_id=? AND status='confirmed' AND checked_in_us IS NULL AND purchase_id IS NOT NULL`: set `status='no_show'`. Return count.
-- [ ] Walks all eligible sessions in a separate sweep method `FinalizePendingSessions(Transaction&, nowUs, SecretsHelper&)` — used by the hourly job.
+### 4.5 Per-instance exception notes (resolved OQ-P8-3) ✅
+- [x] `struct ExceptionNote { personId; firstName; lastName; note; }` + `GetExceptionNotesForOccurrence(slot, occurrenceDateUs)` — `GetExceptionsForSlotOccurrence` filtered to `attending=false` with a non-empty note, resolved via `template → person`. No SQL in business logic. Test `GetExceptionNotesForOccurrenceReturnsSkipNotes`.
 
-### 4.5 Per-instance exception notes (resolved OQ-P8-3)
-- [ ] `struct ExceptionNote { int64_t personId; std::string firstName; std::string lastName; std::string note; }`.
-- [ ] `std::vector<ExceptionNote> GetExceptionNotesForOccurrence(Transaction&, int64_t classScheduleSlotId, int64_t occurrenceDateUs)` — reads `attendance_template_exceptions` rows for this (`class_schedule_slot_id`, `occurrence_date_us`) where `attending=false` and `note` is non-empty, joined to `people` for display names. Surfaced by the GET check-in endpoint (§5.1) and rendered as the small notes panel on the check-in screen (§7.1). Reuse the existing `TableHelpers::AttendanceTemplateExceptions` reader (Phase 5) — no SQL in business logic.
-
-### 4.6 KeyValueTable conversions
-- [ ] `CheckinCandidateToKeyValueTable(...)`, `CheckInResultToKeyValueTable(...)` (include `over_capacity_warning`), `ExceptionNoteToKeyValueTable(...)`.
+### 4.6 KeyValueTable conversions ✅
+- [x] `CheckinCandidateToKeyValueTable` (+ array), `CheckInResultToKeyValueTable` (incl. `over_capacity_warning`), `ExceptionNoteToKeyValueTable` (+ array) added to `scheduling_key_value_table.h/.cpp`. `failed_requirement_group_ids` is a comma-delimited id list.
 
 ## 5. Endpoints
 
