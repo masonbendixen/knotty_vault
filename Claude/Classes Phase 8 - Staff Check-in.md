@@ -161,7 +161,7 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp` (16 tes
 - [x] `struct ExceptionNote { personId; firstName; lastName; note; }` + `GetExceptionNotesForOccurrence(slot, occurrenceDateUs)` — `GetExceptionsForSlotOccurrence` filtered to `attending=false` with a non-empty note, resolved via `template → person`. No SQL in business logic. Test `GetExceptionNotesForOccurrenceReturnsSkipNotes`.
 
 ### 4.6 KeyValueTable conversions ✅
-- [x] `CheckinCandidateToKeyValueTable` (+ array), `CheckInResultToKeyValueTable` (incl. `over_capacity_warning`), `ExceptionNoteToKeyValueTable` (+ array) added to `scheduling_key_value_table.h/.cpp`. `failed_requirement_group_ids` is a comma-delimited id list.
+- [x] `CheckinCandidateToKeyValueTable` (+ array), `CheckInResultToKeyValueTable` (incl. `over_capacity_warning`), `ExceptionNoteToKeyValueTable` (+ array) added to `scheduling_key_value_table.h/.cpp`. `failed_requirement_group_ids` is a comma-delimited id list. Tests in `scheduling_key_value_table_test.cpp` (7 cases: scalar fields, waitlist omitted when unset, failed-group list, array conversions, error-code surfacing).
 
 ## 5. Endpoints
 
