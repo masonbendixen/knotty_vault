@@ -62,10 +62,14 @@ Lowest layer first:
 
 1. `business_logic/scheduling/reporting_helper.h/.cpp` — pure SQL aggregation helpers.
 2. `endpoints/` — three read-only admin endpoints.
-3. Angular admin pages using Material + the existing chart library (or chart.js if not yet present — flagged in open questions).
+3. Angular admin pages using **Angular Material + minimal CSS-only bar/line visualizations — NO chart dependency added (resolved OQ-P14-1).** `ng2-charts` (Chart.js wrapper) is a deferred follow-up only if admins later want richer interactivity.
 4. Tests.
 
 No new tables; no new table helpers (uses existing reads).
+
+### Resolved decisions
+- **OQ-P14-1 (resolved):** charts are hand-rolled CSS-only (Material) — no new chart library. AR-1 already uses a CSS grid; AR-2/AR-3 use CSS bar/line visuals.
+- **OQ-P14-2 (resolved):** AR-2 weekly buckets key off `event_sessions.start_time_us` in **facility-local TZ** (`AT TIME ZONE f.timezone`), the same TZ-aware approach as Phase 9 attendance history.
 
 ## 1. AR-1 Schedule Grid
 
@@ -89,14 +93,14 @@ No new tables; no new table helpers (uses existing reads).
 
 ### 2.1 Business logic
 - [ ] `struct EnrollmentTrendPoint { int64_t classId; std::string className; int64_t weekStartUs; int64_t attendeeCount; int64_t capacity; }`.
-- [ ] `std::vector<EnrollmentTrendPoint> GetEnrollmentTrend(Transaction&, int64_t classId, int weeksBack)`. Returns weekly buckets for the last N weeks for one class (or `classId=0` for all classes overlaid).
+- [ ] `std::vector<EnrollmentTrendPoint> GetEnrollmentTrend(Transaction&, int64_t classId, int weeksBack)`. Returns weekly buckets for the last N weeks for one class (or `classId=0` for all classes overlaid). **Weeks are bucketed by `event_sessions.start_time_us` in facility-local TZ (`AT TIME ZONE f.timezone`), resolved OQ-P14-2** — same TZ-aware approach as Phase 9, so an 11pm-Pacific session on a week boundary lands in the correct local week, not the UTC one.
 
 ### 2.2 Endpoint
 - [ ] `GET /api/admin/enrollment_trend?class_id=&weeks_back=`. Permission `manage_class_schedule`. Endpoint test.
 
 ### 2.3 Frontend
 - [ ] `enrollment-trend.component.*/.spec.ts`.
-- [ ] Line chart over weeks; tooltip per week with attendee count.
+- [ ] **CSS-only** line/bar visualization over weeks (Material, no chart dependency — resolved OQ-P14-1); tooltip per week with attendee count.
 
 ## 3. AR-3 Instructor Load (UI polish)
 
@@ -105,7 +109,7 @@ No new tables; no new table helpers (uses existing reads).
 
 ### 3.2 Frontend
 - [ ] `instructor-load-dashboard.component.*/.spec.ts`.
-- [ ] Sortable table + bar chart visualization; date range picker + facility filter.
+- [ ] Sortable table + **CSS-only** bar visualization (Material, no chart dependency — resolved OQ-P14-1); date range picker + facility filter.
 
 ## 4. `ServerAccess`
 
@@ -122,9 +126,9 @@ No new tables; no new table helpers (uses existing reads).
 
 ## 7. Tests-Required Summary
 
-- [ ] Business-logic tests for both new aggregation helpers (correctness of week bucketing, capacity / booked count joins).
+- [ ] Business-logic tests for both new aggregation helpers (capacity / booked count joins; **week bucketing in facility-local TZ — a session straddling midnight UTC lands in the correct local week, resolved OQ-P14-2**).
 - [ ] Endpoint tests for both new endpoints.
-- [ ] Frontend specs for all three pages including chart-component-mock-render.
+- [ ] Frontend specs for all three pages, asserting the **CSS-only** Material visualizations render (no chart library — resolved OQ-P14-1).
 
 ## 8. Cross-Layer Acceptance Criteria
 
@@ -134,8 +138,10 @@ No new tables; no new table helpers (uses existing reads).
 
 ## 9. Open Questions
 
-- **OQ-P14-1.** Which chart library? Recommend: use Angular Material + a minimal CSS-only bar/line visualization for AR-2/AR-3 to avoid adding a chart dependency. If admin wants richer interactivity, add `ng2-charts` (Chart.js wrapper) in a follow-up.
-- **OQ-P14-2.** AR-2 weekly bucketing: bucket by `event_sessions.start_time_us` in facility-local TZ? Recommend yes; same TZ-aware approach as Phase 9 attendance history.
+Both resolved (Mason, 2026-06-09) and folded into the plan above (Layering ▸ Resolved decisions + the cited sections).
+
+- **OQ-P14-1. — RESOLVED (Mason: "that sounds fine").** No chart dependency — AR-2/AR-3 use minimal CSS-only Material bar/line visuals; `ng2-charts` deferred to a follow-up only if needed. Folded into Layering, §2.3, §3.2, §7.
+- **OQ-P14-2. — RESOLVED (Mason: "go with your recommendation").** AR-2 weekly buckets key off `event_sessions.start_time_us` in facility-local TZ (`AT TIME ZONE f.timezone`), same as Phase 9. Folded into Layering, §2.1, §7.
 
 ## 10. Cross-References
 
