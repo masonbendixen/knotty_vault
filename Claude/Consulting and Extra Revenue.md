@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 6/9/2026
-Version: 0.1
+Last Updated: 6/10/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -106,28 +106,30 @@ Ranked roughly by speed-to-cash for *your* profile:
 - **Deposit + milestones** on fixed projects; don't float a stranger's build.
 - **Money hygiene:** invoicing/time tool (Harvest, Bonsai, or Wave-free), set aside ~30% for taxes, pay quarterly estimates, track expenses (home office, tools, insurance, mileage).
 
-## 8. Sequencing (you want money *and* studio progress)
+## 8. Sequencing (re-anchored to real dates 6/10/2026 — massage license returns ~mid-July, so June is a consulting-only month)
 
-**This week (0–2 weeks):**
-- [ ] Sign up for 3–5 expert networks (GLG, AlphaSights, Guidepoint, Coleman, Tegus).
-- [ ] Draft the warm-network message; send to 15–25 specific people.
-- [ ] Stand up the one-pager + clean LinkedIn headline.
-- [ ] Confirm massage licensure + insurance; line up 2–3 local/B2B massage leads for immediate cash.
+**Now → June 21 (consulting-only window):**
+- [ ] Complete the CPR class (booked) + remaining CE hours; submit the license renewal the moment you're eligible.
+- [ ] Sign up for 3–5 expert networks (GLG, AlphaSights, Guidepoint, Coleman, Tegus). In your profiles, lead with the *AI-accelerated development practitioner* angle alongside the historical systems roles — it's the more in-demand call topic (see §12).
+- [ ] Draft the warm-network message; send to your specific shortlist (OQ-7) first, then broaden to 15–25 ex-colleagues.
+- [ ] Stand up the one-pager + LinkedIn headline ("Consultant — systems, databases, AI-accelerated engineering").
+- [ ] Be Raining-Virtue-ready **before** Mara's intro email goes out: one-pager done, portal case study at least drafted.
 
-**30 days:**
-- [ ] Apply to Toptal / A.Team / Bolster.
-- [ ] Write the portal case study + one "how I build with AI" LinkedIn post.
-- [ ] Lock in a recurring chair-massage contract if one's available.
+**June 22 → mid-July:**
+- [ ] Apply to A.Team / Braintrust (lighter onboarding than Toptal — see §12); Bolster for fractional/advisory. Toptal optional, later.
+- [ ] Finish the portal case study with real numbers from git history + publish the first "how I build with AI" LinkedIn post. You said yes to visible marketing (OQ-4) — commit to ~1 post/week.
 - [ ] Define your 2–3 productized offers (AI audit, enablement workshop, due-diligence package) with fixed prices.
+- [ ] Queue massage liability insurance (ABMP/AMTA) so it activates the day the license does.
 
-**60 days:**
-- [ ] First paid consulting engagement landed (likely via warm network or expert network).
-- [ ] Reach out to VC/PE contacts re: technical due diligence.
-- [ ] Decide your weekly capacity split between studio / massage / consulting and protect it.
+**Mid-July → mid-August (massage comes online):**
+- [ ] Line up first 1:1 massage clients; pitch 2–3 Seattle/Eastside companies on recurring chair-massage.
+- [ ] Land the first paid consulting engagement (most likely warm network or expert network).
+- [ ] Ask the warm network specifically about investor technical-diligence needs (warm-intro-only channel — see §12).
 
-**90 days:**
+**Mid-August → September:**
 - [ ] Convert one client into a retainer or repeat work.
-- [ ] Review what's actually paying best per hour-of-effort and **cut the rest** (likely: drop low-rate web/brochure work; keep expert calls + a retainer + selective B2B massage).
+- [ ] Review actual $/hour-of-effort against the $5k/mo floor and **cut the rest** (likely: drop low-rate web/brochure work; keep expert calls + a retainer + selective B2B massage).
+- [ ] Hold capacity at ~20 hrs/week; only stretch toward 30 for work that clearly beats your average rate.
 
 ## 9. Pitfalls for a first-time consultant
 
@@ -181,15 +183,41 @@ I read the full plan fresh. The strategy is sound — warm network first, AI-ena
 - **Make the case study quantitative or don't bother.** "X features in Y weeks, solo, AI-augmented" only sells if X and Y are real numbers. You have the git history and the Obsidian planning docs to reconstruct them — payments + scheduling + refunds + multi-tenant groundwork with dates attached is a genuinely impressive artifact. The planning-doc workflow itself (this vault) is a *demo*, and a live demo beats any slide deck in an AI-enablement sale.
 - **One synergy the plan undersells:** §10's "productize the studio platform" isn't a wild long-horizon idea — you're *already* doing the multi-tenant conversion work in the codebase. Every consulting conversation with a studio/SMB owner doubles as customer-discovery for that SaaS. Keep a running list of what prospective clients say they'd pay for.
 
-## 13. Open questions for you (answer inline and I'll tighten the plan)
+## 13. Open questions (answered by Mason 6/10/2026 — synthesized into §14)
 
 - **OQ-1.** Remote-only, local-only, or both? (Changes channel emphasis — expert networks/marketplaces are remote; massage + SMB are local.)
 	- Mason- I'd rather mostly work remote but I'm open to local work if it pays well.
 - **OQ-2.** How many hours/week can you realistically give to income work without stealing from studio build-out? Rough split you'd *want* across massage / consulting?
-	- M
+	- Mason- I'd like to stay 20 or under but I could go up to 30 if paid well.
 - **OQ-3.** Target number: what's "enough extra money" per month to make this worth it?
+	- Mason- I'd really like to bring in a minimum of $5k per month but more is better.
 - **OQ-4.** Are you willing to do visible self-marketing (LinkedIn posts, build-in-public), or do you prefer to stay heads-down and rely on warm intros + networks?
+	- Mason- I can do visible marketing.
 - **OQ-5.** Massage status: licensed + insured + ready to take B2B/corporate work now, or is there setup first?
+	- I am in the process of renewing my massage license. I have booked a CPR class next week and have most of the CE requirements. I'll get insurance after that. I should have it reactivated by mid July.
 - **OQ-6.** Appetite for the longer plays (productizing the studio platform, courses), or strictly near-term cash for now?
+	- I'm open to both.
 - **OQ-7.** Any ex-colleagues/companies you'd specifically *want* (or want to avoid) working with? Helps target the warm-network list.
+	- I have a few I can reach out to.
 - **OQ-8.** Geographic market (which metro)? Rates and local channels vary a lot.
+	- Seattle / Redmond area.
+
+## 14. Tightened plan — decisions locked in (6/10/2026)
+
+Your answers resolve the plan's open variables. Here's what changes:
+
+**The money math says your floor is easy — aim higher.** $5k/month at your 20 hr/week cap is ~80 income-hours/month, so you only need a **$62/hr blended average** to hit the floor. Every channel in §2 beats that by 2–5×: one enablement workshop ≈ a whole month's floor; ~25 consulting hours at $200/hr is $5k; even chair massage alone could nearly do it. The real planning number should be **$8–12k/month at 15–20 paid hours/week** — which means the binding constraint is *landing clients*, not capacity or rates. That keeps the pressure on outreach, not on grinding hours.
+
+**Capacity rule (OQ-2):** budget 20 hrs/week for income work, full stop. The "up to 30 if paid well" stretch only triggers for work above your blended average (a retainer, a workshop, a high-rate contract) — never for filler. Pre-studio energy is the scarce resource; protect it.
+
+**Remote-first channel ranking (OQ-1):** expert networks, A.Team/Braintrust, warm-network consulting, and AI-enablement workshops (all deliverable remote) are the core. Local work earns its slot only at B2B rates: chair-massage contracts, Raining Virtue, and well-paying Seattle/Redmond SMB builds. Skip low-rate local networking grinds (BNI etc.) — with visible marketing on the table, LinkedIn replaces them.
+
+**June is a consulting-only month (OQ-5).** Massage income starts ~mid-July when the license reactivates. Don't let massage prep consume June beyond the CPR class + CE + paperwork — June's job is consulting pipeline so something lands by the time massage comes online. The two streams stacking in late July is what gets you past $5k.
+
+**Visible marketing is on (OQ-4):** commit to a sustainable cadence — ~1 LinkedIn post/week on AI-accelerated development, built from artifacts you already produce (planning docs, before/after workflow examples). The portal case study is post #1. This is your only compounding channel; everything else is transactional.
+
+**Seattle/Redmond is a genuine advantage (OQ-8):** Redmond means the Microsoft vendor pipeline (§11-C) is literally next door, and the Eastside corporate campuses are the densest chair-massage B2B market in the region. WTIA events and Eastside chambers are your high-value local touchpoints — same rooms contain consulting buyers *and* chair-massage buyers.
+
+**Warm list (OQ-7):** your few specific contacts are priority one — personal notes this week, before the broader blast. A handful of people who've seen you work is worth more than a hundred cold profiles.
+
+**Longer plays (OQ-6):** both stay alive but neither gets June/July time. The studio-platform SaaS runs as passive customer discovery (keep the running list from §12); course/content waits until the first consulting revenue proves the methodology pitch.
