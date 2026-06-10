@@ -59,11 +59,11 @@ Lowest layer first per item; each item respects the standard layering and tests 
 
 **Goal:** "Auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist."
 
-- [ ] DB: extend `user_notification_preferences` (Phase 6 table) with `waitlist_auto_confirm_max_hours_before INT` NULL — if set, the waitlist promotion process honors it.
+- [ ] DB: extend `user_notification_preferences` (Phase 6 table) with `waitlist_auto_confirm_max_hours_before INT` NULL, **default NULL = no cap (resolved OQ-P15-1)** — preserves today's behavior (auto-promote at any time before start). Only when a user sets a value does the promotion process honor the window.
 - [ ] Business logic: extend `BookingHelper`'s waitlist-auto-promote path. When a paid attendee cancels and the next-waitlisted is up, check the preference — if a `waitlist_auto_confirm_max_hours_before` exists and `now > session.start_time_us - max_hours * 3600_000_000`, skip the user and check the next.
 - [ ] Add an hourly job: `POST /api/admin/expire_stale_waitlist` — drops users from waitlists for sessions where their `max_hours_before` window has elapsed. Idempotent.
-- [ ] Frontend: extend Phase 6's preferences page with the new input.
-- [ ] Tests at all layers.
+- [ ] Frontend: extend Phase 6's preferences page with the new input — defaults to empty / "No cap (auto-confirm any time)" (the NULL default, resolved OQ-P15-1).
+- [ ] Tests at all layers (incl. NULL = current behavior preserved; a set window skips a too-early promotion).
 
 ## 2. M-13 Per-Session Price Override
 
@@ -89,10 +89,11 @@ Lowest layer first per item; each item respects the standard layering and tests 
 
 - [ ] DB: reuse the existing multi-seat entitlement model (`entitlements.seats_total > 1`). Add `bookings.guest_person_id BIGINT` NULL `REFERENCES people(id)` — when set, indicates the primary attendee booked a guest under the same booking.
 - [ ] Or alternatively: create a separate `booking` row for the guest tied to the same `purchase_id`. This is cleaner. Recommend separate bookings.
-- [ ] Business logic: extend `BookingHelper::BookEvent` to accept an optional `guest_person_id` (or `guest_first_name + guest_last_name + guest_email` for new-person creation). Validate: the booker has an active multi-seat membership / paid booking that supports the extra seat; the guest is an adult.
+- [ ] **Guest is a real account, not a lightweight contact (resolved OQ-P15-2).** When the guest has no existing `people` row, create a **real `people` account** (email required), reusing the **M-9 guest-pass auto-account flow** rather than a name-only contact. So `guest_person_id` always references a genuine account.
+- [ ] Business logic: extend `BookingHelper::BookEvent` to accept an optional `guest_person_id` (or `guest_first_name + guest_last_name + guest_email` → creates the real account via the M-9 flow). Validate: the booker has an active multi-seat membership / paid booking that supports the extra seat; the guest is an adult; an email is present when creating a new guest account.
 - [ ] Endpoints: extend `POST /api/book_event/<id>` body with the new fields.
-- [ ] Frontend: extend the booking-confirmation dialog with a "Add a partner / friend" toggle and form.
-- [ ] Tests at all layers.
+- [ ] Frontend: extend the booking-confirmation dialog with a "Add a partner / friend" toggle and form (first / last / email — email required, since the guest gets a real account).
+- [ ] Tests at all layers (incl. new-guest creates a real `people` account via the M-9 flow; existing-person path links by `guest_person_id`; adult-only + seat-availability validation; missing-email rejected when creating a new guest).
 
 ## 4. AR-4 Open-Seat Heatmap
 
@@ -131,10 +132,10 @@ Each item above includes tests at all layers (table helpers, business logic, end
 
 ## 8. Open Questions
 
-- **OQ-P15-1.** For CAP-8, what's the default `waitlist_auto_confirm_max_hours_before`? Recommended: NULL (= no cap; current behavior preserved).
-	- Mason- I'll go with your recommendation.
-- **OQ-P15-2.** For M-14, should `guest_person_id` create a real `people` row (auto-account) or be a "lightweight contact" (name only)? Recommended: real `people` row; mirrors the guest-pass flow from M-9.
-	- Mason- Yeah, I would like them to has an actual account.
+Both resolved (Mason, 2026-06-09) and folded into the plan above (the cited item sections).
+
+- **OQ-P15-1. — RESOLVED (Mason: "go with your recommendation").** CAP-8 `waitlist_auto_confirm_max_hours_before` defaults to NULL (= no cap; today's behavior preserved); only a user-set value gates promotion. Folded into §1.
+- **OQ-P15-2. — RESOLVED (Mason: "I would like them to have an actual account").** M-14 guests get a **real `people` account** (email required), created via the M-9 guest-pass auto-account flow — not a name-only contact. Folded into §3.
 
 ## 9. Cross-References
 
