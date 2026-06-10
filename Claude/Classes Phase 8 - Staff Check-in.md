@@ -163,23 +163,33 @@ Files: `business_logic/scheduling/class_checkin_helper.h/.cpp/_test.cpp` (16 tes
 ### 4.6 KeyValueTable conversions ✅
 - [x] `CheckinCandidateToKeyValueTable` (+ array), `CheckInResultToKeyValueTable` (incl. `over_capacity_warning`), `ExceptionNoteToKeyValueTable` (+ array) added to `scheduling_key_value_table.h/.cpp`. `failed_requirement_group_ids` is a comma-delimited id list. Tests in `scheduling_key_value_table_test.cpp` (7 cases: scalar fields, waitlist omitted when unset, failed-group list, array conversions, error-code surfacing).
 
-## 5. Endpoints
+## 5. Endpoints ✅ DONE
 
-### 5.1 Staff endpoints
-- [ ] `GET /api/staff/checkin/<eventSessionId>` → `{ window_open, session_info, candidates: [...], exception_notes: [...] }`. `exception_notes` comes from `GetExceptionNotesForOccurrence` (resolved OQ-P8-3). Permission `staff` OR `manage_classes`. Endpoint test (asserts exception notes returned for an occurrence with an `attending=false` note).
-- [ ] `POST /api/staff/checkin/<eventSessionId>/person/<personId>` body `{ skill_override?, override_reason? }`. Returns `CheckInResult`. Endpoint test.
-- [ ] `DELETE /api/staff/checkin/<eventSessionId>/person/<personId>` → undo. Endpoint test.
-- [ ] `POST /api/staff/people/search?q=...` — autocomplete. Permission `staff`. Endpoint test (reuse if existing; otherwise create).
-- [ ] `POST /api/staff/checkin/<eventSessionId>/walkin` body `{ first_name, last_name, email }` — **all three required** (resolved OQ-P8-2) → creates the person + check-in atomically; returns 400 `MISSING_WALKIN_CONTACT_INFO` if any is missing or `email` is malformed. Endpoint test (success + missing-email validation error).
+Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
+`endpoints/admin_finalize_class_attendance.{h,cpp}` (+ `_test.cpp`, 3 cases).
 
-### 5.2 Admin/scheduler endpoint
-- [ ] `POST /api/admin/finalize_class_attendance` — runs `FinalizePendingSessions(now)` over all sessions in the last 48h. Idempotent. Permission `admin`. Endpoint test.
+**Reconciliations vs the plan:**
+- **People search reuses the existing endpoint.** `GET /api/staff/search_people?q=` already exists (`staff_search_people.cpp`, `staff_access`-gated) — reused, not recreated (the plan allowed "reuse if existing"). The frontend points at that path, not the plan's `POST /api/staff/people/search`.
+- **Permission is `staff_access`.** The Phase-1.7/3.6 security review mandates every `/api/staff/*` route require `staff_access` (`RequirePermission`, which there's no "any-of" variant of), so the GET uses `staff_access` rather than the plan's loose "staff OR manage_classes". The override-on-check-in path still separately checks `manage_class_schedule` inside the helper.
+- **Admin finalize uses `manage_class_schedule`.** The codebase has no generic "admin" gate for jobs; sibling job endpoints (e.g. instructor-digest) gate on `manage_class_schedule`, which the scheduler service account holds. Used here too.
+- **Lazy-derivation bridge added.** Action endpoints are keyed by a persisted `eventSessionId`, but a purely-derived occurrence has none until first recording. Added `POST /api/staff/checkin/ensure {class_schedule_slot_id, occurrence_date_us}` → `{event_session_id}` (idempotent `EnsureSessionExists`) so the frontend can obtain an id for a derived occurrence before GET/check-in. Check-in via id uses the new `ClassCheckinHelper::CheckInByEventSession` wrapper (reads the session's slot+date, delegates to `CheckIn`).
 
-### 5.3 Routing
-- [ ] All registered in `web_app.cpp`.
+### 5.1 Staff endpoints ✅
+- [x] `GET /api/staff/checkin/<eventSessionId>` → `{ window_open, session_info, candidates, exception_notes }`. `session_info` from `EventSessionHelper::GetEventSession`; `candidates`/`exception_notes` from `ClassCheckinHelper`. `staff_access`. Tests: returns candidates+notes+window, 401 anon, 403 non-staff.
+- [x] `POST /api/staff/checkin/<eventSessionId>/person/<personId>` body `{ skill_override?, override_reason? }` → `CheckInResult` JSON (200; `ok`/`error_code`/`over_capacity_warning` carried in the body). staffPersonId = the logged-in session. Tests: creates booking, 403 non-staff.
+- [x] `DELETE /api/staff/checkin/<eventSessionId>/person/<personId>` → `{ ok }`. Test: undo after check-in.
+- [x] People search — reused `GET /api/staff/search_people` (see above). No new endpoint.
+- [x] `POST /api/staff/checkin/<eventSessionId>/walkin` body `{ first_name, last_name, email }` — all required; returns **400** when contact info missing/malformed, else `CheckInResult`. Tests: success + missing-email 400.
+- [x] `POST /api/staff/checkin/ensure` — lazy-derivation bridge (see above). Tests: returns id + 400 on missing body.
 
-### 5.4 Async-write safety
-- [ ] These endpoints DO queue async writes (booking-confirmation emails are not relevant here, but the `bookings.notes` audit append may invoke logging). Apply the `ThreadPool::Shutdown()` discipline per memory `feedback_sync_sql_before_threadpool_queue.md` and CLAUDE.md.
+### 5.2 Admin/scheduler endpoint ✅
+- [x] `POST /api/admin/finalize_class_attendance` — `FinalizePendingSessions(now)` over the last 48h. Idempotent. `manage_class_schedule`. Returns `{ no_show_count }`. Tests: 401 anon, 403 without permission, finalizes + idempotent second run.
+
+### 5.3 Routing ✅
+- [x] All six functions registered in `web_app.cpp` (includes + reference vars) and `endpoints/CMakeLists.txt` (sources + tests).
+
+### 5.4 Async-write safety ✅
+- [x] These endpoints do NOT call `ThreadPool::Queue` (check-in writes are synchronous: `MarkCheckedIn`/`AddBooking`/`UpdateBooking`), so the queue-race doesn't arise. The endpoint tests still apply the `ThreadPool::Shutdown()` discipline (flush after each `handle_full`) to drain any session-touch writes before the next request / DB read, per `feedback_sync_sql_before_threadpool_queue.md`.
 
 ## 6. Scheduled job integration
 
