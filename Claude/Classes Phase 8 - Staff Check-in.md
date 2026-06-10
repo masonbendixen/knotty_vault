@@ -208,6 +208,7 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
 - **Search reuses `staffSearchPeople()`** (`GET /api/staff/search_people`), per the §5 reconciliation — not the plan's `/api/staff/people/search`.
 - **Field names are snake_case** matching the wire format (codebase convention): `exception_notes` / `over_capacity_warning`, not the plan's camelCase prose names. `ServerAccessNetwork` normalizes KVT string-booleans → real booleans and splits the comma-delimited `failed_requirement_group_ids` → `number[]`.
 - **Inline panels, not MatDialog** — the walk-in form and override confirmation are inline bordered panels (same pattern as the existing staff check-in page's inline walk-in flow); spec-friendlier and consistent.
+- **Timezone fix (2026-06-10):** class times (`TodayClassEntry.start_us/end_us` and `EnsureSessionExists`-persisted `event_sessions.start_time_us`) are **studio wall-clock encoded as UTC** (occurrence UTC-midnight + `start_time_minutes`, `GetDerivedSessionsForRange`), NOT real instants — they must be formatted with `timeZone: 'UTC'` or a Pacific browser shows a 6pm class as 11am. Fixed in `class-checkin.component.ts` (list + header times) **and** the pre-existing `account/today-classes` page which had the same latent bug; pinned by timezone-proof regression tests in both specs (assert 6:00 PM on a Pacific test host).
 
 ### 7.1 Staff check-in page ✅
 - [x] `ui/src/app/pages/staff/class-checkin/class-checkin.component.{ts,html,scss,spec.ts}` (standalone, SharedModule).
