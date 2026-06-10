@@ -191,9 +191,14 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
 ### 5.4 Async-write safety ✅
 - [x] These endpoints do NOT call `ThreadPool::Queue` (check-in writes are synchronous: `MarkCheckedIn`/`AddBooking`/`UpdateBooking`), so the queue-race doesn't arise. The endpoint tests still apply the `ThreadPool::Shutdown()` discipline (flush after each `handle_full`) to drain any session-touch writes before the next request / DB read, per `feedback_sync_sql_before_threadpool_queue.md`.
 
-## 6. Scheduled job integration
+## 6. Scheduled job integration ✅ DONE
 
-- [ ] Add hourly job in `knottyyoga_helper`: `POST /api/admin/finalize_class_attendance`. Idempotent.
+- [x] Add hourly job in `knottyyoga_helper`: `POST /api/admin/finalize_class_attendance`. Idempotent.
+  - `scheduler_config.h` — added `JobIntervals::finalizeAttendanceSeconds = 3600` (hourly).
+  - `scheduled_job.cpp` `BuildStandardJobs` — registers `finalize_class_attendance` → `POST /api/admin/finalize_class_attendance` (via `AppendIfEnabled`, so a 0 interval disables it).
+  - `main.cpp` — `--finalize_attendance_interval` ABSL flag (default 3600), wired into `BuildConfigFromFlags` and the startup `LogConfigSummary` line.
+  - Validation: follows the recent-sibling convention (instructor/weekly/series jobs aren't in `ValidateSchedulerConfig` either); `BuildStandardJobs` already defends against `<= 0`.
+  - Tests: `scheduled_job_test.cpp` — job count 15→16, `EachJobHasPostMethodAndExpectedPath` spot-checks the new path, `ZeroIntervalDisablesIndividualJob` 13→14, added `FinalizeAttendanceCanBeDisabled` + `IntervalFromConfigPropagatedForFinalizeAttendance`, all-zeros initializer extended to 16. `scheduler_config_test.cpp` + `scheduler_test.cpp` — all-zeros initializers extended to 16, `InitializeRegistersAllEnabledJobs` 15→16.
 
 ## 7. Frontend
 
