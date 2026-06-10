@@ -200,37 +200,46 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
   - Validation: follows the recent-sibling convention (instructor/weekly/series jobs aren't in `ValidateSchedulerConfig` either); `BuildStandardJobs` already defends against `<= 0`.
   - Tests: `scheduled_job_test.cpp` — job count 15→16, `EachJobHasPostMethodAndExpectedPath` spot-checks the new path, `ZeroIntervalDisablesIndividualJob` 13→14, added `FinalizeAttendanceCanBeDisabled` + `IntervalFromConfigPropagatedForFinalizeAttendance`, all-zeros initializer extended to 16. `scheduler_config_test.cpp` + `scheduler_test.cpp` — all-zeros initializers extended to 16, `InitializeRegistersAllEnabledJobs` 15→16.
 
-## 7. Frontend
+## 7. Frontend ✅ DONE
 
-### 7.1 Staff check-in page
-- [ ] `ui/src/app/pages/portal/staff/class-checkin/class-checkin.component.*/.spec.ts`.
-- [ ] Lists today's sessions for the staff member's facility (sorted by start time); click into one → check-in screen for that session.
-- [ ] On the check-in screen:
-  - Session header: class name, room, instructor, current attended count / capacity, window open/closed badge.
-  - **Exception-notes panel** (resolved OQ-P8-3): a small collapsible panel listing members who marked `attending=false` for this occurrence and their notes, from the GET endpoint's `exception_notes`. Hidden when empty.
-  - Search bar at top with autocomplete (≥2 chars; debounced; uses `/api/staff/people/search`).
-  - Pre-pop list grouped by source (Template Attendees, Paid Bookings, Recent Attendees) with checkboxes for "Attended" — click flips state via API.
-  - "Add walk-in" button → dialog with **first / last / email fields, all required** (resolved OQ-P8-2 — email is required, not optional; disable submit and show a field error until a valid email is entered).
-  - Yellow-flag chip next to anyone with missing skill requirements; clicking "Check in anyway" pops a reason-required confirmation dialog.
-  - When a check-in returns `over_capacity_warning` (resolved OQ-P8-1), the check-in still succeeds; surface a non-blocking toast/badge ("Over capacity — checked in anyway").
-- [ ] Optimistic UI updates with rollback on error.
-- [ ] Spec covers all flows: regular check-in, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel render**, and the **over-capacity soft-warn** toast.
+**Reconciliations vs the plan:**
+- **Path is `pages/staff/`, not `pages/portal/staff/`** — the staff portal lives at `ui/src/app/pages/staff/` (route prefix `/staff`); the new page is `pages/staff/class-checkin/` at `/staff/class-checkin`, registered in `staff.routes.ts` + a "Class Check-In" dashboard card (`fact_check` icon). The pre-existing `/staff/check-in` page (paid service/event booking check-in from the Provider Portal era) is untouched — different feature.
+- **Session list reuses `getTodayClasses()`** (Phase 5 §4.5) — it already returns today's derived+persisted class occurrences with `event_session_id` (0 when purely derived), names, rooms, instructors. No new listing endpoint needed.
+- **Search reuses `staffSearchPeople()`** (`GET /api/staff/search_people`), per the §5 reconciliation — not the plan's `/api/staff/people/search`.
+- **Field names are snake_case** matching the wire format (codebase convention): `exception_notes` / `over_capacity_warning`, not the plan's camelCase prose names. `ServerAccessNetwork` normalizes KVT string-booleans → real booleans and splits the comma-delimited `failed_requirement_group_ids` → `number[]`.
+- **Inline panels, not MatDialog** — the walk-in form and override confirmation are inline bordered panels (same pattern as the existing staff check-in page's inline walk-in flow); spec-friendlier and consistent.
 
-### 7.2 `ServerAccess` extensions
-- [ ] `getCheckinList(eventSessionId)` (response now includes `exceptionNotes`), `checkInPerson(eventSessionId, personId, skillOverride?, overrideReason?)` (result includes `overCapacityWarning`), `undoCheckIn(eventSessionId, personId)`, `walkInCheckin(eventSessionId, firstName, lastName, email)` (**email required — resolved OQ-P8-2**), `searchPeople(query)`.
-- [ ] Update `ServerAccess.mock.spec.ts` (incl. a walk-in case that rejects a missing/blank email, and the exception-notes + over-capacity-warning fields).
+### 7.1 Staff check-in page ✅
+- [x] `ui/src/app/pages/staff/class-checkin/class-checkin.component.{ts,html,scss,spec.ts}` (standalone, SharedModule).
+- [x] Lists today's sessions (sorted by `start_us`); click → check-in screen. A derived occurrence (`event_session_id=0`) is resolved via `ensureCheckinSession(slot, occurrenceDate)` first (§5.1 bridge).
+- [x] Check-in screen:
+  - Session header: class name, time range (facility timezone), room, facility, **attended count / capacity** (red over capacity), **window open/closed badge**.
+  - **Exception-notes panel** (OQ-P8-3): collapsible amber panel from `exception_notes`; hidden when empty.
+  - Search bar with autocomplete (≥2 chars, 300ms debounce, `staffSearchPeople`); "Check in" per result (`checkInPerson`, then list refresh).
+  - Pre-pop list grouped Template Attendees / Paid Bookings / Recent Attendees with checkbox toggles; toggles disabled when the window is closed.
+  - "Add walk-in" → inline panel, **first/last/email all required** (OQ-P8-2): submit disabled + field error until valid email; server 400 surfaced inline; autofocus on first field.
+  - Yellow "Requirements not met" chip (`meets_requirements=false`); clicking the toggle opens the **reason-required** override confirmation → `checkInPerson(…, skillOverride=true, reason)`.
+  - `over_capacity_warning` (OQ-P8-1) → non-blocking warning toast "Over capacity — checked in anyway." (check-in retained).
+- [x] Optimistic toggle updates with rollback on `ok=false` AND on transport error (both directions: check-in + undo).
+- [x] Spec: 24 cases — list sort/empty, persisted-vs-derived open (ensure bridge), header render, grouping, notes panel render/hide/collapse, yellow flag, check-in + rollback (`ok=false` and throw), undo + rollback, over-capacity toast (check-in AND walk-in), override open/disabled-until-reason/confirm args, walk-in email validation (invalid + missing) / submit+refresh / 400 surface, window-closed badge + disabled toggles + no server call, search debounce + <2-char skip + search-result check-in, back-to-list reload.
 
-### 7.3 Types
-- [ ] `checkin.types.ts`: `CheckinCandidate`, `CheckInResult` (with `overCapacityWarning`), `CheckinSessionInfo`, `ExceptionNote`, and a `CheckinListResponse` that carries `exceptionNotes`.
+### 7.2 `ServerAccess` extensions ✅
+- [x] Interface + `ServerAccessNetwork` + `ServerAccessMock` + `ServerAccessProxy`: `ensureCheckinSession(slotId, occurrenceDateUs)`, `getCheckinList(eventSessionId)` (carries `exception_notes`), `checkInPerson(eventSessionId, personId, skillOverride?, overrideReason?)` (result carries `over_capacity_warning`), `undoCheckIn(eventSessionId, personId)`, `walkInCheckin(eventSessionId, firstName, lastName, email)` (**email required**). People search = existing `staffSearchPeople`.
+- [x] Mock state mirrors the server: lazy ensure map (slot+date → session 501), three-source candidate list incl. a gated person, exception note, capacity-3 session, created-by-check-in bookings deleted on undo vs paid reset, walk-in reuse-by-email.
+- [x] `ServerAccess.mock.spec.ts`: 24 new cases — ensure (resolve/idempotent/400/401), list (three sources + notes + gated flags + 404), check-in (create/reuse/gated-reject/blank-reason-reject/override-allow/**over-capacity soft-warn**/window-closed/idempotent/401), undo (delete-created/reset-paid/never-checked-in), walk-in (create+check-in/**missing-email 400**/malformed-email 400/blank-name 400/reuse-by-email/401).
 
-## 8. Admin Metadata
+### 7.3 Types ✅
+- [x] `shared/types/checkin.types.ts`: `CheckinCandidate` (+`CheckinCandidateSource`), `CheckInResult` (with `over_capacity_warning`), `CheckinSessionInfo`, `ExceptionNote`, `CheckinListResponse` (carries `exception_notes`), `WalkInCheckinRequest`, `CheckinErrorCodes` const map. Re-exported from `shared/types/ServerAccess.ts`.
+- [x] Updated `staff-dashboard.component.spec.ts` for the new card (index + count assertions).
 
-- [ ] New permissions used: `manage_classes` (reused; introduced earlier). No new admin tables.
+## 8. Admin Metadata ✅ DONE
+
+- [x] No new permissions and no new admin tables. Verified: the endpoints gate on the pre-existing `staff_access` (staff routes) and `manage_class_schedule` (finalize job + override path) — both already seeded (`db_schema/permissions.h`); the §5 reconciliation already corrected the plan's original `manage_classes` mention. Nothing to register in `create_database.cpp`.
 
 ## 9. Tests-Required Summary
 
-- [ ] Table helper tests for `GetRecentCheckedInPersonsForSchedule`, `MarkCheckedIn`, `MarkNoShow`.
-- [ ] `class_checkin_helper_test.cpp`:
+- [x] Table helper tests for `GetRecentCheckedInPersonsForSchedule`, `MarkCheckedIn`, `MarkNoShow` (done in §3).
+- [x] `class_checkin_helper_test.cpp` (done in §4):
   - Pre-pop list combines template + paid + history correctly without duplicates.
   - Check-in creates booking for membership-included class with `purchase_id=NULL`.
   - Check-in on existing paid booking sets `checked_in_us`.
@@ -240,9 +249,9 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
   - Skill override requires `manage_classes`; rejects without permission.
   - Undo deletes walk-in booking; resets `checked_in_us` for paid.
   - `FinalizeAttendance` marks `no_show` on paid + unchecked.
-- [ ] Endpoint tests for all six endpoints (success + permission-denied + validation-error), incl. the walk-in **missing-email 400** and the GET endpoint returning `exception_notes`.
-- [ ] Frontend spec for check-in page covering search, pre-pop, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel**, and the **over-capacity soft-warn** toast.
-- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`.
+- [x] Endpoint tests for all six endpoints (success + permission-denied + validation-error), incl. the walk-in **missing-email 400** and the GET endpoint returning `exception_notes` (done in §5).
+- [x] Frontend spec for check-in page covering search, pre-pop, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel**, and the **over-capacity soft-warn** toast (done in §7 — `class-checkin.component.spec.ts`, 24 cases; plus 24 mock cases in `ServerAccess.mock.spec.ts` and the dashboard spec update).
+- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`. **(Outstanding — only unfinished Phase 8 item; lives in `test_helper/commands/`, not part of §7/§8.)**
 
 ## 10. Cross-Layer Acceptance Criteria
 

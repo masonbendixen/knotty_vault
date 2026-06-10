@@ -145,7 +145,43 @@ Ranked roughly by speed-to-cash for *your* profile:
 - **Open-source a slice** of your tooling/methodology for visibility → inbound.
 - **Advisory/board seats** for early studios-tech or dev-tools startups via Bolster.
 
-## 11. Open questions for you (answer inline and I'll tighten the plan)
+## 11. Contracting firms & agency channels (answering Mason's note in §2 — added by Fable, 6/10/2026)
+
+First, a correction to your note: the **Washington Software Alliance no longer exists under that name** — it became the **Washington Technology Industry Association (WTIA)** in 2008 (washingtontechnology.org). Still worth joining: they run CEO roundtables, affinity groups, and events that put you in the room with exactly the founder/CTO crowd that buys both consulting and AI enablement.
+
+There are three distinct flavors of "contracting firm," and they pay and behave very differently:
+
+**A. Boutique consultancies (subcontract / white-label overflow)** — pitch yourself as senior bench capacity they can drop into client work as a 1099 sub. They have sales teams; you don't. Margin is lower than direct clients but far higher than staffing agencies, and a couple of these relationships can fill your pipeline gaps indefinitely.
+- **Slalom / Slalom Build** — HQ'd in Seattle, huge local footprint, does exactly the AI-transformation work you want to sell.
+- **Fresh Consulting** (Bellevue) — software + hardware + robotics; your datacenter-robotics and embedded/systems background is unusually on-target for them.
+- **Nortal** (Seattle office) — enterprise modernization, gov/health.
+- **Substantial**, **Logic20/20**, **West Monroe** (all Seattle) — product studios / tech consultancies that use senior independents.
+- **Aditi Consulting** (Bellevue) — large Microsoft-ecosystem consultancy.
+
+**B. Staffing / contract agencies (W2 hourly, zero sales effort)** — lower effective rate than direct consulting (they keep a margin, often 30–50%), but the fastest "guaranteed paycheck" channel and useful as an income *floor* while the direct pipeline builds. Strong in the Puget Sound market:
+- **Wimmer Solutions** (Seattle — PNW-focused, places senior consultants at the big locals)
+- **TEKsystems**, **Insight Global**, **Apex Systems**, **Experis**, **Kforce** — national, all active in Seattle
+- **Actalent** (formerly Aerotek's engineering arm) — engineering/embedded; the channel into aerospace C++ work (Blue Origin et al.)
+- **Robert Half Technology** — shorter, smaller engagements
+
+**C. Big-tech contingent-workforce pipelines** — as an ex-Microsoft and ex-Google engineer you can come back as a contractor at strong rates with essentially no sales motion. Microsoft a-/v- roles flow through approved suppliers (TEKsystems/Allegis, Experis, Collabera, Wimmer, Aditi); Google's contingent workforce is managed through **Magnit** and **Adecco**. C++ systems contractors at these rates do well, and your alumni status + internal references move you to the front of the line. The tradeoff: it's a job-shaped engagement that can quietly eat all the studio time — time-box it hard if you go this route.
+
+How I'd prioritize: **A for margin, C for speed, B as the fallback floor.** And note these are all in tension with §9's "don't trade all your hours" warning — agency W2 work is the least leveraged thing on this entire plan, so treat it as bridge income only.
+
+## 12. Fable second-opinion review (added 6/10/2026)
+
+I read the full plan fresh. The strategy is sound — warm network first, AI-enablement as the timely wedge, massage as floor-plus-funnel all hold up. These are the places I'd push back or add:
+
+- **Expert networks: temper the expectation.** Two real frictions the plan glosses over. (1) *Compliance*: GLG/AlphaSights have strict rules — you cannot discuss confidential information about former employers, and most of what makes Spanner/Fuchsia/SQL Server interesting to a hedge-fund client is exactly the stuff your Google/Microsoft NDAs cover. You'll do fine on industry-landscape calls, but you can't be "the guy who explains Spanner internals." (2) *Recency*: networks heavily favor people in or recently out of a role; your big-tech tenure is now a few years back. Sign up — it's free and the calls are easy money when they come — but model it as bursty supplemental income, not a reliable channel. Your *AI-accelerated development practitioner* angle is actually fresher and more in-demand for these calls in 2026 than your historical systems roles.
+- **Toptal screening is a real cost.** Multi-week process including algorithmic coding screens — a nontrivial time tax for someone juggling studio build-out. **A.Team and Braintrust have lighter onboarding**; do those first and treat Toptal as optional.
+- **Washington-specific business mechanics §7 misses:** WA has no state income tax but **does have B&O (Business & Occupation) tax on gross receipts** (Service & Other Activities classification, ~1.75–2%, with a small-business credit) — register with the WA Department of Revenue, plus a city business license. Massage practice requires a current **WA LMT license through the Department of Health**; liability coverage through ABMP or AMTA is ~$250/yr. Worth confirming all of this with your accountant alongside the LLC question.
+- **Technical due diligence is warm-intro-only in practice.** Cold outreach to VC/PE firms almost never lands a first DD gig — they staff diligence from people they already know. Reframe §5 item 4: ask your *warm network* specifically "do you know any investors who need technical diligence help?" rather than contacting funds directly.
+- **The Mara → Raining Virtue intro is your hottest live lead.** A warm intro to an owner/CEO is the exact top-of-list channel this plan recommends — don't let it land before you're ready. Get the one-pager and the portal case study (§6) done *before* her email goes out, and reply same-day when it does.
+- **Nine service lines is too many to sell.** The §2 table is a good map of the territory, but for the first 60 days actively sell at most three: **AI-accelerated delivery, expert-network calls, and massage (incl. B2B chair)**. Everything else stays opportunistic — say yes if it walks in, but don't spend outreach effort on it. A first-time consultant marketing nine offerings reads as unfocused to buyers and splits your already-thin time.
+- **Make the case study quantitative or don't bother.** "X features in Y weeks, solo, AI-augmented" only sells if X and Y are real numbers. You have the git history and the Obsidian planning docs to reconstruct them — payments + scheduling + refunds + multi-tenant groundwork with dates attached is a genuinely impressive artifact. The planning-doc workflow itself (this vault) is a *demo*, and a live demo beats any slide deck in an AI-enablement sale.
+- **One synergy the plan undersells:** §10's "productize the studio platform" isn't a wild long-horizon idea — you're *already* doing the multi-tenant conversion work in the codebase. Every consulting conversation with a studio/SMB owner doubles as customer-discovery for that SaaS. Keep a running list of what prospective clients say they'd pay for.
+
+## 13. Open questions for you (answer inline and I'll tighten the plan)
 
 - **OQ-1.** Remote-only, local-only, or both? (Changes channel emphasis — expert networks/marketplaces are remote; massage + SMB are local.)
 - **OQ-2.** How many hours/week can you realistically give to income work without stealing from studio build-out? Rough split you'd *want* across massage / consulting?
