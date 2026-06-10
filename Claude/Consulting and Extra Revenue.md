@@ -184,7 +184,9 @@ I read the full plan fresh. The strategy is sound — warm network first, AI-ena
 ## 13. Open questions for you (answer inline and I'll tighten the plan)
 
 - **OQ-1.** Remote-only, local-only, or both? (Changes channel emphasis — expert networks/marketplaces are remote; massage + SMB are local.)
+	- Mason- I'd rather mostly work remote but I'm open to local work if it pays well.
 - **OQ-2.** How many hours/week can you realistically give to income work without stealing from studio build-out? Rough split you'd *want* across massage / consulting?
+	- M
 - **OQ-3.** Target number: what's "enough extra money" per month to make this worth it?
 - **OQ-4.** Are you willing to do visible self-marketing (LinkedIn posts, build-in-public), or do you prefer to stay heads-down and rely on warm intros + networks?
 - **OQ-5.** Massage status: licensed + insured + ready to take B2B/corporate work now, or is there setup first?
