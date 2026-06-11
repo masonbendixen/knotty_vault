@@ -171,14 +171,15 @@ LIMIT :limit OFFSET :offset
   - `FiveSameDayAttendancesCountAsFive` (OQ-P9-1).
   - `EarliestAttendanceIsMinStartAcrossHistory` (OQ-P9-2) — earliest is a no_show (full history statuses); a confirmed-only person → nullopt.
 
-## 3. Endpoints
+## 3. Endpoints ✅ DONE
 
-### 3.1 User endpoint
-- [ ] `endpoints/get_my_attendance_history.h/cpp` + test:
+### 3.1 User endpoint ✅
+- [x] `endpoints/get_my_attendance_history.h/cpp` + test (registered in `web_app.cpp` include + reference var, and `endpoints/CMakeLists.txt`):
   - `GET /api/me/attendance_history?year=&month=&class_id=&instructor_id=&include_no_show=&include_cancelled=&offset=&limit=`.
-  - Permission: logged-in session.
-  - Returns `{ total_count, rows: [...], distinct_class_ids, distinct_instructor_ids, earliest_attendance_us }` — the distinct lists drive the FK filter dropdowns; `earliest_attendance_us` (null when no attendance) drives the year-dropdown range (resolved OQ-P9-2).
-  - Use `crow::query_string` for query params (per memory).
+  - Permission: logged-in session (401 anonymous).
+  - Returns `{ total_count, rows: [...], distinct_class_ids, distinct_instructor_ids, earliest_attendance_us }` — `earliest_attendance_us` is JSON **null** when no history (drives the year dropdown, OQ-P9-2).
+  - Validation (400 `ValidationError`): any non-integer numeric param; `month` outside 1–12. Bool flags accept `true`/`1`. `offset`/`limit` pass through to the helper's defensive clamps (§2).
+  - Test (`get_my_attendance_history_test.cpp`, 8 cases): 401 anonymous; rows+metadata (sort order, instructor name on the row, both distinct lists, exact earliest); empty history → null earliest + empty arrays; year/month/class/instructor filters; include flags reveal no_show then cancelled; pagination across pages with most-recent-first; **invalid-param matrix** (month 13/0/abc, year `20x6`, class_id/instructor_id/offset/limit non-numeric → 400, sane request still 200 after); cross-user isolation (another member's bookings never leak). Query params set via `crow::query_string` per the memory rule; every request flushes `ThreadPool` before the next DB read.
 
 ## 4. Frontend
 
@@ -201,8 +202,8 @@ LIMIT :limit OFFSET :offset
 
 ## 5. Tests-Required Summary
 
-- [ ] Business logic test cases enumerated in 2.6 (incl. distinct-bookings count + `GetEarliestAttendanceUs`).
-- [ ] Endpoint test cases (filter combos, pagination, validation-errors, and `earliest_attendance_us` present in metadata / null when no attendance).
+- [x] Business logic test cases enumerated in 2.6 (incl. distinct-bookings count + `GetEarliestAttendanceUs`) — done in §2.
+- [x] Endpoint test cases (filter combos, pagination, validation-errors, and `earliest_attendance_us` present in metadata / null when no attendance) — done in §3.
 - [ ] Component spec for filter UI + paginator + empty state + mock service, incl. the year dropdown built from `earliestAttendanceUs` (and disabled/empty when null).
 
 ## 6. Cross-Layer Acceptance Criteria
