@@ -246,21 +246,21 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
 
 **Status check — the core behavior already shipped in Phase 8.** The pre-pop list's `history` source (§3.1 `GetRecentCheckedInPersonsForClass` + §4.2 `GetCheckinList` step (c)) pulls everyone with a `checked_in_us` booking on this class in the last `class_checkin_history_weeks` (secret, default **4 weeks ≈ "last month"**), dedupes against template/paid entries, and the frontend (§7.1) renders them as the **Recent Attendees** group with one-click check-in. It has been invisible in dev only because the database has no historical attendance — which is exactly what the §9.5 seeding commands fix. So §9 = (a) verification of that path end-to-end once seeded, (b) one small polish item (surface *when* they last attended), and (c) the new test-helper tooling.
 
-### 9.1 Database Schema
-- [ ] No new tables or columns. Verify the existing pieces suffice:
+### 9.1 Database Schema ✅ DONE
+- [x] No new tables or columns. Verified:
   - `bookings.checked_in_us` + `event_sessions.class_id` (denormalized; only recorded/attended occurrences have it) is exactly the "took this class" join.
-  - `class_checkin_history_weeks` secret already seeded (default 4). Confirm 4 weeks matches the intended "last month"; change the seed default only if Mason wants a different window (it is operator-configurable either way).
+  - `class_checkin_history_weeks` secret already seeded (default 4 weeks ≈ "last month"); operator-configurable, default left as-is.
 
-### 9.2 Table Helpers
-- [ ] `TableHelpers::Bookings::GetRecentCheckedInPersonsForClass` already returns `(person_id, last_checked_in_us)` (per-person MAX, window-filtered, NULL-check-in excluded — tested in `bookings_test.cpp`). Verify no changes needed; the `last_checked_in_us` it already computes is the input for §9.3's polish item.
+### 9.2 Table Helpers ✅ DONE
+- [x] Verified — `TableHelpers::Bookings::GetRecentCheckedInPersonsForClass` already returns `(person_id, last_checked_in_us)` (per-person MAX, window-filtered, NULL-check-in excluded — tested in `bookings_test.cpp`). No changes needed.
 
-### 9.3 Business Logic
-- [ ] Plumb `lastCheckedInUs` (optional) onto `CheckinCandidate` for `history`-source rows so staff can see *when* the person last attended ("Maya — last attended May 28"). Populated from the §9.2 pair; absent for `template`/`paid_booking` rows.
-- [ ] `scheduling_key_value_table.cpp`: emit `last_checked_in_us` (omitted when unset, like `waitlist_position`). Tests in `scheduling_key_value_table_test.cpp`.
-- [ ] `class_checkin_helper_test.cpp`: extend `GetCheckinListMergesSourcesDedupesAndSkips` (or add a sibling test) to assert (a) a person checked in ~1 week ago appears as `history` with the right `lastCheckedInUs`, (b) a person on the template AND in history appears once as `template` (dedupe priority unchanged), (c) a person whose last check-in is older than the window does NOT appear.
+### 9.3 Business Logic ✅ DONE
+- [x] `CheckinCandidate.lastCheckedInUs` (`std::optional<int64_t>`) — set only for `history`-source rows in `GetCheckinList` (header comment flags it as a REAL UTC instant, unlike session times). Absent for `template`/`paid_booking` rows.
+- [x] `scheduling_key_value_table.cpp`: emits `last_checked_in_us` when set, omitted when unset (the `waitlist_position` pattern). Tests: `CheckinCandidateSurfacesLastCheckedIn` (new) + omission assertions added to both existing candidate cases.
+- [x] `class_checkin_helper_test.cpp` — `GetCheckinListMergesSourcesDedupesAndSkips` extended with five new behaviors: (a) history row carries the exact `lastCheckedInUs`; (a') with TWO attendances, it carries the LATEST one (MAX, not first-found); (b) template+history person resolves as `template`, exactly once, with NO history decoration; (c) attendee whose last check-in is 35 days old is excluded entirely; (d) paid/template rows carry no `lastCheckedInUs`.
 
-### 9.4 Endpoints
-- [ ] No new endpoints; `GET /api/staff/checkin/<id>` candidates now carry `last_checked_in_us`. Extend the GET endpoint test to assert the field is present for a history candidate.
+### 9.4 Endpoints ✅ DONE
+- [x] No new endpoints. `GetReturnsCandidatesNotesAndWindow` extended: seeds a real attendance on last week's occurrence of the same slot (`EnsureSessionExists` + attended booking), then asserts the JSON history candidate has `source="history"` + the exact `last_checked_in_us`, and the template candidate has NO `last_checked_in_us` key.
 
 ### 9.5 Test-Helper Changes (before frontend, so the UI work is verifiable)
 New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance"), registered alongside the existing commands + added to `test_helper/CMakeLists.txt`. Existing related commands to reuse/not duplicate: `preview_schedule` (`ps`, per-class+date slot resolution), `list_class_schedules` (`lcs`), `list_users` (`lu`).
