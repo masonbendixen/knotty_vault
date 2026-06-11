@@ -240,7 +240,47 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
 
 - [x] No new permissions and no new admin tables. Verified: the endpoints gate on the pre-existing `staff_access` (staff routes) and `manage_class_schedule` (finalize job + override path) — both already seeded (`db_schema/permissions.h`); the §5 reconciliation already corrected the plan's original `manage_classes` mention. Nothing to register in `create_database.cpp`.
 
-## 9. Tests-Required Summary
+## 9. Recent-Attendee Quick Check-in + Test-Helper Attendance Seeding
+
+**Request (Mason, 2026-06-11):** Show people who have taken a given class over the last month as automatically-added candidates (when they aren't already there via template) so checking them in is one click — many people won't use the schedule template. Also add test-helper commands to enumerate classes with an active schedule and their slots, search for a person (autocomplete), and mark that person as having attended that class slot the previous week, so the feature can be validated in the UI.
+
+**Status check — the core behavior already shipped in Phase 8.** The pre-pop list's `history` source (§3.1 `GetRecentCheckedInPersonsForClass` + §4.2 `GetCheckinList` step (c)) pulls everyone with a `checked_in_us` booking on this class in the last `class_checkin_history_weeks` (secret, default **4 weeks ≈ "last month"**), dedupes against template/paid entries, and the frontend (§7.1) renders them as the **Recent Attendees** group with one-click check-in. It has been invisible in dev only because the database has no historical attendance — which is exactly what the §9.5 seeding commands fix. So §9 = (a) verification of that path end-to-end once seeded, (b) one small polish item (surface *when* they last attended), and (c) the new test-helper tooling.
+
+### 9.1 Database Schema
+- [ ] No new tables or columns. Verify the existing pieces suffice:
+  - `bookings.checked_in_us` + `event_sessions.class_id` (denormalized; only recorded/attended occurrences have it) is exactly the "took this class" join.
+  - `class_checkin_history_weeks` secret already seeded (default 4). Confirm 4 weeks matches the intended "last month"; change the seed default only if Mason wants a different window (it is operator-configurable either way).
+
+### 9.2 Table Helpers
+- [ ] `TableHelpers::Bookings::GetRecentCheckedInPersonsForClass` already returns `(person_id, last_checked_in_us)` (per-person MAX, window-filtered, NULL-check-in excluded — tested in `bookings_test.cpp`). Verify no changes needed; the `last_checked_in_us` it already computes is the input for §9.3's polish item.
+
+### 9.3 Business Logic
+- [ ] Plumb `lastCheckedInUs` (optional) onto `CheckinCandidate` for `history`-source rows so staff can see *when* the person last attended ("Maya — last attended May 28"). Populated from the §9.2 pair; absent for `template`/`paid_booking` rows.
+- [ ] `scheduling_key_value_table.cpp`: emit `last_checked_in_us` (omitted when unset, like `waitlist_position`). Tests in `scheduling_key_value_table_test.cpp`.
+- [ ] `class_checkin_helper_test.cpp`: extend `GetCheckinListMergesSourcesDedupesAndSkips` (or add a sibling test) to assert (a) a person checked in ~1 week ago appears as `history` with the right `lastCheckedInUs`, (b) a person on the template AND in history appears once as `template` (dedupe priority unchanged), (c) a person whose last check-in is older than the window does NOT appear.
+
+### 9.4 Endpoints
+- [ ] No new endpoints; `GET /api/staff/checkin/<id>` candidates now carry `last_checked_in_us`. Extend the GET endpoint test to assert the field is present for a history candidate.
+
+### 9.5 Test-Helper Changes (before frontend, so the UI work is verifiable)
+New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance"), registered alongside the existing commands + added to `test_helper/CMakeLists.txt`. Existing related commands to reuse/not duplicate: `preview_schedule` (`ps`, per-class+date slot resolution), `list_class_schedules` (`lcs`), `list_users` (`lu`).
+- [ ] `list_active_class_slots` (`lacs`) — enumerate every class that has an active instance + active implementation **today**, with its slots: slot id, class name, day-of-week, start–end (HH:MM from `start_time_minutes`/`duration_minutes`), room, facility. This is the "what slot id do I seed?" view (differs from `preview_schedule`, which needs a specific class + date).
+- [ ] `find_person` (`fp`) — `--q=<substring>`: case-insensitive search over first/last/email (same shape as the staff search endpoint); prints person id, name, email. This is the "autocomplete" workflow inside the REPL: search, copy the id.
+- [ ] `seed_class_attendance` (`sca`) — `--slot_id=` + (`--person_id=` or `--email=`) + optional `--weeks_ago=1`:
+  1. Resolve the slot; compute the occurrence date `weeks_ago` weeks before the slot's most recent occurrence (UTC-midnight keyed, same encoding as everywhere in Phase 8).
+  2. `ClassScheduleHelper::EnsureSessionExists(slot, occurrenceDate)` (idempotent).
+  3. Create the attended booking via the existing helpers — `TableHelpers::Bookings::AddBooking` (purchase-less) + `MarkCheckedIn` with a **backdated** `nowUs` = the occurrence's start time (MarkCheckedIn already takes the timestamp as a parameter), `is_walkin=false`, then `IncrementBookedCount`. Idempotent: if a non-cancelled booking for (session, person) already exists, report and skip.
+  4. Print what was created (session id, booking id, occurrence date) so the operator can immediately open the NEXT occurrence of that slot in the check-in UI and see the person under Recent Attendees.
+- [ ] Optional (nice-to-have, only if cheap): replxx value-completion for `--email=` from the people table. The REPL already completes command names/flags; primary workflow is `find_person`, so skip if fiddly.
+- [ ] This subsection also satisfies most of §10's outstanding "manual-testing-helper commands" item; fold the remaining `checkin`/`walkin_checkin`/`finalize_attendance` wrappers in here only if still wanted after `sca` lands (the UI now covers those flows interactively).
+
+### 9.6 Frontend
+- [ ] Verify end-to-end with seeded data: seed one person via `sca`, open the next occurrence of that slot in `/staff/class-checkin`, confirm they appear under **Recent Attendees** and one-click check-in works (this is the §9 acceptance test).
+- [ ] `checkin.types.ts`: `last_checked_in_us?: number` on `CheckinCandidate`; `ServerAccessNetwork.normalizeCheckinCandidate` coerces it with `Number()` when present; mock seeds it on its `history` candidates (+ mock spec assertion).
+- [ ] `class-checkin.component`: show a dim "Last attended <Mon DD>" subtitle on history-group rows. **Timezone care:** `checked_in_us` is a REAL UTC instant (unlike every other timestamp on this page, which is wall-clock-encoded and formatted with `timeZone: 'UTC'`) — format this one in browser-local time, and say so in a comment or the next reader will "fix" it.
+- [ ] Component spec: history row renders the last-attended label; rows without the field render no label.
+
+## 10. Tests-Required Summary
 
 - [x] Table helper tests for `GetRecentCheckedInPersonsForSchedule`, `MarkCheckedIn`, `MarkNoShow` (done in §3).
 - [x] `class_checkin_helper_test.cpp` (done in §4):
@@ -255,9 +295,9 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
   - `FinalizeAttendance` marks `no_show` on paid + unchecked.
 - [x] Endpoint tests for all six endpoints (success + permission-denied + validation-error), incl. the walk-in **missing-email 400** and the GET endpoint returning `exception_notes` (done in §5).
 - [x] Frontend spec for check-in page covering search, pre-pop, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel**, and the **over-capacity soft-warn** toast (done in §7 — `class-checkin.component.spec.ts`, 24 cases; plus 24 mock cases in `ServerAccess.mock.spec.ts` and the dashboard spec update).
-- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`. **(Outstanding — only unfinished Phase 8 item; lives in `test_helper/commands/`, not part of §7/§8.)**
+- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`. **(Outstanding — superseded in large part by §9.5's `seed_class_attendance`/`list_active_class_slots`/`find_person`; revisit after §9.5 lands and fold in only what's still missing.)**
 
-## 10. Cross-Layer Acceptance Criteria
+## 11. Cross-Layer Acceptance Criteria
 
 Tuesday 6:55pm (5min before session start of "Vinyasa Flow at Studio A 7-8pm"):
 - [ ] Staff opens `/portal/staff/class-checkin`, clicks on the session.
@@ -272,7 +312,7 @@ Tuesday 6:55pm (5min before session start of "Vinyasa Flow at Studio A 7-8pm"):
 The next morning at 11pm window-close:
 - [ ] Hourly `finalize_class_attendance` job runs; for a separate paid workshop where 2 attendees never checked in, those bookings flip to `status='no_show'`.
 
-## 11. Open Questions
+## 12. Open Questions
 
 All three resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Locked-in + the cited sections).
 
@@ -280,7 +320,7 @@ All three resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Loc
 - **OQ-P8-2. — RESOLVED (Mason: "name and email for everyone").** Walk-in person creation requires **both name AND email** — email is NOT optional; reject with `MISSING_WALKIN_CONTACT_INFO` if missing/malformed. Folded into §1.1, §4.3, §5.1, §7.1–7.3, §9, §10.
 - **OQ-P8-3. — RESOLVED (Mason: "go with your recommendation").** A small exception-notes panel on the check-in screen shows notes from members who marked `attending=false` for the occurrence, via `GetExceptionNotesForOccurrence` + the GET endpoint's `exception_notes`. Folded into §1.1, §4.5, §5.1, §7.1–7.3, §9, §10.
 
-## 12. Cross-References
+## 13. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 8.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 3 - Skill Levels]], [[Classes Phase 5 - Attendance Templates]].
