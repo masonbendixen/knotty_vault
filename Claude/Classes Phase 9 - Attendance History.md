@@ -80,9 +80,17 @@ No new DB tables; no new table helpers (uses existing `bookings`, `event_session
 - [x] `class_id` filters by `event_sessions.class_id` (denormalized convenience set when the occurrence row is ensured in Phase 1).
 - [x] `instructor_id` filters via `event_session_staffing` rows with that `person_id` and role in (`'instructor'`, `'lead_instructor'`).
 
-## 2. Business Logic — `AttendanceHistoryHelper`
+## 2. Business Logic — `AttendanceHistoryHelper` ✅ DONE
 
-Files: `business_logic/scheduling/attendance_history_helper.h/.cpp/_test.cpp`.
+Files: `business_logic/scheduling/attendance_history_helper.h/.cpp/_test.cpp` (registered in the scheduling CMakeLists).
+
+**Reconciliations vs the plan's original prose (2026-06-11):**
+- **Year/month extraction is `AT TIME ZONE 'UTC'`, NOT `AT TIME ZONE f.timezone`** (§2.4's sketch). Class-session `start_time_us` is the facility's **wall-clock encoded as UTC** (occurrence UTC-midnight + slot minutes — the Phase 8 timezone saga), so reading the encoded value as UTC *is* the §1.2 facility-local calendar. Applying the facility timezone again would double-convert and shift early-morning classes into the previous local day. The 11pm-March-31-Pacific acceptance case still reads as March — pinned by test.
+- **Instructor roles are `('instructor','substitute')`** — the plan's `'lead_instructor'` does not exist in this schema (staffing_role enum: instructor / assistant / substitute; a substitute taught the session, an assistant didn't headline it).
+- **Instructor matching/naming is staffing ∪ slot**: membership-class sessions created by `EnsureSessionExists` carry their instructor on `class_schedule_slots.instructor_person_id` and have NO staffing rows, so both paths are honored (UNION dedupes a person reachable via both).
+- **History statuses are exactly `('attended'[, 'no_show'][, 'cancelled'])`** — the §2.4 sketch's NOT-exclusions would have leaked `'confirmed'` (future/unfinalized) bookings into history; they never appear, regardless of flags.
+- `classPhotoUrl` is declared but empty, the `ClassCatalogEntry::photoUrl` convention (Phase 13 / image wiring surfaces it).
+- Defensive paging: `limit < 1` → 25, capped at `kMaxPageSize = 200`; negative `offset` → 0; ties in the sort broken by `b.id DESC` so pagination is stable.
 
 ### 2.1 Filter struct
 ```cpp
@@ -119,12 +127,12 @@ struct AttendanceHistoryRow {
 };
 ```
 
-### 2.3 Methods
-- [ ] `int64_t GetTotalCount(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — count query. Counts `bookings` rows (distinct bookings, **not** distinct dates — resolved OQ-P9-1); 5 same-day attendances count as 5.
-- [ ] `std::vector<AttendanceHistoryRow> GetHistory(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — the paginated read (one row per `bookings` row).
-- [ ] `std::vector<int64_t> GetDistinctInstructorIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown.
-- [ ] `std::vector<int64_t> GetDistinctClassIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown.
-- [ ] `std::optional<int64_t> GetEarliestAttendanceUs(Transaction&, int64_t personId)` — `MIN(event_sessions.start_time_us)` across the person's bookings (resolved OQ-P9-2); feeds the year-dropdown range. `nullopt` when the member has no attendance yet. The UI converts this to a year using the facility-local TZ, consistent with §1.2's TZ-aware year/month filtering.
+### 2.3 Methods ✅
+- [x] `int64_t GetTotalCount(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — count query. Counts `bookings` rows (distinct bookings, **not** distinct dates — resolved OQ-P9-1); 5 same-day attendances count as 5.
+- [x] `std::vector<AttendanceHistoryRow> GetHistory(Transaction&, int64_t personId, const AttendanceHistoryFilter&)` — the paginated read (one row per `bookings` row).
+- [x] `std::vector<int64_t> GetDistinctInstructorIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown (slot ∪ staffing instructor/substitute, across all history statuses).
+- [x] `std::vector<int64_t> GetDistinctClassIdsForPerson(Transaction&, int64_t personId)` — feeds the filter dropdown.
+- [x] `std::optional<int64_t> GetEarliestAttendanceUs(Transaction&, int64_t personId)` — `MIN(event_sessions.start_time_us)` across the person's history bookings (all history statuses, so the year range covers what the toggles can reveal — resolved OQ-P9-2). `nullopt` when no history. NOTE for §4: the value is wall-clock-encoded, so the UI reads its year **as UTC** (no facility-TZ conversion).
 
 ### 2.4 SQL strategy
 Single query with conditional WHERE clauses. Joins:
@@ -144,23 +152,24 @@ WHERE b.person_id = :person_id
 ORDER BY es.start_time_us DESC
 LIMIT :limit OFFSET :offset
 ```
-- [ ] Facility-TZ extraction handled in SQL with `AT TIME ZONE f.timezone`. Verify the Postgres TZ DB has the relevant zones (it does by default).
-- [ ] Instructor names assembled in a separate batch query (one round-trip after the page query) to avoid N+1.
+- [x] ~~Facility-TZ extraction with `AT TIME ZONE f.timezone`~~ — **superseded**: extraction is `AT TIME ZONE 'UTC'` because session times are wall-clock-encoded (see the §2 reconciliation note). The §1.2 semantic (facility-local calendar) is what's delivered; the mechanism differs from the sketch.
+- [x] Instructor names assembled in one batch UNION query (staffing ∪ slot, instructor-role-filtered, deduped) after the page query — no N+1.
 
-### 2.5 KeyValueTable conversion
-- [ ] `AttendanceHistoryRowToKeyValueTable(...)` in `scheduling_key_value_table.h/.cpp`.
+### 2.5 KeyValueTable conversion ✅
+- [x] `AttendanceHistoryRowToKeyValueTable` + `AttendanceHistoryRowsToKeyValueTableArray` in `scheduling_key_value_table.h/.cpp`. `instructor_names` is pipe-delimited (the `TodayClassEntry` convention); tz emitted as `facility_timezone` (the `EventSessionInfo` convention). 3 new KVT tests (full-field, empty-names + non-walk-in, array).
 
-### 2.6 Tests
-- [ ] `attendance_history_helper_test.cpp`:
-  - Empty result for a person with no bookings.
-  - Filter by year/month uses facility TZ (test with a session straddling midnight UTC).
-  - Filter by class_id excludes other classes.
-  - Filter by instructor_id excludes other instructors.
-  - `includeNoShow=false` excludes no-shows by default.
-  - Pagination correct (offset 0 / limit 10 returns most-recent 10; offset 10 returns the next 10).
-  - Sort: most recent first.
-  - Five same-day attendances count as 5 rows / `GetTotalCount`==5 (distinct bookings, not distinct dates — resolved OQ-P9-1).
-  - `GetEarliestAttendanceUs` returns the `MIN(start_time_us)` across the person's bookings, and `nullopt` for a member with no attendance (resolved OQ-P9-2).
+### 2.6 Tests ✅
+- [x] `attendance_history_helper_test.cpp` — 9 tests, all plan cases plus the reconciliation behaviors:
+  - `EmptyForPersonWithNoBookings` — history/count/distinct-lists/earliest all empty for a fresh person.
+  - `RowsHydrateAllFields` — every row field incl. slot-instructor name, room/facility names, walk-in flag, empty photo URL; another person sees nothing.
+  - `SortsMostRecentFirstAndPaginates` — 15 rows: page 1 (10, descending), page 2 (5, no overlap, ends at the oldest), count 15, and the defensive limit/offset clamps.
+  - `YearMonthFilterUsesFacilityLocalCalendar` — 11pm March-31 Pacific class is **March** (month=3 matches, month=4 doesn't; year 2025 doesn't; month-only filter works) — the straddling-midnight-UTC case under the wall-clock encoding.
+  - `ClassFilterExcludesOtherClasses` (+ distinct class ids).
+  - `InstructorFilterMatchesSlotAndStaffing` — slot-instructor session and staffing-instructor session each match their teacher; an **assistant never matches**; names resolve per-path; distinct ids are the union.
+  - `InstructorNamesDedupeSlotAndStaffing` — same person via both paths → named once.
+  - `StatusFlagsControlNoShowAndCancelled` — default attended-only; flags add no_show then cancelled; **`confirmed` never appears** even with all flags on.
+  - `FiveSameDayAttendancesCountAsFive` (OQ-P9-1).
+  - `EarliestAttendanceIsMinStartAcrossHistory` (OQ-P9-2) — earliest is a no_show (full history statuses); a confirmed-only person → nullopt.
 
 ## 3. Endpoints
 
