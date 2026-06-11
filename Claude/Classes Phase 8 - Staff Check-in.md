@@ -262,17 +262,14 @@ Files: `endpoints/staff_class_checkin.{h,cpp}` (+ `_test.cpp`, 10 cases) and
 ### 9.4 Endpoints ✅ DONE
 - [x] No new endpoints. `GetReturnsCandidatesNotesAndWindow` extended: seeds a real attendance on last week's occurrence of the same slot (`EnsureSessionExists` + attended booking), then asserts the JSON history candidate has `source="history"` + the exact `last_checked_in_us`, and the template candidate has NO `last_checked_in_us` key.
 
-### 9.5 Test-Helper Changes (before frontend, so the UI work is verifiable)
-New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance"), registered alongside the existing commands + added to `test_helper/CMakeLists.txt`. Existing related commands to reuse/not duplicate: `preview_schedule` (`ps`, per-class+date slot resolution), `list_class_schedules` (`lcs`), `list_users` (`lu`).
-- [ ] `list_active_class_slots` (`lacs`) — enumerate every class that has an active instance + active implementation **today**, with its slots: slot id, class name, day-of-week, start–end (HH:MM from `start_time_minutes`/`duration_minutes`), room, facility. This is the "what slot id do I seed?" view (differs from `preview_schedule`, which needs a specific class + date).
-- [ ] `find_person` (`fp`) — `--q=<substring>`: case-insensitive search over first/last/email (same shape as the staff search endpoint); prints person id, name, email. This is the "autocomplete" workflow inside the REPL: search, copy the id.
-- [ ] `seed_class_attendance` (`sca`) — `--slot_id=` + (`--person_id=` or `--email=`) + optional `--weeks_ago=1`:
-  1. Resolve the slot; compute the occurrence date `weeks_ago` weeks before the slot's most recent occurrence (UTC-midnight keyed, same encoding as everywhere in Phase 8).
-  2. `ClassScheduleHelper::EnsureSessionExists(slot, occurrenceDate)` (idempotent).
-  3. Create the attended booking via the existing helpers — `TableHelpers::Bookings::AddBooking` (purchase-less) + `MarkCheckedIn` with a **backdated** `nowUs` = the occurrence's start time (MarkCheckedIn already takes the timestamp as a parameter), `is_walkin=false`, then `IncrementBookedCount`. Idempotent: if a non-cancelled booking for (session, person) already exists, report and skip.
-  4. Print what was created (session id, booking id, occurrence date) so the operator can immediately open the NEXT occurrence of that slot in the check-in UI and see the person under Recent Attendees.
-- [ ] Optional (nice-to-have, only if cheap): replxx value-completion for `--email=` from the people table. The REPL already completes command names/flags; primary workflow is `find_person`, so skip if fiddly.
-- [ ] This subsection also satisfies most of §10's outstanding "manual-testing-helper commands" item; fold the remaining `checkin`/`walkin_checkin`/`finalize_attendance` wrappers in here only if still wanted after `sca` lands (the UI now covers those flows interactively).
+### 9.5 Test-Helper Changes ✅ DONE
+New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance"), registered in `command_runner.cpp` `RegisterAllCommands` + `test_helper/CMakeLists.txt`.
+- [x] `list_active_class_slots` (`lacs`) — sweeps active classes, resolves each through `ClassScheduleHelper::GetActiveScheduleView(now)` (same activity logic as the admin preview), and prints every slot of every class active **today**: slot id, class, day, start–end, room/facility names. Ends with a copy-paste hint for `sca`.
+- [x] `find_person` (`fp`) — `--q=<substring>`: parameterized case-insensitive ILIKE over first/last/email, first 20 matches with a narrow-the-search note.
+- [x] `seed_class_attendance` (`sca`) — `--slot_id=` + (`--person_id=` or `--email=`) + `--weeks_ago=1` (1–52): resolves the slot's most recent occurrence on-or-before today minus N weeks, `EnsureSessionExists` (idempotent), then a purchase-less **attended** booking with backdated `checked_in_us` + `IncrementBookedCount`. Idempotent — an existing non-cancelled booking for (session, person) reports and skips. Notes column marks the row "Seeded by knottyyoga_test_helper". **Implementation deviations from the sketch:** the booking is created directly with `status=attended`/`checked_in_us` set (no `MarkCheckedIn` call — that would append a bogus "Checked in by person 0" note), and `checked_in_us` is converted **wall-clock → real UTC instant through the facility timezone** (it's the one real-instant field; storing the wall-clock encoding would have been our fourth timezone bug).
+- [x] Replxx `--email` value-completion: skipped per the plan's "only if cheap" — `find_person` covers the workflow.
+- [x] §10's outstanding "manual-testing-helper commands" item: `sca` covers the seeding need; the `checkin`/`walkin_checkin`/`finalize_attendance` wrappers are dropped (the UI exercises those flows interactively).
+- Testing note: test-helper commands follow the established convention of no gtest coverage (none of the ~25 existing commands have tests; the tool is itself a manual-QA aid). Every load-bearing operation `sca` performs is already test-covered at its home layer (`EnsureSessionExists`, `AddBooking`, `IncrementBookedCount`, and the §9.3 history-window behavior they feed).
 
 ### 9.6 Frontend
 - [ ] Verify end-to-end with seeded data: seed one person via `sca`, open the next occurrence of that slot in `/staff/class-checkin`, confirm they appear under **Recent Attendees** and one-click check-in works (this is the §9 acceptance test).
@@ -295,7 +292,7 @@ New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance")
   - `FinalizeAttendance` marks `no_show` on paid + unchecked.
 - [x] Endpoint tests for all six endpoints (success + permission-denied + validation-error), incl. the walk-in **missing-email 400** and the GET endpoint returning `exception_notes` (done in §5).
 - [x] Frontend spec for check-in page covering search, pre-pop, walk-in (incl. **email-required validation**), skill-override, undo, **exception-notes panel**, and the **over-capacity soft-warn** toast (done in §7 — `class-checkin.component.spec.ts`, 24 cases; plus 24 mock cases in `ServerAccess.mock.spec.ts` and the dashboard spec update).
-- [ ] Manual-testing-helper commands: `checkin <event_session_id> <person_id>`, `walkin_checkin <event_session_id> <first> <last> <email>`, `finalize_attendance`. **(Outstanding — superseded in large part by §9.5's `seed_class_attendance`/`list_active_class_slots`/`find_person`; revisit after §9.5 lands and fold in only what's still missing.)**
+- [x] Manual-testing-helper commands — **resolved by §9.5** (`seed_class_attendance` / `list_active_class_slots` / `find_person`, shipped 2026-06-11). The originally-sketched `checkin`/`walkin_checkin`/`finalize_attendance` wrappers are intentionally dropped: the staff UI exercises those flows interactively, and seeding history was the actual gap.
 
 ## 11. Cross-Layer Acceptance Criteria
 
