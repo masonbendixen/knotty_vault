@@ -275,7 +275,7 @@ New file `test_helper/commands/checkin_commands.{h,cpp}` (category "Attendance")
 ### 9.6 Frontend
 - [ ] Verify end-to-end with seeded data: seed one person via `sca`, open the next occurrence of that slot in `/staff/class-checkin`, confirm they appear under **Recent Attendees** and one-click check-in works (this is the §9 acceptance test).
 - [ ] `checkin.types.ts`: `last_checked_in_us?: number` on `CheckinCandidate`; `ServerAccessNetwork.normalizeCheckinCandidate` coerces it with `Number()` when present; mock seeds it on its `history` candidates (+ mock spec assertion).
-- [ ] `class-checkin.component`: show a dim "Last attended <Mon DD>" subtitle on history-group rows. **Timezone care:** `checked_in_us` is a REAL UTC instant (unlike every other timestamp on this page, which is wall-clock-encoded and formatted with `timeZone: 'UTC'`) — format this one in browser-local time, and say so in a comment or the next reader will "fix" it.
+- [ ] `class-checkin.component`: show a dim "Last attended {Mon DD}" subtitle on history-group rows. **Timezone care:** `checked_in_us` is a REAL UTC instant (unlike every other timestamp on this page, which is wall-clock-encoded and formatted with `timeZone: 'UTC'`) — format this one in browser-local time, and say so in a comment or the next reader will "fix" it.
 - [ ] Component spec: history row renders the last-attended label; rows without the field render no label.
 
 ## 10. Tests-Required Summary
