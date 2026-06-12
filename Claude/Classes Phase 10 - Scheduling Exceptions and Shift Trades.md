@@ -90,18 +90,25 @@ Lowest layer first:
 - [x] Class shift trade: no `free_cancel_until_us` extension (different from services — parent ST-5).
 - [x] **Class shift trades are NOT admin-gated (resolved OQ-P10-3):** unlike the massage/provider path, class shift trades do NOT require admin approval even when there are confirmed paid attendees (workshops / series). Swapping a fitness instructor is far less invasive than swapping a massage provider and carries no refund exposure (per the no-`free_cancel` rule above). Target acceptance executes the swap immediately; the `shift_change_booking_block_days` secret and the affected-count review gate do NOT apply to class shifts.
 
-## 2. Database Schema
+## 2. Database Schema ✅ DONE
 
 ### 2.1 No class-closure schema (impls cover it)
-- [ ] No `scheduling_exceptions` extension for classes — closures are empty high-priority `class_schedules` impls (Phase 1 tables, no new columns). The `scheduling_exceptions` cascade for service sessions is unchanged.
+- [x] No `scheduling_exceptions` extension for classes — closures are empty high-priority `class_schedules` impls (Phase 1 tables, no new columns). The `scheduling_exceptions` cascade for service sessions is unchanged. (Confirmed — nothing to do.)
 
 ### 2.2 Extend `shift_change_requests` table
-- [ ] Add `event_session_staffing_id BIGINT` NULL `REFERENCES event_session_staffing(id)` — for class-assignment shift trades (distinct from the availability columns for service providers).
-- [ ] CHECK constraint **(corrected by the §1.1 audit — the table has `requesting_availability_id` + `target_availability_id`, not a single `provider_availability_id`)**: class trades set `event_session_staffing_id` non-NULL with both availability columns NULL; service trades set `requesting_availability_id` non-NULL with `event_session_staffing_id` NULL.
-- [ ] Document the union semantics in the table helper file header comment.
+- [x] Add `event_session_staffing_id BIGINT` NULL `REFERENCES event_session_staffing(id)` — for class-assignment shift trades (distinct from the availability columns for service providers). Done in `db_schema/shift_change_requests.h/.cpp`; `requesting_availability_id` changed from NOT NULL to nullable (the CHECK enforces non-NULL for the service kind; the endpoint also still validates it at the API layer).
+- [x] CHECK constraint **(corrected by the §1.1 audit — the table has `requesting_availability_id` + `target_availability_id`, not a single `provider_availability_id`)**: class trades set `event_session_staffing_id` non-NULL with both availability columns NULL; service trades set `requesting_availability_id` non-NULL with `event_session_staffing_id` NULL. Named `chk_shift_change_requests_exactly_one_subject`.
+- [x] Document the union semantics in the table helper file header comment (`sql_util/table_helpers/shift_change_requests.h`).
+
+**Implementation note (2026-06-12):** the schema DSL had no CHECK-constraint support, so it was added following the unique-constraint pattern: `TableCheckConstraint {name, expression}` + `TableInfo::AddCheckConstraint/GetTableCheckConstraints` (+ `operator==` coverage) in `sql_util/schema/table_info.h/.cpp`, `DatabaseInfo::AddCheckConstraint` passthrough, and `CONSTRAINT <name> CHECK (<expr>)` emission in `GenerateCreateTableSql` (after FK + UNIQUE constraints). Available for any future table.
 
 ### 2.3 Wire schema into DB init
-- [ ] Update `make_database_info.cpp` / `create_database.cpp` for any column additions.
+- [x] Update `make_database_info.cpp` / `create_database.cpp` for any column additions. **No changes needed:** the table definition lives in `MakeShiftChangeRequestsTable` (already called after `MakeEventSessionStaffingTable`, satisfying the new FK's ordering); `CreateTables()` already creates `event_session_staffing` (line ~243) before `shift_change_requests` (~260); the table is already registered in both `admin_top_level_tables` and `admin_nested_tables`, and it has no per-column admin metadata to extend.
+
+### 2.4 Tests ✅
+- [x] Schema DSL: 6 new `TableInfoTest` cases (named/unnamed store, empty-expression throws, empty/multiple getters, equality with differing/missing constraints) + 2 `DatabaseInfoTest` cases (passthrough, unknown-table throws).
+- [x] DDL generation: 3 new `DbOpsTest` SQL-string cases (named, unnamed, ordering after FK + UNIQUE constraints) + 2 live round-trip cases (valid row inserts; violating row throws against a real Postgres table).
+- [x] `shift_change_requests_test.cpp`: 7 new cases — class row with staffing-only accepted (availability columns NULL); service path still works and carries NULL staffing; CHECK rejections (staffing+requesting, staffing+target, neither); FK rejection for unknown staffing id; ON DELETE CASCADE from `event_session_staffing` removes the class request row.
 
 ## 3. Table Helpers
 
@@ -214,7 +221,7 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 
 ## 8. Tests-Required Summary
 
-- [ ] Table helper tests for the `shift_change_requests.event_session_staffing_id` column.
+- [x] Table helper tests for the `shift_change_requests.event_session_staffing_id` column — done in §2.4 (7 cases incl. CHECK + FK + cascade), plus schema-DSL/DDL tests for the new check-constraint support.
 - [ ] `scheduling_exception_helper_test.cpp` extension: cascade to class sessions for facility-wide closures.
 - [ ] `session_cancellation_helper_test.cpp` extension: mixed paid + zero-money attendees handled.
 - [ ] `instructor_substitution_helper_test.cpp` new — incl. a series-occurrence sub that does NOT cascade to sibling occurrences (resolved OQ-P10-1).
