@@ -75,8 +75,13 @@ Lowest layer first:
 ## 1. Pre-Coding Design Decisions
 
 ### 1.1 Reuse audit
-- [ ] Class closures do NOT extend the `scheduling_exceptions` cascade. Per the redesign, a class closure is an empty high-priority impl under the class's active instance. Build/confirm `ClassClosureHelper::CloseClassesForRange` (Phase 1 stub) which creates those impls. The `scheduling_exceptions` table + its cascade remain for **service sessions** only — do not touch that path.
-- [ ] Verify `ShiftChangeHelper`. It's keyed off `provider_availability` for service providers. For classes, the shift is `event_session_staffing.person_id` for a specific session, NOT a `provider_availability` block. We need a parallel code path.
+- [x] Class closures do NOT extend the `scheduling_exceptions` cascade. Per the redesign, a class closure is an empty high-priority impl under the class's active instance. Build/confirm `ClassClosureHelper::CloseClassesForRange` (Phase 1 stub) which creates those impls. The `scheduling_exceptions` table + its cascade remain for **service sessions** only — do not touch that path.
+- [x] Verify `ShiftChangeHelper`. It's keyed off `provider_availability` for service providers. For classes, the shift is `event_session_staffing.person_id` for a specific session, NOT a `provider_availability` block. We need a parallel code path.
+
+**Audit findings (2026-06-12):**
+- **`ClassClosureHelper` does NOT exist** — no `class_closure_helper.*` files, no `CloseClasses*` symbol anywhere in `src/`. The "Phase 1 stub" never materialized, so §4.1 builds it from scratch. The building blocks it composes ARE in place: `ClassScheduleHelper::CreateImplementation` (+ `CreateImplementationRequest`), `TableHelpers::ClassSchedules::AddClassSchedule`, and the priority model in `db_schema/class_schedules.h` (higher priority wins on overlap within an instance; same-priority overlap rejected in business logic, default priority 3).
+- **`ShiftChangeHelper` confirmed service-path-only**, as suspected: `RespondToRequest` / `ReviewRequest` / `CountAffectedBookings` are all keyed by availability id, and the private `ExecuteShiftChange` carries the free-cancel-deadline override — exactly the behaviors the class path must NOT inherit (§1.2 / OQ-P10-3). Parallel overloads per §4.4 stand.
+- **Schema correction for §2.2:** `shift_change_requests` does not have a single `provider_availability_id` — it has TWO availability columns, `requesting_availability_id` and `target_availability_id` (see `db_schema/shift_change_requests.h`). The §2.2 CHECK constraint must be restated as: class trades set `event_session_staffing_id` non-NULL with **both** availability columns NULL; service trades set `requesting_availability_id` non-NULL (target optional, per existing semantics) with `event_session_staffing_id` NULL.
 
 ### 1.2 Locked-in
 - [x] Instructor substitution: NO refund (parent §2.14 ST-4) and NO email (parent OQ-19) — homepage + calendar display only.
@@ -91,8 +96,8 @@ Lowest layer first:
 - [ ] No `scheduling_exceptions` extension for classes — closures are empty high-priority `class_schedules` impls (Phase 1 tables, no new columns). The `scheduling_exceptions` cascade for service sessions is unchanged.
 
 ### 2.2 Extend `shift_change_requests` table
-- [ ] Add `event_session_staffing_id BIGINT` NULL `REFERENCES event_session_staffing(id)` — for class-assignment shift trades (distinct from `provider_availability_id` for service providers).
-- [ ] CHECK constraint: exactly one of `provider_availability_id` and `event_session_staffing_id` is non-NULL.
+- [ ] Add `event_session_staffing_id BIGINT` NULL `REFERENCES event_session_staffing(id)` — for class-assignment shift trades (distinct from the availability columns for service providers).
+- [ ] CHECK constraint **(corrected by the §1.1 audit — the table has `requesting_availability_id` + `target_availability_id`, not a single `provider_availability_id`)**: class trades set `event_session_staffing_id` non-NULL with both availability columns NULL; service trades set `requesting_availability_id` non-NULL with `event_session_staffing_id` NULL.
 - [ ] Document the union semantics in the table helper file header comment.
 
 ### 2.3 Wire schema into DB init
