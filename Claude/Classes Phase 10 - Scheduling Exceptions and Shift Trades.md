@@ -126,48 +126,36 @@ Lowest layer first:
 - [x] `event_session_staffing_test.cpp` — 4 new `UpdateStaffing` cases: person reassignment + note (the substitution shape, other columns untouched), role-only update, missing-id no-op leaves existing rows alone, unknown-person FK violation throws.
 - [x] `shift_change_requests_test.cpp` — 5 new cases: `AddClassRequest` round-trip (staffing set, availabilities NULL, pending), unknown-staffing FK throw, class-only read filters out the same person's service request while the generic read returns both, target matches / uninvolved person sees nothing, most-recent-first ordering (created_us pinned explicitly — `now_us()` can tie within one transaction).
 
-## 4. Business Logic
+## 4. Business Logic ✅ DONE
 
-### 4.1 New `ClassClosureHelper` (replaces the cascade-extension)
-- [ ] `business_logic/scheduling/class_closure_helper.h/.cpp/_test.cpp`.
-- [ ] `CloseClassesForRange(Transaction&, const std::vector<int64_t>& classIds, int64_t fromUs, int64_t toUs, std::string_view reason)` — for each class, find its active `class_instances`, create an empty high-priority `class_schedules` impl (no slots) over `[fromUs, toUs)` under it. Derivation then yields no occurrences for those classes in the window. Workshops/series under their own classes are untouched unless explicitly included in `classIds`.
-- [ ] Already-purchased paid occurrences in the window (rare for recurring classes; possible for a series instance) are NOT auto-cancelled — the empty impl just stops *new* derivation. To refund + cancel a specific booked occurrence, admin uses the single-cancel path (§4.2). The impl-save sweep (Phase 1) refuses to silently drop a `purchase_id`-bearing row.
-- [ ] Tests: closing class A for a week yields no derived occurrences for A in that window; a workshop under class B in the same window still derives.
+### 4.1 New `ClassClosureHelper` (replaces the cascade-extension) ✅
+- [x] `business_logic/scheduling/class_closure_helper.h/.cpp/_test.cpp` (built from scratch — the §1.1 audit found no Phase 1 stub; registered in the scheduling CMakeLists).
+- [x] `CloseClassesForRange(Transaction&, const std::vector<int64_t>& classIds, int64_t fromUs, int64_t toUs, std::string_view reason)` — per class: `ClassInstances::GetActiveInstance` at the window start (none → per-class skip outcome, not an error), closure window **clamped to the instance window** (a series run ending mid-window closes for the days it covers), priority = `max(100, max overlapping impl priority + 1)` so the closure always outranks special-week impls AND repeated closures never trip the same-priority-overlap validation, then `ClassScheduleHelper::CreateImplementation` with no slots, named `"Closure: <reason>"`. Returns per-class outcomes + closedCount.
+- [x] Already-purchased paid occurrences NOT auto-cancelled (documented in the header; single-cancel path is §4.2's `CancelOccurrence`).
+- [x] Tests (8): closed class derives nothing in-window while days outside still derive + impl is empty and reason-named; unselected class unaffected (L-9); batch closes multiple; skips class without instance while still closing the rest; clamps to a bounded instance window (asserts stored `valid_to_us`); closure outranks a priority-150 impl; repeated closure over the same window succeeds; invalid window / empty batch rejected.
 
-### 4.2 Extend `SessionCancellationHelper` (ensure-on-action)
-- [ ] Single-occurrence cancel takes the occurrence identity (`class_schedule_slot_id`, `occurrence_date_us`) and first calls `ClassScheduleHelper::EnsureSessionExists` to get/create the `event_sessions` row (the occurrence usually has no persisted row under the lazy model). Then:
-  1. For each `booking WHERE event_session_id=? AND status='confirmed'`:
-     - If `purchase_id IS NOT NULL` → full refund via `RefundHelper::ProcessRefund(purchase_id)`. Queue cancellation email with `STATUS:CANCELLED` iCal (Phase 4 hookup).
-     - If `purchase_id IS NULL` → no refund; `booking.status='cancelled'`, decrement `booked_count`, queue cancellation email (no refund line).
-  2. Mark `event_sessions.status='cancelled'` + set `cancellation_reason`.
-- [ ] Tests: ensure-then-cancel on an occurrence with no prior row; mixed-population cancellation refunds paid attendees and decrements capacity for the rest.
+### 4.2 Extend `SessionCancellationHelper` (ensure-on-action) ✅
+- [x] `CancelOccurrence(Transaction&, classScheduleSlotId, occurrenceDateUs, reason)` — `EnsureSessionExists` then the existing `CancelSession`; result gains `eventSessionId`.
+- [x] **Mixed-population fix in `CancelSession`:** it previously did `std::stoll(row.at(purchase_id))`, which THROWS for zero-money (NULL-purchase) bookings — the old test-file note had deferred this. Now: paid bookings refund 100% via `RefundHelper`; zero-money bookings release capacity + get the cancellation email with no refund line; both count in `confirmedCancelled`.
+- [x] Session marked `cancelled` + `cancellation_reason` (existing behavior, now asserted via the occurrence path). NOTE: the cancellation email is the existing session-cancellation mail; the `STATUS:CANCELLED` .ics attachment remains a Phase 4 hookup to wire at the endpoint/mail layer (tracked for §5).
+- [x] Tests (4 new): mixed paid + zero-money (1 refund, 2 cancelled, capacity 0, 2 emails); ensure-then-cancel with no prior row (idempotent ensure returns the same id); occurrence cancel with an existing session + zero-money booking (row reused, no refund, email still sent); invalid slot fails.
 
-### 4.3 New `InstructorSubstitutionHelper`
-Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cpp`.
+### 4.3 New `InstructorSubstitutionHelper` ✅
+- [x] `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cpp` (in CMakeLists). `SubstituteRequest` exactly as planned; result carries `eventSessionId` + `staffingId`.
+- [x] `Substitute`: validates the new instructor exists → `EnsureSessionExists` → finds the teaching row (`'instructor'`, else `'substitute'` from a prior sub — `'lead_instructor'` doesn't exist in this schema) → updates `person_id` + **prepends** the audit line, or seeds a fresh `'instructor'` row carrying the new person directly when the lazily-ensured session has no staffing. The audit line is prepended (not appended) so notes **start with** "Substituted by …" — §6.5's chip detection requires that prefix. The `notes` column already existed (no schema work).
+- [x] NO emails (structural — the helper takes no MailHelper); single occurrence only (OQ-P10-1).
+- [x] Tests (7): seeds session+staffing when none exist (audit prefix + admin name + reason pinned); updates the existing row in place (id reuse, person swapped, original note retained under the new line); double substitution stacks the audit trail on one row; sibling occurrence of the same slot untouched (OQ-P10-1); assistant rows never touched (picks the instructor row by role, not position); invalid slot → `INVALID_OCCURRENCE`; unknown instructor → `INVALID_INSTRUCTOR` with nothing persisted.
 
-- [ ] `struct SubstituteRequest { int64_t classScheduleSlotId; int64_t occurrenceDateUs; int64_t newInstructorPersonId; std::string reason; int64_t adminPersonId; }`.
-- [ ] `bool Substitute(Transaction&, const SubstituteRequest&)`:
-  1. `eventSessionId = ClassScheduleHelper::EnsureSessionExists(classScheduleSlotId, occurrenceDateUs)` (recording trigger #2 — the occurrence may have had no persisted row).
-  2. Load `event_session_staffing` for the session; find the existing `'instructor'` / `'lead_instructor'` row, or seed one from the slot's default `instructor_person_id` if none exists yet.
-  3. Update `person_id` to the new instructor; append a substitution note ("Substituted by adminPerson reason: ...") to `event_session_staffing.notes` (add the column if missing — `event_session_staffing.notes TEXT`).
-  4. NO emails sent (per parent OQ-19 / ST-4). Homepage / calendar reflect the new instructor on next render (overriding the slot default).
-  5. Return ok.
-- [ ] **Single occurrence only (resolved OQ-P10-1):** `Substitute` operates on exactly the one `(classScheduleSlotId, occurrenceDateUs)` passed in — even when that occurrence belongs to a series run, it does NOT cascade to the run's other instances. Subbing the rest is a separate per-occurrence call by the admin.
-- [ ] Tests (incl. a series-occurrence sub that leaves the sibling occurrences' staffing untouched).
+### 4.4 Extend `ShiftChangeHelper` for class assignments ✅
+- [x] `CreateClassShiftChangeRequest(transaction, requestType, requestingPersonId, targetPersonId, eventSessionStaffingId, notes)` — validates: **transfers only** (a trade needs two staffing rows and the schema carries one — design note), requester must be the currently-assigned person, target ≠ requester, staffing row + target person exist. Creates via `AddClassRequest` (+ notes).
+- [x] `RespondToClassShiftRequest` — same involvement/status rules as the service path; **acceptance executes the swap immediately, never `pending_admin` (OQ-P10-3)**. The generic `RespondToRequest` now detects class-kind rows up front and routes here (this also prevents the old code's `.at(requesting_availability_id)` crash on class rows and makes the existing respond endpoint work unchanged).
+- [x] No admin review path for class shifts: class requests never reach `pending_admin`, so the existing `ReviewRequest` rejects them with `invalid_status` (pinned by test).
+- [x] `ExecuteClassShiftChange` — reassigns `event_session_staffing.person_id` via the §3 `UpdateStaffing`, prepends a "Shift transferred from X to Y (request #N)" audit note. NO `free_cancel_until_us`, NO booking updates, NO emails (structural — helper has no mail member).
+- [x] Tests (6): create round-trip with notes; validation matrix (trade / not-owner / self-target / bad staffing / bad target); **accept with a confirmed PAID attendee executes immediately — approved + autoApproved, staffing → Tina with audit note, booking untouched incl. NULL `free_cancel_until_us`, and `ReviewRequest` rejects**; generic `RespondToRequest` routes class rows; decline + requester-cancel + self-accept-rejected leave staffing unchanged; outsider/service-row/missing-id rejections.
 
-### 4.4 Extend `ShiftChangeHelper` for class assignments
-- [ ] Add overload methods that take `event_session_staffing_id` instead of `provider_availability_id`.
-- [ ] `CreateClassShiftChangeRequest(Transaction&, request_type, requesting_person_id, target_person_id, event_session_staffing_id, notes)` — creates a `shift_change_requests` row with `event_session_staffing_id` set.
-- [ ] `RespondToClassShiftRequest(...)` — same as service path but operates on `event_session_staffing`. **When the target accepts, it executes the swap immediately (resolved OQ-P10-3) — there is NO admin-approval gate, even when the session has confirmed paid attendees.** It calls `ExecuteClassShiftChange` directly.
-- [ ] **No `ReviewClassShiftRequest` for class shifts (resolved OQ-P10-3).** The affected-count → admin-approval gate and the `shift_change_booking_block_days` secret apply to the **service/provider** path only; class shift trades skip review entirely. (Do not add an admin review path for class shifts.)
-- [ ] `ExecuteClassShiftChange(...)` — reassigns `event_session_staffing.person_id`. NO `free_cancel_until_us` set on attendee bookings (parent ST-5). NO emails to attendees (parent OQ-19).
-- [ ] Tests: target-accept executes the swap with paid attendees present and **without** any admin review step; audit note recorded; no free-cancel / no email.
-
-### 4.5 Admin "who's teaching what"
-- [ ] Read-only in `business_logic/scheduling/staffing_helper.h/.cpp` (already exists from [[Scheduling thin slice]]). Add:
-  - `struct InstructorLoadRow { int64_t personId; std::string firstName; std::string lastName; int64_t totalSessionsInRange; int64_t totalConfirmedAttendees; }`.
-  - `std::vector<InstructorLoadRow> GetInstructorLoad(Transaction&, int64_t facilityId, int64_t fromUs, int64_t toUs)` — joins `event_session_staffing` ↔ `event_sessions` ↔ `bookings` with `COUNT/SUM` aggregations.
-- [ ] Test.
+### 4.5 Admin "who's teaching what" ✅
+- [x] `InstructorLoadRow` + `GetInstructorLoad(Transaction&, facilityId, fromUs, toUs)` in `staffing_helper.h/.cpp` — single aggregate query (`event_session_staffing ↔ event_sessions ↔ people` LEFT JOIN confirmed `bookings`), teaching roles only (`instructor`/`substitute` — assistants don't headline), `status='scheduled'` sessions starting in `[fromUs, toUs)`, `facilityId 0` = all facilities, `COUNT(DISTINCT ...)` on both aggregates so dual-role staffing can't double-count, ordered by last/first name.
+- [x] Tests (4): per-instructor session + attendee counts with ordering; facility filter + facility-0 + half-open range boundary; roles & statuses (substitute counts, assistant/cancelled-session don't; only confirmed bookings count); empty range.
 
 ## 5. Endpoints
 
@@ -226,11 +214,11 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 ## 8. Tests-Required Summary
 
 - [x] Table helper tests for the `shift_change_requests.event_session_staffing_id` column — done in §2.4 (7 cases incl. CHECK + FK + cascade), plus schema-DSL/DDL tests for the new check-constraint support, plus §3.4's 9 method-level cases (`AddClassRequest`/`GetClassShiftRequestsForPerson`/`UpdateStaffing`).
-- [ ] `scheduling_exception_helper_test.cpp` extension: cascade to class sessions for facility-wide closures.
-- [ ] `session_cancellation_helper_test.cpp` extension: mixed paid + zero-money attendees handled.
-- [ ] `instructor_substitution_helper_test.cpp` new — incl. a series-occurrence sub that does NOT cascade to sibling occurrences (resolved OQ-P10-1).
-- [ ] `shift_change_helper_test.cpp` extension: class-shift variant; no email; no free-cancel offering; **target-accept executes immediately with paid attendees present and no admin-review step (resolved OQ-P10-3)**.
-- [ ] `staffing_helper_test.cpp` extension: `GetInstructorLoad` correctness.
+- [x] ~~`scheduling_exception_helper_test.cpp` extension~~ — N/A under the redesign (no class cascade); closure coverage lives in the new `class_closure_helper_test.cpp` (8 cases, §4.1).
+- [x] `session_cancellation_helper_test.cpp` extension: mixed paid + zero-money attendees handled (+ 3 `CancelOccurrence` cases) — done in §4.2.
+- [x] `instructor_substitution_helper_test.cpp` new — 7 cases incl. the no-cascade sibling test (OQ-P10-1) — done in §4.3.
+- [x] `shift_change_helper_test.cpp` extension: 6 class-shift cases; no email (structural); no free-cancel asserted; **target-accept executes immediately with a paid attendee and ReviewRequest rejects (OQ-P10-3)** — done in §4.4.
+- [x] `staffing_helper_test.cpp` extension: `GetInstructorLoad` correctness (4 cases) — done in §4.5.
 - [ ] Endpoint tests for all three new endpoints + extensions to existing shift-trade endpoints.
 - [ ] Frontend specs for scheduling-exceptions update, substitution dialog, instructor-load grid, provider-shift class variant, homepage substitute chip, mock service.
 
