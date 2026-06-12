@@ -165,7 +165,7 @@ Lowest layer first:
 
 ### 5.1 Admin instructor-substitution ✅
 - [x] `POST /api/admin/class_substitute` (`endpoints/admin_class_substitute.h/.cpp`) body `{ class_schedule_slot_id, occurrence_date_us, new_instructor_person_id, reason? }`. Permission `manage_class_schedule`; `adminPersonId` from the session. INVALID_OCCURRENCE → 404, INVALID_INSTRUCTOR → 400; response via `SubstituteResultToKeyValueTable`.
-- [x] Test (`admin_class_substitute_test.cpp`, 5 cases): 403; missing-field matrix; 404 unknown slot (error code pinned); 400 unknown instructor; 200 ensures the session + staffing row points at the sub with the "Substituted by <admin>" note **and the test mail helper stays empty (no email, OQ-19)**.
+- [x] Test (`admin_class_substitute_test.cpp`, 5 cases): 403; missing-field matrix; 404 unknown slot (error code pinned); 400 unknown instructor; 200 ensures the session + staffing row points at the sub with the "Substituted by {admin}" note **and the test mail helper stays empty (no email, OQ-19)**.
 
 ### 5.2 Provider portal class-shift-trade ✅
 - [x] `POST /api/provider/class_shift_change_request` (`endpoints/provider_class_shift_change_request.h/.cpp`) body `{ request_type, target_person_id, event_session_staffing_id, notes? }`. **Authorization decision (departs from the plan's "permission `provider`"):** the endpoint requires a logged-in session and the HELPER enforces that the requester is the person currently assigned on the staffing row — gating on the `provider` permission would lock out instructors, who teach classes but aren't service providers. Error mapping: not_found → 404, not_authorized → 403, else 400.
