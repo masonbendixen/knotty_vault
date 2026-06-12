@@ -110,17 +110,21 @@ Lowest layer first:
 - [x] DDL generation: 3 new `DbOpsTest` SQL-string cases (named, unnamed, ordering after FK + UNIQUE constraints) + 2 live round-trip cases (valid row inserts; violating row throws against a real Postgres table).
 - [x] `shift_change_requests_test.cpp`: 7 new cases — class row with staffing-only accepted (availability columns NULL); service path still works and carries NULL staffing; CHECK rejections (staffing+requesting, staffing+target, neither); FK rejection for unknown staffing id; ON DELETE CASCADE from `event_session_staffing` removes the class request row.
 
-## 3. Table Helpers
+## 3. Table Helpers ✅ DONE
 
 ### 3.1 Reuse Phase 1 `TableHelpers::ClassSchedules` / `ClassInstances`
-- [ ] Class closures use the Phase 1 impl-create path (`ClassSchedules::AddClassSchedule` with an empty slot set + high priority under the class's active instance). No `SchedulingExceptions` work for classes. The `SchedulingExceptions` helper stays as-is for the service-session path.
+- [x] Class closures use the Phase 1 impl-create path (`ClassSchedules::AddClassSchedule` with an empty slot set + high priority under the class's active instance). No `SchedulingExceptions` work for classes. The `SchedulingExceptions` helper stays as-is for the service-session path. **Confirmed (2026-06-12):** `AddClassSchedule` takes a generic `KeyValueTable` (priority + validity window included), an "empty slot set" is simply not creating slot rows, and `GetImplementationsOverlapping` supports the same-priority-overlap validation §4.1 needs. No code.
 
 ### 3.2 Extend `TableHelpers::ShiftChangeRequests`
-- [ ] Surface `event_session_staffing_id`.
-- [ ] `GetClassShiftRequestsForPerson(Transaction&, personId)` — filter to requests where `event_session_staffing_id IS NOT NULL` and the requesting or target person is this instructor.
+- [x] Surface `event_session_staffing_id` — `AddClassRequest(transaction, requestType, requestingPersonId, targetPersonId, eventSessionStaffingId)` inserts the class-kind row (staffing set, both availability columns NULL, status `pending`); reads are `SELECT *` so the column flows out of `GetRequest`/`GetRequestsForPerson` automatically.
+- [x] `GetClassShiftRequestsForPerson(Transaction&, personId)` — `event_session_staffing_id IS NOT NULL AND (requesting_person_id = $1 OR target_person_id = $1)`, ordered `created_us DESC`.
 
 ### 3.3 Reuse `TableHelpers::EventSessionStaffing`
-- [ ] Already exists from [[Scheduling thin slice]] / Phase 1. Confirm methods present: `GetStaffingBySession`, `AddStaffing`, `UpdateStaffing`, `DeleteStaffing`. Tests in place.
+- [x] Audit result (2026-06-12): `AddStaffing`, `GetStaffing`, `GetStaffingForSession` (the plan's "GetStaffingBySession"), `GetStaffingForPerson`, `DeleteStaffing` all existed with tests — but **`UpdateStaffing` did NOT exist** and §4.3 (substitution) / §4.4 (`ExecuteClassShiftChange`) both need to reassign `person_id` and append notes. Added `UpdateStaffing(Transaction&, id, const KeyValueTable&)` via `DbCrud::UpdateRow` (silent no-op on missing id, matching `UpdateRequest`). The `notes` column §4.3 wants already exists — no schema work.
+
+### 3.4 Tests ✅
+- [x] `event_session_staffing_test.cpp` — 4 new `UpdateStaffing` cases: person reassignment + note (the substitution shape, other columns untouched), role-only update, missing-id no-op leaves existing rows alone, unknown-person FK violation throws.
+- [x] `shift_change_requests_test.cpp` — 5 new cases: `AddClassRequest` round-trip (staffing set, availabilities NULL, pending), unknown-staffing FK throw, class-only read filters out the same person's service request while the generic read returns both, target matches / uninvolved person sees nothing, most-recent-first ordering (created_us pinned explicitly — `now_us()` can tie within one transaction).
 
 ## 4. Business Logic
 
@@ -221,7 +225,7 @@ Files: `business_logic/scheduling/instructor_substitution_helper.h/.cpp/_test.cp
 
 ## 8. Tests-Required Summary
 
-- [x] Table helper tests for the `shift_change_requests.event_session_staffing_id` column — done in §2.4 (7 cases incl. CHECK + FK + cascade), plus schema-DSL/DDL tests for the new check-constraint support.
+- [x] Table helper tests for the `shift_change_requests.event_session_staffing_id` column — done in §2.4 (7 cases incl. CHECK + FK + cascade), plus schema-DSL/DDL tests for the new check-constraint support, plus §3.4's 9 method-level cases (`AddClassRequest`/`GetClassShiftRequestsForPerson`/`UpdateStaffing`).
 - [ ] `scheduling_exception_helper_test.cpp` extension: cascade to class sessions for facility-wide closures.
 - [ ] `session_cancellation_helper_test.cpp` extension: mixed paid + zero-money attendees handled.
 - [ ] `instructor_substitution_helper_test.cpp` new — incl. a series-occurrence sub that does NOT cascade to sibling occurrences (resolved OQ-P10-1).
