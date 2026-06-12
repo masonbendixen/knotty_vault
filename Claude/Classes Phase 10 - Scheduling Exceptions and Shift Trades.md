@@ -157,25 +157,32 @@ Lowest layer first:
 - [x] `InstructorLoadRow` + `GetInstructorLoad(Transaction&, facilityId, fromUs, toUs)` in `staffing_helper.h/.cpp` — single aggregate query (`event_session_staffing ↔ event_sessions ↔ people` LEFT JOIN confirmed `bookings`), teaching roles only (`instructor`/`substitute` — assistants don't headline), `status='scheduled'` sessions starting in `[fromUs, toUs)`, `facilityId 0` = all facilities, `COUNT(DISTINCT ...)` on both aggregates so dual-role staffing can't double-count, ordered by last/first name.
 - [x] Tests (4): per-instructor session + attendee counts with ordering; facility filter + facility-0 + half-open range boundary; roles & statuses (substitute counts, assistant/cancelled-session don't; only confirmed bookings count); empty range.
 
-## 5. Endpoints
+## 5. Endpoints ✅ DONE
 
-### 5.0 Admin class closure (batch)
-- [ ] `POST /api/admin/close_classes` body `{ class_ids: int64[], from_us, to_us, reason }` → `ClassClosureHelper::CloseClassesForRange`. Permission `manage_class_schedule`. Endpoint test (verifies empty high-priority impls created; verifies a non-selected class still derives).
+### 5.0 Admin class closure (batch) ✅
+- [x] `POST /api/admin/close_classes` (`endpoints/admin_close_classes.h/.cpp`) body `{ class_ids: int64[], from_us, to_us, reason? }` → `ClassClosureHelper::CloseClassesForRange`. Permission `manage_class_schedule`. Returns `{ closed_count, outcomes: [{class_id, closed, class_schedule_id?, skip_reason?}] }`. Helper validation errors (NO_CLASSES / INVALID_WINDOW) → 400.
+- [x] Test (`admin_close_classes_test.cpp`, 4 cases): 403 without permission; invalid-body matrix (missing/non-array class_ids, missing window, empty batch, backwards window — sane request still 200 after); 200 closes the selected class only (empty reason-named impl, derivation dark in-window, bystander class still derives); batch reports a skipped no-instance class while closing the rest.
 
-### 5.1 Admin instructor-substitution
-- [ ] `POST /api/admin/class_substitute` body `{ class_schedule_slot_id, occurrence_date_us, new_instructor_person_id, reason }`. Permission `manage_class_schedule`. Endpoint test (verifies ensure-session + staffing override, no email). (Takes the occurrence identity, not an `event_session_id`, since the row may not exist yet.)
+### 5.1 Admin instructor-substitution ✅
+- [x] `POST /api/admin/class_substitute` (`endpoints/admin_class_substitute.h/.cpp`) body `{ class_schedule_slot_id, occurrence_date_us, new_instructor_person_id, reason? }`. Permission `manage_class_schedule`; `adminPersonId` from the session. INVALID_OCCURRENCE → 404, INVALID_INSTRUCTOR → 400; response via `SubstituteResultToKeyValueTable`.
+- [x] Test (`admin_class_substitute_test.cpp`, 5 cases): 403; missing-field matrix; 404 unknown slot (error code pinned); 400 unknown instructor; 200 ensures the session + staffing row points at the sub with the "Substituted by <admin>" note **and the test mail helper stays empty (no email, OQ-19)**.
 
-### 5.2 Provider portal class-shift-trade
-- [ ] `POST /api/provider/class_shift_change_request` body `{ request_type, target_person_id, event_session_staffing_id, notes }`. Permission `provider` (existing). Endpoint test.
-- [ ] Extend the existing `GET /api/provider/my_shift_requests` to include class-shift requests (filter by `event_session_staffing_id IS NOT NULL`).
-- [ ] Extend `POST /api/provider/respond_shift_request/:id` to handle the class-shift variant via the new `ShiftChangeHelper` overloads — **target acceptance executes the swap immediately (resolved OQ-P10-3)**. Do NOT extend `POST /api/admin/review_shift_request/:id` for class shifts: there is no admin-review step for them (the admin review endpoint stays service-path only). Endpoint test asserts an accept with paid attendees executes without a review call.
+### 5.2 Provider portal class-shift-trade ✅
+- [x] `POST /api/provider/class_shift_change_request` (`endpoints/provider_class_shift_change_request.h/.cpp`) body `{ request_type, target_person_id, event_session_staffing_id, notes? }`. **Authorization decision (departs from the plan's "permission `provider`"):** the endpoint requires a logged-in session and the HELPER enforces that the requester is the person currently assigned on the staffing row — gating on the `provider` permission would lock out instructors, who teach classes but aren't service providers. Error mapping: not_found → 404, not_authorized → 403, else 400.
+- [x] `GET /api/provider/my_shift_requests` already returns class rows (no kind filter in the table helper read); extended `EnrichRequestsWithDetails` to resolve class-kind rows' session details (`class_event_session_id`, `class_session_start_us/end_us`, `class_name` from the class else the product) — `event_session_staffing_id` presence is the client's kind discriminator.
+- [x] `POST /api/provider/respond_shift_request/:id` needed NO routing change — §4.4's `RespondToRequest` routes class rows internally. Added an explicit `IsClassShiftRequest` guard (made public on the helper) so the service-path acceptance email is skipped for class shifts rather than relying on a swallowed `.at()` exception; the pending_admin admin-mail block is unreachable for class rows. Admin review endpoint untouched (service-path only).
+- [x] Tests (`provider_class_shift_change_request_test.cpp`, 6 cases): 401 anonymous; bad-request matrix (missing fields, trade 400, self-target 400, unknown staffing 404); 403 when the logged-in user doesn't hold the shift; 200 create + row persisted + **my_shift_requests lists it with the class enrichment fields**; target accepts via the EXISTING respond endpoint with a confirmed attendee present → approved + auto_approved immediately, staffing reassigned, booking untouched, **zero emails**; uninvolved responder 403 leaves staffing unchanged.
 
-### 5.3 Admin "who's teaching what"
-- [ ] `GET /api/admin/instructor_load?facility_id=&date_from=&date_to=`. Permission new `view_admin_instructor_load`. Endpoint test.
+### 5.3 Admin "who's teaching what" ✅
+- [x] `GET /api/admin/instructor_load?facility_id=&date_from=&date_to=` (`endpoints/admin_instructor_load.h/.cpp`). Permission `view_admin_instructor_load`. `date_from`/`date_to` required, strictly-parsed microsecond ints with `date_to > date_from`; `facility_id` optional (omitted/0 = all). Returns `{ instructors: [...] }` via `InstructorLoadRowsToKeyValueTableArray`.
+- [x] Test (`admin_instructor_load_test.cpp`, 4 cases): 403; invalid-param matrix (missing/non-numeric/backwards/empty range, bad facility — sane request still 200 after); per-instructor counts (names + session + confirmed-attendee totals); facility filter vs all-facilities vs empty-range result. Query params set via `crow::query_string` per the memory rule; every request flushes `ThreadPool`.
 
-### 5.4 Routing + permissions
-- [ ] All registered in `web_app.cpp`.
-- [ ] New permission `view_admin_instructor_load` seeded.
+### 5.4 Routing + permissions ✅
+- [x] All four registered in `web_app.cpp` (includes + reference vars) and `endpoints/CMakeLists.txt` (sources + tests).
+- [x] New permission `view_admin_instructor_load` (constant in `db_schema/permissions.h`, seeded at id 11 in `PopulatePermissions`, granted to **admin + Studio Manager** in `PopulateRolePermissions`).
+
+### 5.5 KVT conversions (per the layering rule) ✅
+- [x] `scheduling_key_value_table.h/.cpp`: `ClassClosureOutcomeToKeyValueTable(+Array)`, `SubstituteResultToKeyValueTable`, `InstructorLoadRowToKeyValueTable(+Array)` — 7 new cases in `scheduling_key_value_table_test.cpp` (closed/skipped outcome shapes, success/error substitute shapes, load row + arrays).
 
 ## 6. Frontend
 
@@ -209,7 +216,7 @@ Lowest layer first:
 
 ## 7. Admin Metadata
 
-- [ ] No new top-level tables; permission `view_admin_instructor_load` added in 5.4.
+- [x] No new top-level tables; permission `view_admin_instructor_load` added in 5.4.
 
 ## 8. Tests-Required Summary
 
@@ -219,7 +226,7 @@ Lowest layer first:
 - [x] `instructor_substitution_helper_test.cpp` new — 7 cases incl. the no-cascade sibling test (OQ-P10-1) — done in §4.3.
 - [x] `shift_change_helper_test.cpp` extension: 6 class-shift cases; no email (structural); no free-cancel asserted; **target-accept executes immediately with a paid attendee and ReviewRequest rejects (OQ-P10-3)** — done in §4.4.
 - [x] `staffing_helper_test.cpp` extension: `GetInstructorLoad` correctness (4 cases) — done in §4.5.
-- [ ] Endpoint tests for all three new endpoints + extensions to existing shift-trade endpoints.
+- [x] Endpoint tests for all four new endpoints + the shift-trade extensions — done in §5 (19 endpoint cases + 7 KVT cases).
 - [ ] Frontend specs for scheduling-exceptions update, substitution dialog, instructor-load grid, provider-shift class variant, homepage substitute chip, mock service.
 
 ## 9. Cross-Layer Acceptance Criteria
