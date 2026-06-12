@@ -181,30 +181,36 @@ LIMIT :limit OFFSET :offset
   - Validation (400 `ValidationError`): any non-integer numeric param; `month` outside 1–12. Bool flags accept `true`/`1`. `offset`/`limit` pass through to the helper's defensive clamps (§2).
   - Test (`get_my_attendance_history_test.cpp`, 8 cases): 401 anonymous; rows+metadata (sort order, instructor name on the row, both distinct lists, exact earliest); empty history → null earliest + empty arrays; year/month/class/instructor filters; include flags reveal no_show then cancelled; pagination across pages with most-recent-first; **invalid-param matrix** (month 13/0/abc, year `20x6`, class_id/instructor_id/offset/limit non-numeric → 400, sane request still 200 after); cross-user isolation (another member's bookings never leak). Query params set via `crow::query_string` per the memory rule; every request flushes `ThreadPool` before the next DB read.
 
-## 4. Frontend
+## 4. Frontend ✅ DONE
 
-### 4.1 Attendance history page
-- [ ] `ui/src/app/pages/account/attendance-history/attendance-history.component.*/.spec.ts`.
-- [ ] Layout: filter row at top (year picker, month picker, class FK picker, instructor FK picker, "Show no-shows" toggle), then a Material table, then a Material paginator.
-- [ ] **Year dropdown** is populated from `earliest_attendance_us` (its facility-local year) up to the current year — not a fixed "last 5 years" range (resolved OQ-P9-2). When `earliest_attendance_us` is null (no attendance), the year filter is empty/disabled and the empty state shows.
-- [ ] Filter values feed query params; pagination state preserved on back-navigation.
-- [ ] Empty state: "You haven't attended any classes yet. Browse the catalog at /classes."
-- [ ] Mat-card border + back-nav + RouterTestingModule per memory `feedback_account_page_layout.md`.
-- [ ] Use real date/time pickers per memory `feedback_date_time_pickers.md`.
-- [ ] Spec covers filter combinations + pagination + empty state.
+**Reconciliations vs the plan's original prose (2026-06-11):**
+- **No `MatTable`/`MatPaginator`** — neither module exists anywhere in the app (not in `MatImports`); the page uses the house pattern: a bordered CSS-grid table + a simple Previous/Next pager with an "X–Y of Z" label. Same §6 behaviors, established widgets.
+- **Year/month are `mat-select` dropdowns, not date pickers** — the `feedback_date_time_pickers` rule covers picking calendar dates/times; a year/month *filter* over discrete options is a dropdown (matching the §4.1 "year picker / month picker" dropdown intent).
+- **Field names are snake_case** matching the wire (`earliest_attendance_us`, `distinct_class_ids`), per the codebase convention — not the plan's camelCase prose names. Query type is `AttendanceHistoryQuery` (camelCase inputs) → network layer builds the snake_case query string.
+- **URL is the single source of truth**: user actions `router.navigate` query params (`year/month/class_id/instructor_id/show_all/page`); the component fetches from the `queryParamMap` subscription, so browser back/forward restores filters AND page for free.
+- Session times render with `timeZone: 'UTC'` (wall-clock encoding, the Phase 8 rule) — pinned by a timezone-proof spec test.
 
-### 4.2 `ServerAccess` extension
-- [ ] `getMyAttendanceHistory(filter): Observable<AttendanceHistoryResponse>`.
-- [ ] Update `ServerAccess.mock.spec.ts` (mock returns `earliestAttendanceUs` in the metadata; a no-attendance case returns null).
+### 4.1 Attendance history page ✅
+- [x] `pages/account/attendance-history/attendance-history.component.{ts,html,scss,spec.ts}` (standalone, SharedModule), route `/my/attendance-history` in `account.routes.ts`, + an "Attendance History" card on the account dashboard (`user.component` html/ts/spec updated — card count 11→12 + nav test).
+- [x] Filter row: year + month + class + instructor `mat-select`s, "Show no-shows & cancellations" slide-toggle (the §1.1 "Show all" toggle: sets BOTH include flags). Class/instructor dropdowns resolve labels via `getClasses()`/`getInstructors()` against the metadata ids, with `Class #id` fallbacks for catalog-removed classes.
+- [x] Year dropdown from `earliest_attendance_us` (UTC-read year, per §2.3's encoding note) up to the current year, descending; null ⇒ filters disabled + no-history empty state (OQ-P9-2).
+- [x] Two empty states: no-history ("You haven't attended any classes yet" + catalog link) vs no-matches (filters active, with a clear-filters action).
+- [x] Rows: date + time range (UTC-formatted), class (+walk-in tag), facility · room, instructors, status chip (green attended / red no-show / gray cancelled).
+- [x] Pager: Previous/Next + range label, 25/page; page index round-trips through the URL.
 
-### 4.3 Types
-- [ ] `attendance-history.types.ts`: `AttendanceHistoryFilter`, `AttendanceHistoryRow`, `AttendanceHistoryResponse` (the response carries `earliestAttendanceUs: number | null` alongside `distinctClassIds` / `distinctInstructorIds`).
+### 4.2 `ServerAccess` extension ✅
+- [x] `getMyAttendanceHistory(query?)` in interface + `ServerAccessNetwork` (query-string builder + row normalization: pipe-split `instructor_names`, string-bool `is_walkin`, `Number()`ed ids, null-preserved `earliest_attendance_us`) + proxy + mock.
+- [x] Mock mirrors the server: encoded-as-UTC year/month matching, attended-only default, slot/staffing-style instructor ids, pagination, metadata unaffected by filters, month 13 → 400, 401 when logged out. 4 seeded rows (2 classes, 2 instructors, a no-show, a walk-in, a 2025 earliest).
+- [x] `ServerAccess.mock.spec.ts` — 8 new cases incl. the **no-attendance → null earliest** case.
+
+### 4.3 Types ✅
+- [x] `shared/types/attendance-history.types.ts`: `AttendanceHistoryQuery`, `AttendanceHistoryRow`, `AttendanceHistoryStatus`, `AttendanceHistoryResponse` (carries `earliest_attendance_us: number | null` + the distinct id lists); re-exported from the ServerAccess barrel.
 
 ## 5. Tests-Required Summary
 
 - [x] Business logic test cases enumerated in 2.6 (incl. distinct-bookings count + `GetEarliestAttendanceUs`) — done in §2.
 - [x] Endpoint test cases (filter combos, pagination, validation-errors, and `earliest_attendance_us` present in metadata / null when no attendance) — done in §3.
-- [ ] Component spec for filter UI + paginator + empty state + mock service, incl. the year dropdown built from `earliestAttendanceUs` (and disabled/empty when null).
+- [x] Component spec for filter UI + paginator + empty state + mock service, incl. the year dropdown built from `earliest_attendance_us` (and disabled/empty when null) — done in §4: 12 component cases (init load + render, UTC time-format pin, year-range build, label resolution with fallbacks, both empty states, filter pass-through + page reset, show-all flags, pagination offsets/range label/guards, **URL-init for back-navigation**, no-show chip + walk-in tag, clear-filters) + 8 mock cases. Full Angular suite: 2569/2569.
 
 ## 6. Cross-Layer Acceptance Criteria
 
