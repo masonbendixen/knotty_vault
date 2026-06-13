@@ -184,35 +184,39 @@ Lowest layer first:
 ### 5.5 KVT conversions (per the layering rule) ✅
 - [x] `scheduling_key_value_table.h/.cpp`: `ClassClosureOutcomeToKeyValueTable(+Array)`, `SubstituteResultToKeyValueTable`, `InstructorLoadRowToKeyValueTable(+Array)` — 7 new cases in `scheduling_key_value_table_test.cpp` (closed/skipped outcome shapes, success/error substitute shapes, load row + arrays).
 
-## 6. Frontend
+## 6. Frontend ✅ DONE
 
-### 6.1 Admin class-closure batch UI (new — deferred OQ-CSI-4)
-- [ ] New "Close classes for a date range" admin action: class-multiselect + from/to date pickers + reason. Calls `close_classes`. Shows which classes will be dark for the window (and notes that workshops under their own classes are unaffected unless selected). This is NOT the service-session `scheduling_exceptions` page — that stays separate for the service path.
-- [ ] Spec.
+### 6.0 Backend prerequisite discovered during §6.5 (2026-06-12) ✅
+- [x] **The plan's claim that "the today-classes feed already loads `event_session_staffing`" was wrong** — the feed only read the slot default instructor, so substitutions and shift trades would never surface. Extended `AttendanceTemplateHelper::ResolveClassesInRange`: a persisted occurrence's teaching staffing rows (instructor/substitute) now override the slot default for `instructorNames`, and `TodayClassEntry.hasSubstitute` is set when a teaching row's notes start with `"Substituted by"` (the §4.3 prepend convention; shift trades swap the name without the chip). KVT emits `has_substitute`.
+- [x] Tests: `FeedShowsStaffingOverridesAndSubstituteChip` (3 occurrences — substituted with chip / traded without chip / derived slot default) + a `TodayClassEntry` KVT case.
 
-### 6.2 Admin instructor-substitution dialog
-- [ ] `ui/src/app/pages/portal/manage/event-session-detail/substitute-instructor-dialog/substitute-instructor-dialog.component.*/.spec.ts`.
-- [ ] Form: new instructor picker (FK to people filtered by `instructor` permission) + reason field + confirm.
+### 6.1 Admin class-closure batch UI (new — deferred OQ-CSI-4) ✅
+- [x] `pages/manage/close-classes/` (ts/html/scss/spec), route `/manage/close-classes`, + a "Close Classes" card on the Manage dashboard. Class-multiselect (`getClasses()`), from/to `mat-datepicker`s (inclusive last day → half-open window via `pickerDateToUs` + 1 day, the **UTC-midnight** validity convention), reason input, dark-class preview chips, per-class outcome list (closed vs skipped with friendly skip reasons), and a note that workshops under their own classes are unaffected. The service-session `scheduling_exceptions` page is untouched.
+- [x] Spec (7 cases): init load, submit gating incl. backwards window, **UTC-midnight window math pinned**, blank-reason omission, outcome rendering incl. skips, preview chips, server error detail surfaced.
 
-### 6.3 Admin "who's teaching what" grid
-- [ ] `ui/src/app/pages/portal/manage/instructor-load/instructor-load.component.*/.spec.ts`.
-- [ ] Date range picker + facility filter; table with instructor name + session count + attendee count.
-- [ ] **Default date range = "next 30 days" (resolved OQ-P10-2)** — on first load the picker is pre-filled today → today+30d (forward-looking operational visibility for planning), and the grid loads that range before the admin touches the picker. Spec asserts the default range.
+### 6.2 Admin instructor-substitution dialog ✅
+- [x] `pages/manage/class-schedules/dialogs/substitute-instructor-dialog.component.{ts,html,spec.ts}` (the actual class-schedule authoring page — the plan's `event-session-detail` path doesn't exist). Opened from a new per-slot "Substitute instructor for one date" action; the page calls `substituteInstructor(slotId, occurrenceDateUs, personId, reason?)`.
+- [x] Form: occurrence date picker + instructor picker over the `getInstructors()` roster (the instructors table, which is the "people who teach" source) + optional reason; the dialog copy states single-occurrence scope and no attendee emails.
+- [x] Specs: 6 dialog cases (roster load + failure, validation, **UTC-midnight date pinned**, optional reason, cancel) + 3 `class-schedule-manage` cases (substitute call args + dialog data label, blank-reason omission + error_code surfacing, dialog-cancel no-op).
 
-### 6.4 Provider portal extension
-- [ ] In the existing `shift-requests` provider-portal page, surface class-shift requests alongside service-shift requests. Visually distinguish (chip "Class") via the `event_session_staffing_id` presence.
-- [ ] Spec update.
+### 6.3 Admin "who's teaching what" grid ✅
+- [x] `pages/manage/instructor-load/` (ts/html/scss/spec), route `/manage/instructor-load`, + a "Who's Teaching What" dashboard card.
+- [x] From/to date pickers + facility dropdown (`getTableRows('facilities')`, 0 = all); CSS-grid table with instructor name + session count + confirmed-attendee count; empty state; reload on any filter change.
+- [x] **Default next-30-days range loads on init before the admin touches the picker (OQ-P10-2)** — spec asserts the default range and the init call (UTC-midnight converted).
+- [x] Spec (7 cases): default range + init load, grid render, facility options, filter pass-through/omission, backwards-range guard (no server call), empty state, load error.
 
-### 6.5 Homepage display of substitute instructor
-- [ ] Phase 5's today-classes feed already loads `event_session_staffing` for each session — when an instructor changes (substitution OR shift trade), this list reflects the change on next render. Add a subtle "Substitute: {new name}" chip when the staffing row's `notes` field starts with "Substituted by".
-- [ ] Spec.
+### 6.4 Provider portal extension ✅
+- [x] `pages/staff/shift-requests/`: class-kind requests (discriminated by `event_session_staffing_id`) render a green "Class" chip and show the class name + session time instead of availability shift details; `onAcceptClick` skips the booking-check confirm gate entirely for class shifts (OQ-P10-3 — accept executes immediately).
+- [x] Spec update (4 cases): chip only on class rows + class session details, `isClassShift` discrimination, class accept bypasses `checkShiftBookings` and reports auto-approval, service accept still routes through the booking check.
 
-### 6.6 `ServerAccess` extensions
-- [ ] `closeClasses(classIds, fromUs, toUs, reason)`.
-- [ ] `substituteInstructor(classScheduleSlotId, occurrenceDateUs, newInstructorPersonId, reason)`.
-- [ ] `submitClassShiftChangeRequest(req)`, etc. — likely just additions on top of the existing provider shift APIs.
-- [ ] `getInstructorLoad(facilityId, dateFrom, dateTo)`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+### 6.5 Homepage display of substitute instructor ✅
+- [x] `today-classes`: amber "Substitute" chip next to the instructor line when `has_substitute` (backend wiring in §6.0; trades show the new name without the chip).
+- [x] Spec: chip renders only for flagged rows; `TodayClassEntry` literals in the class-checkin and upcoming-classes specs updated for the new required field.
+
+### 6.6 `ServerAccess` extensions ✅
+- [x] `closeClasses(classIds, fromUs, toUs, reason?)`, `substituteInstructor(slotId, occurrenceDateUs, personId, reason?)`, `providerCreateClassShiftChangeRequest(targetPersonId, staffingId, notes?)` (transfer-only per §4.4), `getInstructorLoad(dateFromUs, dateToUs, facilityId?)` — interface + network (string-bool coercion for `closed`/`ok`) + proxy + mock. Responding to class requests reuses the existing `providerRespondShiftRequest`.
+- [x] Types: `ClassClosureOutcome`/`CloseClassesResult`/`SubstituteInstructorResult`/`InstructorLoadRow` + the class fields on `ShiftChangeRequest` + `TodayClassEntry.has_substitute` (with `normalizeTodayClass` coercion).
+- [x] Mock mirrors the server (401s, 400/404 conventions via id 999999, class-request enrichment, substitution flips the mock today-feed entry, seeded 2-facility instructor-load grid) — 9 new `ServerAccess.mock.spec.ts` cases.
 
 ## 7. Admin Metadata
 
@@ -227,7 +231,7 @@ Lowest layer first:
 - [x] `shift_change_helper_test.cpp` extension: 6 class-shift cases; no email (structural); no free-cancel asserted; **target-accept executes immediately with a paid attendee and ReviewRequest rejects (OQ-P10-3)** — done in §4.4.
 - [x] `staffing_helper_test.cpp` extension: `GetInstructorLoad` correctness (4 cases) — done in §4.5.
 - [x] Endpoint tests for all four new endpoints + the shift-trade extensions — done in §5 (19 endpoint cases + 7 KVT cases).
-- [ ] Frontend specs for scheduling-exceptions update, substitution dialog, instructor-load grid, provider-shift class variant, homepage substitute chip, mock service.
+- [x] Frontend specs — done in §6: ~~scheduling-exceptions update~~ (N/A under the redesign; the closure batch UI is the new `close-classes` page, 7 cases), substitution dialog (6 + 3 manage-page cases), instructor-load grid (7 cases), provider-shift class variant (4 cases), homepage substitute chip (1 case + 2 fixture updates), mock service (9 cases), manage-dashboard cards (1 case). Backend §6.0 prerequisite: today-feed staffing override + chip flag (1 helper case + 1 KVT case).
 
 ## 9. Cross-Layer Acceptance Criteria
 
