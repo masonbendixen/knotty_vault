@@ -110,43 +110,36 @@ Lowest layer first:
 - [x] Added `GetReminder(Transaction&, id)` (single-row read, mirrors `ShiftChangeRequests::GetRequest`) for §4/§5 + tests.
 - [x] Tests — `sql_util/table_helpers/signup_open_reminders_test.cpp` (11 cases): AddReminder creates the pending row + round-trips; idempotent returns the existing pending id with no duplicate; a notified OR a cancelled row frees a fresh AddReminder; CancelReminder retires the pending row (cancelled_us set, notified_us still NULL) and drops it from the work list; CancelReminder is a harmless no-op when nothing pending and leaves other people's reminders alone; GetPendingReadyToSend filters by `notify_at_us <= now` and orders ASC, and excludes notified/cancelled rows; MarkNotified stamps notified_us and retires the row. Each test calls `CreateSignupOpenRemindersIndexes(tx)` first (the partial index AddReminder's `ON CONFLICT` needs isn't created by `SetupAllTables`).
 
-## 4. Business Logic — `SignupReminderHelper`
+## 4. Business Logic — `SignupReminderHelper` ✅
 
-Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp`.
+Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp` + the email body in `signup_reminder_mail.h/.cpp/_test.cpp`. The helper takes only a `DatabaseHelper`; mail is a per-call `::Mail::MailHelper*` on `SendPendingReminders` (so it's constructible without mail, like `InstructorSubstitutionHelper`). Wired into the scheduling `CMakeLists.txt`.
 
-### 4.1 Best-window computation
-- [ ] `int64_t ResolveBestAdvanceDaysForPerson(Transaction&, int64_t productId, int64_t personId, int64_t asOfUs)`:
-  1. Load all `product_booking_windows` rows for the product.
-  2. Filter to rows where `permission_id IS NULL` OR `permission_id` ∈ user's permission set.
-  3. Return `max(advance_days)` across the filtered set. If no matches → 0 (booking always open today, or never open — caller distinguishes).
+### 4.1 Best-window computation ✅
+- [x] `int64_t ResolveBestAdvanceDaysForPerson(Transaction&, productId, personId, asOfUs)` — **delegates to the existing `TableHelpers::ProductBookingWindows::ResolveAdvanceDaysForUser`**, whose SQL is already exactly the planned semantics: `COALESCE(MAX(advance_days), 0)` over `WHERE permission_id IS NULL OR permission_id IN (user's permissions)`. `asOfUs` is accepted for the documented contract but unused (permissions are evaluated as of now). No new SQL needed.
 
-### 4.2 Request-reminder flow
-- [ ] `struct RequestReminderResult { bool ok; int64_t reminderId; int64_t notifyAtUs; std::string errorCode; }`.
-- [ ] `RequestReminder(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)`:
-  1. Resolve the occurrence's product from the slot's active `class_instances` row; compute `occurrenceStartUs` from the slot + date.
-  2. Compute `advanceDays = ResolveBestAdvanceDaysForPerson(productId, personId, now)`.
-  3. Compute `notifyAtUs = occurrenceStartUs - advanceDays * 86400_000_000`.
-  4. If `notifyAtUs <= now` → return `WINDOW_ALREADY_OPEN` (the user can book right now; no reminder needed).
-  5. Insert `signup_open_reminders` row (slot + occurrence-date keyed; no `event_sessions` row need exist yet).
-- [ ] Tests.
+### 4.2 Request-reminder flow ✅
+- [x] `struct RequestReminderResult { bool ok; int64_t reminderId; int64_t notifyAtUs; std::string errorCode; }`.
+- [x] `RequestReminder(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)` — resolves the occurrence's product by walking slot → `class_schedules` (impl) → `class_instances` (the slot's owning instance carries the product); `occurrenceStartUs = occurrenceDateUs + slot.start_time_minutes`; `notifyAtUs = occurrenceStartUs - advanceDays·day`. Returns `INVALID_OCCURRENCE` when the slot doesn't resolve to a product, `WINDOW_ALREADY_OPEN` when **`advanceDays <= 0`** (no window configured → nothing to wait for) **or** `notifyAtUs <= now`; else inserts via the §3 helper (idempotent on the partial index).
+- [x] Tests — see §4 test summary below.
 
-### 4.3 Sending pending reminders
-- [ ] `int SendPendingReminders(Transaction&, MailHelper*, int64_t nowUs)`:
-  1. `GetPendingReadyToSend(nowUs)`.
-  2. For each pending reminder, resolve the occurrence's product/class via the slot's active `class_instances` row and build the email (resolved OQ-P11-1):
-     - **Series run** (`classes.kind='series'`): a **single** email — subject/body list the series as one line (name + start + end + per-instance schedule summary), and attach a **multi-VEVENT `.ics`** with one VEVENT per upcoming instance of the run. Derive the run's occurrences via `ClassScheduleHelper::GetDerivedSessionsForRange(classId, runStartUs, runEndUs)` and emit the iCal with the existing Phase 7 series-confirmation / Phase 4 multi-VEVENT generator. **One email per series, not per instance.**
-     - **Single workshop / intro occurrence**: body "Sign-ups are open for {className} on {date}" + a **one-VEVENT `.ics`** for that occurrence.
-     - Wrap the body with `NormalizeCrLf()` (mailio CRLF rule) and queue via `MailHelper`.
-  3. `MarkNotified`.
-  4. Return count.
-- [ ] Tests with `TestMailHelper`: a series reminder queues exactly **one** email whose `.ics` contains **N VEVENTs** (N = upcoming instances); a single-workshop reminder queues one email with a one-VEVENT `.ics`.
+### 4.3 Sending pending reminders ✅
+- [x] `int SendPendingReminders(Transaction&, ::Mail::MailHelper*, int64_t nowUs)` — for each `GetPendingReadyToSend(nowUs)` row: resolve class/product, resolve the person's email/name, build the iCal + email, queue it, then `MarkNotified`. Returns the count queued. Reminders that can't send (slot gone / no email on file) are retired without an email so the cron stays idempotent. No-op (0) when `mailHelper` is null.
+  - **Series run** (`classes.kind == 'series'`): ONE email (OQ-P11-1) carrying a multi-VEVENT `.ics` — one VEVENT per upcoming instance derived from the instance's validity window via `ClassScheduleHelper::GetDerivedSessionsForRange`.
+  - **Single workshop / intro occurrence**: ONE email with a one-VEVENT `.ics`.
+  - iCal built with `ICalGenerator::GenerateICalendar(vector<ICalEvent>)`; **`floatingLocal=true`** since occurrence times are wall-clock-encoded-as-UTC (not real instants); per-occurrence UID via `BuildTemplateOccurrenceUid`. Body via `signup_reminder_mail` (FormatString + `NormalizeCrLf`); attachment `signup_reminder.ics` (contentType "calendar"); sender from `Secrets::kMailSender*`.
+- [x] Tests with `TestMailHelper` — see §4 test summary.
 
-### 4.4 Booking-side dedupe
-- [ ] In `BookingHelper::BookEvent` (and the series-booking flow), after creating the booking, call `SignupOpenReminders::CancelReminder(personId, eventSessionId)` — no-op if no pending reminder.
-- [ ] Test the dedupe: request a reminder, then book the same session, then run `SendPendingReminders` → zero sent.
+### 4.4 Booking-side dedupe ✅
+- [x] `BookingHelper::BookEvent` — after `AddBooking`, when the session row carries `class_schedule_slot_id` + `occurrence_date_us` (a class occurrence), calls `TableHelpers::SignupOpenReminders::CancelReminder(personId, slotId, occurrenceDateUs)`. **Keyed by (slot, occurrence), not the plan's stale `eventSessionId`.** No-op for classic events and when no reminder is pending. Fires for waitlist joins too (sign-ups are open either way).
+- [x] Test — `booking_helper_test.cpp::BookEventCancelsPendingSignupReminder` (attaches a slot+occurrence to the priced event session so the dedupe path runs through the real `BookEvent`; asserts the pending reminder is cancelled) + the helper-level `CancelledReminderIsNotSent` (a cancelled reminder is never emailed).
 
-### 4.5 KeyValueTable conversions
-- [ ] `SignupReminderInfoToKeyValueTable(...)`.
+### 4.5 KeyValueTable conversions ✅
+- [x] `SignupReminderInfo` struct (helper header) + `SignupReminderInfoToKeyValueTable(+Array)` in `scheduling_key_value_table.h/.cpp`, with 2 KVT test cases. The producer (`GetPendingRemindersForPerson`) is deferred to §5/§7 where the listing endpoint is wired.
+
+### §4 test summary
+- `signup_reminder_helper_test.cpp` (11 cases): ResolveBestAdvanceDays delegation (0 with no window, base window applies); RequestReminder correct notifyAt; rejects with no window and with an already-open window; idempotent; INVALID_OCCURRENCE; **SendPendingReminders workshop → 1 email / 1 VEVENT**; **series → 1 email / N VEVENTs (N computed via the same derivation, ASSERT ≥ 2)**; marks-notified-and-doesn't-resend; skips reminders whose window hasn't opened; null-mail no-op; cancelled-not-sent (dedupe at the data layer).
+- `signup_reminder_mail_test.cpp` (3 cases): subject names the class; single vs series body wording; CRLF endings.
+- `scheduling_key_value_table_test.cpp` (2 new cases) + `booking_helper_test.cpp` (1 integration case).
 
 ## 5. Endpoints
 
