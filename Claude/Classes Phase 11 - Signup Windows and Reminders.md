@@ -141,11 +141,15 @@ Files: `business_logic/scheduling/signup_reminder_helper.h/.cpp/_test.cpp` + the
 - `signup_reminder_mail_test.cpp` (3 cases): subject names the class; single vs series body wording; CRLF endings.
 - `scheduling_key_value_table_test.cpp` (2 new cases) + `booking_helper_test.cpp` (1 integration case).
 
-## 5. Endpoints
+## 5. Endpoints ✅
 
-- [ ] `POST /api/me/signup_reminder` body `{ class_schedule_slot_id, occurrence_date_us }` — calls `RequestReminder`. Returns reminderId + notifyAtUs. Endpoint test (success + window-already-open + duplicate-no-op).
-- [ ] `DELETE /api/me/signup_reminder/<eventSessionId>` — cancel a pending reminder.
-- [ ] `POST /api/admin/send_signup_open_reminders` — cron-callable, idempotent. Permission `admin`. Endpoint test.
+All three registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. The DELETE/POST `/me` endpoints require only a logged-in session; the admin send endpoint gates on `manage_class_schedule`.
+
+- [x] `POST /api/me/signup_reminder` (`post_signup_reminder.h/.cpp`) body `{ class_schedule_slot_id, occurrence_date_us }` → `SignupReminderHelper::RequestReminder`. **Both "created" and "already open" are 200** with `{ reminder_id, notify_at_us, window_already_open }` (reminder_id 0 + window_already_open true for the already-open case, so the SPA shows a toast rather than treating it as an error); `INVALID_OCCURRENCE` → 404; missing fields → 400. Test (`post_signup_reminder_test.cpp`, 6 cases): 401 anon; 400 missing fields; **creates with a future window**; **window-already-open returns the flag (not an error)**; **duplicate returns the same reminder_id (idempotent)**; 404 invalid occurrence.
+- [x] `DELETE /api/me/signup_reminder?class_schedule_slot_id=&occurrence_date_us=` (`delete_signup_reminder.h/.cpp`) → `SignupReminderHelper::CancelReminder`. **Keyed by (slot, occurrence) via query params, NOT the plan's stale `<eventSessionId>` path** — query params keep the large `occurrence_date_us` an int64 (Crow `<int>` is 32-bit). Idempotent 200 `{ ok: true }`. Test (4 cases): 401 anon; 400 missing param; cancels a pending reminder (cancelled_us stamped); no-op 200 when nothing pending.
+- [x] `POST /api/admin/send_signup_open_reminders` (`admin_send_signup_reminders.h/.cpp`) — cron-callable, idempotent; `RequirePermission(manage_class_schedule)`; computes `now_us()`, calls `SendPendingReminders(tx, GetMailHelper().get(), now)`, returns `{ sent_count }`. **Gated on `manage_class_schedule`** (the plan's `admin`; consistent with the other Phase 10/11 class-admin endpoints — §6's scheduler account must hold it). Test (2 cases): 403 without the permission; **sends one pending reminder (1 mail queued) and a second run sends 0** (idempotent).
+
+**Shared-fixture change:** added a `productId` field to `template_test_fixture.h`'s `SlotFixture` (set by `CreateRecurringSlot`) so the booking-window setup can attach a `product_booking_windows` row — additive, existing callers unaffected. Each endpoint test that creates reminders calls `CreateSignupOpenRemindersIndexes(tx)` first (the partial index isn't created by `SetupAllTables`).
 
 ## 6. Scheduled job integration
 
