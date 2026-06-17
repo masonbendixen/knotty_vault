@@ -151,9 +151,17 @@ All three registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. The DELETE/P
 
 **Shared-fixture change:** added a `productId` field to `template_test_fixture.h`'s `SlotFixture` (set by `CreateRecurringSlot`) so the booking-window setup can attach a `product_booking_windows` row — additive, existing callers unaffected. Each endpoint test that creates reminders calls `CreateSignupOpenRemindersIndexes(tx)` first (the partial index isn't created by `SetupAllTables`).
 
-## 6. Scheduled job integration
+## 6. Scheduled job integration ✅
 
-- [ ] Add hourly job to `knottyyoga_helper`: `POST /api/admin/send_signup_open_reminders`. Idempotent.
+- [x] Added the hourly `send_signup_open_reminders` job to `knottyyoga_helper`: `scheduler_config.h` (`signupRemindersSeconds = 3600`), `scheduled_job.cpp` (`AppendIfEnabled` → `POST /api/admin/send_signup_open_reminders`), and `main.cpp` (`--signup_reminders_interval` flag + config wiring + the startup `LogConfigSummary` line). Idempotent and self-gating (the endpoint only emails reminders whose window has opened, via `GetPendingReadyToSend`'s `notify_at_us` filter).
+- [x] **Scheduler permission fix (required for the job to authorize).** Traced that the scheduler service account holds only `manage_subscriptions` (via `EnsureSchedulerServiceAccount`), and the permission check (`Session::ActiveUserHasPermission` → direct `role_permissions` lookup) has **no implication expansion or admin bypass**. But my endpoint — and the existing class crons `finalize_class_attendance`, `send_instructor_exception_digests`, `run_series_min_attendees_check` — gate on `manage_class_schedule`, which the scheduler did **not** hold. So those crons were latently mis-authorized (they'd 403). Fixed at the single source of truth: `EnsureSchedulerServiceAccount` now also grants the scheduler role `manage_class_schedule` (best-effort — granted only when the permission row exists, which it always does in a real DB since `PopulatePermissions` seeds it before this runs; this keeps the auth unit tests that seed only `manage_subscriptions` unaffected). This makes the new cron work AND repairs the three existing class crons.
+- [x] Tests:
+  - `scheduled_job_test.cpp`: total job count 16 → **17**; `send_signup_open_reminders` present with the right path/POST; disabled at interval 0; interval propagated from config; all-zero (now 17 zeros) produces no jobs.
+  - `scheduler_test.cpp`: `InitializeRegistersAllEnabledJobs` count 16 → 17; the three `{…16 zeros…}` aggregate inits → 17 zeros so the "0 jobs" / "1 job" assertions stay correct (the 17th member would otherwise default to 3600 and add a job).
+  - `scheduler_config_test.cpp`: the all-zero validation case updated to 17 zeros.
+  - `service_account_test.cpp` (2 new): the scheduler is granted `manage_class_schedule` when seeded; `Ensure` still succeeds (and grants `manage_subscriptions`) when it isn't seeded.
+
+**Note:** the `scheduled_job.cpp` header comment still says "all jobs require manage_subscriptions" — that's now stale (the class crons require `manage_class_schedule`); left as-is to keep this change scoped, but worth a follow-up cleanup.
 
 ## 7. Frontend
 
