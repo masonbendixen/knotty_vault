@@ -102,12 +102,13 @@ Lowest layer first:
 
 ## 3. Table Helpers
 
-### 3.1 `TableHelpers::SignupOpenReminders`
-- [ ] `AddReminder(Transaction&, KeyValueTable&)` — idempotent on the partial unique index.
-- [ ] `CancelReminder(Transaction&, personId, eventSessionId)` — sets `cancelled_us=now`.
-- [ ] `GetPendingReadyToSend(Transaction&, nowUs)` → list of pending reminders where `notify_at_us <= nowUs` AND `notified_us IS NULL` AND `cancelled_us IS NULL`.
-- [ ] `MarkNotified(Transaction&, id, nowUs)`.
-- [ ] Tests.
+### 3.1 `TableHelpers::SignupOpenReminders` ✅
+- [x] `AddReminder(Transaction&, personId, classScheduleSlotId, occurrenceDateUs, notifyAtUs)` → reminderId — idempotent on the partial unique index. **Signature uses explicit params (house style — matches `ShiftChangeRequests::AddRequest`) rather than the plan's `KeyValueTable&`.** Uses `INSERT ... ON CONFLICT (person_id, class_schedule_slot_id, occurrence_date_us) WHERE notified_us IS NULL AND cancelled_us IS NULL DO NOTHING RETURNING id`; on conflict (a pending reminder already exists) it returns that existing row's id via a fallback `SELECT`.
+- [x] `CancelReminder(Transaction&, personId, classScheduleSlotId, occurrenceDateUs)` — sets `cancelled_us = now_us()` for the pending row; no-op when none. **Keyed by (person, slot, occurrence), NOT the plan's stale `eventSessionId`** — the §2 schema + redesign note key reminders by the occurrence identity (the occurrence usually has no persisted `event_sessions` row). §4.4 booking-dedupe must call it with (slot, occurrence) too.
+- [x] `GetPendingReadyToSend(Transaction&, nowUs)` → pending reminders where `notify_at_us <= nowUs` AND `notified_us IS NULL` AND `cancelled_us IS NULL`, ordered `notify_at_us ASC, id ASC`.
+- [x] `MarkNotified(Transaction&, id, nowUs)` — `DbCrud::UpdateRow` sets `notified_us = nowUs`.
+- [x] Added `GetReminder(Transaction&, id)` (single-row read, mirrors `ShiftChangeRequests::GetRequest`) for §4/§5 + tests.
+- [x] Tests — `sql_util/table_helpers/signup_open_reminders_test.cpp` (11 cases): AddReminder creates the pending row + round-trips; idempotent returns the existing pending id with no duplicate; a notified OR a cancelled row frees a fresh AddReminder; CancelReminder retires the pending row (cancelled_us set, notified_us still NULL) and drops it from the work list; CancelReminder is a harmless no-op when nothing pending and leaves other people's reminders alone; GetPendingReadyToSend filters by `notify_at_us <= now` and orders ASC, and excludes notified/cancelled rows; MarkNotified stamps notified_us and retires the row. Each test calls `CreateSignupOpenRemindersIndexes(tx)` first (the partial index AddReminder's `ON CONFLICT` needs isn't created by `SetupAllTables`).
 
 ## 4. Business Logic — `SignupReminderHelper`
 
