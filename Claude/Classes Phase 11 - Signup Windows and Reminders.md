@@ -163,39 +163,41 @@ All three registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. The DELETE/P
 
 **Note:** the `scheduled_job.cpp` header comment still says "all jobs require manage_subscriptions" — that's now stale (the class crons require `manage_class_schedule`); left as-is to keep this change scoped, but worth a follow-up cleanup.
 
-## 7. Frontend
+## 7. Frontend ✅ (button + plumbing; page-wiring + panel deferred — see notes)
 
-### 7.1 Catalog / calendar future-session hint
-- [ ] In the existing class / series / workshop card render, if the user's window is closed for this session, show "Sign-ups open {local-date}" chip + a "🔔 Remind me" button.
-- [ ] Clicking the button calls `requestSignupReminder(eventSessionId)`. If `WINDOW_ALREADY_OPEN`, surface a toast "Sign-ups are already open for this session".
-- [ ] Spec.
+### 7.1 Catalog / calendar future-session hint ✅ (reusable button) / ⚠️ (page-wiring deferred)
+- [x] Built a **reusable standalone `SignupReminderButton`** (`shared/components/signup-reminder-button/`): inputs `[classScheduleSlotId]` + `[occurrenceDateUs]`; the "🔔 Remind me when sign-ups open" button calls `requestSignupReminder` and, on the response, either flips to a confirmed "We'll remind you" state (`window_already_open=false`, success toast) or shows an **info toast "Sign-ups are already open for this session."** (`window_already_open=true`) and stays a button. Errors → error toast, stays actionable. Uses the existing `ToastService`. The button needs no up-front window state — the backend's `window_already_open` flag drives the UX.
+- [x] Spec — `signup-reminder-button.component.spec.ts` (5 cases): renders; success → confirmed + success toast; already-open → info toast, stays a button; failure → error toast, stays actionable; repeat-click no-op once set.
+- [ ] **Page-wiring DEFERRED (no suitable surface yet).** §7.1 wants the chip+button on a card where "the user's window is closed for this session." The "Sign-ups open {date}" chip needs per-session window state, which **no feed exposes**. And the only member-facing list carrying `class_schedule_slot_id` + `occurrence_date_us` is **`upcoming-classes`, which is recurring-membership-only** (`EligibleRecurringClassIds`) — those classes have no sign-up window, so the button would be misleading there. There is **no member-facing surface listing future *paid* workshop/series occurrences** with the slot + date. The button is ready to drop in once such a catalog/calendar surface exists (it needs backend support: a paid-offering feed exposing slot + occurrence + a window-closed/opens-on flag). **Not wired** rather than shipped on the wrong page.
 
-### 7.2 My signup-reminders panel (optional)
-- [ ] On `/my/account/notification-preferences` (created in Phase 6), add a section listing the user's pending reminders with a "Cancel" action each.
-- [ ] Spec.
+### 7.2 My signup-reminders panel (optional) — ⚠️ DEFERRED (no backend list endpoint)
+- [ ] The panel needs a "list my pending reminders" read; **no such endpoint exists** (§4.5 deferred the producer `GetPendingRemindersForPerson`; §5 built only POST/DELETE/admin-send). The `SignupReminderInfo` type + KVT conversion are in place, but a `GET /api/me/signup_reminders` endpoint + helper method are prerequisites. Deferred; admins can still inspect rows via Manage Data (§8).
 
-### 7.3 `ServerAccess` extensions
-- [ ] `requestSignupReminder(eventSessionId)`, `cancelSignupReminder(eventSessionId)`, `getMyPendingSignupReminders()`.
-- [ ] Update `ServerAccess.mock.spec.ts`.
+### 7.3 `ServerAccess` extensions ✅ (request + cancel; list deferred)
+- [x] `requestSignupReminder(classScheduleSlotId, occurrenceDateUs)` (POST) and `cancelSignupReminder(classScheduleSlotId, occurrenceDateUs)` (DELETE, query params) across interface / network / proxy / mock. **Keyed by (slot, occurrence), not the plan's stale `eventSessionId`.** `getMyPendingSignupReminders()` omitted (no backend list endpoint — §7.2).
+- [x] `ServerAccess.mock.spec.ts` (3 new + the logged-out batch +2): request creates a reminder / reports `window_already_open` (sentinel slot 999998) / 404 (slot 999999); cancel resolves; both 401 when logged out.
 
-### 7.4 Types
-- [ ] `signup-reminder.types.ts`: `SignupReminderInfo`.
+### 7.4 Types ✅
+- [x] `signup-reminder.types.ts`: `RequestSignupReminderResult` (the POST response) + `SignupReminderInfo` (for the deferred panel, mirroring the backend KVT).
 
-## 8. Admin Metadata (inspection only)
+## 8. Admin Metadata (inspection only) ✅
 
-- [ ] `signup_open_reminders` → `admin_nested_tables` under `people` keyed by `person_id`. Permission `admin`. This table is **system/user-generated** — rows are created by the user's §7.1 "🔔 Remind me" button and consumed/cancelled by the cron + booking-dedupe paths. There is no admin *authoring* workflow here, so registering it purely for inspection in Manage Data is appropriate (per memory `feedback_manage_data_is_debug_only.md`); it must NOT become a flow where staff hand-create reminder rows.
+- [x] `signup_open_reminders` added to `admin_nested_tables` (`PopulateAdminNestedTables` in `create_database.cpp`), nesting under `people` via `person_id` — mirrors the Phase 6 `user_notification_preferences` / `ical_feed_tokens` pattern. **No `admin_table_permissions` mapping → admin-only** (which satisfies the plan's "Permission `admin`"). Inspection only — there is no admin authoring workflow (rows are created by the "Remind me" button and consumed/cancelled by the cron + booking dedupe). Seed-data registration (consistent with the other ~40 `AddRow` calls), so no dedicated unit test.
 
-## 9. Tests-Required Summary
+## 9. Tests-Required Summary ✅
 
-- [ ] Table helper tests (CRUD + partial-unique-index + ready-to-send filter).
-- [ ] `signup_reminder_helper_test.cpp`:
-  - Request creates reminder at correct notifyAtUs.
-  - Request rejects when window already open.
-  - SendPendingReminders sends + marks notified.
-  - Series reminder sends **one** email with a multi-VEVENT `.ics` (N VEVENTs = upcoming instances); single-workshop reminder sends one email with a one-VEVENT `.ics` (resolved OQ-P11-1).
-  - Booking the same session cancels pending reminder.
-- [ ] Endpoint tests.
-- [ ] Frontend specs.
+- [x] **Table helper tests** (CRUD + partial-unique-index + ready-to-send filter) — `signup_open_reminders_test.cpp`, 11 cases (§3).
+- [x] **`signup_reminder_helper_test.cpp`** (13 cases, §4 + §5):
+  - [x] Request creates reminder at correct notifyAtUs.
+  - [x] Request rejects when window already open (no window + already-open).
+  - [x] SendPendingReminders sends + marks notified (+ skips future, null-mail no-op).
+  - [x] **Series reminder → one email with a multi-VEVENT `.ics`** (N VEVENTs computed via the same derivation, ASSERT ≥ 2); **single-workshop → one email, one-VEVENT `.ics`** (resolved OQ-P11-1).
+  - [x] Booking the same session cancels the pending reminder (`booking_helper_test.cpp::BookEventCancelsPendingSignupReminder` + the helper-level `CancelledReminderIsNotSent`); plus the §5 `CancelReminder` business method (2 cases).
+- [x] **Endpoint tests** — `post_signup_reminder_test` (6), `delete_signup_reminder_test` (4), `admin_send_signup_reminders_test` (2).
+- [x] **Schema + DDL** — `signup_open_reminders_test.cpp` schema cases (§2), `scheduling_key_value_table_test.cpp` (`SignupReminderInfo` + the today-feed fields).
+- [x] **Scheduler** — `scheduled_job_test` / `scheduler_test` / `scheduler_config_test` (job wiring + counts), `service_account_test` (scheduler permission grant).
+- [x] **Frontend specs** — `signup-reminder-button.component.spec.ts` (5), `ServerAccess.mock.spec.ts` (request/cancel + 401 batch). **Verified green: component spec 5/5, mock spec 463/463.**
+- [ ] **Not yet covered (deferred work):** §7.1 page-wiring spec + §7.2 panel spec — both await the prerequisite surfaces/endpoint noted in §7.
 
 ## 10. Cross-Layer Acceptance Criteria
 
