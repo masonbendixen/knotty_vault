@@ -82,8 +82,8 @@ Lowest layer first:
 
 ## 2. Database Schema
 
-### 2.1 `signup_open_reminders` table
-- [ ] `db_schema/signup_open_reminders.h/.cpp`:
+### 2.1 `signup_open_reminders` table ✅
+- [x] `db_schema/signup_open_reminders.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)`
   - `class_schedule_slot_id BIGINT NOT NULL REFERENCES class_schedule_slots(id)` — the occurrence's slot (the occurrence usually has no persisted `event_sessions` row yet)
@@ -92,11 +92,13 @@ Lowest layer first:
   - `notified_us BIGINT NULL`
   - `cancelled_us BIGINT NULL`
   - `created_us BIGINT NOT NULL`
-- [ ] Partial unique index `UNIQUE (person_id, class_schedule_slot_id, occurrence_date_us) WHERE notified_us IS NULL AND cancelled_us IS NULL` — one pending reminder at a time.
-- [ ] Index on `notify_at_us` for the daily cron scan.
+- [x] Partial unique index `signup_open_reminders_pending_unique_idx` `UNIQUE (person_id, class_schedule_slot_id, occurrence_date_us) WHERE notified_us IS NULL AND cancelled_us IS NULL` — one pending reminder at a time. (Raw `CREATE UNIQUE INDEX` in `CreateSignupOpenRemindersIndexes` — partial, so it can't be a DSL constraint.)
+- [x] Index `signup_open_reminders_notify_at_idx` on `notify_at_us` for the daily cron scan.
 
-### 2.2 Wire into DB init
-- [ ] `make_database_info.cpp` + `create_database.cpp`.
+**Implementation note (2026-06-16):** the table uses only existing schema-DSL features (FK refs, simple/nullable/default-now columns), so no DSL extension was needed. Both indexes live in `CreateSignupOpenRemindersIndexes(Transaction&)` (the established `Create*Indexes` pattern — `SetupAllTables` doesn't run these, so tests that exercise the partial unique index call it in-transaction first). Test coverage in `signup_open_reminders_test.cpp` (10 cases): valid-row round-trip + defaults; person/slot FK rejection; NOT NULL rejection (occurrence_date_us, notify_at_us); both indexes created + idempotent; partial-unique blocks a duplicate pending while allowing a distinct occurrence; a notified or cancelled row frees a new pending; distinct people share an occurrence.
+
+### 2.2 Wire into DB init ✅
+- [x] `make_database_info.cpp` (`MakeSignupOpenRemindersTable`, after iCal feed tokens) + `create_database.cpp` (`CreateTable` + `CreateSignupOpenRemindersIndexes`, FK-ordered after `class_schedule_slots`). Sources added to `db_schema/CMakeLists.txt` (core + test). Admin-metadata registration is deferred to §8 (inspection only).
 
 ## 3. Table Helpers
 
