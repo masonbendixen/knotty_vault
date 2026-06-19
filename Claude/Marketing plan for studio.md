@@ -177,14 +177,59 @@ Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience
 - **Referral program** — members refer a friend, both get a perk (free month / free couples upgrade). Cheapest acquisition there is, and it pulls in *more of the same kind of person*.
 - **Email/SMS list from day one** — and you're building the booking site yourself, so you own this channel completely. Capture every lead; it's the only audience the algorithm can't take away.
 
-## 7. Suggested sequence (how I'd roll this out)
+## 8. Channel reality check — TikTok, and the "content takes years" worry
 
-1. **One photo + video shoot** to bank 6–8 photos and 20+ vertical clips.
-2. **Set up the free foundation**: Google Business Profile, IG/TikTok, Meetup group, email capture.
-3. **Define the offer** (intro deal) and a simple landing/booking page to send ads to.
-4. **Post organically for 2–3 weeks**, see which clips pop.
-5. **Put paid money behind the winners** at whatever budget tier you pick.
-6. **Add retargeting** once there's enough traffic ($400+ tier).
+**On TikTok:** your skepticism is *strategically correct for your market*, so don't feel bad about it. Your buyer is a 38-year-old married Eastside engineer with disposable income — that person converts on **Instagram and Facebook**, not TikTok. TikTok's audience skews younger/broker, and you're right that it can invite a flakier, drama-prone crowd for a partner-touch discipline. **So: don't *build for* TikTok.** BUT — there's a free, zero-downside move: **auto-cross-post the exact same vertical Reels to TikTok and YouTube Shorts** (tools like Metricool/Later do it in one click). It costs you nothing, occasionally a video pops and sends a few curious locals, and you're not courting that audience or managing comments closely. Treat TikTok as a **passive billboard**, not a community you tend. Best of both.
+
+**On "content takes months/years to accumulate":** true if you rely on grabbing random clips in class — that path is slow and inconsistent. The fix is your **secret weapon**: you have a **video/marketing major shooting cheap for his portfolio** *and* a **best friend who's a creative director at an ad agency and a Premiere expert.** That's an agency-grade team most studios would kill for. So **don't accumulate — manufacture.** One focused **half-day "content factory" shoot** with a shot list can bank **20–40 vertical clips + a dozen photos** — i.e., 4–8 weeks of posting *and* your whole ad-creative library — in an afternoon. Do this **quarterly**, supplement with the organic in-class candids. You flip from "content-starved" to "content-rich" overnight. **You are not content-constrained; you just haven't run the factory yet.**
+
+## 9. Wild & wacky brainstorm (reject freely — volume is the point)
+
+A grab-bag of bigger swings. Some are gold, some are dumb, that's the deal.
+
+### Events & experiences (turn the studio into a destination)
+- **"Acro Date Night"** — a monthly ticketed couples event (~$30–40/couple). Low commitment, fun, wine-and-cheese vibe, ends with a couples photo. *This is a direct funnel into your $300 couples membership* and tailor-made for your married avatar. Run it on/near **Valentine's, anniversaries, date-night Fridays.**
+- **Student Showcase / "Cirque Night"** — quarterly mini-performance where students invite friends & family. Pure social proof + a built-in recruiting event (every guest is a warm prospect who just watched someone like them do something amazing). Capture it all on video for a year of content.
+- **Free monthly Open House** — exactly as you suggested. Low-pressure "try everything" night. Pair with a same-night signup incentive.
+- **Corporate team-building (this could be huge given your geography)** — you're surrounded by Microsoft, Meta, Google, Amazon, and a thousand funded startups. **Partner acro is *literally* a trust/communication exercise** — HR and team leads pay real money for offsites. Sell **"Team Trust Lab"** 90-min workshops to tech teams. High ticket, fills daytime/off-peak hours, and seeds individual memberships from attendees. Possibly your single most lucrative non-membership line.
+- **Bachelorette / birthday / private party packages** — aerial + acro is a memorable, very Instagrammable private booking. Affluent area, lots of celebrations, books your off-hours.
+
+### Local / guerrilla / partnership plays
+- **Woodinville winery pop-up — "Acro & Rosé"** — Woodinville is wine-country and your *exact* demographic spends weekends there. A handstand/acro demo + mini intro at a winery patio = perfect-fit eyeballs, gorgeous content, and a partner who'll co-promote to their list. Genuinely on-brand for the Eastside.
+- **Marymoor Park / Redmond farmers-market flash demo** — a 3-minute acro flash performance in a high-foot-traffic affluent-family spot, with a few people handing out **$19-intro QR cards.** Cheap, content-rich, very local.
+- **Climbing-gym & CrossFit cross-promo** — their members are your *perfect* avatar (strong, fit, looking for the next challenge). Trade: you teach a fun handstand mini-clinic at their gym, they let you flyer; you do the reverse. Warm, pre-qualified leads.
+- **Physio / chiropractor / "longevity" clinic referrals** — Eastside is full of premium wellness providers whose clients want to *move better*. A referral handshake sends you motivated, solvent prospects (and feeds your future spa).
+- **"First Friday" / local business alliance** — co-market with other premium Eastside studios (Pilates, dance) to share each other's audiences.
+
+### Offer & funnel hacks
+- **"Founding Member" scarcity** — for the relaunch, "first 50 founding members lock in $X / get a perk forever." Affluent + competitive demographic responds to exclusivity and FOMO.
+- **Couples challenge / "30-day partner challenge"** — a packaged 30-day couples program as the on-ramp; gamified, social, shareable, and it pre-sells the couples membership.
+- **Referral-as-status** — "bring a friend who joins → you both get a free month." Compounds, and recruits more of your ideal type.
+- **Lead-magnet PDFs** — "Handstand in 30 Days," "5 Partner Moves for Date Night," "The Eastside Adult's Guide to Trying Aerial." Email capture → nurture → workshop. You own the site, so this is nearly free to run.
+- **"Bring your spouse free" intro week** — leans on the gender insight: woman signs up, drags partner in, partner is the one who retains.
+
+### Content / brand swings
+- **Recurring series with hooks people return for** — "Can a Normal Adult Learn This in 30 Days?" docu-style follow of one real beginner. Builds a story arc people *subscribe* to, not just scroll past.
+- **"Eastside vs. gravity"** local-pride branding bit — playful hometown identity.
+- **Transformation wall / member spotlights** — real Eastside professionals ("Sarah, product manager, first handstand at 41"). Mirror = your avatar sees themselves.
+- **A signature, ownable move/photo** — one dramatic shape that becomes *your* visual signature across every grid, ad, and shirt.
+- **Merch as walking billboards** — tasteful "Knotty Yoga" tees/totes; affluent areas wear local-brand gear as identity.
+
+### Wackier (filter hard)
+- **Billboard / coffee-shop screens** near tech campuses with one impossible photo + "Beat the traffic. Stand on your hands. [Eastside]." (Plays to the commuter "kill time till traffic dies" insight you mentioned — a free bonus segment even if Eastside residents are your focus.)
+- **"Acro flash mob" at a Microsoft/Amazon campus plaza** at lunch (where allowed) → viral-able clip + corporate-workshop lead gen in one.
+- **Partner with a high-end gym/hotel spa** to pre-seed your future spa cross-sell while marketing fitness now.
+
+## 10. Suggested sequence (how I'd roll this out)
+
+1. **Run one "content factory" half-day shoot** with your team + a shot list → bank 20–40 vertical clips + photos (your posting library *and* ad creative in one afternoon).
+2. **Set up the free foundation**: Google Business Profile, IG + Facebook, Meetup group, email/SMS capture on your own site, Nextdoor presence.
+3. **Lock the funnel**: $19 intro workshop + a landing/booking page on your site + the in-room conversion choreography + a lead-magnet PDF.
+4. **Post organically ~2–3 weeks**, see which clips pop (cheap real-world A/B test).
+5. **Start paid at ~$400/mo on Meta**, pointed at the $19 intro, using your best-performing organic clips as the ads.
+6. **Measure cost-per-intro-signup and intro→member rate** for 4–6 weeks.
+7. **Turn the dial up** (toward $500–$1,000+, add retargeting) as long as CAC < ~$300 and you're under capacity.
+8. **Layer in events** (Acro Date Night, Open House, Showcase, first corporate workshop) as recurring funnels.
 
 ---
 
@@ -223,3 +268,32 @@ Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience
 	- I want to add students.
 13. Are you marketing the **four athletic classes only for now**, or do you want the brand built so it can later stretch to the **spa/massage** side without a rebrand?
 	- I want to grow these people into spa clients later but that's a bit in the future and will also be heavily targeting an older demographic than the fitness tier.
+
+---
+
+## Round 2 — open questions (let's keep going)
+
+Pick off whatever sparks something; each answer sharpens a section above.
+
+**Funnel & offer**
+1. Is **$19 intro workshop** the right hero offer, or do you want to test **$19 workshop vs. buy-one-month-get-one-free** head to head? (They attract different commitment levels.)
+2. What actually happens **inside the intro workshop** today — is it choreographed to end with a "wow + here's membership" moment, or is that something we need to design? (This is the single biggest ROI lever.)
+3. What's your rough gut on **intro→membership conversion** when someone shows up — 1 in 5? 1 in 2? (Tells us how hard to push paid.)
+4. Roughly **how long does the average member stay** (or your best guess)? Even a rough number pins down LTV and therefore how much we can spend to acquire.
+
+**Capacity & class mix**
+5. Of the 200 capacity, what's the **current count**, and which of the four disciplines has the **most open seats** to fill first? (Point ads at the emptiest profitable class.)
+6. Any **off-peak hours** (weekday daytime) you'd love to fill? That's where **corporate workshops / private bookings** shine.
+
+**The big swings — what's your appetite?**
+7. The **corporate "Team Trust Lab"** idea (selling partner-acro team-building to Eastside tech companies) — does that excite you or feel like a distraction right now? It could be a major revenue line.
+8. The **"Acro Date Night"** monthly couples event — want me to spec it out as a concrete recurring funnel (pricing, format, promo)?
+9. **Woodinville winery pop-up** / farmers-market flash demo — are you up for guerrilla/live events, or do you prefer to keep it studio + online?
+
+**Production & rollout**
+10. Can you get your **video friend + creative-director friend** for **one half-day "content factory" shoot** in the next few weeks? If yes, I'll build you a full **shot list** mapped to the ad themes above.
+11. Do you want me to draft the **actual Meta ad targeting setup** (audiences, geo radius around the 7 cities, interest/behavior stacks, the campaign structure) as a concrete next deliverable?
+12. Want a **lead-magnet PDF** drafted (e.g., "Handstand in 30 Days" or "5 Partner Moves for Date Night") to start the email-capture path?
+
+**Branding for the future**
+13. Should the brand name/visual identity stay **"Knotty Yoga"** for the athletic tier, or are you considering a name that stretches more cleanly to **fitness + spa** later? (Affects how hard we lean on the name in creative now.)
