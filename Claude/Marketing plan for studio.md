@@ -277,6 +277,7 @@ Pick off whatever sparks something; each answer sharpens a section above.
 
 **Funnel & offer**
 1. Is **$19 intro workshop** the right hero offer, or do you want to test **$19 workshop vs. buy-one-month-get-one-free** head to head? (They attract different commitment levels.)
+	- I figure we can do both. Intro workshops that are a sample of what class is like and a sales tool and then a hard close with if you buy today, you get buy one month, get the second month free but today only.
 2. What actually happens **inside the intro workshop** today — is it choreographed to end with a "wow + here's membership" moment, or is that something we need to design? (This is the single biggest ROI lever.)
 3. What's your rough gut on **intro→membership conversion** when someone shows up — 1 in 5? 1 in 2? (Tells us how hard to push paid.)
 4. Roughly **how long does the average member stay** (or your best guess)? Even a rough number pins down LTV and therefore how much we can spend to acquire.
