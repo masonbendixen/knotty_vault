@@ -279,11 +279,15 @@ Pick off whatever sparks something; each answer sharpens a section above.
 1. Is **$19 intro workshop** the right hero offer, or do you want to test **$19 workshop vs. buy-one-month-get-one-free** head to head? (They attract different commitment levels.)
 	- I figure we can do both. Intro workshops that are a sample of what class is like and a sales tool and then a hard close with if you buy today, you get buy one month, get the second month free but today only.
 2. What actually happens **inside the intro workshop** today — is it choreographed to end with a "wow + here's membership" moment, or is that something we need to design? (This is the single biggest ROI lever.)
+	- I generally go through a basic class with introduction to basic acrobatics strength, simple aerial, basic partner acro, and maybe some arm balancing. I kind of teach to the level of the people. I want them to get an accurate representation of what my classes are like and what they can expect.
 3. What's your rough gut on **intro→membership conversion** when someone shows up — 1 in 5? 1 in 2? (Tells us how hard to push paid.)
+	- Probably about 1 in three to four.
 4. Roughly **how long does the average member stay** (or your best guess)? Even a rough number pins down LTV and therefore how much we can spend to acquire.
+	- Many years. I don't lose many people that stick around six months.
 
 **Capacity & class mix**
 5. Of the 200 capacity, what's the **current count**, and which of the four disciplines has the **most open seats** to fill first? (Point ads at the emptiest profitable class.)
+	- I have about 25 people so far. But I have a decent number of classes and schedule space to add way more based on demand. 
 6. Any **off-peak hours** (weekday daytime) you'd love to fill? That's where **corporate workshops / private bookings** shine.
 
 **The big swings — what's your appetite?**
