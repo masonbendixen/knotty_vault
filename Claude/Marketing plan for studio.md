@@ -36,6 +36,25 @@ A working tagline for the brand umbrella (not an ad slogan, the north star):
 
 Everything below should feel like it belongs to that promise.
 
+### Who we're actually talking to (from your answers)
+
+This is one of the cleaner, higher-value target markets I've seen — write it on the wall, because every ad, audience, and creative decision flows from it:
+
+- **Geography:** Eastside affluent suburbs — **Redmond, Kirkland, Bellevue, Sammamish, Woodinville, Bothell, Issaquah.** (You're not chasing Seattle proper.) This is one of the wealthiest, most tech-employed, highest-disposable-income corridors in the country. That matters: $200/mo is *nothing* to this demographic, so price is not your obstacle — **belief that "I could do this" is.**
+- **The person:** 30s–40s, **married, well-employed, no kids or older kids**, already in decent shape and wanting to "move it up a notch." Often a **dance / cheer / gymnastics / CrossFit / climbing** background.
+- **Explicitly NOT:** very overweight, injured, or rehab-seeking. Your creative should subtly signal "athletic next step," not "anyone off the couch" — *without* tipping into intimidating (see below).
+- **The gender nuance (important strategically):** women are easier to acquire, men retain better. So: **acquire through women, retain through couples.** Market the entry to women, then use couples / bring-your-partner mechanics to pull the man in — and he's the one who stays. Your **$300 couples membership** is the retention engine hiding in plain sight.
+- **Brand tone:** relatable & approachable, with a *light* aspirational top note. The enemy is intimidation. Real students, real laughs, "look how normal these people are" — then one jaw-dropping move to create the want.
+
+### The unit economics change everything (read this before the budget section)
+
+You said you don't know how much to spend or what ROI to expect. Here's the frame that answers it:
+
+- A membership is **$200/mo recurring.** If a member stays even **6 months that's ~$1,200**; a year is **$2,400.** Couples double it.
+- That means you can afford to **pay $100–$300 to acquire a member and still make 4–24× back.** Most local businesses can't dream of those numbers — you can because of recurring revenue + an affluent market.
+- **So the real question isn't "what's the budget?" — it's "how high can I push spend before my cost-per-new-member climbs above ~$300 OR I hit my 200-student capacity?"** Whichever comes first. Everything below treats budget as a *dial you turn up while the math works*, not a fixed tier.
+- Your two genuine constraints: **(1) capacity (200 — lots of headroom)** and **(2) content/ops throughput.** You are **distribution-constrained, not budget-constrained** — and with a near-pro production team (below), not even very content-constrained. That's a great problem.
+
 ## 2. Video content ideas for ads
 
 Your partner-acro "couple's counseling" concept is genuinely great — it has a *reveal* and a *reframe*, which is exactly what short-form needs. Here are more in that vein, grouped by the mechanic that makes them work.
@@ -62,6 +81,17 @@ Your partner-acro "couple's counseling" concept is genuinely great — it has a 
 - **"POV: your first aerial class"** — exaggerated terror → unexpected grace → ear-to-ear grin.
 - **"Things my non-acro friends say"** — quick-cut bits ("aren't you scared?", "isn't that just yoga?") answered with a move.
 - **Bloopers / fails montage** — humanizing, shareable, makes it feel approachable rather than elite.
+
+### F. The Couples / Date-night angle (your highest-LTV segment — lean in)
+- **"Date ideas, ranked"** — text overlay: "Dinner (forgettable). Movie (you didn't talk). Acro (you literally held each other up)." → couple doing a clean flying pose, both grinning.
+- **"My husband and I needed a hobby that wasn't a screen."** Real couple, relatable voiceover, ending on them nailing a counterbalance.
+- **"Couples who acro together…"** — playful, the base pretending to drop the flyer, both cracking up. Sells trust + fun, defuses intimidation.
+- **The bicker-to-sync bit**: a couple comically out of sync ("you LEANED!" "you didn't COUNT!") → smash cut to them perfectly nailing it → "Turns out we just needed a base and a flyer." Ties straight back to your couples-counseling hook.
+
+### G. The "approachable next step" angle (speaks to your exact avatar)
+- **"You already lift / climb / run. This is the fun part you're missing."** Quick cuts of gym/climbing/running B-roll → smash to acro. Targets the fit-but-bored 30-something directly.
+- **"Things that finally made working out fun again."** — for the person who's done the treadmill grind and wants play, not punishment.
+- **The "no, you don't need to be flexible/strong already" myth-buster** — answers the #1 silent objection of your "quasi-fit, slightly intimidated" prospect.
 
 ### Production notes
 - Shoot **vertical 9:16 first**, everything else is a crop.
@@ -94,36 +124,58 @@ Short, swipeable lines to test:
 - **"Trust falls, but athletic."** (partner acro)
 - **"Stronger together. Literally."** (partner acro)
 - **"Your first class is the hardest. After that you're hooked."**
+- **"The best date night on the Eastside doesn't involve a reservation."** (couples, local)
+- **"You already work out. This is the part that's fun."** (fit-but-bored avatar)
+- **"Date night, but you'll actually remember it."** (couples)
+- **"Couples who fly together, stay together."** (couples)
+- **"For people who are done with the treadmill."** (avatar)
+- **"You don't need to be flexible. You need to be curious."** (objection-killer)
 
-## 5. Monthly budget plans
+## 5. The funnel (build this before you spend a dollar)
 
-A few principles baked into all tiers:
-- **Don't split a tiny budget across many platforms.** Below ~$15/day a platform can't exit its learning phase. Concentrate.
-- **Meta (Instagram + Facebook) is one ad account, one budget** — let Meta distribute across both placements. Don't think of IG and FB as separate spends.
-- **Google "Search" is intent capture** (people already searching "aerial class near me"); **Meta is demand creation** (people who didn't know they wanted it). For a novel/visual offering, **Meta is the workhorse**; Google Search is a cheap always-on safety net.
-- **Always reserve a slice for "boosting your single best organic post"** — your own winning Reel outperforms most purpose-built ads.
-- **Free/owned channels do the heavy lifting at every tier** (Section 6). Paid amplifies what's already working.
+Ads don't sell $200/mo memberships cold. They sell a **cheap, low-risk first step**, and the *experience* sells the membership. Your funnel:
 
-| Tier | Meta (IG+FB) ads | Google | Boost best organic post | Other / experiment | Notes |
-|---|---|---|---|---|---|
-| **$100/mo** | $80 (80%) | $0 | $20 (20%) | $0 | One platform only. ~$2.65/day Meta — keep ONE simple campaign, one audience, one CTA. Lean hard on free channels. |
-| **$200/mo** | $140 (70%) | $20 (10%) Google Business Profile is free; this is a tiny Search safety net for "aerial class near me" | $40 (20%) | $0 | Now you can run 2 creatives and let Meta pick a winner. |
-| **$400/mo** | $260 (65%) | $60 (15%) Search | $40 (10%) | $40 (10%) — first Reels/TikTok test or a local micro-influencer trade | Enough to A/B test audiences AND creatives. |
-| **$500/mo** | $300 (60%) | $75 (15%) Search + first retargeting | $50 (10%) | $75 (15%) — retargeting (warm audiences) + creator collab | Add a **retargeting** layer: cheap, high-ROI, re-touches people who watched 50%+ of a video or hit the site. |
+```
+Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience ──► membership ($200 / couple $300)
+        └──► Free PDF / lead magnet ──► email nurture ──► intro workshop ──► membership
+```
 
-**The single most important spend rule for a small budget:** put real money into **one clear offer** (e.g., "$X intro class" or "free first class"), point all ads at it, and measure cost-per-signup — not likes. Likes don't pay rent; bums on mats do.
+- **The paid intro workshop ($9–$19) is the hero offer.** Your instinct is dead right: a small fee massively outperforms "free" on show-up rate because of skin in the game. $19 also filters for your "employed, serious" avatar and screens out flakes. Price it **$19**, not $9 — your market won't blink, and it qualifies harder.
+- **The conversion happens IN THE ROOM, not in the ad.** So the workshop must be choreographed to end with: a genuine win (everyone gets *one* impressive photo of themselves inverted/flying), a warm "here's what membership looks like" moment, and a **same-day signup incentive** (e.g., "join today and your $19 applies / first month is X"). The single biggest ROI lever in this whole plan is **intro→membership conversion rate** — a shoot-for 30–50%.
+- **The lead magnet (email path)** captures the not-ready-yet: a free **"Handstand in 30 days" progression guide** or **"5 partner moves for date night"** PDF → email → nurture sequence on your own site → workshop. Cheap, compounding, and you *own* the audience.
+- **Your offer menu** (all consistent with the funnel): $19 intro workshop · free monthly **open house** · **student showcase / "Cirque night"** (recruiting event, social proof) · **buy-one-month-get-one-free** for fence-sitters who skip the workshop.
 
-## 6. Free / low-cost channels (do these regardless of budget)
+## 6. Budget — think of it as a dial, not a tier
 
-- **Google Business Profile** — free, and the #1 thing for "near me" searches. Photos, hours, class list, reviews. Ask every happy student for a review.
-- **Instagram + TikTok organic** — post the same vertical clips you're already making for ads. 4–7x/week. Reels reach > feed by a mile right now.
-- **Meetup.com** — a "Partner Acro Jam" or "Handstand Practice" group is *perfect* for this niche; it's how a huge share of the acro community actually finds classes. Low effort, high intent.
-- **Facebook Group** (your own community) + posting in **local fitness / dance / circus / "things to do in [city]" groups**.
-- **Free community jams / "bring a friend" days** — partner acro especially spreads by people physically bringing someone.
-- **Cross-promotion / trade** with nearby complementary businesses (climbing gyms, dance studios, physiotherapists, the future spa/massage side of your own business).
-- **Local micro-influencers** — trade free classes for content. One enthusiastic local creator with 5–20k followers often beats paid reach.
-- **Referral program** — "bring a friend, you both get a free class." Cheapest acquisition there is.
-- **Email/SMS list** from day one — capture every lead; it's the only audience you actually own.
+**The mindset shift:** because each member is worth $1,200–$2,400+, you should **scale spend UP as long as your cost-per-acquired-member stays under ~$300 and you're under 200 students.** Don't anchor on a number — anchor on the *math*. Here's roughly what to expect at each level. (CAC = cost to acquire one paying member. These are planning estimates for affluent-suburb fitness on Meta; your real numbers replace them within ~4–6 weeks.)
+
+| Monthly ad spend | Where it goes | What to expect | When to stay here |
+|---|---|---|---|
+| **$100** ("toe in water") | 100% Meta, one audience, one offer (~$3.30/day) | Barely exits Meta's learning phase. Maybe 1–3 intro signups/mo. Mostly proves the creative works. | Only as a 2–4 week *test*, not a destination. Your economics justify far more. |
+| **$200** | ~$170 Meta + ~$30 boosting your best organic Reel | 2 creatives competing; first real read on cost-per-lead. ~3–6 intro signups → ~1–3 members. | While you're still learning which creative/audience wins. |
+| **$400** | ~$300 Meta + ~$50 boost + ~$50 Google Search net ("aerial/handstand class near me") | Can A/B test audiences *and* creatives. ~6–12 intros → ~3–6 members = **likely already cash-flow positive on month 1**, very positive over LTV. | The sensible **default starting commitment** given your economics. |
+| **$500–$1,000+** | ~60% Meta prospecting · ~15% retargeting (site visitors / video-viewers) · ~15% Google Search · ~10% boost/creator collabs | Retargeting layer kicks in (cheap, warm, high-ROI). At good CAC this is **5–15+ new members/mo**, i.e. **$1,000–$3,000/mo of NEW recurring revenue added every month, compounding.** | **Push here fast if CAC < ~$300.** This is where the recurring-revenue snowball really starts. Keep climbing until CAC rises or you near capacity. |
+
+**Allocation principles (all tiers):**
+- **Meta (IG + Facebook) is the workhorse** — one ad account, one budget, let Meta split placements. For your demographic, **Facebook still carries serious weight** (married 35–45 Eastside professionals live there), so don't dismiss FB as "old people."
+- **Google Search is a cheap intent net**, not a driver — catch the few already typing "aerial class Redmond." Google **Business Profile is free** and separate; set it up regardless.
+- **Always keep a slice to boost your single best organic post.** Your own winning Reel beats most purpose-built ads — and with your production team you'll have winners.
+- **Retargeting is the highest-ROI dollar you'll spend** — but you need traffic first, so it turns on around $400–$500.
+- **Measure cost-per-intro-signup and intro→member rate. Not likes.** Likes don't pay rent; bums on mats do. Track every member's source (ask "how'd you hear about us" at signup, and use your own site's analytics since you control it).
+
+**Bottom line on "how much":** start at **$400/mo for 4–6 weeks** to get clean data, then **turn the dial up aggressively** as long as the per-member math holds. With your LTV and capacity, under-spending is the bigger risk than over-spending.
+
+## 7. Free / low-cost channels (do these regardless of budget)
+
+- **Google Business Profile** — free, and the #1 thing for "near me" searches. Photos, hours, class list, reviews. **Reviews are huge for the Eastside** — this is a research-y, due-diligence demographic. Build a habit of asking every happy member for a Google review (a quick QR card at the door).
+- **Instagram + Facebook organic** — post the vertical clips you're already shooting. Even 3–4x/week compounds. Reels reach > feed by a mile. **Cross-post to Facebook** specifically — that's where your married-35+ avatar lives.
+- **Meetup.com** — a free **"Eastside Partner Acro Jam"** or **"Redmond Handstand Practice"** group is *perfect* for this niche; it's literally how the acro community finds each other. High-intent, low-effort, and a content goldmine.
+- **Facebook Groups** — your own community group, plus posting in local ones: **"Redmond/Kirkland/Bellevue Moms," "Eastside Foodies/Things To Do," neighborhood Buy-Nothing/Nextdoor, local fitness & dance groups.** Nextdoor in particular over-indexes on exactly your affluent-homeowner avatar.
+- **Free community jams / "bring a partner" days** — partner acro spreads by people physically bringing someone. Engineer this.
+- **Cross-promotion / trade** with Eastside complementary businesses (climbing gyms, dance/cheer studios, CrossFit boxes, physios, chiropractors) — and your own future **spa/massage** side.
+- **Local micro-influencers** — *not* teen TikTokers. Think **Eastside lifestyle / fitness / "mom" / date-night-ideas accounts** with 5–30k engaged local followers. Trade classes for content. One good local creator beats a lot of paid reach.
+- **Referral program** — members refer a friend, both get a perk (free month / free couples upgrade). Cheapest acquisition there is, and it pulls in *more of the same kind of person*.
+- **Email/SMS list from day one** — and you're building the booking site yourself, so you own this channel completely. Capture every lead; it's the only audience the algorithm can't take away.
 
 ## 7. Suggested sequence (how I'd roll this out)
 
