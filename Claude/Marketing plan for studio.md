@@ -21,7 +21,24 @@ Let's brainstorm and explore all kinds of ideas. Please start a dialog with me a
 
 # Place plan here
 
-> Status: **Brainstorm v0.1** — first pass of ideas to react to. Nothing here is locked. See the open questions at the bottom; answer whatever sparks something and we'll iterate.
+> Status: **Brainstorm v0.3** — now built around your answers (both rounds). Your verbatim answers are preserved in **Appendix A** at the bottom; the plan body below distills them so this reads as a plan, not a transcript.
+
+## Studio snapshot (what we know — the facts every decision flows from)
+
+| | |
+|---|---|
+| **Market** | Eastside affluent suburbs: Redmond, Kirkland, Bellevue, Sammamish, Woodinville, Bothell, Issaquah. Not chasing Seattle proper. One of the highest-income, most tech-employed corridors in the US. |
+| **Avatar** | 30s–40s, married/partnered, well-employed, no kids or older kids, already fit and wanting to level up. Backgrounds in dance / cheer / gymnastics / CrossFit / climbing. **Not** for very overweight, injured, or rehab-seeking. |
+| **Owners** | **Queer-owned** — you and your partner teach and run it together. **Significant existing LGBTQ+ student base.** (See the dedicated inclusive-marketing section — this is a real competitive moat.) |
+| **Offer** | Membership **$200/mo**, couples **$300/mo**. Hero entry = **$19 intro workshop** (a real sample class) → **hard close: "buy today → buy one month, get the second free, today only."** Also: free open houses, student showcase. |
+| **Conversion** | Intro → membership ≈ **1 in 3–4** (~28%). Strong. |
+| **Retention** | **Multi-year.** You rarely lose anyone past 6 months → **LTV is huge** (this is the headline fact for budget). |
+| **Capacity** | Up to **200**; currently **~25 students** with lots of schedule headroom → aggressive growth is justified, you won't overflow. |
+| **Off-peak** | Nothing weekday-daytime yet. **Mon/Fri lunch** is ripe (tech WFH days) → corporate + lunch classes. |
+| **Production** | Near-pro team for cheap: a video/marketing-major friend (portfolio-building) + a best friend who's a creative director at an ad agency & Premiere expert. Lights bought. Photogenic, willing students. **You are distribution-constrained, not content-constrained.** |
+| **Channels** | Build for **Instagram + Facebook** (where the avatar lives). TikTok = passive cross-post only. Booking/email = **your own site** (this codebase) → you own the audience. |
+| **Brand** | "Knotty Yoga" today, but you're developing a **new, more inclusive, less-double-entendre name** → build creative around the *promise* + visual identity, don't hard-bake the current name everywhere. |
+| **Goal (90 days)** | **Add students.** Spa/massage is a *later*, older-demographic cross-sell — build the brand so it can stretch there without a rebrand. |
 
 ## 1. Positioning (the thing all the ads should ladder up to)
 
@@ -43,17 +60,18 @@ This is one of the cleaner, higher-value target markets I've seen — write it o
 - **Geography:** Eastside affluent suburbs — **Redmond, Kirkland, Bellevue, Sammamish, Woodinville, Bothell, Issaquah.** (You're not chasing Seattle proper.) This is one of the wealthiest, most tech-employed, highest-disposable-income corridors in the country. That matters: $200/mo is *nothing* to this demographic, so price is not your obstacle — **belief that "I could do this" is.**
 - **The person:** 30s–40s, **married, well-employed, no kids or older kids**, already in decent shape and wanting to "move it up a notch." Often a **dance / cheer / gymnastics / CrossFit / climbing** background.
 - **Explicitly NOT:** very overweight, injured, or rehab-seeking. Your creative should subtly signal "athletic next step," not "anyone off the couch" — *without* tipping into intimidating (see below).
-- **The gender nuance (important strategically):** women are easier to acquire, men retain better. So: **acquire through women, retain through couples.** Market the entry to women, then use couples / bring-your-partner mechanics to pull the man in — and he's the one who stays. Your **$300 couples membership** is the retention engine hiding in plain sight.
+- **The acquisition/retention nuance:** women are easier to acquire, men retain better. So the strategic move is **acquire broadly, retain through couples.** Whatever the entry point, **couples / bring-your-partner mechanics** are the retention engine — your **$300 couples membership** is hiding in plain sight. (Couples here means *all* couples — see the inclusive section; don't let imagery default to hetero pairs.)
+- **Queer-owned is a core advantage, not a side note:** you and your partner run and teach this together, with a real LGBTQ+ student base. On the Eastside — corporate, suburban, and thin on explicitly queer-affirming *athletic* spaces — an unquestionably safe, celebratory home for queer people and queer couples is a genuine moat. It's authentic (you're the real thing, not rainbow-washing), and it dovetails with the more-inclusive name you're building. Full playbook in **§ Inclusive / LGBTQ+ marketing** below.
 - **Brand tone:** relatable & approachable, with a *light* aspirational top note. The enemy is intimidation. Real students, real laughs, "look how normal these people are" — then one jaw-dropping move to create the want.
 
 ### The unit economics change everything (read this before the budget section)
 
-You said you don't know how much to spend or what ROI to expect. Here's the frame that answers it:
+You said you don't know how much to spend or what ROI to expect. **Your Round 2 numbers answer it decisively — and the answer is "a lot more than you'd guess."**
 
-- A membership is **$200/mo recurring.** If a member stays even **6 months that's ~$1,200**; a year is **$2,400.** Couples double it.
-- That means you can afford to **pay $100–$300 to acquire a member and still make 4–24× back.** Most local businesses can't dream of those numbers — you can because of recurring revenue + an affluent market.
-- **So the real question isn't "what's the budget?" — it's "how high can I push spend before my cost-per-new-member climbs above ~$300 OR I hit my 200-student capacity?"** Whichever comes first. Everything below treats budget as a *dial you turn up while the math works*, not a fixed tier.
-- Your two genuine constraints: **(1) capacity (200 — lots of headroom)** and **(2) content/ops throughput.** You are **distribution-constrained, not budget-constrained** — and with a near-pro production team (below), not even very content-constrained. That's a great problem.
+- A membership is **$200/mo recurring**, and you said members stay **multiple years** (rarely lose anyone past 6 months). Even a *deliberately conservative* **18-month** average life = **$3,600 LTV**; a realistic multi-year life is **$5,000–$7,000+**. Couples ($300/mo) are richer still.
+- **Your funnel already converts ~1 in 3.5** intro attendees into members. So if Meta delivers an intro signup for, say, **$15–$40**, your **cost to acquire a member is roughly $50–$140** (≈3.5 × cost-per-intro). Against a **$3,600+ LTV**, that's a **25–70×** return. Those are absurd, wonderful numbers — they say *spend*.
+- **Reframe the whole budget question:** it's not "what tier?" It's **"how high can I push spend before cost-per-member climbs past what I'm willing to pay (comfortably $300–$600 given multi-year LTV) OR I approach 200 capacity?"** With ~25 students today, capacity is *not* your limit for a long time — so **the limiter is just keeping CAC reasonable and ops/content flowing.** Budget below is a **dial you turn up while the math holds**, not a fixed tier.
+- Your two real constraints: **(1) ops/instructor throughput as classes fill** and **(2) content production** — and with your near-pro team, even content isn't tight. **You are distribution-constrained, not budget-constrained.** The biggest risk in this whole plan is *under*-spending.
 
 ## 2. Video content ideas for ads
 
@@ -136,25 +154,26 @@ Short, swipeable lines to test:
 Ads don't sell $200/mo memberships cold. They sell a **cheap, low-risk first step**, and the *experience* sells the membership. Your funnel:
 
 ```
-Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience ──► membership ($200 / couple $300)
+Ad (Meta) ──► $19 intro workshop ──► sample class + hard close ──► membership ($200 / couple $300)
         └──► Free PDF / lead magnet ──► email nurture ──► intro workshop ──► membership
 ```
 
-- **The paid intro workshop ($9–$19) is the hero offer.** Your instinct is dead right: a small fee massively outperforms "free" on show-up rate because of skin in the game. $19 also filters for your "employed, serious" avatar and screens out flakes. Price it **$19**, not $9 — your market won't blink, and it qualifies harder.
-- **The conversion happens IN THE ROOM, not in the ad.** So the workshop must be choreographed to end with: a genuine win (everyone gets *one* impressive photo of themselves inverted/flying), a warm "here's what membership looks like" moment, and a **same-day signup incentive** (e.g., "join today and your $19 applies / first month is X"). The single biggest ROI lever in this whole plan is **intro→membership conversion rate** — a shoot-for 30–50%.
+- **The $19 intro workshop is the hero offer** (price it $19, not $9 — your market won't blink and it qualifies harder). Your model is exactly right: the workshop is a **real, representative sample class** (a taste of strength, simple aerial, basic partner acro, arm balancing, taught to the room's level) that doubles as a **sales tool**, followed by a **hard close**: *"Join today and you get buy-one-month-get-the-second-free — today only."* That two-step (genuine value → urgency close) is textbook and you're already doing it.
+- **You already convert ~1 in 3.5 — that's strong; protect and nudge it.** The conversion happens IN THE ROOM, so keep tuning the close: make sure everyone leaves with **one impressive photo/clip of themselves** flying or inverted (instant social proof they'll share *and* a reason to come back), a crisp "here's what membership looks like" moment, and the today-only urgency. Even nudging 28% → 35% is free money on top of every ad dollar.
+- **Note the offer stack:** the **BOGO-month** close is your in-room urgency play; keep the separate **standalone BOGO** offer in reserve for fence-sitters who *won't* book a workshop (a softer, lower-friction path). They serve different commitment levels — run both.
 - **The lead magnet (email path)** captures the not-ready-yet: a free **"Handstand in 30 days" progression guide** or **"5 partner moves for date night"** PDF → email → nurture sequence on your own site → workshop. Cheap, compounding, and you *own* the audience.
 - **Your offer menu** (all consistent with the funnel): $19 intro workshop · free monthly **open house** · **student showcase / "Cirque night"** (recruiting event, social proof) · **buy-one-month-get-one-free** for fence-sitters who skip the workshop.
 
 ## 6. Budget — think of it as a dial, not a tier
 
-**The mindset shift:** because each member is worth $1,200–$2,400+, you should **scale spend UP as long as your cost-per-acquired-member stays under ~$300 and you're under 200 students.** Don't anchor on a number — anchor on the *math*. Here's roughly what to expect at each level. (CAC = cost to acquire one paying member. These are planning estimates for affluent-suburb fitness on Meta; your real numbers replace them within ~4–6 weeks.)
+**The mindset shift:** because each member is worth **$3,600+ in LTV** (multi-year retention) and you already convert ~1 in 3.5, you should **scale spend UP as long as cost-per-acquired-member stays comfortably under ~$300–$600 and you're well under 200 students.** With ~25 students today you have *enormous* headroom. Don't anchor on a number — anchor on the *math*. Here's roughly what to expect at each level. (CAC = cost to acquire one paying member ≈ 3.5 × cost-per-intro-signup. These are planning estimates for affluent-suburb fitness on Meta; your real numbers replace them within ~4–6 weeks.)
 
 | Monthly ad spend | Where it goes | What to expect | When to stay here |
 |---|---|---|---|
 | **$100** ("toe in water") | 100% Meta, one audience, one offer (~$3.30/day) | Barely exits Meta's learning phase. Maybe 1–3 intro signups/mo. Mostly proves the creative works. | Only as a 2–4 week *test*, not a destination. Your economics justify far more. |
 | **$200** | ~$170 Meta + ~$30 boosting your best organic Reel | 2 creatives competing; first real read on cost-per-lead. ~3–6 intro signups → ~1–3 members. | While you're still learning which creative/audience wins. |
 | **$400** | ~$300 Meta + ~$50 boost + ~$50 Google Search net ("aerial/handstand class near me") | Can A/B test audiences *and* creatives. ~6–12 intros → ~3–6 members = **likely already cash-flow positive on month 1**, very positive over LTV. | The sensible **default starting commitment** given your economics. |
-| **$500–$1,000+** | ~60% Meta prospecting · ~15% retargeting (site visitors / video-viewers) · ~15% Google Search · ~10% boost/creator collabs | Retargeting layer kicks in (cheap, warm, high-ROI). At good CAC this is **5–15+ new members/mo**, i.e. **$1,000–$3,000/mo of NEW recurring revenue added every month, compounding.** | **Push here fast if CAC < ~$300.** This is where the recurring-revenue snowball really starts. Keep climbing until CAC rises or you near capacity. |
+| **$500–$1,000+** | ~60% Meta prospecting · ~15% retargeting (site visitors / video-viewers) · ~15% Google Search · ~10% boost/creator collabs | Retargeting layer kicks in (cheap, warm, high-ROI). At good CAC this is **5–15+ new members/mo**, i.e. **$1,000–$3,000/mo of NEW recurring revenue added every month, compounding** (and with multi-year retention, that revenue *stacks*). | **Push here fast** — with ~25/200 students and $3,600+ LTV, CAC has a *long* way to climb before this stops being wildly profitable. Keep climbing until CAC gets uncomfortable or classes fill. |
 
 **Allocation principles (all tiers):**
 - **Meta (IG + Facebook) is the workhorse** — one ad account, one budget, let Meta split placements. For your demographic, **Facebook still carries serious weight** (married 35–45 Eastside professionals live there), so don't dismiss FB as "old people."
@@ -165,7 +184,37 @@ Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience
 
 **Bottom line on "how much":** start at **$400/mo for 4–6 weeks** to get clean data, then **turn the dial up aggressively** as long as the per-member math holds. With your LTV and capacity, under-spending is the bigger risk than over-spending.
 
-## 7. Free / low-cost channels (do these regardless of budget)
+## 7. Inclusive / LGBTQ+ marketing — your competitive moat
+
+This is one of your strongest, most ownable advantages, so treat it as a pillar — not a Pride-month afterthought. You and your partner are a **queer couple who run and teach the studio**, with a **real LGBTQ+ student base**, in a region (the corporate Eastside) where explicitly queer-affirming *athletic* spaces are scarce. Partner acro and aerial are intimate, touch-based, trust-based disciplines — so "a place where queer people and queer couples are unquestionably safe and celebrated" is a powerful, differentiated promise that bigger gyms literally cannot copy. And it's authentic: you're the real thing, which is exactly what this audience can smell from a mile away.
+
+### Principles (get the tone right or it backfires)
+- **Represent, don't tokenize.** Put same-sex pairings and diverse couples in your *main* content rotation year-round — not fenced into a June carve-out. The signal queer audiences trust is "they're already here, normally," not a once-a-year rainbow logo swap.
+- **You and your partner are the story.** A queer couple building a studio where everyone can fly is relatable, aspirational, and rare. Lean into founder content — it humanizes the brand and signals safety simultaneously.
+- **Safety + consent as a named value.** A consent-forward, respectful-touch culture is both a strong queer draw *and* a universal one — and it directly answers the "weird sexual dynamics" worry you raised about certain crowds. Make "everyone is safe and respected here" explicit on the about page and in instructor culture.
+- **It pairs perfectly with the inclusive rebrand** you're developing — the inclusivity isn't a campaign, it's the brand identity.
+
+### Channels (queer-specific, layered on top of the general plan)
+- **GSBA (Greater Seattle Business Association)** — the LGBTQ+ chamber of commerce. Get **certified as an LGBTQ-owned business**: directory listings, networking, and (big one) **corporate procurement** relationships. Many Eastside tech companies actively prioritize LGBTQ-owned vendors — this feeds your corporate-workshop line directly.
+- **Tech LGBTQ+ ERGs (Employee Resource Groups)** — Microsoft **GLEAM**, Amazon **glamazon**, Google **Gayglers**, Meta Pride, etc. These groups have **real budgets** for team events, Pride activities, and wellness. A *queer-owned* partner-acro "Team Trust Lab" is a near-perfect, hard-to-refuse pitch. Plausibly your **single highest-value B2B channel** — it merges the corporate line + the LGBTQ moat.
+- **Pride events** — Seattle Pride (June), **Eastside/Redmond Pride**, Capitol Hill Pride, Bellevue Pride. Booth, live acro demo, flyer, or perform. Seattle Pride pulls plenty of Eastside queer folks even though you're Eastside-focused.
+- **Queer community orgs & rec leagues** — Gay City, Ingersoll, Lambert House, GSBA events, and LGBTQ+ sports/social leagues (e.g., Emerald City / Team Seattle). Cross-promote jams and events.
+- **Queer event calendars, FB groups & Meetups** — "Seattle LGBTQ events," queer women's groups, gay men's social groups, "Eastside Queers," etc. Post your jams, date nights, and speed-dating events there.
+- **Queer micro-influencers** — local *queer* lifestyle/fitness/date-night creators, not generic ones. Trade classes for content.
+- **Queer-friendly business directories / maps** — get listed.
+
+### Events & offers with an explicit LGBTQ+ lane
+- **Queer Partner Acro Speed Dating** — you already floated speed dating; a **queer night** (plus inclusive mixed nights) is novel, wholesome, *very* shareable, and serves a community hungry for in-person, non-bar ways to connect. This could become a **signature event** people travel for.
+- **Pride-season "Lift Each Other Up" workshop/pop-up** — a Pride-month partner-acro event; donate a slice to an LGBTQ+ org for genuine goodwill + PR.
+- **Inclusive Acro Date Night** — your couples event, with imagery and copy that obviously welcome all couples (don't let the visuals default to hetero).
+- **"Chosen family" community jams** — belonging/found-family framing resonates deeply and reinforces the safe-space promise.
+
+### Creative adjustments
+- Audit every ad set so **same-sex couples appear in the primary rotation**, not a side gallery.
+- **Founder-story video:** you + your partner, "we built a place where everyone can fly."
+- Inclusive double-read slogans: **"Lift each other up." · "Everyone flies here." · "Find your people. Hold them up." · "A studio where everyone gets to fly."**
+
+## 8. Free / low-cost channels (do these regardless of budget)
 
 - **Google Business Profile** — free, and the #1 thing for "near me" searches. Photos, hours, class list, reviews. **Reviews are huge for the Eastside** — this is a research-y, due-diligence demographic. Build a habit of asking every happy member for a Google review (a quick QR card at the door).
 - **Instagram + Facebook organic** — post the vertical clips you're already shooting. Even 3–4x/week compounds. Reels reach > feed by a mile. **Cross-post to Facebook** specifically — that's where your married-35+ avatar lives.
@@ -177,21 +226,23 @@ Ad (Meta) ──► $9–$19 intro workshop ──► amazing in-room experience
 - **Referral program** — members refer a friend, both get a perk (free month / free couples upgrade). Cheapest acquisition there is, and it pulls in *more of the same kind of person*.
 - **Email/SMS list from day one** — and you're building the booking site yourself, so you own this channel completely. Capture every lead; it's the only audience the algorithm can't take away.
 
-## 8. Channel reality check — TikTok, and the "content takes years" worry
+## 9. Channel reality check — TikTok, and the "content takes years" worry
 
 **On TikTok:** your skepticism is *strategically correct for your market*, so don't feel bad about it. Your buyer is a 38-year-old married Eastside engineer with disposable income — that person converts on **Instagram and Facebook**, not TikTok. TikTok's audience skews younger/broker, and you're right that it can invite a flakier, drama-prone crowd for a partner-touch discipline. **So: don't *build for* TikTok.** BUT — there's a free, zero-downside move: **auto-cross-post the exact same vertical Reels to TikTok and YouTube Shorts** (tools like Metricool/Later do it in one click). It costs you nothing, occasionally a video pops and sends a few curious locals, and you're not courting that audience or managing comments closely. Treat TikTok as a **passive billboard**, not a community you tend. Best of both.
 
 **On "content takes months/years to accumulate":** true if you rely on grabbing random clips in class — that path is slow and inconsistent. The fix is your **secret weapon**: you have a **video/marketing major shooting cheap for his portfolio** *and* a **best friend who's a creative director at an ad agency and a Premiere expert.** That's an agency-grade team most studios would kill for. So **don't accumulate — manufacture.** One focused **half-day "content factory" shoot** with a shot list can bank **20–40 vertical clips + a dozen photos** — i.e., 4–8 weeks of posting *and* your whole ad-creative library — in an afternoon. Do this **quarterly**, supplement with the organic in-class candids. You flip from "content-starved" to "content-rich" overnight. **You are not content-constrained; you just haven't run the factory yet.**
 
-## 9. Wild & wacky brainstorm (reject freely — volume is the point)
+## 10. Wild & wacky brainstorm (reject freely — volume is the point)
 
 A grab-bag of bigger swings. Some are gold, some are dumb, that's the deal.
 
 ### Events & experiences (turn the studio into a destination)
-- **"Acro Date Night"** — a monthly ticketed couples event (~$30–40/couple). Low commitment, fun, wine-and-cheese vibe, ends with a couples photo. *This is a direct funnel into your $300 couples membership* and tailor-made for your married avatar. Run it on/near **Valentine's, anniversaries, date-night Fridays.**
+- **"Acro Date Night"** — a monthly ticketed couples event (~$30–40/couple). Low commitment, fun, wine-and-cheese vibe, ends with a couples photo. *Direct funnel into your $300 couples membership*, tailor-made for your married avatar, and **imagery/copy should obviously welcome all couples** (see § 7). Run it on/near **Valentine's, anniversaries, date-night Fridays.** *(You're green-lit on this — I'll spec the full recurring funnel as a deliverable.)*
+- **Partner Acro Speed Dating** *(your idea — and a great one)* — singles paired through rotating partner-acro mini-challenges. Wholesome, hilarious, *intensely* shareable, and it solves a real problem (in-person, non-bar ways to meet). Run **a queer night, a general night, maybe a women's night** — each serves a hungry community and seeds memberships + content. Strong candidate for your **signature event.**
 - **Student Showcase / "Cirque Night"** — quarterly mini-performance where students invite friends & family. Pure social proof + a built-in recruiting event (every guest is a warm prospect who just watched someone like them do something amazing). Capture it all on video for a year of content.
 - **Free monthly Open House** — exactly as you suggested. Low-pressure "try everything" night. Pair with a same-night signup incentive.
-- **Corporate team-building (this could be huge given your geography)** — you're surrounded by Microsoft, Meta, Google, Amazon, and a thousand funded startups. **Partner acro is *literally* a trust/communication exercise** — HR and team leads pay real money for offsites. Sell **"Team Trust Lab"** 90-min workshops to tech teams. High ticket, fills daytime/off-peak hours, and seeds individual memberships from attendees. Possibly your single most lucrative non-membership line.
+- **Mon/Fri lunchtime "Desk-to-Handstand" class** *(your insight)* — so many Eastside tech folks WFH Mon & Fri; a midday class fills your empty weekday-daytime slots with people who'd otherwise just be at a screen. Market it as "the best 60-minute break on your WFH day." Doubles as the soft entry point for the corporate line below.
+- **Corporate team-building (huge given your geography — and you're green-lit)** — you're surrounded by Microsoft, Meta, Google, Amazon, and a thousand funded startups. **Partner acro is *literally* a trust/communication exercise** — HR and team leads pay real money for offsites. Sell **"Team Trust Lab"** 90-min workshops. **Two doors in:** (1) general HR/people-ops, and (2) **LGBTQ+ ERGs** (GLEAM, glamazon, Gayglers…) who have budgets *and* a reason to book a queer-owned vendor (§ 7). High ticket, fills daytime/off-peak, and seeds individual memberships. Possibly your single most lucrative non-membership line.
 - **Bachelorette / birthday / private party packages** — aerial + acro is a memorable, very Instagrammable private booking. Affluent area, lots of celebrations, books your off-hours.
 
 ### Local / guerrilla / partnership plays
