@@ -289,16 +289,24 @@ Pick off whatever sparks something; each answer sharpens a section above.
 5. Of the 200 capacity, what's the **current count**, and which of the four disciplines has the **most open seats** to fill first? (Point ads at the emptiest profitable class.)
 	- I have about 25 people so far. But I have a decent number of classes and schedule space to add way more based on demand. 
 6. Any **off-peak hours** (weekday daytime) you'd love to fill? That's where **corporate workshops / private bookings** shine.
+	- I have nothing weekday daytime currently but am open to grow there based on demand. So many people in tech work from home Mon/Fri I think those days could be ripe for a lunch time class.
 
 **The big swings — what's your appetite?**
 7. The **corporate "Team Trust Lab"** idea (selling partner-acro team-building to Eastside tech companies) — does that excite you or feel like a distraction right now? It could be a major revenue line.
+	- I'd be totally open to doing that.
 8. The **"Acro Date Night"** monthly couples event — want me to spec it out as a concrete recurring funnel (pricing, format, promo)?
+	- Sure. I've also though about doing a partner acro speed dating thing.
 9. **Woodinville winery pop-up** / farmers-market flash demo — are you up for guerrilla/live events, or do you prefer to keep it studio + online?
+	- I'm totally open to that.
 
 **Production & rollout**
 10. Can you get your **video friend + creative-director friend** for **one half-day "content factory" shoot** in the next few weeks? If yes, I'll build you a full **shot list** mapped to the ad themes above.
+	- Definitely
 11. Do you want me to draft the **actual Meta ad targeting setup** (audiences, geo radius around the 7 cities, interest/behavior stacks, the campaign structure) as a concrete next deliverable?
+	- Absolutely
 12. Want a **lead-magnet PDF** drafted (e.g., "Handstand in 30 Days" or "5 Partner Moves for Date Night") to start the email-capture path?
+	- Sure
 
 **Branding for the future**
 13. Should the brand name/visual identity stay **"Knotty Yoga"** for the athletic tier, or are you considering a name that stretches more cleanly to **fitness + spa** later? (Affects how hard we lean on the name in creative now.)
+	- Yes, I've been working on a new, more inclusive and less double entendre name.
