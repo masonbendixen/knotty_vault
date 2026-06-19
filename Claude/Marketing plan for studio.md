@@ -264,27 +264,40 @@ A grab-bag of bigger swings. Some are gold, some are dumb, that's the deal.
 - **"Eastside vs. gravity"** local-pride branding bit — playful hometown identity.
 - **Transformation wall / member spotlights** — real Eastside professionals ("Sarah, product manager, first handstand at 41"). Mirror = your avatar sees themselves.
 - **A signature, ownable move/photo** — one dramatic shape that becomes *your* visual signature across every grid, ad, and shirt.
-- **Merch as walking billboards** — tasteful "Knotty Yoga" tees/totes; affluent areas wear local-brand gear as identity.
+- **Merch as walking billboards** — tasteful studio tees/totes; affluent areas wear local-brand gear as identity. *(Hold heavy merch runs until the new inclusive name is locked — don't print a soon-to-be-retired name. Build the visual identity around the signature move/shape so it survives the rename.)*
 
 ### Wackier (filter hard)
 - **Billboard / coffee-shop screens** near tech campuses with one impossible photo + "Beat the traffic. Stand on your hands. [Eastside]." (Plays to the commuter "kill time till traffic dies" insight you mentioned — a free bonus segment even if Eastside residents are your focus.)
 - **"Acro flash mob" at a Microsoft/Amazon campus plaza** at lunch (where allowed) → viral-able clip + corporate-workshop lead gen in one.
 - **Partner with a high-end gym/hotel spa** to pre-seed your future spa cross-sell while marketing fitness now.
 
-## 10. Suggested sequence (how I'd roll this out)
+## 11. Suggested sequence (how I'd roll this out)
 
-1. **Run one "content factory" half-day shoot** with your team + a shot list → bank 20–40 vertical clips + photos (your posting library *and* ad creative in one afternoon).
-2. **Set up the free foundation**: Google Business Profile, IG + Facebook, Meetup group, email/SMS capture on your own site, Nextdoor presence.
-3. **Lock the funnel**: $19 intro workshop + a landing/booking page on your site + the in-room conversion choreography + a lead-magnet PDF.
+1. **Run one "content factory" half-day shoot** with your team + a shot list → bank 20–40 vertical clips + photos (your posting library *and* ad creative in one afternoon). **Include same-sex/diverse pairings in the main shot list, not a side set.**
+2. **Set up the free foundation**: Google Business Profile, IG + Facebook, Meetup group, email/SMS capture on your own site, Nextdoor presence, GSBA listing.
+3. **Lock the funnel**: $19 intro workshop + a landing/booking page on your site + the in-room hard-close + a lead-magnet PDF.
 4. **Post organically ~2–3 weeks**, see which clips pop (cheap real-world A/B test).
 5. **Start paid at ~$400/mo on Meta**, pointed at the $19 intro, using your best-performing organic clips as the ads.
 6. **Measure cost-per-intro-signup and intro→member rate** for 4–6 weeks.
-7. **Turn the dial up** (toward $500–$1,000+, add retargeting) as long as CAC < ~$300 and you're under capacity.
-8. **Layer in events** (Acro Date Night, Open House, Showcase, first corporate workshop) as recurring funnels.
+7. **Turn the dial up** (toward $500–$1,000+, add retargeting) — you have huge room before CAC or capacity bites.
+8. **Layer in events** (Acro Date Night, Speed Dating, Open House, Showcase, first corporate/ERG workshop) as recurring funnels.
+
+## 12. Committed next deliverables (you green-lit these — I'll draft each)
+
+- [ ] **Content-factory shot list** — every video theme above mapped to specific shots/setups for your half-day shoot (with the inclusive-rotation note baked in).
+- [ ] **Meta ad targeting setup** — geo radius around the 7 cities, audience/interest/behavior stacks, campaign structure, budget pacing, and the creative→offer mapping.
+- [ ] **Lead-magnet PDF** — pick one to draft first: *"Handstand in 30 Days"* (broad) or *"5 Partner Moves for Date Night"* (couples/inclusive) — plus the email nurture sequence.
+- [ ] **Acro Date Night + Speed Dating event spec** — pricing, format/run-of-show, promo plan, and the membership conversion mechanics (incl. the queer-night variant).
+
+> Tell me which to start with (or "all of them") and I'll build it out in the planning doc.
 
 ---
 
-## Open questions (answer whatever sparks something — let's dialog)
+## Appendix A — Interview notes (your answers, verbatim)
+
+*Source record. The substance is already folded into the plan above (Studio Snapshot + each section) — kept here so nothing's lost.*
+
+### Round 1
 
 **About the studio & you**
 1. What **city/market** are you in, and roughly how big? (Changes whether "near me" search even has volume, and how cheap Meta reach is.)
@@ -322,9 +335,7 @@ A grab-bag of bigger swings. Some are gold, some are dumb, that's the deal.
 
 ---
 
-## Round 2 — open questions (let's keep going)
-
-Pick off whatever sparks something; each answer sharpens a section above.
+### Round 2
 
 **Funnel & offer**
 1. Is **$19 intro workshop** the right hero offer, or do you want to test **$19 workshop vs. buy-one-month-get-one-free** head to head? (They attract different commitment levels.)
@@ -361,3 +372,23 @@ Pick off whatever sparks something; each answer sharpens a section above.
 **Branding for the future**
 13. Should the brand name/visual identity stay **"Knotty Yoga"** for the athletic tier, or are you considering a name that stretches more cleanly to **fitness + spa** later? (Affects how hard we lean on the name in creative now.)
 	- Yes, I've been working on a new, more inclusive and less double entendre name.
+
+---
+
+## Round 3 — open questions (let's keep the dialog going)
+
+**Deliverables — sequencing**
+1. Which committed deliverable should I build out first — **shot list**, **Meta targeting setup**, **lead-magnet PDF**, or the **Acro Date Night / Speed Dating spec**? (Or "all, in that order.")
+2. For the lead magnet, which pulls you more: **"Handstand in 30 Days"** (broadest reach) or **"5 Partner Moves for Date Night"** (couples + inclusive, ties to events)?
+
+**Inclusive / LGBTQ+**
+3. How **forward** do you want the queer-owned identity in *paid ads* specifically — front-and-center (a clear differentiator, may slightly narrow broad reach) vs. **woven-in/represented** (inclusive imagery, identity louder on owned channels & events)? My default rec: woven-in for cold paid reach, loud-and-proud on your site, email, events, and the founder story — but your call.
+4. Are you and your partner comfortable being **the on-camera face** of the founder-story content? (It's your single most powerful trust + safety signal — but only if it feels right to you both.)
+5. Any **existing ties** to Eastside/Seattle queer orgs, ERGs, or Pride organizers I should build the plan around (warm intros beat cold outreach every time)?
+6. Appetite to pursue **GSBA LGBTQ-owned business certification** soon? It's the key that unlocks the corporate-vendor + ERG channel.
+
+**The new name**
+7. Want to **workshop the new inclusive name** here too (criteria, candidates, domain/handle availability), or is that a separate track you've got handled? It affects when we lock the visual identity and merch.
+
+**Events**
+8. For **Partner Acro Speed Dating** — start with a **queer night, a general/mixed night, or both**? And is this a "test once and see" or something you'd want to make a recurring signature event from the jump?
