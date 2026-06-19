@@ -110,10 +110,11 @@ Lowest layer first:
 ### 2.3 Ensure-time rate snapshot ✅ (2026-06-19)
 - [x] Added `event_sessions.specialty_instructor_cost_id BIGINT` NULL `REFERENCES specialty_instructor_costs(id)` (`kEventSessionsSpecialtyInstructorCostId`) — set when the occurrence row is ensured (no materialization) so payroll later reads the snapshot rather than the live rate. event_sessions is now created AFTER specialty_instructor_costs in both the builder and `CreateTables` so the FK resolves.
 
-### 2.4 Ensure-time hook — DEFERRED to §4 (needs the §3.1 table helper)
-- [ ] In `ClassScheduleHelper::EnsureSessionExists` (Phase 1), when creating a new occurrence row, look up the active `specialty_instructor_costs` row for the occurrence's `class_instance_id` (+ matching `class_schedule_slot_id` if a per-slot override exists), the slot's `instructor_person_id`, and `asOfUs` via the active `price_schedule`. If found, set `event_sessions.specialty_instructor_cost_id` on the new row.
-- [ ] If no cost row, leave NULL (non-specialty instructors). Idempotent: ensuring an existing row doesn't re-stamp.
-- **Note (2026-06-19):** intentionally NOT implemented in the schema phase. The lookup needs `SpecialtyInstructorCosts::GetActiveCostForSchedule` (§3.1); doing it now would force ad-hoc SQL into business logic (violates `feedback_no_sql_in_business_logic`). Implement alongside §3.1/§4 once the table helper exists.
+### 2.4 Ensure-time hook ✅ (2026-06-19, alongside §3.1)
+- [x] In `ClassScheduleHelper::EnsureSessionExists`, when creating a NEW occurrence row, if the slot has an `instructor_person_id` we look up `specialtyCosts_.GetActiveCostForOccurrence(instanceId, slotId, instructorPersonId, asOfUs=startUs)` and, when found, set `event_sessions.specialty_instructor_cost_id` on the new row. `asOfUs` is the occurrence's **start time** (the rate in effect for that session). A per-slot override wins over a whole-run row (handled by the table helper's ORDER BY).
+- [x] No cost row (or no slot instructor) → column stays NULL. Idempotent for free: the stamp only runs on the new-row branch; an already-persisted occurrence returns early before this code, so re-ensuring never re-stamps.
+- [x] Wired a `TableHelpers::SpecialtyInstructorCosts specialtyCosts_` member into `ClassScheduleHelper` (no ad-hoc SQL in business logic — `feedback_no_sql_in_business_logic` satisfied).
+- [x] Tests in `class_schedule_helper_test.cpp`: stamps the snapshot when an active cost exists; leaves NULL when the instructor has no cost row; leaves NULL when the slot has no instructor (even if a cost exists for someone else).
 
 ### 2.5 Wire into DB init ✅ (2026-06-19)
 - [x] `make_database_info.cpp` (both `Make*Table` calls added before `MakeEventSessionsTable`, with includes) + `create_database.cpp` `CreateTables()` (both `CreateTable` calls before `kEventSessionsTable`, with includes). Also added both files to `db_schema/CMakeLists.txt` (sources + the two `_test.cpp` to the test target).
@@ -123,13 +124,14 @@ Lowest layer first:
 
 ## 3. Table Helpers
 
-### 3.1 `TableHelpers::SpecialtyInstructorCosts`
-- [ ] Full CRUD + `GetActiveCostForSchedule(Transaction&, classScheduleId, asOfUs)` — joins to `price_schedules` to filter to the active window.
-- [ ] Tests.
+### 3.1 `TableHelpers::SpecialtyInstructorCosts` ✅ (2026-06-19)
+- [x] Full CRUD (`AddCost` / `GetCost` / `UpdateCost` (bumps `updated_us`) / `DeleteCost`) + `GetCostsForInstance(Transaction&, classInstanceId)` (all rows for a run, newest first).
+- [x] **`GetActiveCostForOccurrence(Transaction&, classInstanceId, classScheduleSlotId, instructorPersonId, asOfUs)`** — joins to `price_schedules` and filters to the active window (`is_active` + `valid_from_us <= asOfUs < valid_to_us|∞`); a **per-slot override** (`class_schedule_slot_id = slotId`) wins over a whole-run row (slot NULL) via `ORDER BY (class_schedule_slot_id IS NULL) ASC`. *(Renamed from the doc's stale pre-redesign `GetActiveCostForSchedule(classScheduleId, …)` — cost keys off the run + occurrence slot, and the §2.4 hook needs the instructor + per-slot-override semantics.)*
+- [x] Tests `specialty_instructor_costs_test.cpp` (table-helper layer): add/get, costs-for-instance (scoped + newest-first), active whole-run match, per-slot-override-wins, window respected (roll-forward old vs new), inactive-schedule excluded, instructor filter, none→nullopt, update, delete.
 
-### 3.2 `TableHelpers::InstructorClassPreferences`
-- [ ] Full CRUD + `GetMaxForInstructorAndClass(Transaction&, instructorPersonId, classId)`.
-- [ ] Tests.
+### 3.2 `TableHelpers::InstructorClassPreferences` ✅ (2026-06-19)
+- [x] Full CRUD (`AddPreference` / `GetPreference` / `UpdatePreference` (bumps `updated_us`) / `DeletePreference`) + `GetPreferencesForInstructor(Transaction&, instructorPersonId)` + `GetForInstructorAndClass(...)` + **`GetMaxForInstructorAndClass(Transaction&, instructorPersonId, classId)`** (empty when no row or NULL max).
+- [x] Tests `instructor_class_preferences_test.cpp` (table-helper layer): add/get, get-for-(instructor,class)/nullopt, get-max (value / NULL-max / no-row), get-for-instructor scoping, update, delete.
 
 ## 4. Business Logic — `SpecialtyCostHelper`
 

@@ -142,12 +142,15 @@ A few principles baked into all tiers:
 1. What **city/market** are you in, and roughly how big? (Changes whether "near me" search even has volume, and how cheap Meta reach is.)
 	- Redmond, Wa. I'm close to Seattle but across a lake. Many people work in this area but live in Seattle and it is a nice way to get a workout in and buy time until traffic dies before commuting home but I'm more interested in targeting Redmond, Woodinville, Kirkland, Bothell, Bellevue, Sammamish, and Issaquah.
 2. Who's your **dream student** for these four classes — total beginners, ex-gymnasts/dancers, the climbing/CrossFit crowd, couples, the "I'm bored of my gym" crowd? Or several?
-	- Dream student is quasi fit people 30+ who are married, well employed with no kids or older kids. I do really well with people who are in pretty good shape but looking to move it up a notch. This isn't really for people who are really overweight or injured. People with a dance, cross fit, rock climbing, gymnastics, cheer, or other high end athletics background tend to love it. I prefer a 
+	- Dream student is quasi fit people 30+ who are married, well employed with no kids or older kids. I do really well with people who are in pretty good shape but looking to move it up a notch. This isn't really for people who are really overweight or injured. People with a dance, cross fit, rock climbing, gymnastics, cheer, or other high end athletics background tend to love it. I prefer a pretty even mix of men and women. I find women easier to market to but a higher retention rate among men.
 3. What's the **price point** of a class / membership, and is there an **intro offer** already (free first class? $X for 2 weeks?)? The offer drives the whole ad strategy.
+	- It's $200 a month for a membership. $300 a month for a couple's membership. I'm offering a set of intro classes / workshops that I'm thinking of pricing $9 or $19. The fee isn't that important but I've found that if people spend money they show up whereas they flake on free. I'm open to a buy one month get the second month free intro offer. I can also do free open houses and maybe even do a small student show.
 4. What's your realistic **monthly capacity** — how many new students *could* you actually absorb right now? (No point paying to overflow a full class.)
+	- I could handle up to 200.
 
 **About content & assets**
 5. Who's **shooting** the video/photos — you, a hired pro, a student? And are your instructors/students comfortable being **on camera** and being **funny** (the humor angles need willing hams)?
+	- I have a friend who majored in video and digital marketing who is looking to build his portfolio and work for fairly cheap and my best friend is a long time student and graphics design major and is the creative director at an ad agency and is well ver
 6. Do you lean more **polished/aspirational** or **raw/authentic-relatable** for the brand feel? (Affects which video themes we prioritize.)
 7. Any **existing footage/photos** I should plan around, or are we starting from a blank shoot?
 
