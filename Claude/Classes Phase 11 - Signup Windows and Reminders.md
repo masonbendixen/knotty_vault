@@ -220,27 +220,31 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 ### 11.1 Backend (do first)
 - [ ] **Occurrence booking helper** (`business_logic/scheduling/` or extend `BookingHelper`): given `(class_schedule_slot_id, occurrence_date_us)` →
   1. `CheckAccess` (membership/skill gate) — reject if not allowed.
-  2. `EnsureSessionExists(slotId, occurrenceDateUs)` to materialize the occurrence into `event_sessions` (idempotent).
-  3. Capacity guard (derived slot capacity / room concurrent-capacity) — over-capacity → waitlist or reject (reuse the `BookingHelper` capacity path).
-  4. Resolve the per-session price from the workshop's active-instance product (`ResolveBestPriceForPerson`, already surfaced in `ClassDetail.priceInfo`).
-  5. Delegate to the existing `BookingHelper` / payment path keyed by the materialized `event_session` id (reuse `BookEvent` + `purchase_pay_card`).
+  2. `EnsureSessionExists(slotId, occurrenceDateUs)` to materialize the occurrence into `event_sessions` (idempotent) — book-time materialization (resolved §11.3).
+  3. **Capacity / attendance cap — enforced for both included and paid bookings** (resolved §11.3) so attendance is tracked and a cap can apply (over-capacity → waitlist or reject; reuse the `BookingHelper` capacity path).
+  4. **Branch on included vs paid (resolved §11.3):**
+     - *Included in membership* (`priceInfo.isIncludedInMembership`) → create the booking as a **free RSVP** (no payment) so attendance is tracked under the cap.
+     - *Paid* → resolve the per-session price from the workshop's active-instance product (`ResolveBestPriceForPerson`, surfaced in `ClassDetail.priceInfo`) and run the payment path.
+  5. Delegate to the existing `BookingHelper` keyed by the materialized `event_session` id — booking-only for the RSVP case; `BookEvent` + `purchase_pay_card` for the paid case. The occurrence's **product refund policy** (resolved §11.3) governs later cancel/refund, not hardcoded workshop copy.
   6. On success, cancel any pending sign-up reminder for `(person, slot, occurrence)` — already wired in `booking_helper.cpp` §4.4.
 - [ ] **Endpoint** — a thin `POST /api/me/book_class_occurrence` taking `class_schedule_slot_id` + `occurrence_date_us` (query/body int64-safe), returning the booking + a payment handle (or reusing the purchase/pay-card two-step the shop already uses). Keep it thin per the endpoints-layer rule; logic in the helper.
 - [ ] **Idempotency** — guard double-submit (one confirmed booking per person+occurrence); the materialized `event_sessions` row + a unique booking guard.
 - [ ] **Tests (required)** — helper tests (access reject, materialize-then-book, capacity, price resolution, reminder-cancel), endpoint tests (401, access 403, happy path, double-book).
 
 ### 11.2 Frontend (after backend)
-- [ ] Per-session **"Book"** button on the class-detail "Upcoming Sessions" cards, shown only for **workshop** kind (series keep the runs section; recurring is membership "just show up"). Drive the CTA off `priceInfo`: paid → "Book — {price}"; included-in-membership → "Reserve" (free RSVP) — see OQ below; members-only / no price → no button.
-- [ ] Route into the **existing checkout/payment flow** (mirror `/shop/series` hand-off via router state) so card tokenization/payment is reused, not reinvented.
+- [ ] Per-session **"Book" / "Reserve"** button on the class-detail "Upcoming Sessions" cards, **workshop** kind only (series keep the runs section; recurring is membership "just show up"). Drive the CTA off `priceInfo` (resolved §11.3):
+  - paid → **"Book — {price}"** → checkout;
+  - included-in-membership → **"Reserve"** (free RSVP, creates a booking, **no checkout** — attendance tracked, capacity cap enforced);
+  - members-only / no price → no button.
+- [ ] Route the **paid** case into the **existing checkout/payment flow** (mirror `/shop/series` hand-off via router state) so card tokenization/payment is reused; the **RSVP** case calls the endpoint directly and confirms in place.
+- [ ] Surface the occurrence's **product refund policy** on the CTA / confirmation (resolved §11.3), not a hardcoded workshop string.
 - [ ] `ServerAccess.bookClassOccurrence(slotId, occurrenceDateUs)` across interface / network / proxy / mock + mock-spec.
-- [ ] `class-detail.component.spec.ts` — button visibility per `priceInfo` + kind, and the booking call.
+- [ ] `class-detail.component.spec.ts` — button label/visibility per `priceInfo` + kind (paid "Book", included "Reserve", members-only none), and the booking call.
 
-### 11.3 Open decisions
-- [ ] **Included (membership) workshops** — is a covered workshop a free **RSVP/reserve** (creates a booking, no payment) or "just show up" like recurring? Leaning RSVP so capacity is tracked.
-	- Mason- I think we want to track attendance for those. There might also be an attendance cap.
-- [ ] **Materialize-on-book vs on-view** — book-time materialization (chosen above) keeps `event_sessions` clean; confirm no surface needs the row earlier.
-	- Mason- Whatever is simpler.
-- [ ] **Refund/cancel policy** for a booked workshop occurrence (workshops are currently "no refund — staff may issue a voucher"; mirror that copy).
+### 11.3 Decisions (resolved — Mason)
+- [x] **Included (membership) workshops → free RSVP with tracked attendance + cap.** A membership-covered workshop is booked as a **free RSVP** (creates a booking, **no payment**) so attendance is tracked, and it **respects an attendance/capacity cap** (Mason: "we want to track attendance for those… there might also be an attendance cap"). So the booking path branches: included → booking-only RSVP; paid → booking + payment. Capacity is enforced for **both**. Folded into §11.1 (3–5) and §11.2.
+- [x] **Materialize-on-book** (Mason: "whatever is simpler"). Keep book-time materialization via `EnsureSessionExists`; no surface needs the `event_sessions` row earlier, and it keeps the table clean. Confirmed in §11.1 (2).
+- [x] **Refund/cancel policy is a product attribute** (Mason: "isn't this tied to the product?") — **confirmed:** `products.cancellation_policy_id` already exists, so the booked occurrence's product carries its own cancel/refund policy. Reuse it: surface the policy on the booking CTA / confirmation and honor it on cancel, rather than hardcoding workshop copy. No new field needed. Folded into §11.1 (5) and §11.2.
 
 > Depends on: the §7 reminder cancel-on-book hook (done) and the class-detail derive change (done). Reuses Phase 7 series booking + the shop payment flow.
 
