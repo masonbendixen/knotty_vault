@@ -137,34 +137,23 @@ Lowest layer first:
 
 Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 
-### 4.1 Pay computation
-- [ ] `int64_t ComputeInstructorPayCents(Transaction&, int64_t eventSessionId, int64_t attendeeCount)`:
-  1. Load `event_sessions.specialty_instructor_cost_id`. If NULL → 0.
-  2. Load the cost row.
-  3. `pay = base_rate_cents`. If `bonus_threshold_count` set and `attendeeCount > bonus_threshold_count`: `pay += per_student_bonus_cents × (attendeeCount - bonus_threshold_count)`. Else if `bonus_threshold_count IS NULL` and `per_student_bonus_cents > 0`: `pay += per_student_bonus_cents × attendeeCount`.
-  4. Return `pay`.
+**Built (2026-06-19).** `business_logic/scheduling/specialty_cost_helper.{h,cpp,_test.cpp}` — pure orchestration of table helpers; no SQL in business logic (`feedback_no_sql_in_business_logic`). Two existing table helpers gained the cross-table queries it needs (each with its own added tests):
+- **`Bookings::GetSessionAttendanceRevenue(Transaction&, eventSessionId)`** → one-row aggregate `{attendee_count, paid_count, revenue_cents}`. "Held seat" = status not in (`cancelled`,`waitlisted`); paid rows also carry a purchase; revenue = `SUM(purchase_items.line_total_cents)` over paid held seats (LEFT JOIN so free RSVPs still count as attendees). Tests in `bookings_test.cpp`.
+- **`ProductEntitlementRules::IsPermissionGrantedBySubscriptionProduct(Transaction&, permissionId)`** → member-tier detection: EXISTS an **active `subscription`** product granting the permission. Tests in `product_entitlement_rules_test.cpp` (subscription→true, one_time→false, no-rule→false, inactive→false).
 
-### 4.2 Pricing assistant
-- [ ] `struct PricingSuggestion { int64_t permissionId; std::string permissionName; int64_t suggestedPriceCents; double appliedMarginPct; std::string rationale; }`. (`appliedMarginPct` echoes the margin actually used for that tier so the UI can show it.)
-- [ ] `struct PricingSuggestionRequest { int64_t classScheduleId; int64_t targetAttendees; std::vector<int64_t> allowedPermissionIds; std::optional<double> profitMarginPct; std::map<int64_t, double> perTierMarginPct; }`. **Margin is configurable (resolved OQ-P12-1):** `perTierMarginPct[permissionId]` wins if present, else the request-level `profitMarginPct`, else the `non_member_profit_margin_pct` secret default (§2.6). Member tiers ignore margin (they break even).
-- [ ] `std::vector<PricingSuggestion> SuggestPricesForBreakeven(Transaction&, const PricingSuggestionRequest&, const SecretsHelper&)`:
-  1. Resolve the default margin from the `non_member_profit_margin_pct` secret (default 50%).
-  2. Load active specialty cost for the schedule.
-  3. Compute total cost at the target attendee count: `totalCost = ComputeInstructorPayCents(at attendees=target)`.
-  4. For each tier in `allowedPermissionIds`:
-     - If `tier` is a member tier (you can detect this via the permission's existing-membership-grant linkage; if the user holds an active membership granting that permission, they should "cover cost" only — break-even price = `totalCost / target`; `appliedMarginPct = 0`).
-     - If `tier` is a non-member tier: resolve the effective margin (`perTierMarginPct` → request `profitMarginPct` → secret default) → `suggestedPriceCents = (totalCost / target) × (1 + margin)`; record `appliedMarginPct`.
-  5. Return suggestions with rationale strings that name the margin used ("Break-even for Gold tier at 8 attendees: $X" / "Non-member at 8 attendees with 50% margin: $Y").
+### 4.1 Pay computation ✅
+- [x] `int64_t ComputeInstructorPayCents(Transaction&, int64_t eventSessionId, int64_t attendeeCount)`: reads `event_sessions.specialty_instructor_cost_id` (NULL → 0), loads the cost row (missing → 0), then `pay = base_rate_cents`; with a threshold the per-student bonus applies only to attendees beyond it, else (no threshold + positive bonus) to every attendee. Reads the SNAPSHOT row, authoritative even after its window closes (OQ-P12-2). Tests: base-only, bonus-no-threshold, bonus-with-threshold (4/6/10), no-cost→0, missing-cost→0, snapshot-not-live regression.
 
-### 4.3 Cost / revenue report
-- [ ] `struct SessionCostRevenueReport { int64_t eventSessionId; int64_t attendeeCount; int64_t paidAttendeeCount; int64_t instructorPayCents; int64_t revenueCents; int64_t marginCents; }`.
-- [ ] `SessionCostRevenueReport GetSessionCostRevenue(Transaction&, int64_t eventSessionId)`:
-  1. Compute pay via `ComputeInstructorPayCents`.
-  2. Query paid revenue: SUM of `purchase_items.line_total_cents` across `bookings` for this session where `purchase_id IS NOT NULL`.
-  3. Return.
+### 4.2 Pricing assistant ✅
+- [x] `PricingSuggestion { permissionId; permissionName; suggestedPriceCents; appliedMarginPct; rationale; }` and `PricingSuggestionRequest { eventSessionId; targetAttendees; allowedPermissionIds; std::optional<double> profitMarginPct; std::map<int64_t,double> perTierMarginPct; }`. *(Keyed on `eventSessionId`, not the doc's stale pre-redesign `classScheduleId` — the §5 endpoint is `/api/admin/session/<id>/suggest_pricing`, and the cost is the session's snapshot, so the assistant reuses `ComputeInstructorPayCents` directly.)*
+- [x] `SuggestPricesForBreakeven(Transaction&, request, const Secrets::SecretsHelper&)`: default margin from the `non_member_profit_margin_pct` secret (50% fallback); `totalCost = ComputeInstructorPayCents(target)`; `breakEvenPerAttendee = round(totalCost / target)`; per tier — member tier (`IsPermissionGrantedBySubscriptionProduct`) → break-even, `appliedMarginPct=0`; non-member → `round(breakEven × (1 + margin/100))` with margin precedence `perTierMarginPct[id]` > `profitMarginPct` > secret. Rationale names the margin. Tests: member break-even, non-member default-from-secret, secret-changed, request override, per-tier-wins, member-ignores-margin, mixed tiers, bonus-in-breakeven.
 
-### 4.4 KeyValueTable conversions
-- [ ] `PricingSuggestionToKeyValueTable`, `SessionCostRevenueReportToKeyValueTable`.
+### 4.3 Cost / revenue report ✅
+- [x] `SessionCostRevenueReport { eventSessionId; attendeeCount; paidAttendeeCount; instructorPayCents; revenueCents; marginCents; }`.
+- [x] `GetSessionCostRevenue(Transaction&, eventSessionId)`: pulls `Bookings::GetSessionAttendanceRevenue`, computes pay at `attendeeCount`, `marginCents = revenue − pay` (can be negative). Tests: paid/free/cancelled/waitlisted mix; zero-cost session.
+
+### 4.4 KeyValueTable conversions ✅
+- [x] `PricingSuggestionToKeyValueTable` (+ array) and `SessionCostRevenueReportToKeyValueTable` in `scheduling_key_value_table.*`. `applied_margin_pct` formats with `%g` so whole margins (50) coerce to a JSON number and fractional (32.5) stay precise. Tests in `scheduling_key_value_table_test.cpp` (whole + fractional margin, array, report incl. negative margin).
 
 ## 5. Endpoints
 
