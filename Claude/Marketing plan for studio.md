@@ -168,4 +168,6 @@ A few principles baked into all tiers:
 11. Which **budget tier** are you most likely to start at — and is that a hard ceiling or a "spend more if it works"?
 	- I'm open to spending more if it will pay off. I just really don't know how much is worth throwing at this and what type of ROI I can expect.
 12. What does **success in 90 days** look like to you — a specific number of new students? Filling a specific class? Brand awareness? Revenue target?
+	- I want to add students.
 13. Are you marketing the **four athletic classes only for now**, or do you want the brand built so it can later stretch to the **spa/massage** side without a rebrand?
+	- I want to grow these people into spa clients later but that's a bit in the future and will also be heavily targeting an older demographic than the fitness tier.
