@@ -150,16 +150,22 @@ A few principles baked into all tiers:
 
 **About content & assets**
 5. Who's **shooting** the video/photos — you, a hired pro, a student? And are your instructors/students comfortable being **on camera** and being **funny** (the humor angles need willing hams)?
-	- I have a friend who majored in video and digital marketing who is looking to build his portfolio and work for fairly cheap and my best friend is a long time student and graphics design major and is the creative director at an ad agency and is well ver
+	- I have a friend who majored in video and digital marketing who is looking to build his portfolio and work for fairly cheap and my best friend is a long time student and graphics design major and is the creative director at an ad agency and is well versed in Adobe Premeire and shooting / editing video. I've also bought quite a set of lights. I have a number of photogenic students fine being on camera.
 6. Do you lean more **polished/aspirational** or **raw/authentic-relatable** for the brand feel? (Affects which video themes we prioritize.)
+	- I have found that people get intimidated so I think relatable and approachable with little bit of non intimidating aspirational work well.
 7. Any **existing footage/photos** I should plan around, or are we starting from a blank shoot?
+	- I have existing footage and photos but a lot of those students have moved and I'd rather just recreate those ideas with my current roster of people.
 
 **About channels & comfort**
 8. Are you (or someone) able to **post organically several times a week**, or should the plan assume "shoot in bulk, schedule, mostly hands-off"?
+	- We are trying to shoot randomply in class a couple of times a week. I feel like it takes months / years to accumulate a large volume of content.
 9. How do you feel about being **on TikTok**, not just Instagram? (Different vibe, younger, huge organic reach for this content.)
+	- I have mixed feelings about tiktok. I feel like younger people are flaky, don't have money, like to follow the shiny object, and tend to have kids and stop. They also cause sexual dynamic issues that blow up in exhausting ways. That said, I'm open to all options.
 10. Is there an **existing email/SMS list or booking system** (Mindbody, etc.), or do we need to stand that up?
+	- That's the website I've been building with you.
 
 **About budget & goals**
 11. Which **budget tier** are you most likely to start at — and is that a hard ceiling or a "spend more if it works"?
+	- I'm open to spending more if it will pay off. I just really don't know how much is worth throwing at this and what type of ROI I can expect.
 12. What does **success in 90 days** look like to you — a specific number of new students? Filling a specific class? Brand awareness? Revenue target?
 13. Are you marketing the **four athletic classes only for now**, or do you want the brand built so it can later stretch to the **spa/massage** side without a rebrand?
