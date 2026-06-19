@@ -211,14 +211,47 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 - [x] On day 18, the hourly cron emails **one** "Sign-ups are open for 6-Week Aerial 101 starting {date}" email — carrying a multi-VEVENT `.ics` with one VEVENT per instance of the 6-week run (resolved OQ-P11-1), not six separate emails.
 - [x] If user books before day 18, the reminder is cancelled and no email goes out.
 
-## 11. Open Questions
+## 11. Workshop Per-Session Booking ⬜ (planned — not yet built)
+
+**Motivation.** The public class-detail page now lists *derived* upcoming workshop occurrences (the `ClassCatalogHelper::GetClassDetail` derive-from-schedule change), so a freshly-authored workshop shows its real dates immediately. But that "Upcoming Sessions" list is **display-only** — there's no per-occurrence "Book" button. **Series** already have booking (the "Series Runs" section → `/shop/series`), and **standalone event sessions** are bookable by id via `BookEvent`. The gap is the **à-la-carte workshop occurrence**: a member can see the date but can't book that specific session. Closing it is what makes a multi-date / single-date workshop actually sellable from the catalog.
+
+**Core problem.** A derived workshop occurrence has **no `event_sessions` row** until it's materialized (a booking/check-in/cancel/sub triggers `EnsureSessionExists`). So "book this occurrence" must **materialize first**, then run the existing event booking + payment flow against the resulting session id.
+
+### 11.1 Backend (do first)
+- [ ] **Occurrence booking helper** (`business_logic/scheduling/` or extend `BookingHelper`): given `(class_schedule_slot_id, occurrence_date_us)` →
+  1. `CheckAccess` (membership/skill gate) — reject if not allowed.
+  2. `EnsureSessionExists(slotId, occurrenceDateUs)` to materialize the occurrence into `event_sessions` (idempotent).
+  3. Capacity guard (derived slot capacity / room concurrent-capacity) — over-capacity → waitlist or reject (reuse the `BookingHelper` capacity path).
+  4. Resolve the per-session price from the workshop's active-instance product (`ResolveBestPriceForPerson`, already surfaced in `ClassDetail.priceInfo`).
+  5. Delegate to the existing `BookingHelper` / payment path keyed by the materialized `event_session` id (reuse `BookEvent` + `purchase_pay_card`).
+  6. On success, cancel any pending sign-up reminder for `(person, slot, occurrence)` — already wired in `booking_helper.cpp` §4.4.
+- [ ] **Endpoint** — a thin `POST /api/me/book_class_occurrence` taking `class_schedule_slot_id` + `occurrence_date_us` (query/body int64-safe), returning the booking + a payment handle (or reusing the purchase/pay-card two-step the shop already uses). Keep it thin per the endpoints-layer rule; logic in the helper.
+- [ ] **Idempotency** — guard double-submit (one confirmed booking per person+occurrence); the materialized `event_sessions` row + a unique booking guard.
+- [ ] **Tests (required)** — helper tests (access reject, materialize-then-book, capacity, price resolution, reminder-cancel), endpoint tests (401, access 403, happy path, double-book).
+
+### 11.2 Frontend (after backend)
+- [ ] Per-session **"Book"** button on the class-detail "Upcoming Sessions" cards, shown only for **workshop** kind (series keep the runs section; recurring is membership "just show up"). Drive the CTA off `priceInfo`: paid → "Book — {price}"; included-in-membership → "Reserve" (free RSVP) — see OQ below; members-only / no price → no button.
+- [ ] Route into the **existing checkout/payment flow** (mirror `/shop/series` hand-off via router state) so card tokenization/payment is reused, not reinvented.
+- [ ] `ServerAccess.bookClassOccurrence(slotId, occurrenceDateUs)` across interface / network / proxy / mock + mock-spec.
+- [ ] `class-detail.component.spec.ts` — button visibility per `priceInfo` + kind, and the booking call.
+
+### 11.3 Open decisions
+- [ ] **Included (membership) workshops** — is a covered workshop a free **RSVP/reserve** (creates a booking, no payment) or "just show up" like recurring? Leaning RSVP so capacity is tracked.
+	- Mason- I think we want to track attendance for those. There might also be an attendance cap.
+- [ ] **Materialize-on-book vs on-view** — book-time materialization (chosen above) keeps `event_sessions` clean; confirm no surface needs the row earlier.
+	- Mason- Whatever is simpler.
+- [ ] **Refund/cancel policy** for a booked workshop occurrence (workshops are currently "no refund — staff may issue a voucher"; mirror that copy).
+
+> Depends on: the §7 reminder cancel-on-book hook (done) and the class-detail derive change (done). Reuses Phase 7 series booking + the shop payment flow.
+
+## 12. Open Questions
 
 Both resolved (Mason, 2026-06-09) and folded into the plan above (§1.1 Locked-in + the cited sections).
 
 - **OQ-P11-1. — RESOLVED (Mason refines the recommendation).** One email per series (single line: name + start + end + per-instance schedule summary), **but it must carry a multi-VEVENT `.ics` with one VEVENT per instance** (reuse the Phase 7 / Phase 4 iCal generator). Single workshop/intro → one-VEVENT `.ics`. Folded into §1.1, §4.3, §9, §10.
 - **OQ-P11-2. — RESOLVED (Mason: "go with your recommendation").** Reminders are class series / workshops / intro only; non-class events and bookable services are out of scope for Phase 11. Folded into §1.1.
 
-## 12. Cross-References
+## 13. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 11.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 2 - Membership-Gated Drop-In]], [[Classes Phase 7 - Class Series and Workshops]].
