@@ -211,7 +211,7 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 - [x] On day 18, the hourly cron emails **one** "Sign-ups are open for 6-Week Aerial 101 starting {date}" email — carrying a multi-VEVENT `.ics` with one VEVENT per instance of the 6-week run (resolved OQ-P11-1), not six separate emails.
 - [x] If user books before day 18, the reminder is cancelled and no email goes out.
 
-## 11. Workshop Per-Session Booking — §11.1 backend ✅ / §11.2 frontend ⬜
+## 11. Workshop Per-Session Booking ✅ (§11.1 backend + §11.2 frontend)
 
 **Motivation.** The public class-detail page now lists *derived* upcoming workshop occurrences (the `ClassCatalogHelper::GetClassDetail` derive-from-schedule change), so a freshly-authored workshop shows its real dates immediately. But that "Upcoming Sessions" list is **display-only** — there's no per-occurrence "Book" button. **Series** already have booking (the "Series Runs" section → `/shop/series`), and **standalone event sessions** are bookable by id via `BookEvent`. The gap is the **à-la-carte workshop occurrence**: a member can see the date but can't book that specific session. Closing it is what makes a multi-date / single-date workshop actually sellable from the catalog.
 
@@ -242,15 +242,15 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 
 </details>
 
-### 11.2 Frontend (after backend)
-- [ ] Per-session **"Book" / "Reserve"** button on the class-detail "Upcoming Sessions" cards, **workshop** kind only (series keep the runs section; recurring is membership "just show up"). Drive the CTA off `priceInfo` (resolved §11.3):
-  - paid → **"Book — {price}"** → checkout;
-  - included-in-membership → **"Reserve"** (free RSVP, creates a booking, **no checkout** — attendance tracked, capacity cap enforced);
-  - members-only / no price → no button.
-- [ ] Route the **paid** case into the **existing checkout/payment flow** (mirror `/shop/series` hand-off via router state) so card tokenization/payment is reused; the **RSVP** case calls the endpoint directly and confirms in place.
-- [ ] Surface the occurrence's **product refund policy** on the CTA / confirmation (resolved §11.3), not a hardcoded workshop string.
-- [ ] `ServerAccess.bookClassOccurrence(slotId, occurrenceDateUs)` across interface / network / proxy / mock + mock-spec.
-- [ ] `class-detail.component.spec.ts` — button label/visibility per `priceInfo` + kind (paid "Book", included "Reserve", members-only none), and the booking call.
+### 11.2 Frontend ✅ (2026-06-19)
+
+**Backend prerequisite shipped:** `UpcomingSessionInfo` now carries `class_schedule_slot_id` + `occurrence_date_us` (struct + `UpcomingSessionInfoToKeyValueTable` + populated from `DerivedSession` in `GetClassDetail`) so the client can name the occurrence to book. Tests updated: `scheduling_key_value_table_test`, `class_catalog_helper_test`, `get_class_detail_test`. **Needs a server rebuild.**
+
+- [x] Per-session **"Book" / "Reserve"** button on the class-detail "Upcoming Sessions" cards, **workshop** kind only (`canBookOccurrences` gates on `kind==='workshop'` + a bookable `pricingState`). Driven by `pricingState`: paid → **"Book — {price}"**; included → **"Reserve"**; members-only / none → no button; logged-out → **"Log in to book"** link.
+- [x] **Paid** → navigates to a new **`/shop/class-occurrence`** checkout page (`ClassOccurrenceBookingComponent`) via router state (mirrors `/shop/series`); the page materializes+books (`bookClassOccurrence`) then pays (`purchasePayCard`) using the shared `PaymentMethodComponent` — booking is created once (kept across a payment retry). **RSVP** (included) → calls `bookClassOccurrence` in place and flips the card to "You're booked."
+- [x] Refund note on the checkout page reads "Refund terms follow this workshop's cancellation policy" (the product's `cancellation_policy_id`, resolved §11.3) rather than hardcoded copy. *(Showing the resolved policy text inline would need it added to the detail/checkout payload — left as a polish follow-up; the cancel path already honors the product policy.)*
+- [x] `ServerAccess.bookClassOccurrence(slotId, occurrenceDateUs, couponCode?)` → `BookEventResponse`, across interface / network / proxy / mock + mock-spec (paid, free/$0, 404 sentinel, 401).
+- [x] Specs — `class-detail.component.spec.ts` (+6: non-workshop hides button, paid "Book" navigates with state, included "Reserve" RSVP in place, logged-out "Log in to book", members-only none, RSVP error) and `class-occurrence-booking.component.spec.ts` (5: invalid state, summary/price/UTC time, book→pay→success, payment error stays bookable, retry doesn't re-book). **Verified green: 512/512 affected-spec run.**
 
 ### 11.3 Decisions (resolved — Mason)
 - [x] **Included (membership) workshops → free RSVP with tracked attendance + cap.** A membership-covered workshop is booked as a **free RSVP** (creates a booking, **no payment**) so attendance is tracked, and it **respects an attendance/capacity cap** (Mason: "we want to track attendance for those… there might also be an attendance cap"). So the booking path branches: included → booking-only RSVP; paid → booking + payment. Capacity is enforced for **both**. Folded into §11.1 (3–5) and §11.2.
