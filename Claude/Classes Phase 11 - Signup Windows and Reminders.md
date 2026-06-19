@@ -211,13 +211,22 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 - [x] On day 18, the hourly cron emails **one** "Sign-ups are open for 6-Week Aerial 101 starting {date}" email — carrying a multi-VEVENT `.ics` with one VEVENT per instance of the 6-week run (resolved OQ-P11-1), not six separate emails.
 - [x] If user books before day 18, the reminder is cancelled and no email goes out.
 
-## 11. Workshop Per-Session Booking ⬜ (planned — not yet built)
+## 11. Workshop Per-Session Booking — §11.1 backend ✅ / §11.2 frontend ⬜
 
 **Motivation.** The public class-detail page now lists *derived* upcoming workshop occurrences (the `ClassCatalogHelper::GetClassDetail` derive-from-schedule change), so a freshly-authored workshop shows its real dates immediately. But that "Upcoming Sessions" list is **display-only** — there's no per-occurrence "Book" button. **Series** already have booking (the "Series Runs" section → `/shop/series`), and **standalone event sessions** are bookable by id via `BookEvent`. The gap is the **à-la-carte workshop occurrence**: a member can see the date but can't book that specific session. Closing it is what makes a multi-date / single-date workshop actually sellable from the catalog.
 
 **Core problem.** A derived workshop occurrence has **no `event_sessions` row** until it's materialized (a booking/check-in/cancel/sub triggers `EnsureSessionExists`). So "book this occurrence" must **materialize first**, then run the existing event booking + payment flow against the resulting session id.
 
-### 11.1 Backend (do first)
+### 11.1 Backend (do first) ✅
+
+**Built (2026-06-19).** The occurrence booking is a thin *validate → materialize → BookEvent* wrapper, so access gate, capacity/waitlist, pricing→purchase, the §4.4 reminder-cancel, and the double-book conflict guard all come from the existing `BookEvent` path; payment stays the separate `purchase_pay_card` step.
+- [x] **`ClassScheduleHelper::IsDerivableOccurrence(slot, occurrenceDateUs)`** — rejects fabricated occurrences (non-midnight-aligned dates, wrong weekday, dates outside the run window, cancelled occurrences) before anything is materialized. Tests: `class_schedule_helper_test.cpp` (6 cases).
+- [x] **`BookingHelper::BookClassOccurrence(BookClassOccurrenceRequest)`** — `IsDerivableOccurrence` → `EnsureSessionExists` (idempotent materialize) → `BookEvent`. New error `kErrorOccurrenceNotFound`. RSVP-vs-paid is implicit (the resolved product price drives the purchase total — $0 for a free/included workshop, >0 for paid). Refund/cancel governed by the product's `cancellation_policy_id` via the normal cancel path. Tests: `booking_helper_test.cpp` (8 cases: paid, free/$0, fabricated date, unknown slot, cancelled, idempotent+double-book conflict, waitlist-when-full, reminder-cancel, access-gate reject).
+- [x] **Endpoint** `POST /api/me/book_class_occurrence` (`book_class_occurrence.{h,cpp}`, registered in `web_app.cpp` + CMake) — body `{class_schedule_slot_id, occurrence_date_us, coupon_code?, staff_override?, override_reason?}`; returns `{purchase, booking, waitlisted}`; OCCURRENCE_NOT_FOUND→404, conflict→409, missing-requirements→403, etc.; waitlist confirmation email. Tests: `book_class_occurrence_test.cpp` (401, happy path, fabricated→404, unknown slot→404, missing fields→400).
+- [x] **Idempotency / double-submit** — `EnsureSessionExists` is idempotent (one `event_sessions` row per occurrence) and `BookEvent`'s overlapping-booking check returns `BOOKING_CONFLICT` (409) on a repeat by the same person.
+
+<details><summary>Original plan (for reference)</summary>
+
 - [ ] **Occurrence booking helper** (`business_logic/scheduling/` or extend `BookingHelper`): given `(class_schedule_slot_id, occurrence_date_us)` →
   1. `CheckAccess` (membership/skill gate) — reject if not allowed.
   2. `EnsureSessionExists(slotId, occurrenceDateUs)` to materialize the occurrence into `event_sessions` (idempotent) — book-time materialization (resolved §11.3).
@@ -230,6 +239,8 @@ A gold member (advance_days=42) views a "6-Week Aerial 101" series starting in 6
 - [ ] **Endpoint** — a thin `POST /api/me/book_class_occurrence` taking `class_schedule_slot_id` + `occurrence_date_us` (query/body int64-safe), returning the booking + a payment handle (or reusing the purchase/pay-card two-step the shop already uses). Keep it thin per the endpoints-layer rule; logic in the helper.
 - [ ] **Idempotency** — guard double-submit (one confirmed booking per person+occurrence); the materialized `event_sessions` row + a unique booking guard.
 - [ ] **Tests (required)** — helper tests (access reject, materialize-then-book, capacity, price resolution, reminder-cancel), endpoint tests (401, access 403, happy path, double-book).
+
+</details>
 
 ### 11.2 Frontend (after backend)
 - [ ] Per-session **"Book" / "Reserve"** button on the class-detail "Upcoming Sessions" cards, **workshop** kind only (series keep the runs section; recurring is membership "just show up"). Drive the CTA off `priceInfo` (resolved §11.3):
