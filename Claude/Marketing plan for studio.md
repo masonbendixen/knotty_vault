@@ -140,6 +140,7 @@ A few principles baked into all tiers:
 
 **About the studio & you**
 1. What **city/market** are you in, and roughly how big? (Changes whether "near me" search even has volume, and how cheap Meta reach is.)
+	- Redmond, Wa. I'm close to Seattle but across a lake. Many people work in this area but live in Seattle and it is a nice way to get a workout in and buy time until 
 2. Who's your **dream student** for these four classes — total beginners, ex-gymnasts/dancers, the climbing/CrossFit crowd, couples, the "I'm bored of my gym" crowd? Or several?
 3. What's the **price point** of a class / membership, and is there an **intro offer** already (free first class? $X for 2 weeks?)? The offer drives the whole ad strategy.
 4. What's your realistic **monthly capacity** — how many new students *could* you actually absorb right now? (No point paying to overflow a full class.)
