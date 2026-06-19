@@ -80,8 +80,8 @@ Lowest layer first:
 
 ## 2. Database Schema
 
-### 2.1 `specialty_instructor_costs` table
-- [ ] `db_schema/specialty_instructor_costs.h/.cpp`:
+### 2.1 `specialty_instructor_costs` table ✅ (2026-06-19)
+- [x] `db_schema/specialty_instructor_costs.h/.cpp`:
   - `id BIGSERIAL PK`
   - `class_instance_id BIGINT NOT NULL REFERENCES class_instances(id)` — the run the instructor is hired for
   - `class_schedule_slot_id BIGINT NULL REFERENCES class_schedule_slots(id)` — optional per-slot override (specialty teacher only covers certain days of the run)
@@ -92,10 +92,11 @@ Lowest layer first:
   - `bonus_threshold_count BIGINT NULL` — bonus applies for attendees beyond this count
   - `notes TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
-- [ ] Unique on `(class_instance_id, class_schedule_slot_id, instructor_person_id, price_schedule_id)`.
+- [x] Unique on `(class_instance_id, class_schedule_slot_id, instructor_person_id, price_schedule_id)` (named `uq_specialty_instructor_costs_run_slot_instructor_schedule`). **Schema note:** because Postgres treats NULLs as distinct, whole-run rows (NULL slot) are NOT deduped by this constraint — dedup of whole-run rows is the helper's job (§3/§4). Documented + locked in by `WholeRunRowsAreNotDedupedByNullSlot`.
+- [x] Schema test `specialty_instructor_costs_test.cpp`: valid-insert-with-defaults, per-slot+bonus, the three NOT-NULL FK rejections (instance/instructor/price_schedule), slot-FK rejection, base-rate NOT NULL, unique-blocks-duplicate / allows-new-window, NULL-slot-not-deduped.
 
-### 2.2 `instructor_class_preferences` table
-- [ ] `db_schema/instructor_class_preferences.h/.cpp`:
+### 2.2 `instructor_class_preferences` table ✅ (2026-06-19)
+- [x] `db_schema/instructor_class_preferences.h/.cpp`:
   - `id BIGSERIAL PK`
   - `instructor_person_id BIGINT NOT NULL REFERENCES people(id)`
   - `class_id BIGINT NOT NULL REFERENCES classes(id)`
@@ -103,20 +104,22 @@ Lowest layer first:
   - `max_attendees BIGINT NULL`
   - `notes TEXT NOT NULL DEFAULT ''`
   - `created_us`, `updated_us`
-- [ ] Unique on `(instructor_person_id, class_id)`.
+- [x] Unique on `(instructor_person_id, class_id)` (named `uq_instructor_class_preferences_instructor_class`).
+- [x] Schema test `instructor_class_preferences_test.cpp`: valid-insert-with-defaults, min/max+notes, instructor-FK + class-FK rejections, unique-blocks-duplicate-pair / allows-different-class.
 
-### 2.3 Ensure-time rate snapshot
-- [ ] Add `event_sessions.specialty_instructor_cost_id BIGINT` NULL `REFERENCES specialty_instructor_costs(id)` — set when the occurrence row is ensured (no materialization) so payroll later reads the snapshot rather than the live rate.
+### 2.3 Ensure-time rate snapshot ✅ (2026-06-19)
+- [x] Added `event_sessions.specialty_instructor_cost_id BIGINT` NULL `REFERENCES specialty_instructor_costs(id)` (`kEventSessionsSpecialtyInstructorCostId`) — set when the occurrence row is ensured (no materialization) so payroll later reads the snapshot rather than the live rate. event_sessions is now created AFTER specialty_instructor_costs in both the builder and `CreateTables` so the FK resolves.
 
-### 2.4 Ensure-time hook
+### 2.4 Ensure-time hook — DEFERRED to §4 (needs the §3.1 table helper)
 - [ ] In `ClassScheduleHelper::EnsureSessionExists` (Phase 1), when creating a new occurrence row, look up the active `specialty_instructor_costs` row for the occurrence's `class_instance_id` (+ matching `class_schedule_slot_id` if a per-slot override exists), the slot's `instructor_person_id`, and `asOfUs` via the active `price_schedule`. If found, set `event_sessions.specialty_instructor_cost_id` on the new row.
 - [ ] If no cost row, leave NULL (non-specialty instructors). Idempotent: ensuring an existing row doesn't re-stamp.
+- **Note (2026-06-19):** intentionally NOT implemented in the schema phase. The lookup needs `SpecialtyInstructorCosts::GetActiveCostForSchedule` (§3.1); doing it now would force ad-hoc SQL into business logic (violates `feedback_no_sql_in_business_logic`). Implement alongside §3.1/§4 once the table helper exists.
 
-### 2.5 Wire into DB init
-- [ ] `make_database_info.cpp` + `create_database.cpp`.
+### 2.5 Wire into DB init ✅ (2026-06-19)
+- [x] `make_database_info.cpp` (both `Make*Table` calls added before `MakeEventSessionsTable`, with includes) + `create_database.cpp` `CreateTables()` (both `CreateTable` calls before `kEventSessionsTable`, with includes). Also added both files to `db_schema/CMakeLists.txt` (sources + the two `_test.cpp` to the test target).
 
-### 2.6 Config secret (resolved OQ-P12-1)
-- [ ] Seed `non_member_profit_margin_pct` in the `config_secrets` defaults (in `create_database.cpp`), default `50` (percent). This is the fallback the pricing assistant uses when the Suggest-pricing request supplies no per-tier / request-level margin override. Read via `SecretsHelper` in §4.2 (no secrets lookup inside table helpers).
+### 2.6 Config secret (resolved OQ-P12-1) ✅ (2026-06-19)
+- [x] Seeded `non_member_profit_margin_pct`, default `50` (percent), via the established secrets-default mechanism: `kNonMemberProfitMarginPct` in `secret_keys.h` + `kNonMemberProfitMarginPctValue` ("50") + `addSecret(...)` in `secret_values.cpp`. This auto-loads into the DB on first run AND into the test secrets helper (so §4.2 / §8 tests get the default for free). Read via `SecretsHelper` in §4.2 (no secrets lookup inside table helpers). *(Used `secret_keys.h`/`secret_values.cpp` rather than hand-seeding in `create_database.cpp` — that's the canonical path and the only one that also covers the test helper.)*
 
 ## 3. Table Helpers
 
