@@ -171,51 +171,40 @@ Files: `business_logic/scheduling/specialty_cost_helper.h/.cpp/_test.cpp`.
 - [x] `GET /api/admin/instructor/<id>/class_preferences` (→ items with `class_name`), `POST /api/admin/instructor_class_preference`, `PUT`/`DELETE /api/admin/instructor_class_preference/<id>` — bespoke CRUD via the `InstructorClassPreferences` table helper. Tests at each verb (403 / 400-missing or 404 / 200+persist).
 - [x] Thin handlers in `endpoints/`; the create/update/close orchestration (cost + price_schedule roll-forward) lives in `SpecialtyCostHelper` (`SpecialtyCostRequest` / `SpecialtyCostMutationResult` + error codes), with its own helper tests. *(Chose bespoke endpoints over generic CRUD because the POST/PUT need the price_schedule orchestration and the GETs need joins — generic CRUD can't express either.)*
 
-## 6. Frontend
+## 6. Frontend ✅ (2026-06-20)
 
-### 6.1 Admin session detail extension
-- [ ] On the admin session-detail page (likely under `portal/manage/event-session-detail/`), add:
-  - "Specialty cost" panel: shows rate + bonus + computed pay at current attendee count.
-  - "Cost vs revenue" panel: revenue, cost, margin.
-  - "Suggest pricing" button → opens a dialog with target-attendees input + allowed-tiers multiselect + a **profit-margin input** (pre-filled from the `non_member_profit_margin_pct` secret default, editable; optional per-tier margin override) → calls the suggest-pricing endpoint → displays table of suggestions per tier, showing the `applied_margin_pct` used for each (resolved OQ-P12-1).
-- [ ] Specs (incl. editing the margin re-queries and the per-tier suggestion price changes accordingly).
+**Built — full §6.4/§6.5 foundation + §6.2/§6.3 authoring UIs wired into their hosts + §6.1 dialog/panel as self-contained components.** Whole frontend suite green (**2720 tests**). Components are self-contained sub-components (testable in isolation, minimal host coupling); specs instantiate them directly with `ServerAccessMock` + dialog spies.
 
-### 6.2 Specialty-cost authoring on the run (bespoke Manage UI — NOT Manage Data)
-> Authoring specialty-instructor pay is done in the dedicated `/manage` portal, mirroring the Phase 7 `series-run-form-dialog` on **Manage Products ▸ Class Schedules**. The Manage Data generic editor is debug-only and must never be the path an admin uses to set up a specialty instructor's rate.
-- [ ] On **Manage Products ▸ Class Schedules**, when a run (`class_instances`) is selected, add a **"Specialty instructor cost"** section/dialog: instructor picker (people filtered to the `instructor` permission), base-rate + per-student-bonus (money inputs), optional bonus-threshold, optional per-slot scope (the slots of the run), notes. Save → `POST /api/admin/specialty_cost`; edit → `PUT` (roll-forward new rate); remove → `DELETE`. List existing cost rows for the run with their active window.
-- [ ] New `specialty-cost-form-dialog.component.*/.spec.ts` under `manage/class-schedules/dialogs/` (sibling of `series-run-form-dialog`). Spec covers defaults, money formatting, per-slot scope toggle, validation paths, and the normalized save result. Use money inputs + date pickers per `feedback_date_time_pickers.md`; mat-card border + RouterTestingModule per `feedback_account_page_layout.md`.
+### 6.1 Admin session detail extension ✅ (components built; host page deferred)
+- [x] `session-cost-revenue-panel.component` (`manage/session-pricing/`): `@Input() sessionId` → loads `getSessionCostRevenue`; shows attendees / instructor pay / revenue / margin (red when negative); "Suggest pricing" button opens the dialog. Spec: load, negative-margin flag, $ formatting, dialog-open args.
+- [x] `suggest-pricing-dialog.component`: target-attendees + tiers multiselect + profit-margin input (pre-filled from `defaultMarginPct`) + per-tier overrides → calls `suggestPricingForSession`, renders a per-tier price/margin table. Spec: validation, member-breakeven vs non-member-margin, margin edit re-prices, per-tier override wins, $ formatting.
+- **Note:** there is **no admin session-detail page** in the app (the doc's `portal/manage/event-session-detail/` doesn't exist). The panel + dialog are self-contained and take their inputs (`sessionId`, `tiers`, `defaultMarginPct`) from a host, so they drop in unchanged once that page is built. Host wiring is the only deferred piece of §6.
 
-### 6.3 Instructor class-preferences authoring (bespoke Manage UI — NOT Manage Data)
-- [ ] On **Manage ▸ Instructors** (`manage/instructors/instructors-admin.component`), add a **"Class preferences"** section per instructor: a small editable table of `(class, min_attendees, max_attendees, notes)` rows backed by the §5 `instructor_class_preference` endpoints (add/edit/delete inline). This replaces the generic-CRUD path the doc previously assumed.
-- [ ] Extend `instructors-admin.component.spec.ts` (or a new `instructor-class-preferences` sub-component spec) covering add/edit/remove + validation.
+### 6.2 Specialty-cost authoring on the run ✅
+- [x] `specialty-cost-form-dialog.component` (+ spec) under `manage/class-schedules/dialogs/` — instructor picker + optional per-slot scope + money inputs (dollars → cents) + bonus threshold + notes; edit mode shows only rate fields (roll-forward). Spec: validation, $→cents, whole-run vs slot scope, negative-bonus reject, edit prefill keeps instructor.
+- [x] `specialty-cost-section.component` (+ spec) — lists the run's **active** cost rows, opens the dialog for add/edit, calls create/update(roll-forward)/delete(close). Wired into `class-schedule-manage` under each run (`[classInstanceId]`, `[instructors]`, `[slots]`), with `instructorOptions`/`slotOptionsForInstance` accessors added to the host. Host spec mock got `getSpecialtyCostsForRun`.
 
-### 6.4 `ServerAccess` extensions
-- [ ] `suggestPricingForSession(sessionId, targetAttendees, tiers, profitMarginPct?, perTierMarginPct?)`, `getSessionCostRevenue(sessionId)`.
-- [ ] `getSpecialtyCostsForRun(classInstanceId)`, `createSpecialtyCost(req)`, `updateSpecialtyCost(id, req)`, `deleteSpecialtyCost(id)`.
-- [ ] `getInstructorClassPreferences(instructorPersonId)`, `createInstructorClassPreference(req)`, `updateInstructorClassPreference(id, req)`, `deleteInstructorClassPreference(id)`.
-- [ ] Update `ServerAccess.mock.spec.ts` (per memory `feedback_always_test.md` — every new `ServerAccess` method needs a mock-spec case).
+### 6.3 Instructor class-preferences authoring ✅
+- [x] `instructor-class-preferences.component` (+ spec) — inline add (class autocomplete via `getFkOptions('classes')`) / edit / delete of `(class, min, max, notes)` rows. Wired into the `instructors-admin` edit panel (`[instructorPersonId]="editing.person_id"`); host spec mock got `getInstructorClassPreferences`. Spec: load, require-class, add/edit/remove round-trip, empty-search clears options.
 
-### 6.5 Types
-- [ ] `specialty-cost.types.ts`: `PricingSuggestion` (incl. `appliedMarginPct`), `PricingSuggestionRequest` (incl. optional `profitMarginPct` + `perTierMarginPct`), `SessionCostRevenueReport`, `SpecialtyCost`, `CreateSpecialtyCostRequest`, `InstructorClassPreference`, `CreateInstructorClassPreferenceRequest`.
+### 6.4 `ServerAccess` extensions ✅
+- [x] All 10 methods (`suggestPricingForSession`, `getSessionCostRevenue`, `getSpecialtyCostsForRun`, `create/update/deleteSpecialtyCost`, `getInstructorClassPreferences`, `create/update/deleteInstructorClassPreference`) across interface / network / proxy / mock. The network layer normalizes the KVT wire format (booleans, NULL/fractional → real bool/number/undefined).
+- [x] `ServerAccess.mock.spec.ts` — 14 cases (suggest member/non-member/override/401, cost_revenue, specialty-cost create→list / roll-forward / COST_NOT_FOUND / delete / 401, preference round-trip / 404 / 401).
 
-## 7. Admin Metadata (debug-only fallback — NOT the authoring workflow)
+### 6.5 Types ✅
+- [x] `specialty-cost.types.ts`: `PricingSuggestion`, `PricingSuggestionRequest`, `SessionCostRevenueReport`, `SpecialtyCost`, `Create/UpdateSpecialtyCostRequest`, `SpecialtyCostMutationResult`, `InstructorClassPreference`, `Create/UpdateInstructorClassPreferenceRequest`.
 
-> Per memory `feedback_manage_data_is_debug_only.md`: the real authoring workflow for both tables is the bespoke `/manage` UI in §6. The Manage Data registration below is a **debug / raw-data escape hatch only** — it must never be the path an admin uses to set up a specialty cost or instructor preference. Registering the tables is still required so the generic CRUD endpoints (if the bespoke forms reuse them) accept the table and so the rows are inspectable.
-- [ ] `specialty_instructor_costs` → `admin_top_level_tables`. Permission `manage_class_schedule`. (Inspection / debug only.)
-- [ ] `instructor_class_preferences` → `admin_top_level_tables`. Permission `manage_class_schedule`. (Inspection / debug only.)
-- [ ] Friendly names, column data info, display templates — so the rows render legibly in the debug editor; money columns get the cents edit type.
+## 7. Admin Metadata (debug-only fallback) ✅ (2026-06-20)
 
-## 8. Tests-Required Summary
+- [x] `specialty_instructor_costs` + `instructor_class_preferences` registered in `create_database.cpp` across all 6 Populate* functions: top-level tables, `manage_class_schedule` permission, column data info, column friendly names, table friendly names, display templates. Money columns (`base_rate_cents`, `per_student_bonus_cents`) use the `"number"` edit type labeled "(cents)" — matching the codebase convention (`product_prices.amount_cents` etc.; there is no dedicated cents edit type). created/updated are read-only. (Schema/make_database_info/CreateTables/CMake were already done in §2.)
 
-- [ ] Table helper tests for both new tables.
-- [ ] `specialty_cost_helper_test.cpp`:
-  - Pay computation with / without bonus, with / without threshold.
-  - Pricing suggestions cover break-even for member, profit margin for non-member.
-  - **Configurable margin (resolved OQ-P12-1):** request-level `profitMarginPct` override changes the non-member suggestion; per-tier `perTierMarginPct` wins over the request-level value; omitting both falls back to the `non_member_profit_margin_pct` secret; member tiers ignore margin. `appliedMarginPct` is echoed per suggestion.
-  - **Snapshot authoritative (resolved OQ-P12-2):** `ComputeInstructorPayCents` uses the snapshotted cost row even when its `price_schedule` window has closed / a newer rate is active — regression test asserts pay reflects the old snapshot rate, not the live one.
-  - Cost vs revenue reports include only paid attendees in revenue.
-- [ ] Endpoint tests — suggest_pricing, cost_revenue, AND the bespoke authoring endpoints (`specialty_cost` GET/POST/PUT/DELETE, `instructor_class_preference` GET/POST/PUT/DELETE): 403 / validation / persist at each verb.
-- [ ] Frontend specs — session-detail panels, **`specialty-cost-form-dialog` spec**, **instructor class-preferences spec**, and the `ServerAccess.mock.spec.ts` cases for every new mock method.
+## 8. Tests-Required Summary ✅
+
+- [x] Table helper tests for both new tables (§3 — `specialty_instructor_costs_test.cpp`, `instructor_class_preferences_test.cpp`).
+- [x] `specialty_cost_helper_test.cpp`: pay with/without bonus + threshold; member break-even vs non-member margin; configurable margin (request override, per-tier wins, secret fallback, member ignores); snapshot-authoritative regression; cost vs revenue counts only paid held seats. (§4)
+- [x] Endpoint tests — suggest_pricing, cost_revenue, and the bespoke authoring endpoints at each verb (403 / validation / persist). (§5)
+- [x] Frontend specs — the §6.1 panel + dialog, §6.2 dialog + section, §6.3 preferences, and the `ServerAccess.mock.spec.ts` cases for every new mock method. **Full UI suite: 2720 green.**
+- **Build note:** the C++ tests (§3/§4/§5) compile + run on the user's machine; the frontend suite was run here and is green.
 
 ## 9. Cross-Layer Acceptance Criteria
 
