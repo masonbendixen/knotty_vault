@@ -78,6 +78,18 @@ Lowest layer first:
 - [x] **Profit margin is configurable (resolved OQ-P12-1).** The pricing-assistant margin is NOT hard-coded. It comes from a `non_member_profit_margin_pct` config secret (default 50%) and can be overridden per request from the Suggest-pricing dialog — globally and/or per tier. (Mason: "I want this to be configurable.")
 - [x] **The snapshot rate is authoritative for payroll (resolved OQ-P12-2).** `ComputeInstructorPayCents` always reads the cost row referenced by `event_sessions.specialty_instructor_cost_id`, even after that cost's `price_schedule` window has closed — pay is computed from the rate in effect when the occurrence was ensured, never the current live rate. (This was never really an open question — it's a requirement; covered by the §8 regression test.)
 
+## Post-acceptance refinements (2026-06-23, from Mason's testing)
+
+Three fixes after the first end-to-end run:
+
+1. **Stacked action icons (UI).** The specialty-cost row's edit/delete `mat-icon-button`s wrapped vertically (doubling row height). Wrapped them in an `inline-flex` `.action-buttons` container + `width:1%` on the cell so they never get squeezed. Frontend only.
+
+2. **Instructor pay showed $0 when the cost was configured AFTER someone booked (live-cost fallback).** Root cause: the snapshot (`event_sessions.specialty_instructor_cost_id`) is stamped at ensure-time, so a session materialized by a booking placed *before* any cost existed has a NULL snapshot, and a later-added cost never back-fills it. Fix: `ComputeInstructorPayCents` now resolves the cost via `ResolveSessionCost` — **snapshot if present (still authoritative, OQ-P12-2), else the run's current active cost** for the session's slot+instructor at the session's start time. So a rate configured after signup now applies to those pre-existing sessions. Requires the **slot to have an instructor assigned** that matches the cost's instructor (pay can't be attributed otherwise) — documented for the user. Added `classSchedules_` member. Tests: fallback-applies-late-cost (base + threshold bonus), fallback-zero-when-slot-has-no-instructor, snapshot-still-wins.
+
+3. **Cost/revenue is now reported PER RUN, not per session/date (Mason: "better to do this reporting per instance").** The old per-date widget showed a single occurrence's view but summed the *whole bundled series purchase* as that date's revenue (a series is one purchase spanning N sessions → every session reported the full total). New design:
+   - **Backend:** `Bookings::GetRunAttendanceRevenue` (distinct-person counts + revenue summing each `purchase_item` **once** via slot→schedule→instance join, so a bundle isn't multiplied across sessions), `EventSessions::GetSessionIdsForInstance`, `SpecialtyCostHelper::GetRunCostRevenue` (sums each session's pay using the fallback above + run revenue), `RunCostRevenueReport` + converter, `GET /api/admin/class_instance/<id>/cost_revenue`. Tests at each layer incl. the bundled-series-counted-once case.
+   - **Frontend:** a **Cost & revenue (this run)** block in the Specialty instructor cost panel (sessions / attendees / instructor pay / revenue / margin, red when negative). The per-date widget is now **suggest-pricing only** (pick a date → materialize → open the suggest dialog); the per-session actuals panel (`session-cost-revenue-panel`) was deleted. `ServerAccess.getRunCostRevenue` across all layers + mock-spec. Full UI suite green (2724).
+
 ## 2. Database Schema
 
 ### 2.1 `specialty_instructor_costs` table ✅ (2026-06-19)
