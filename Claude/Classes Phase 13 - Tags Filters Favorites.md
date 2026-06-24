@@ -79,9 +79,11 @@ Lowest layer first per CLAUDE.md.
 - [x] Schema tests: `class_tags_test.cpp` (defaults, color/sort/inactive, dup-code rejected, requires-code, requires-name, CreateIndexes adds + idempotent) and `class_tag_assignments_test.cpp` (valid insert, class-FK + tag-FK rejection, unique-blocks-duplicate-pair / allows-different-tag).
 - *(Admin metadata registration is §2.6, deferred — not part of the schema layer; consistent with how Phase 12's new tables were added.)*
 
-### 2.2 Table helpers
-- [ ] `TableHelpers::ClassTags` + tests.
-- [ ] `TableHelpers::ClassTagAssignments` + tests; method `GetTagsForClass(Transaction&, int64_t classId)` → list of `ClassTagInfo`, **ordered by `class_tags.sort_order ASC, id ASC`** so the first element is the chip-color tag (resolved OQ-P13-1). Test asserts the order.
+### 2.2 Table helpers ✅ (2026-06-24)
+- [x] `TableHelpers::ClassTags` (`class_tags.h/.cpp`) — CRUD mirroring `SkillLevels`: `AddClassTag` (code/name + KVT overloads), `GetClassTag(id)`, `GetClassTagByCode(code)`, `GetActiveClassTags` (active, `ORDER BY sort_order, id`), `GetAllClassTags` (incl. inactive, ordered), `UpdateClassTag` (bumps `updated_us`), `DeleteClassTag` (soft-delete `is_active=false`). Tests `class_tags_test.cpp`: add/get + defaults, KVT color/sort, by-code (+unknown→empty), active-order (sort then id tiebreak, excludes inactive), all-incl-inactive ordered, update, soft-delete.
+- [x] `TableHelpers::ClassTagAssignments` (`class_tag_assignments.h/.cpp`) — `AddAssignment(classId, tagId)`, **`GetTagsForClass(classId)`** → joined `class_tags` rows **ordered by `class_tags.sort_order ASC, id ASC`** (first = chip-color tag, resolved OQ-P13-1), `GetTagIdsForClass` (raw ids), `DeleteAssignment(classId, tagId)`, `DeleteAssignmentsForClass(classId)`, `SetTagsForClass(classId, ids)` (replace-all + dedupe, backs the §2.5 multi-select). Tests `class_tag_assignments_test.cpp`: add/get, **GetTagsForClass orders by sort_order regardless of assignment order**, tag-ids, class-scoping, delete-one, delete-all, set-replaces-and-dedupes (incl. set-to-empty).
+- [x] Registered both helpers (4 sources) + 2 test files in `sql_util/table_helpers/CMakeLists.txt`.
+- *(`GetTagsForClass` returns the joined `class_tags` rows as a `KeyValueTableArray` per the table-helper convention — the `ClassTagInfo` domain struct lives in §2.3 business logic, which maps these rows. No active-filter at this layer: a class lists all its assigned tags (§2.5); active-filtering is a §2.3 concern.)*
 
 ### 2.3 Business logic
 - [ ] Extend `ClassCatalogHelper` to surface tag list on every `ClassCatalogEntry` and `ClassDetail`.
