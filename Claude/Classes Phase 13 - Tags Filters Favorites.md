@@ -72,21 +72,12 @@ Lowest layer first per CLAUDE.md.
 
 ## 2. Class Tags
 
-### 2.1 Database schema
-- [ ] `db_schema/class_tags.h/.cpp`:
-  - `id BIGSERIAL PK`
-  - `code TEXT NOT NULL UNIQUE` (slug like `partner-acro`)
-  - `name TEXT NOT NULL` (display name)
-  - `color TEXT NOT NULL DEFAULT ''` (CSS color string for calendar chip — hex or named)
-  - `sort_order BIGINT NOT NULL DEFAULT 0`
-  - `is_active BOOLEAN NOT NULL DEFAULT TRUE`
-  - `created_us`, `updated_us`
-- [ ] `db_schema/class_tag_assignments.h/.cpp`:
-  - `id BIGSERIAL PK`
-  - `class_id BIGINT NOT NULL REFERENCES classes(id)`
-  - `class_tag_id BIGINT NOT NULL REFERENCES class_tags(id)`
-  - `created_us`
-  - `UNIQUE (class_id, class_tag_id)`
+### 2.1 Database schema ✅ (2026-06-23)
+- [x] `db_schema/class_tags.h/.cpp`: `id BIGSERIAL PK`; `code TEXT NOT NULL UNIQUE` (via `AddColumnUnique`, which is NOT NULL + UNIQUE); `name TEXT NOT NULL`; `color TEXT NOT NULL DEFAULT ''`; `sort_order BIGINT NOT NULL DEFAULT 0`; `is_active BOOLEAN NOT NULL DEFAULT TRUE`; `created_us`/`updated_us`. Plus `CreateClassTagsIndexes` → `(is_active, sort_order)` index for the active-list browse (mirrors `skill_levels`).
+- [x] `db_schema/class_tag_assignments.h/.cpp`: `id BIGSERIAL PK`; `class_id` FK→classes; `class_tag_id` FK→class_tags; `created_us`; named UNIQUE `(class_id, class_tag_id)` (`uq_class_tag_assignments_class_tag`) — its leading `class_id` column also serves the §2.2 `GetTagsForClass` lookup, so no separate index needed.
+- [x] Wired into DB init: `make_database_info.cpp` (includes + `MakeClassTagsTable`/`MakeClassTagAssignmentsTable` after the skill block — classes already made, class_tags before assignments), `create_database.cpp::CreateTables` (includes + `CreateTable` calls + index, same FK order), and `db_schema/CMakeLists.txt` (4 sources + 2 test files).
+- [x] Schema tests: `class_tags_test.cpp` (defaults, color/sort/inactive, dup-code rejected, requires-code, requires-name, CreateIndexes adds + idempotent) and `class_tag_assignments_test.cpp` (valid insert, class-FK + tag-FK rejection, unique-blocks-duplicate-pair / allows-different-tag).
+- *(Admin metadata registration is §2.6, deferred — not part of the schema layer; consistent with how Phase 12's new tables were added.)*
 
 ### 2.2 Table helpers
 - [ ] `TableHelpers::ClassTags` + tests.
