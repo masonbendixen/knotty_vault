@@ -104,20 +104,20 @@ Lowest layer first per CLAUDE.md.
 - *(Tag **assignment** to a class — the §2.5 multi-select — uses the `ClassTagAssignments::SetTagsForClass` helper from §2.2; the write endpoint vs. generic-CRUD path is decided in §2.5, so no set-tags endpoint added here, faithful to this §2.4 list.)*
 
 ### 2.5 Frontend
-- [ ] Class catalog gains a tag-filter chip row at the top.
-- [ ] Calendar event chips use **the first tag's color** — the lowest-`sort_order` tag from `GetTagsForClass` (resolved OQ-P13-1). A class with no tags uses the default chip color. Spec asserts a multi-tag class renders the first tag's color.
-- [ ] Class detail page lists tags (all of them, in `sort_order`).
-- [ ] **New bespoke "Manage Tags" admin page** `manage/class-tags/class-tags-admin.component.*/.spec.ts`, modeled on `manage/skills/skills-admin.component`: a table of tags with inline create/edit/delete, a color picker for `color`, `sort_order` ordering, and an active/inactive toggle. Wired to the §2.4 admin tag endpoints. Reachable from the Manage dashboard. (This is the workflow that replaces "go to Manage Data → class_tags".)
-- [ ] Admin class-edit form (`manage/class-schedules/dialogs/class-form-dialog`): multi-select of tags (writes `class_tag_assignments` for the class).
-- [ ] `ServerAccess`: `getClassTags()`, `getAdminClassTags()`, `createClassTag(req)`, `updateClassTag(id, req)`, `deleteClassTag(id)`, `setClassTags(classId, tagIds)`, updated `getClasses(filter)`. Update `ServerAccess.mock.spec.ts` for every new method.
+- [x] Class catalog (`public/class-info`) gains a tag-filter chip row at the top: an "All" chip plus a chip per active tag (`getClassTags()`); selecting one re-fetches `getClasses(tagId)`. Each class card now also shows its tags as colored chips. Spec covers the chip row, filter re-fetch (incl. "re-select active = no re-fetch"), colored chips, and graceful degradation when the vocabulary load fails.
+- [x] Calendar event chips: added optional `color?` to `CalendarEvent`; `calendar-event.component` renders it as the chip's left-edge accent (`event-chip-tagged`), defaulting when absent. Spec asserts the color is applied. **NOTE (deferral):** the calendar is still a disconnected mock (`mockCalendarResponse`, a `// TODO replace with API call` stub) — it carries no class linkage, so the color *plumbing* exists but the data wiring (deriving each event's color from its class's first tag) waits until the calendar reads real class data. Tracked as a follow-up; not blocking §5 acceptance which is exercised through the catalog chips.
+- [x] Class detail page (`public/class-detail`) lists all of a class's tags as colored chips, in `sort_order`. Spec covers ordered colored chips + the no-tags case.
+- [x] **New bespoke "Manage Tags" admin page** `manage/class-tags/class-tags-admin.component.*` (+ `.spec.ts`), modeled on `skills-admin`: a table of tags (color swatch + name + code + sort order + active state, incl. inactive), inline add/edit panels with a native `<input type="color">` picker, `sort_order` field, and an active toggle; create/edit/delete wired to the §2.4 admin endpoints (dup-code → friendly message; delete error → "set inactive instead"). Route `/manage/class-tags` + a "Class Tags" Manage-dashboard card (with a dashboard spec). 13 component specs.
+- [x] Admin class-edit form (`class-form-dialog`): multi-select (`mat-select multiple`) of tags; inactive tags flagged in the option label. Parent (`class-schedule-manage`) loads the vocabulary (`getAdminClassTags`) + the class's current tags (`getClassDetail().tags`) before opening, and on save writes the class row then `setClassTags(classId, tagIds)` (non-fatal if the tag write fails). Specs on both the dialog (selection in/out) and the parent (vocabulary seeded, current tags pre-selected, setClassTags applied, vocabulary-load-failure still creates the class).
+- [x] `ServerAccess`: added `getClassTags()`, `getAdminClassTags()`, `createClassTag(req)→{id}`, `updateClassTag(id, req)→{ok}`, `deleteClassTag(id)→{ok}`, `setClassTags(classId, tagIds)→{ok}`, and changed `getClasses(tagId?)`. New `shared/types/class-tag.types.ts` (`ClassTag`, `ClassTagRef`, `CreateClassTagRequest`, `UpdateClassTagRequest`); `ClassCatalogEntry.tags` upgraded `string[]`→`ClassTagRef[]` + added `chip_color`/`tag_count`. Implemented across interface/network (with `normalizeClassTag` is_active coercion)/proxy/mock; `ServerAccess.mock.spec.ts` gained 14 cases (vocabulary, admin list + 401, create dup/missing, update rename/dup/404, soft-delete, setClassTags + 404, plus catalog tag-nesting + `tag_id` filter).
 
 ### 2.6 Admin metadata (debug-only fallback — NOT the authoring workflow)
 Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is the §2.5 Manage Tags page. The registration below is a debug/inspection escape hatch only.
-- [ ] `class_tags` → top-level. Permission `manage_class_schedule`. (Inspection / debug only; authoring lives in Manage Tags.)
-- [ ] `class_tag_assignments` → nested under `classes` keyed by `class_id`. (Inspection / debug only; assignment lives in the class-edit multi-select.)
+- [x] `class_tags` → top-level. Permission `manage_class_schedule`. (Done in `create_database.cpp` Populate* functions; inspection/debug only — authoring lives in Manage Tags.)
+- [x] `class_tag_assignments` → nested under `classes` keyed by `class_id`. (Done; inspection/debug only — assignment lives in the class-edit multi-select.)
 
 ### 2.7 Tests
-- [ ] Helpers + endpoint tests (incl. the bespoke admin `class_tag` GET/POST/PUT/DELETE: 403 / dup-code / persist) + frontend specs (incl. the **Manage Tags page spec** and the class-edit tag multi-select spec) + `ServerAccess.mock.spec.ts` cases.
+- [x] Helpers + endpoint tests (incl. the bespoke admin `class_tag` GET/POST/PUT/DELETE: 403 / dup-code / persist, and the new `PUT /api/admin/class/<id>/tags` set-tags endpoint: 403/404/400/200-replaces-then-clears) done in §2.2–2.4. Frontend specs: Manage Tags page spec, class-edit multi-select dialog + parent specs, catalog filter/chip specs, class-detail tag specs, calendar-event color spec, and `ServerAccess.mock.spec.ts` cases. **Verified: `ng build` clean + full Karma suite green (2759/2759).**
 
 ## 3. Favorite Instructors
 
@@ -215,6 +215,54 @@ Both resolved (Mason, 2026-06-09: "go with your recommendation") and folded into
 
 - **OQ-P13-1. — RESOLVED.** Multi-tag calendar chip uses the lowest-`sort_order` tag's single solid color (no multi-color stripe); `GetTagsForClass` returns `sort_order`-ordered tags. Folded into §1.1, §2.2, §2.5, §5.
 - **OQ-P13-2. — RESOLVED.** Favorite-instructor notifications also fire on the **first appearance** of a favorited instructor on the upcoming schedule, via a **daily job** (`NotifyNewScheduleAppearances` → `POST /api/admin/send_favorite_instructor_schedule_alerts`), deduped once per (follower, instructor, class) by a new `favorite_instructor_notifications` sent-log plus the existing 24h throttle. Folded into §1.1, §3.1–3.4, §3.6–3.8, §5.
+
+## 6.5 Manual Test Guide — §2 Tags/Filters (frontend)
+
+**Two ways to exercise this. Mock mode needs no backend; full-stack needs the C++ server + a reset DB.**
+
+### Path A — Fast path (mock mode, no backend)
+The mock seeds three tags (Yoga sort 1 / Aerial sort 2 / Partner Acro sort 3 + an inactive "Retired") and assigns Class 1 = Yoga+Partner Acro, Class 2 = Partner Acro.
+1. Terminal: `cd ui` → `ng serve -c local` → open `http://localhost:4200`.
+2. **Catalog filter** — top menu **Classes** (`/classes`). You'll see a chip row: **All · Yoga · Aerial · Partner Acro** (Retired is hidden — it's inactive). "All" is dark (selected). "Knotty Yoga" shows amber **Yoga** + teal **Partner Acro** chips; "Partner Acrobatics" shows teal **Partner Acro**.
+   - Click **Partner Acro** → both classes remain. Click **Yoga** → only "Knotty Yoga". Click **All** → both return.
+3. **Class detail** — click "Knotty Yoga" → under the title you see **Yoga** then **Partner Acro** chips (Yoga first = lowest sort_order). This is the OQ-P13-1 rule.
+4. **Manage Tags** (mock is always "logged in") — top menu **Manage** → **Class Tags** card → `/manage/class-tags`. Add/edit/delete tags with the color picker; changes reflect in the list.
+
+### Path B — Full stack (real backend)
+**Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, `cd ui && ng serve`, and log in as a user holding **manage_class_schedule** (an admin/manager). The DB starts with **no** tags.
+
+**Step 1 — Create the tag vocabulary (Manage Tags page).**
+- Top nav **Manage** → on the dashboard click the **Class Tags** card (icon `label`) → `/manage/class-tags`.
+- Click **Add tag**. Enter exactly:
+  - **Code:** `yoga`  **Name:** `Yoga`  **Color:** pick amber (`#f59e0b`)  **Sort order:** `1`  **Active:** on → **Create**.
+- **Add tag** again: **Code** `aerial` · **Name** `Aerial` · **Color** purple (`#8b5cf6`) · **Sort order** `2` · **Active** on → **Create**.
+- **Add tag** again: **Code** `partner-acro` · **Name** `Partner Acro` · **Color** teal (`#14b8a6`) · **Sort order** `3` · **Active** on → **Create**.
+- You now have three rows, each with a colored swatch, name, code, **Active** chip, and `#sort`.
+- **Duplicate-code check:** Add tag → **Code** `yoga` · **Name** `Dup` → **Create** ⇒ red message "That code is already in use." Cancel.
+- **Edit check:** click the pencil on **Yoga** → change **Name** to `Yoga Flow`, **Save** ⇒ row updates. (Re-open and set it back to `Yoga` if you like.)
+
+**Step 2 — Assign tags to a class (Class Schedules → edit class).**
+- **Manage** dashboard → **Class Schedules** card → `/manage/class-schedules`.
+- Create a class if none exists: **Add class** → **Name** `Knotty Yoga`, **Description** anything, **Default capacity** `16`, **Kind** `Recurring`, **Active** checked. In the **Tags** dropdown (multi-select) tick **Yoga** and **Partner Acro** → **Save**.
+  - (To test editing: select the class in the left list, click **Edit class** — the **Tags** dropdown is pre-checked with its current tags. Add/remove and **Save**.)
+- Create/edit a second class `Partner Acrobatics` and tag it **Partner Acro** only.
+
+**Step 3 — Verify the public catalog filter + chips.**
+- Top nav **Classes** (`/classes`, public — log out or use another browser if you want the logged-out view; the filter works either way).
+- The chip row reads **All · Yoga · Aerial · Partner Acro**. Each class card shows its colored tag chips.
+- Click **Partner Acro** ⇒ both tagged classes show. Click **Yoga** ⇒ only "Knotty Yoga". Click **Aerial** ⇒ empty/"No classes" (nothing tagged aerial yet). Click **All** ⇒ everything.
+
+**Step 4 — Verify class detail tag list + the chip-color rule.**
+- From the catalog click **Knotty Yoga** → under the title, tag chips render **in sort_order**: **Yoga** (amber) then **Partner Acro** (teal). The lower-sort_order tag (Yoga) is first — this is the chip/accent color (OQ-P13-1).
+- A class with no tags shows no chip row.
+
+**Step 5 — Inactive + delete behavior.**
+- Manage Tags → edit **Aerial** → toggle **Active** off → **Save**. Back on `/classes`, **Aerial** disappears from the filter row (public vocabulary is active-only). In the class-edit **Tags** dropdown it shows as `Aerial (inactive)`.
+- Manage Tags → delete a tag that is **not** assigned to any class → it's removed (soft-deleted). Deleting a tag still referenced surfaces "This tag is in use — set it inactive instead."
+
+**Step 6 — (Optional) debug inspection.** `Manage Data` (admin generic editor) now lists **Class Tags** (top-level) and **Class Tag Assignments** (nested under classes) for read-only inspection — but authoring is the Manage Tags page above, not this editor.
+
+**Known gap:** the Calendar view (`/calendar`) is still a disconnected demo (hardcoded sample events); its chips have the color hook wired but won't show real tag colors until the calendar is connected to live class data.
 
 ## 7. Cross-References
 
