@@ -85,9 +85,12 @@ Lowest layer first per CLAUDE.md.
 - [x] Registered both helpers (4 sources) + 2 test files in `sql_util/table_helpers/CMakeLists.txt`.
 - *(`GetTagsForClass` returns the joined `class_tags` rows as a `KeyValueTableArray` per the table-helper convention — the `ClassTagInfo` domain struct lives in §2.3 business logic, which maps these rows. No active-filter at this layer: a class lists all its assigned tags (§2.5); active-filtering is a §2.3 concern.)*
 
-### 2.3 Business logic
-- [ ] Extend `ClassCatalogHelper` to surface tag list on every `ClassCatalogEntry` and `ClassDetail`.
-- [ ] Add `FilterByTag(tagId)` to the catalog query.
+### 2.3 Business logic ✅ (2026-06-24)
+- [x] New `struct ClassTagInfo { id; code; name; color; sortOrder; }`; upgraded `ClassCatalogEntry.tags` from `vector<string>` → `vector<ClassTagInfo>` (the old field was a placeholder "empty until Phase 13"). `BuildEntry` populates it from `ClassTagAssignments::GetTagsForClass` (ordered by `sort_order ASC`, so `tags[0]` is the chip-color tag — resolved OQ-P13-1). Added a `classTagAssignments_` member. Surfaces on every catalog entry AND `ClassDetail.summary`.
+- [x] `FilterByTag`: optional `std::optional<int64_t> filterTagId` on `GetActiveClasses` and `GetClassesVisibleToPerson` — when set, only classes carrying that tag are returned (post-build `HasTag` filter; the catalog is small). `/api/classes?tag_id=` (§2.4) passes it through.
+- [x] KVT converters (`scheduling_key_value_table.*`): `ClassCatalogEntryToKeyValueTable` now emits `chip_color` (first tag's color, "" when none) + `tag_count` instead of the old comma-joined `tags` string; added `ClassTagInfoToKeyValueTable` + `ClassTagInfosToKeyValueTableArray` so §2.4 endpoints can nest the full ordered tag array.
+- [x] Tests: `class_catalog_helper_test.cpp` (tags populated in sort_order incl. empty-list, filter-by-tag returns only tagged / orphan-tag→empty / no-filter→all, visible-to-person filter, class-detail surfaces tags) + `scheduling_key_value_table_test.cpp` (updated the catalog converter test to ClassTagInfos asserting `chip_color`/`tag_count`, empty-tags chip_color, `ClassTagInfo` converter + array). Only the catalog helper, its converters, and their tests reference `.tags` — no other consumers affected.
+- *(Endpoint JSON nesting of the `tags` array + the `tag_id` query param parse are §2.4; the converters above are the building blocks.)*
 
 ### 2.4 Endpoints
 - [ ] `GET /api/class_tags` → list active. Public.
