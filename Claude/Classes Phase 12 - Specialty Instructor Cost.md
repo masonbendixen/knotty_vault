@@ -90,6 +90,16 @@ Three fixes after the first end-to-end run:
    - **Backend:** `Bookings::GetRunAttendanceRevenue` (distinct-person counts + revenue summing each `purchase_item` **once** via slot→schedule→instance join, so a bundle isn't multiplied across sessions), `EventSessions::GetSessionIdsForInstance`, `SpecialtyCostHelper::GetRunCostRevenue` (sums each session's pay using the fallback above + run revenue), `RunCostRevenueReport` + converter, `GET /api/admin/class_instance/<id>/cost_revenue`. Tests at each layer incl. the bundled-series-counted-once case.
    - **Frontend:** a **Cost & revenue (this run)** block in the Specialty instructor cost panel (sessions / attendees / instructor pay / revenue / margin, red when negative). The per-date widget is now **suggest-pricing only** (pick a date → materialize → open the suggest dialog); the per-session actuals panel (`session-cost-revenue-panel`) was deleted. `ServerAccess.getRunCostRevenue` across all layers + mock-spec. Full UI suite green (2724).
 
+## Suggest-pricing removed (2026-06-23, Mason)
+
+Mason: "I don't really find this Suggest pricing per slot useful… it would be better to just remove it… we really just don't need it." Removed the whole **session-keyed** pricing/reporting surface — both the suggest-pricing assistant AND the now-orphaned per-session cost/revenue (superseded by the per-run panel he likes). What stays: the **run-level** cost/revenue report + specialty-cost CRUD + instructor preferences.
+
+**Frontend removed:** `slot-occurrence-pricing` + `suggest-pricing-dialog` components (+ specs), the host wiring (import / `imports[]` / template / `pricingTiers` / `defaultMarginPct` / the permissions tier-load), and the ServerAccess methods `suggestPricingForSession` + `getSessionCostRevenue` (interface/network/proxy/mock/mock-spec) + types `PricingSuggestion` / `PricingSuggestionRequest` / `SessionCostRevenueReport`. Full UI suite green (**2711**).
+
+**Backend removed:** endpoints `admin_session_suggest_pricing` + `admin_session_cost_revenue` (+tests, web_app, CMake); `SpecialtyCostHelper::SuggestPricesForBreakeven` + `GetSessionCostRevenue`; structs `PricingSuggestion` / `PricingSuggestionRequest` / `SessionCostRevenueReport`; their converters + tests; the helper's now-unused `permissions_` / `entitlementRules_` members. **Kept (harmless, reusable, tested):** `ProductEntitlementRules::IsPermissionGrantedBySubscriptionProduct` and the seeded `non_member_profit_margin_pct` secret. (§4.1 `ComputeInstructorPayCents`, §6 run report, and §5 authoring all retained.)
+
+**Note:** §4.2 (pricing assistant) and §4.3 (per-session cost/revenue) below are **superseded** — the live feature is the per-run report only.
+
 ## 2. Database Schema
 
 ### 2.1 `specialty_instructor_costs` table ✅ (2026-06-19)
