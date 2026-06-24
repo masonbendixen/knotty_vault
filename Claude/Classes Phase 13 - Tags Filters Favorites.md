@@ -92,15 +92,16 @@ Lowest layer first per CLAUDE.md.
 - [x] Tests: `class_catalog_helper_test.cpp` (tags populated in sort_order incl. empty-list, filter-by-tag returns only tagged / orphan-tag→empty / no-filter→all, visible-to-person filter, class-detail surfaces tags) + `scheduling_key_value_table_test.cpp` (updated the catalog converter test to ClassTagInfos asserting `chip_color`/`tag_count`, empty-tags chip_color, `ClassTagInfo` converter + array). Only the catalog helper, its converters, and their tests reference `.tags` — no other consumers affected.
 - *(Endpoint JSON nesting of the `tags` array + the `tag_id` query param parse are §2.4; the converters above are the building blocks.)*
 
-### 2.4 Endpoints
-- [ ] `GET /api/class_tags` → list active. Public.
-- [ ] `GET /api/classes?tag_id=<id>` — extend existing endpoint with filter param.
-- [ ] **Admin tag-vocabulary CRUD = bespoke, NOT Manage Data.** Managing the controlled vocabulary (create/edit/retire tags, set name/color/sort_order/is_active) is a real admin workflow, so it gets a dedicated "Manage Tags" UI (§2.5) — never the Manage Data generic table editor (memory `feedback_manage_data_is_debug_only.md`). Add:
-  - `GET /api/admin/class_tags` → all tags incl. inactive. Permission `manage_class_schedule`. Endpoint test.
-  - `POST /api/admin/class_tag` body `{ code, name, color, sort_order, is_active }` → create. Endpoint test (403 / 400-dup-code / 200+persist).
-  - `PUT /api/admin/class_tag/<id>` → update. `DELETE /api/admin/class_tag/<id>` → soft-delete (`is_active=false`). Endpoint tests.
-  - (Implementation note: these MAY be the generic CRUD REST endpoints called *from the bespoke §2.5 Manage Tags page* — the accepted Phase 1 `class-requirements-editor` pattern — but the **authoring surface must be the bespoke page, not the Manage Data editor**.)
-  - Tag **assignment** to a class is already bespoke via the §2.5 class-edit multi-select (writes `class_tag_assignments`).
+### 2.4 Endpoints ✅ (2026-06-24)
+- [x] `GET /api/class_tags` (`get_class_tags.{h,cpp}`) → `{ items: [...] }` from `GetActiveClassTags` (active only, `sort_order` order). Public. Test `get_class_tags_test.cpp` (active-in-order excl. inactive, empty).
+- [x] `GET /api/classes?tag_id=<id>` (`get_classes.cpp`): parses the optional `tag_id` query param → `GetActiveClasses/GetClassesVisibleToPerson(filterTagId)`; and now **nests the ordered `tags` array** per entry (each entry's flat KVT carries `chip_color` + `tag_count`; the array is spliced in as JSON, mirroring `upcoming_sessions`). `get_class_detail` likewise nests `tags`. Tests appended to `get_classes_test.cpp` (nests tags + chip_color from first/lowest-sort_order tag, empty when none; filter-by-tag returns only tagged — query param set via `crow::query_string` per `feedback_crow_query_params_test`).
+- [x] **Admin tag CRUD (bespoke, gated `manage_class_schedule`):**
+  - `GET /api/admin/class_tags` (`admin_class_tags_list`) → all incl. inactive. Test: 403, 200 (incl. inactive).
+  - `POST /api/admin/class_tag` (`admin_class_tag_create`) body `{ code, name, color?, sort_order?, is_active? }`. Pre-checks `GetClassTagByCode` to return a clean **400 `DUPLICATE_CODE`** instead of a constraint 500. Test: 403, 400-missing-field, 400-dup-code, 200+persist.
+  - `PUT /api/admin/class_tag/<id>` (`admin_class_tag_update`) — partial updates; 404 unknown; 400 `DUPLICATE_CODE` when renaming onto another tag's code (own code allowed). Test: 403, 404, 400-dup, 200.
+  - `DELETE /api/admin/class_tag/<id>` (`admin_class_tag_delete`) — soft-delete (`is_active=false`); 404 unknown. Test: 403, 404, 200 (row kept inactive, drops from active list).
+  - Registered all 5 endpoints in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- *(Tag **assignment** to a class — the §2.5 multi-select — uses the `ClassTagAssignments::SetTagsForClass` helper from §2.2; the write endpoint vs. generic-CRUD path is decided in §2.5, so no set-tags endpoint added here, faithful to this §2.4 list.)*
 
 ### 2.5 Frontend
 - [ ] Class catalog gains a tag-filter chip row at the top.
