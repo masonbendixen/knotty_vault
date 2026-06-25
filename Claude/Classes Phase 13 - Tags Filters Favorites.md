@@ -131,8 +131,11 @@ A real, browsable calendar with **month / week / day** views that adapts to who'
   - Show the **full class schedule** — every derived class occurrence (recurring classes expanded across the dates they meet). Each item is **clickable → the class detail page** (`/classes/:classId`).
   - Also show **upcoming series, events, and workshops**. Each is **clickable → its sign-up / detail page** (series → `/shop/series/:classInstanceId`; standalone event → `/shop/event/:sessionId`; workshop occurrence → class detail / per-occurrence booking).
 - **Logged-in ("my schedule"):**
-  - Show the classes, workshops, and series the viewer is **eligible to take** (per the permission-based access gate — membership tier + skills + prerequisites).
-  - **Plus** the viewer's **existing service bookings** (spa sessions, massages, etc.). Clicking a booked item → **the details page for that booking**.
+  - Defaults to a **"My Schedule"** view; a **My Schedule / Full Schedule** toggle switches to the whole public schedule (resolved OQ-P13-4).
+  - Show the classes, workshops, and series the viewer is **eligible to take** (per the permission-based access gate — membership tier + skills + prerequisites). **Ineligible** offerings are still shown, **greyed with a lock badge** for discovery/upsell (resolved OQ-P13-5) — see §3.2 for the click behavior (purchase-membership deep-link vs. skill-requirement popup).
+  - **Plus** the viewer's **existing service bookings** (spa sessions, massages, etc.). Clicking a booked item → its entry in the `/my/...` bookings page, with that booking expanded (resolved OQ-P13-9).
+
+Across both modes: **today-forward only**, **month / week / day** views, a **facility filter** (the selection is persisted client-side — no formal "home facility" concept yet), occurrence times rendered in **studio-local** time, and recurring classes shown on **every** occurrence (no month-view collapsing). Resolved OQ-P13-6/7/8.
 
 ### 3.2 What each item is and where a click goes
 | Item type | Source | Click target (logged-out) | Click target (logged-in) |
@@ -143,41 +146,59 @@ A real, browsable calendar with **month / week / day** views that adapts to who'
 | Standalone event | `visible_event_sessions` (no `class_id`) | `/shop/event/:sessionId` | same |
 | **Service booking** (spa/massage) | the viewer's `my_bookings` (service sessions) | — (not shown logged-out) | the booking's detail page |
 
-Tag color: every class-derived item is tinted by its class's **first-tag color** (the §2.5 `chip_color`, OQ-P13-1); non-class items use a neutral/default color (or a per-kind color — see OQ-P13-3).
+**Item color (resolved OQ-P13-3):** recurring-class, workshop, and series items are tinted by their class's **first-tag color** (the §2.5 `chip_color`, OQ-P13-1). Standalone events and service bookings have no class/tag, so they use a fixed **per-kind** color (events = slate, service bookings = rose).
+
+**Locked items (logged-in, not eligible — resolved OQ-P13-5):** rendered greyed with a lock badge. Click behavior depends on *why* it's gated:
+- **Membership-gated** → navigate to the **purchase page for the required membership tier** (deep-link to the tier/product so they can buy in).
+- **Skill-gated** → open a **skill-requirement popup** showing each missing skill's **name, description, badge photo** (`skill_levels`), and a "talk to a staff member about working toward this skill" prompt. (No purchase path — skills are earned, not bought.)
+- Eligible items click through exactly as the table above.
 
 ### 3.3 Backend
 - [ ] **Reuse, don't reinvent.** Lean on the existing derived-session machinery (`GetDerivedSessionsForRange(... fromUs, toUs)` from [[Class Schedule Implementations Redesign]] / Phase 1) which already walks dates, resolves the active instance+impl per day, expands slots, and left-joins persisted `event_sessions` (cancellations/subs/notes). Compose the calendar feed from: derived class occurrences + `visible_event_sessions` (events) + series runs + (logged-in only) the viewer's service `my_bookings`.
-- [ ] **New endpoint** `GET /api/calendar?from_us=&to_us=[&facility_id=]` returning a flat list of calendar items, each: `kind` (`class|workshop|series|event|service_booking`), `title`, `start_us`, `end_us`, `class_id?`, `session_id?`, `class_instance_id?`, `booking_id?`, `chip_color`, `facility_name`, `instructor_name?` (effective, incl. substitute), and per-viewer `bookable`/`access` flags. When the request is authenticated it filters classes to the eligible/visible set and appends the viewer's service bookings; when anonymous it returns the full public schedule (no bookings).
+- [ ] **New endpoint** `GET /api/calendar?from_us=&to_us=[&facility_id=]` returning a flat list of calendar items, each: `kind` (`class|workshop|series|event|service_booking`), `title`, `start_us`, `end_us`, `class_id?`, `session_id?`, `class_instance_id?`, `booking_id?`, `chip_color`, `facility_id`, `facility_name`, `instructor_name?` (effective, incl. substitute), and per-viewer access fields (next bullet). `from_us` is clamped to **≥ now** (today-forward, resolved OQ-P13-8). `facility_id` is an optional filter (resolved OQ-P13-7). When authenticated it appends the viewer's service bookings; when anonymous it returns the full public schedule (no bookings, no lock state — everything reads as "see details / sign up").
+- [ ] **Per-viewer access resolution (resolved OQ-P13-5)** — for the logged-in view, each class-derived item carries an `access` field reusing the same permission-based gate as class detail:
+  - `eligible` — clickable to book as normal.
+  - `members_only` — plus the **purchasable tier/product id** to deep-link the "buy membership" click-through.
+  - `needs_skill` — plus the **missing `skill_level_id`(s)** so the frontend can render the skill-requirement popup (name/description/badge photo come from the existing `skill_levels` read; no new payload needed beyond the ids).
 - [ ] Honor per-viewer visibility + signup-window state (so future occurrences can render "Sign-ups open on …" like the catalog/Phase 11).
-- [ ] Endpoint tests: date-range expansion, anonymous vs. authenticated payload differences, eligibility filtering, service bookings only-when-logged-in, `chip_color` present.
+- [ ] **(Possible follow-up work item, per Mason)** there's no "home facility" concept today; the calendar persists the chosen facility client-side (§3.4) rather than blocking on one. If a real home-facility preference is wanted later, that's a small separate item (a `people` preference column + settings UI).
+- [ ] Endpoint tests: date-range expansion, today-forward clamp, facility filter, anonymous vs. authenticated payload differences, the three `access` states (eligible / members_only+tier / needs_skill+skill ids), service bookings only-when-logged-in, `chip_color` present.
 
 ### 3.4 Frontend
-- [ ] Extend `CalendarEvent` with `{ kind, classId?, sessionId?, classInstanceId?, bookingId?, chipColor, bookable? }`; keep the existing `color` hook.
-- [ ] Replace `CalendarService._getCalendarEvents()` (the mock) with a real `ServerAccess.getCalendar(fromUs, toUs)` call that maps items → `CalendarEvent` (set `color = chipColor`). Keep a mock for `-c local`.
-- [ ] Click routing per the §3.2 table (a `routerLink`/handler on `calendar-event` keyed by `kind`).
-- [ ] Month/week/day already render via the existing view components — feed them the live data; add a tag-color legend and (optionally) reuse the §2.5 tag-filter chip row.
-- [ ] Auth-awareness: the page subscribes to `AuthService`; logged-out shows the public schedule, logged-in shows the eligible set + service bookings (a "My schedule / Full schedule" toggle — see OQ-P13-4).
-- [ ] Specs: `CalendarService` maps items → events (incl. `color`); `calendar-event` routes by `kind`; the page swaps modes on auth state.
+- [ ] Extend `CalendarEvent` with `{ kind, classId?, sessionId?, classInstanceId?, bookingId?, chipColor, access?, requiredTierProductId?, missingSkillIds? }`; keep the existing `color` hook (set `color = chipColor`, or the per-kind color for events/services per §3.2).
+- [ ] Replace `CalendarService._getCalendarEvents()` (the mock) with a real `ServerAccess.getCalendar(fromUs, toUs, facilityId?)` call that maps items → `CalendarEvent`. **Fetch per visible month**, re-fetching on month/week/day navigation (resolved OQ-P13-8). Keep a mock for `-c local`.
+- [ ] **Click routing** (a handler on `calendar-event` keyed by `kind` + `access`):
+  - eligible class/workshop → `/classes/:classId` (or per-occurrence book); series → `/shop/series/:classInstanceId`; event → `/shop/event/:sessionId`; service booking → `/my/...` with the booking expanded.
+  - **`members_only`** → navigate to the membership purchase page for `requiredTierProductId`.
+  - **`needs_skill`** → open the **skill-requirement popup** (new component) listing each `missingSkillIds` skill's name + description + badge photo (`/api/get_scaled_photo/skill_levels/<id>/...`, via the existing skill read) + "talk to a staff member about working toward this skill." Component + spec.
+- [ ] **My Schedule / Full Schedule toggle** (logged-in; default My Schedule — resolved OQ-P13-4). Logged-out always shows the full public schedule. Page subscribes to `AuthService` to pick the default + show/hide the toggle.
+- [ ] **Facility filter** dropdown; persist the selection in `localStorage` so it survives navigation/return (resolved OQ-P13-7). Default to "all" (or the single facility) until a real home-facility preference exists.
+- [ ] Month/week/day already render via the existing view components — feed them the live data; **do not collapse repeats** in month view (resolved OQ-P13-6). Add a tag-color legend and (optionally) reuse the §2.5 tag-filter chip row.
+- [ ] Greyed/locked styling for ineligible items (lock badge); eligible/booked items render normally.
+- [ ] Specs: `CalendarService` maps items → events (incl. `color` + `access`) and fetches per month; `calendar-event` routes by `kind`/`access` (book vs. purchase-membership vs. skill-popup); the page swaps mode on auth state + toggle; facility selection persists; skill-requirement popup renders name/description/photo.
 
 ### 3.5 Tests
 - [ ] Backend endpoint (§3.3) + frontend service/component specs (§3.4). The §6 calendar acceptance assertions (yoga=yellow / aerial=purple / partner-acro=teal, lowest-sort_order wins) are exercised here.
 
-### 3.6 Open Questions
-- [ ] **OQ-P13-3. Non-class item colors.** Classes get their tag color. What color do **series / events / workshops / service bookings** use on the calendar? Options: (a) a fixed per-kind palette (e.g. events=slate, series=indigo, services=rose); (b) all neutral grey; (c) workshops/series inherit their class's tag color and only standalone events + services get a per-kind color. Recommendation: (c).
+### 3.6 Open Questions — RESOLVED (Mason, 2026-06-25)
+
+All ten resolved and folded into §3.1–§3.4 above (each decision is cited inline as "resolved OQ-P13-N"). Mason's answers are kept below for the record.
+
+- [x] **OQ-P13-3. Non-class item colors.** → workshops/series inherit their class's tag color; standalone events + service bookings get a per-kind color (events=slate, services=rose). Folded into §3.2.
 	- Mason- I'll go with your recommendation.
-- [ ] **OQ-P13-4. Logged-in: one blended calendar or a toggle?** When logged in you asked for *both* the eligible offerings *and* your service bookings. Do you want them **blended into one calendar**, or a **"My Schedule" vs "Full Schedule" toggle** (My = your bookings + eligible; Full = the whole public schedule)? Recommendation: a toggle defaulting to "My Schedule," because the full derived schedule across all classes can be dense.
+- [x] **OQ-P13-4. Logged-in mode.** → a **My Schedule / Full Schedule** toggle, defaulting to My Schedule (your bookings + eligible offerings). Folded into §3.1/§3.4.
 	- Mason- I like your recommendation.
-- [ ] **OQ-P13-5. "Eligible to take" — hide or show-locked?** For logged-in users, should classes the viewer is *not* eligible for be **hidden entirely**, or **shown with a "Members only / prerequisite" lock badge** (like the catalog's members-only state)? Hiding is cleaner; show-locked aids discovery/upsell. Recommendation: show-locked (greyed, not clickable-to-book).
+- [x] **OQ-P13-5. Ineligible classes.** → show-locked (greyed), not hidden. Membership-gated click → the purchase page for the required tier; skill-gated click → a popup with the missing skill's name/description/badge photo + a "talk to a staff member about working toward this skill" prompt (Mason's added requirements). Folded into §3.2/§3.3/§3.4.
 	- Mason- Yes, I like the discovery / upsell angle. It would be nice if clicking on them took them to the page to purchase the required membership. We should also handle the skill requirement. It would be nice if clicking on something for which they don't have the required skill showed them a popup with the details of the skill required that they don't have including the name, description, photo, and a word to talk to a staff member about how to work to improve that skill.
-- [ ] **OQ-P13-6. Recurring-class density in month view.** A recurring class meeting MWF shows ~12 chips/month *per class*. Across many classes a month cell gets crowded. Acceptable, or do you want month view to **collapse repeats** (show the class once per day with a count, or a "+N more" overflow per cell)? Week/day views show every occurrence regardless.
+- [x] **OQ-P13-6. Month-view density.** → do **not** collapse; show every occurrence (few distinct classes, many repeats — the repetition is by design). Folded into §3.1/§3.4.
 	- Mason- The schedule won't have a lot of different classes per se and will have a lot of repeat occurences of the same class but I feel like this is by design and shouldn't be collapsed.
-- [ ] **OQ-P13-7. Facility scope + timezone.** Multiple facilities: one combined calendar with a **facility filter**, or default to the viewer's home facility? (Occurrence times are wall-clock-encoded-as-UTC, so we render in studio-local time — confirm that's the intended display.)
+- [x] **OQ-P13-7. Facility + timezone.** → a facility filter with the selection **persisted client-side** (no formal "home facility" concept yet — flagged as a possible small follow-up item); render in studio-local time. Folded into §3.1/§3.3/§3.4.
 	- Mason- Yeah, I'd like a facility filter that defaults to their home facility (but can be changed). I'm not sure we have the notion of a home facility. This might need to be a work item. It could be that we just persist the selected facility in the calendar instead of needing to make a big deal of this.
-- [ ] **OQ-P13-8. Past occurrences + range.** Show past days greyed, or **today-forward only**? And is fetching **per visible month** (re-fetch on navigation) acceptable for performance, vs. a wider prefetch?
+- [x] **OQ-P13-8. Past + range.** → today-forward only; fetch per visible month, re-fetching on navigation. Folded into §3.3/§3.4.
 	- Mason- Yes, that seems like a good idea.
-- [ ] **OQ-P13-9. Service-booking detail route.** Clicking a service booking should open "the details page for the booking." Today bookings live under `/my/...` (e.g. my-bookings/my-events). Is there a dedicated per-booking detail route you want, or should the click deep-link into the existing my-bookings entry / open a detail modal?
+- [x] **OQ-P13-9. Service-booking click.** → deep-link into the existing `/my/...` bookings page and expand the relevant booking entry. Folded into §3.2/§3.4.
 	- Mason- I think we can just open up the my/ entry and possibly expand the relevant booking if that's not too much of a hassle.
-- [ ] **OQ-P13-10. Anonymous booking entry points.** For logged-out users clicking a series/event/workshop "sign-up" item — send them straight to the shop/booking page (which will prompt login at purchase), or intercept with a "sign in to book" step first? Recommendation: straight to the booking page; it already handles the logged-out → login hand-off.
+- [x] **OQ-P13-10. Anonymous booking.** → straight to the shop/booking page (it handles the logged-out → login hand-off). Folded into §3.2.
 	- Mason- I'll go with your recommendation.
 
 ## 4. Favorite Instructors
