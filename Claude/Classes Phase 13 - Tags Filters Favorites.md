@@ -39,11 +39,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ## Phase Summary
 
-**Nice-to-Have.** Three discoverability features bundled because they're small individually but valuable together:
+**Nice-to-Have.** Discoverability features bundled because they're small individually but valuable together:
 
 1. **Class category / tag taxonomy** (C-7) — controlled vocabulary in `class_tags` table; classes linked via `class_tag_assignments`. Drives catalog filter, calendar color-coding, AND the monthly-attendance-threshold prerequisite (SL-10).
-2. **Favorite-instructor feature** (S-7 / N-11) — `user_favorite_instructors`; user marks favorites and gets notifications when a favorite appears on a new class / substitutes.
-3. **Extended instructor profile pages** (C-8 / S-16) — extension of the existing instructor profile pages with class list + upcoming sessions.
+2. **Live calendar** (§3) — month/week/day public schedule (logged-out: clickable classes + bookable series/events/workshops) and personalized "my schedule" (logged-in: eligible offerings + the viewer's service bookings). Promoted from the Phase 16 stretch backlog (was CAL-1); consolidates the calendar deferrals from Phases 2/10/11.
+3. **Favorite-instructor feature** (S-7 / N-11) — `user_favorite_instructors`; user marks favorites and gets notifications when a favorite appears on a new class / substitutes.
+4. **Extended instructor profile pages** (C-8 / S-16) — extension of the existing instructor profile pages with class list + upcoming sessions.
 
 **Prerequisites:**
 - Phase 1 (classes catalog).
@@ -68,7 +69,7 @@ Lowest layer first per CLAUDE.md.
 - [x] Controlled vocabulary (parent OQ-32) — `class_tags` table with admin CRUD, tag references via primary keys.
 - [x] Tags applied to `classes` (NOT `class_schedules`) — color-coding and filtering happens at the class level.
 - [x] **Multi-tag calendar chip color = first tag's color (resolved OQ-P13-1).** When a class has multiple tags, the calendar/catalog chip uses the color of the **lowest-`sort_order`** tag (a single solid color; no multi-color stripe). `GetTagsForClass` returns tags ordered by `sort_order ASC` so "first tag" is well-defined.
-- [x] **Favorite-instructor notifications also fire on first appearance (resolved OQ-P13-2).** Beyond Phase 10 substitutions/shift-trades, a follower is also notified the **first time** a favorited instructor newly appears on the upcoming schedule (a new `class_schedules` impl / staffing assignment). This is driven by a **daily job**, not per-event, and fires once per (follower, instructor, class) appearance (see §3.3/§3.8).
+- [x] **Favorite-instructor notifications also fire on first appearance (resolved OQ-P13-2).** Beyond Phase 10 substitutions/shift-trades, a follower is also notified the **first time** a favorited instructor newly appears on the upcoming schedule (a new `class_schedules` impl / staffing assignment). This is driven by a **daily job**, not per-event, and fires once per (follower, instructor, class) appearance (see §4.3/§4.8).
 
 ## 2. Class Tags
 
@@ -119,9 +120,61 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
 ### 2.7 Tests
 - [x] Helpers + endpoint tests (incl. the bespoke admin `class_tag` GET/POST/PUT/DELETE: 403 / dup-code / persist, and the new `PUT /api/admin/class/<id>/tags` set-tags endpoint: 403/404/400/200-replaces-then-clears) done in §2.2–2.4. Frontend specs: Manage Tags page spec, class-edit multi-select dialog + parent specs, catalog filter/chip specs, class-detail tag specs, calendar-event color spec, and `ServerAccess.mock.spec.ts` cases. **Verified: `ng build` clean + full Karma suite green (2759/2759).**
 
-## 3. Favorite Instructors
+## 3. Live Calendar (public schedule + "my schedule")
 
-### 3.1 Database schema
+> **Status: design / discussion (started 2026-06-25).** Promoted out of [[Classes Phase 16 - Stretch Items]] (was CAL-1) because we want it now — including screenshots for UX styling. The month/week/day calendar **shell already exists** (`ui/src/app/pages/calendar/` with `month-view` / `week-view` / `day-view` / `calendar-event` / `calendar-view-select` / `date-select` components and `CalendarService`), but it's **mock-driven** (`mockCalendarResponse()` behind a `// TODO replace with API call`). This section wires it to live data. The tag-chip color hook from §2.5 (`CalendarEvent.color` + `event-chip-tagged`) already exists; we feed it real `chip_color` here.
+
+### 3.1 Goal
+A real, browsable calendar with **month / week / day** views that adapts to who's looking:
+
+- **Logged-out (public schedule):**
+  - Show the **full class schedule** — every derived class occurrence (recurring classes expanded across the dates they meet). Each item is **clickable → the class detail page** (`/classes/:classId`).
+  - Also show **upcoming series, events, and workshops**. Each is **clickable → its sign-up / detail page** (series → `/shop/series/:classInstanceId`; standalone event → `/shop/event/:sessionId`; workshop occurrence → class detail / per-occurrence booking).
+- **Logged-in ("my schedule"):**
+  - Show the classes, workshops, and series the viewer is **eligible to take** (per the permission-based access gate — membership tier + skills + prerequisites).
+  - **Plus** the viewer's **existing service bookings** (spa sessions, massages, etc.). Clicking a booked item → **the details page for that booking**.
+
+### 3.2 What each item is and where a click goes
+| Item type | Source | Click target (logged-out) | Click target (logged-in) |
+|---|---|---|---|
+| Recurring class occurrence | derived sessions (slots expanded over dates) | `/classes/:classId` (description) | `/classes/:classId` (or per-occurrence book if bookable) |
+| Workshop | class of `kind=workshop` + its occurrences | class detail → per-occurrence booking | same |
+| Series run | `class_series_instances` / series runs | `/shop/series/:classInstanceId` | same (or "you're enrolled" if booked) |
+| Standalone event | `visible_event_sessions` (no `class_id`) | `/shop/event/:sessionId` | same |
+| **Service booking** (spa/massage) | the viewer's `my_bookings` (service sessions) | — (not shown logged-out) | the booking's detail page |
+
+Tag color: every class-derived item is tinted by its class's **first-tag color** (the §2.5 `chip_color`, OQ-P13-1); non-class items use a neutral/default color (or a per-kind color — see OQ-P13-3).
+
+### 3.3 Backend
+- [ ] **Reuse, don't reinvent.** Lean on the existing derived-session machinery (`GetDerivedSessionsForRange(... fromUs, toUs)` from [[Class Schedule Implementations Redesign]] / Phase 1) which already walks dates, resolves the active instance+impl per day, expands slots, and left-joins persisted `event_sessions` (cancellations/subs/notes). Compose the calendar feed from: derived class occurrences + `visible_event_sessions` (events) + series runs + (logged-in only) the viewer's service `my_bookings`.
+- [ ] **New endpoint** `GET /api/calendar?from_us=&to_us=[&facility_id=]` returning a flat list of calendar items, each: `kind` (`class|workshop|series|event|service_booking`), `title`, `start_us`, `end_us`, `class_id?`, `session_id?`, `class_instance_id?`, `booking_id?`, `chip_color`, `facility_name`, `instructor_name?` (effective, incl. substitute), and per-viewer `bookable`/`access` flags. When the request is authenticated it filters classes to the eligible/visible set and appends the viewer's service bookings; when anonymous it returns the full public schedule (no bookings).
+- [ ] Honor per-viewer visibility + signup-window state (so future occurrences can render "Sign-ups open on …" like the catalog/Phase 11).
+- [ ] Endpoint tests: date-range expansion, anonymous vs. authenticated payload differences, eligibility filtering, service bookings only-when-logged-in, `chip_color` present.
+
+### 3.4 Frontend
+- [ ] Extend `CalendarEvent` with `{ kind, classId?, sessionId?, classInstanceId?, bookingId?, chipColor, bookable? }`; keep the existing `color` hook.
+- [ ] Replace `CalendarService._getCalendarEvents()` (the mock) with a real `ServerAccess.getCalendar(fromUs, toUs)` call that maps items → `CalendarEvent` (set `color = chipColor`). Keep a mock for `-c local`.
+- [ ] Click routing per the §3.2 table (a `routerLink`/handler on `calendar-event` keyed by `kind`).
+- [ ] Month/week/day already render via the existing view components — feed them the live data; add a tag-color legend and (optionally) reuse the §2.5 tag-filter chip row.
+- [ ] Auth-awareness: the page subscribes to `AuthService`; logged-out shows the public schedule, logged-in shows the eligible set + service bookings (a "My schedule / Full schedule" toggle — see OQ-P13-4).
+- [ ] Specs: `CalendarService` maps items → events (incl. `color`); `calendar-event` routes by `kind`; the page swaps modes on auth state.
+
+### 3.5 Tests
+- [ ] Backend endpoint (§3.3) + frontend service/component specs (§3.4). The §6 calendar acceptance assertions (yoga=yellow / aerial=purple / partner-acro=teal, lowest-sort_order wins) are exercised here.
+
+### 3.6 Open Questions
+- [ ] **OQ-P13-3. Non-class item colors.** Classes get their tag color. What color do **series / events / workshops / service bookings** use on the calendar? Options: (a) a fixed per-kind palette (e.g. events=slate, series=indigo, services=rose); (b) all neutral grey; (c) workshops/series inherit their class's tag color and only standalone events + services get a per-kind color. Recommendation: (c).
+- [ ] **OQ-P13-4. Logged-in: one blended calendar or a toggle?** When logged in you asked for *both* the eligible offerings *and* your service bookings. Do you want them **blended into one calendar**, or a **"My Schedule" vs "Full Schedule" toggle** (My = your bookings + eligible; Full = the whole public schedule)? Recommendation: a toggle defaulting to "My Schedule," because the full derived schedule across all classes can be dense.
+- [ ] **OQ-P13-5. "Eligible to take" — hide or show-locked?** For logged-in users, should classes the viewer is *not* eligible for be **hidden entirely**, or **shown with a "Members only / prerequisite" lock badge** (like the catalog's members-only state)? Hiding is cleaner; show-locked aids discovery/upsell. Recommendation: show-locked (greyed, not clickable-to-book).
+- [ ] **OQ-P13-6. Recurring-class density in month view.** A recurring class meeting MWF shows ~12 chips/month *per class*. Across many classes a month cell gets crowded. Acceptable, or do you want month view to **collapse repeats** (show the class once per day with a count, or a "+N more" overflow per cell)? Week/day views show every occurrence regardless.
+- [ ] **OQ-P13-7. Facility scope + timezone.** Multiple facilities: one combined calendar with a **facility filter**, or default to the viewer's home facility? (Occurrence times are wall-clock-encoded-as-UTC, so we render in studio-local time — confirm that's the intended display.)
+- [ ] **OQ-P13-8. Past occurrences + range.** Show past days greyed, or **today-forward only**? And is fetching **per visible month** (re-fetch on navigation) acceptable for performance, vs. a wider prefetch?
+- [ ] **OQ-P13-9. Service-booking detail route.** Clicking a service booking should open "the details page for the booking." Today bookings live under `/my/...` (e.g. my-bookings/my-events). Is there a dedicated per-booking detail route you want, or should the click deep-link into the existing my-bookings entry / open a detail modal?
+- [ ] **OQ-P13-10. Anonymous booking entry points.** For logged-out users clicking a series/event/workshop "sign-up" item — send them straight to the shop/booking page (which will prompt login at purchase), or intercept with a "sign in to book" step first? Recommendation: straight to the booking page; it already handles the logged-out → login hand-off.
+
+## 4. Favorite Instructors
+
+### 4.1 Database schema
 - [ ] `db_schema/user_favorite_instructors.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)`
@@ -137,11 +190,11 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
   - `notified_us BIGINT NOT NULL`
   - `UNIQUE (person_id, instructor_person_id, class_id)` — one "new appearance" email per follower per (instructor, class).
 
-### 3.2 Table helper
+### 4.2 Table helper
 - [ ] `TableHelpers::UserFavoriteInstructors` + tests.
-- [ ] `TableHelpers::FavoriteInstructorNotifications` + tests — `HasNotified(Transaction&, personId, instructorPersonId, classId)` and `RecordNotified(...)` (idempotent on the UNIQUE constraint), backing the §3.3 first-appearance dedupe.
+- [ ] `TableHelpers::FavoriteInstructorNotifications` + tests — `HasNotified(Transaction&, personId, instructorPersonId, classId)` and `RecordNotified(...)` (idempotent on the UNIQUE constraint), backing the §4.3 first-appearance dedupe.
 
-### 3.3 Business logic
+### 4.3 Business logic
 - [ ] In `business_logic/scheduling/favorite_instructor_helper.h/.cpp`:
   - `AddFavorite(Transaction&, personId, instructorPersonId)` — idempotent.
   - `RemoveFavorite(Transaction&, personId, instructorPersonId)`.
@@ -153,52 +206,52 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
   2. For each such (instructor, class): for each follower from `GetFollowersOfInstructor` with `notify_on_schedule_change=true`, skip if `FavoriteInstructorNotifications::HasNotified(follower, instructor, class)`; else queue "{Instructor} is now teaching {Class} — a class you might love", `RecordNotified(...)`, and respect the same at-most-one-per-(follower,instructor)-per-24h throttle as the substitution path.
   3. Return the count sent. Idempotent: a second run the same day sends nothing new (sent-log + throttle).
 
-### 3.4 Endpoints
+### 4.4 Endpoints
 - [ ] `POST /api/me/favorite_instructor/<personId>` — add. Endpoint test.
 - [ ] `DELETE /api/me/favorite_instructor/<personId>` — remove.
 - [ ] `GET /api/me/favorite_instructors` — list.
 - [ ] `POST /api/admin/send_favorite_instructor_schedule_alerts` — cron-callable, idempotent; runs `NotifyNewScheduleAppearances(now)`. Permission `admin`. Endpoint test (403 + 200 sends-once-then-no-op).
 
-### 3.5 Frontend
-- [ ] Add a "favorite" heart icon on instructor profile pages (3.6 / §4 below) + on class-detail instructor-list rows.
+### 4.5 Frontend
+- [ ] Add a "favorite" heart icon on instructor profile pages (4.6 / §5 below) + on class-detail instructor-list rows.
 - [ ] `/my/account/favorite-instructors` page — list, manage.
 - [ ] Per-user notification preference toggle: "Email me when a favorite instructor is teaching" (already lives in Phase 6's preferences page; extend).
 - [ ] `ServerAccess`: `addFavoriteInstructor`, `removeFavoriteInstructor`, `getMyFavoriteInstructors`. Update mock.
 
-### 3.6 Admin metadata (inspection only)
-- [ ] `user_favorite_instructors` → nested under `people` keyed by `person_id`. Permission `admin`. This table is **user-generated** (rows created by the §3.5 favorite heart, removed by the user) — there is no admin authoring workflow to build, so registering it purely for inspection in Manage Data is appropriate (per `feedback_manage_data_is_debug_only.md`).
-- [ ] `favorite_instructor_notifications` → nested under `people` keyed by `person_id`. Permission `admin`. **System-generated** sent-log (written by the §3.8 daily job); inspection only — never hand-authored.
+### 4.6 Admin metadata (inspection only)
+- [ ] `user_favorite_instructors` → nested under `people` keyed by `person_id`. Permission `admin`. This table is **user-generated** (rows created by the §4.5 favorite heart, removed by the user) — there is no admin authoring workflow to build, so registering it purely for inspection in Manage Data is appropriate (per `feedback_manage_data_is_debug_only.md`).
+- [ ] `favorite_instructor_notifications` → nested under `people` keyed by `person_id`. Permission `admin`. **System-generated** sent-log (written by the §4.8 daily job); inspection only — never hand-authored.
 
-### 3.7 Tests
+### 4.7 Tests
 - [ ] Helper + endpoint + frontend specs + mail-helper assertion that the substitution/shift-trade fan-out queues exactly one email per follower per change with the 24h dedupe respected.
 - [ ] **First-appearance (resolved OQ-P13-2):** `NotifyNewScheduleAppearances` queues one email per follower when a favorited instructor newly appears on a class's upcoming schedule; a second same-day run sends nothing (sent-log + 24h throttle); a follower with `notify_on_schedule_change=false` gets none; `FavoriteInstructorNotifications::HasNotified`/`RecordNotified` idempotency.
 
-### 3.8 Scheduled job (resolved OQ-P13-2)
+### 4.8 Scheduled job (resolved OQ-P13-2)
 - [ ] Add a **daily** job to `knottyyoga_helper`: `POST /api/admin/send_favorite_instructor_schedule_alerts`. Idempotent; wired in the three standard places (`scheduler/scheduled_job.cpp` `BuildStandardJobs` via `AppendIfEnabled`, a `JobIntervals::favoriteInstructorAlertSeconds` default 86400s, and a `--favorite_instructor_alert_interval` flag in `scheduler/main.cpp`). Per the existing interval-cron pattern, the endpoint self-gates / is idempotent rather than relying on an exact time. Update `scheduled_job_test` (job count + disable/propagate cases for the new job).
 
-## 4. Extended Instructor Profile Pages
+## 5. Extended Instructor Profile Pages
 
-### 4.1 Business logic
+### 5.1 Business logic
 - [ ] In `business_logic/scheduling/instructor_profile_helper.h/.cpp` (new):
   - `struct InstructorProfile { int64_t personId; std::string firstName; std::string lastName; std::string bio; std::string photoUrl; std::vector<ClassSummary> classesTaught; std::vector<UpcomingSessionInfo> upcomingSessions; }`.
   - `InstructorProfile GetInstructorProfile(Transaction&, int64_t personId)` — joins `people` → `event_session_staffing` → distinct `class_id`; pulls upcoming sessions in the next 4 weeks.
 
-### 4.2 Endpoints
+### 5.2 Endpoints
 - [ ] `GET /api/instructors/<id>` — public. Endpoint test.
 - [ ] `GET /api/instructors` — listing of active instructors. Public.
 
-### 4.3 Frontend
+### 5.3 Frontend
 - [ ] `ui/src/app/pages/instructors/instructor-detail/instructor-detail.component.*/.spec.ts` (extend if exists).
 - [ ] Hero photo + bio + tag chips (their primary tags) + upcoming sessions list + favorite heart.
 - [ ] Linked from class detail page (each instructor's name is a hyperlink).
 
-### 4.4 `ServerAccess`
+### 5.4 `ServerAccess`
 - [ ] `getInstructor(id)`, `getInstructors()`. Update mock.
 
-### 4.5 Tests
+### 5.5 Tests
 - [ ] Helper + endpoint + frontend specs.
 
-## 5. Cross-Layer Acceptance Criteria
+## 6. Cross-Layer Acceptance Criteria
 
 - [ ] Admin creates tags "yoga", "aerial", "partner-acro" with distinct colors. Assigns "yoga" to Vinyasa Flow, "aerial" to Aerial 101, "partner-acro" to Partner Acro - All Levels and Partner Acro - Intermediate.
 - [ ] Calendar shows yellow chip for yoga, purple for aerial, teal for partner-acro.
@@ -209,14 +262,14 @@ Per `feedback_manage_data_is_debug_only.md`: the real tag-vocabulary workflow is
 - [ ] Admin newly schedules Sara to teach a brand-new Friday class; the next daily run emails her followers "Sara is now teaching {Class}" once; subsequent daily runs send nothing for that same appearance (resolved OQ-P13-2).
 - [ ] Visiting `/instructors/<sara-id>` shows her bio, photo, list of classes she teaches, next 4 weeks of sessions.
 
-## 6. Open Questions
+## 7. Open Questions
 
 Both resolved (Mason, 2026-06-09: "go with your recommendation") and folded into the plan above (§1.1 Locked-in + the cited sections).
 
-- **OQ-P13-1. — RESOLVED.** Multi-tag calendar chip uses the lowest-`sort_order` tag's single solid color (no multi-color stripe); `GetTagsForClass` returns `sort_order`-ordered tags. Folded into §1.1, §2.2, §2.5, §5.
-- **OQ-P13-2. — RESOLVED.** Favorite-instructor notifications also fire on the **first appearance** of a favorited instructor on the upcoming schedule, via a **daily job** (`NotifyNewScheduleAppearances` → `POST /api/admin/send_favorite_instructor_schedule_alerts`), deduped once per (follower, instructor, class) by a new `favorite_instructor_notifications` sent-log plus the existing 24h throttle. Folded into §1.1, §3.1–3.4, §3.6–3.8, §5.
+- **OQ-P13-1. — RESOLVED.** Multi-tag calendar chip uses the lowest-`sort_order` tag's single solid color (no multi-color stripe); `GetTagsForClass` returns `sort_order`-ordered tags. Folded into §1.1, §2.2, §2.5, §3, §6.
+- **OQ-P13-2. — RESOLVED.** Favorite-instructor notifications also fire on the **first appearance** of a favorited instructor on the upcoming schedule, via a **daily job** (`NotifyNewScheduleAppearances` → `POST /api/admin/send_favorite_instructor_schedule_alerts`), deduped once per (follower, instructor, class) by a new `favorite_instructor_notifications` sent-log plus the existing 24h throttle. Folded into §1.1, §4.1–4.4, §4.6–4.8, §6.
 
-## 6.5 Manual Test Guide — §2 Tags/Filters (frontend)
+## 7.5 Manual Test Guide — §2 Tags/Filters (frontend)
 
 **Two ways to exercise this. Mock mode needs no backend; full-stack needs the C++ server + a reset DB.**
 
@@ -264,7 +317,7 @@ The mock seeds three tags (Yoga sort 1 / Aerial sort 2 / Partner Acro sort 3 + a
 
 **Known gap:** the Calendar view (`/calendar`) is still a disconnected demo (hardcoded sample events); its chips have the color hook wired but won't show real tag colors until the calendar is connected to live class data. **Tracked as [[Classes Phase 16 - Stretch Items]] §4 (CAL-1)** — the calendar↔live-data wiring that also unblocks the deferred Phase 2 §6.2 / Phase 10 / Phase 11 calendar work.
 
-## 7. Cross-References
+## 8. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 13.
 - Predecessors: [[Classes Phase 1 - Catalog and Schedule Authoring]], [[Classes Phase 10 - Scheduling Exceptions and Shift Trades]].
