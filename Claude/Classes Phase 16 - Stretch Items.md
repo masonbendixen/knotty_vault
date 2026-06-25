@@ -47,6 +47,7 @@ Items from parent §5.5:
 - **PR-1..PR-4** Specialty instructor full payroll model (rates, snapshots, payroll report, CSV export). Builds on [[Classes Phase 12 - Specialty Instructor Cost]].
 - **SI-5** Payroll CSV export — subset of PR.
 - **AR-6** Series min-attendees risk dashboard.
+- **CAL-1** Wire the public Calendar page to live class data (it's currently a hardcoded mock). Consolidates the calendar deferrals from Phases 2/10/11/13. See §4.
 
 ## Layering & Conventions
 
@@ -159,11 +160,34 @@ Per parent §2.17: track per-user "indicated attending but didn't attend" rate; 
 ### 3.4 Tests
 - [ ] Helper + endpoint + frontend spec.
 
-## 4. Promote individual stretch items as needed
+## 4. Calendar ↔ live class data wiring (CAL-1)
+
+### 4.1 Background
+The public Calendar page (`ui/src/app/pages/calendar/`) is **entirely mock-driven**: `CalendarService._getCalendarEvents()` returns `mockCalendarResponse()` (hardcoded `EXAMPLE_CALENDAR_EVENTS`) behind a `// TODO replace with API call for production environment`, and `CalendarEvent` carries only `{ id, title, startTime, endTime, location, color? }` — no class linkage, price, membership, instructor, or tag data. Nothing on the calendar reflects real schedules. This single gap is why several phases deferred calendar-facing work; consolidate them here.
+
+**Deferrals this unblocks (all currently note "calendar is mock-only"):**
+- **Phase 2 §6.2** — session chip labels "Included / Tier-priced / Members only".
+- **Phase 13 §2.5 + §6.5** — tag chip *color* on calendar events (the `color?` hook + `event-chip-tagged` style already exist on `CalendarEvent` / `calendar-event.component`; only the data wiring is missing). Closes the unchecked Phase 13 §5 acceptance boxes (lines ~204–205: "Calendar shows yellow chip for yoga…", "…lowest-sort_order tag wins").
+- **Phase 10** — substitute/effective instructor display on the calendar.
+- **Phase 11** — future-session "Sign-ups open on …" chip on the calendar.
+
+### 4.2 Backend
+- [ ] Reuse the existing derived-session machinery rather than inventing a new one. `GetDerivedSessionsForRange(... fromUs, toUs)` (Class Schedule Implementations Redesign / Phase 1) already walks dates, resolves the active instance + impl per day, expands slots, and left-joins persisted `event_sessions` for cancellations/subs/notes. Confirm/extend a calendar-range read endpoint (e.g. `GET /api/calendar/sessions?from_us=&to_us=[&facility_id=]`) that returns, per occurrence: class id/name, start/end, facility/room, effective instructor (+ `has_substitute`), price/membership flags (as `visible_event_sessions` already resolves), and the class's **`chip_color`** (first-tag color, OQ-P13-1) + tags.
+- [ ] Permission/visibility: honor per-viewer visibility + signup-window state (so the calendar can render "Sign-ups open on …" like the catalog).
+
+### 4.3 Frontend
+- [ ] Replace `CalendarService._getCalendarEvents()` with a real `ServerAccess` call; map each returned occurrence into `CalendarEvent`, setting `color = occurrence.chip_color`. Extend `CalendarEvent` with the class/price/instructor fields the chips need.
+- [ ] Render: tag color accent (already wired via `[style.border-left-color]`), the membership/price label (Phase 2 §6.2), substitute instructor (Phase 10), and the signup-window chip (Phase 11).
+- [ ] Remove `mockCalendarResponse` from the production path (keep a mock for `-c local`).
+
+### 4.4 Tests
+- [ ] Backend: calendar-range endpoint (date expansion, cancellation/sub left-join, per-viewer price/visibility, `chip_color`). Frontend: `CalendarService` maps occurrences → events (incl. `color`), and `calendar-event` renders the color/label/instructor/signup chips. The Phase 13 §5 calendar acceptance assertions move here.
+
+## 5. Promote individual stretch items as needed
 
 When a stretch item is ready to ship, copy its sub-section into its own dedicated `Classes Phase ... .md` doc using the template, expand with more concrete schema / endpoint / UI sketches per the patterns in Phases 1-14, and remove it here.
 
-## 5. Open Questions
+## 6. Open Questions
 
 All three resolved (Mason, 2026-06-09) and folded into the plan above (the cited item sections).
 
@@ -171,7 +195,8 @@ All three resolved (Mason, 2026-06-09) and folded into the plan above (the cited
 - **OQ-P16-2. — RESOLVED (Mason: "any window, monthly is a fine default").** `payroll_periods` accept arbitrary `{start_us, end_us}`; the create form pre-fills the current month but allows any window. Folded into §2.1, §2.3, §2.4, §2.5.
 - **OQ-P16-3. — RESOLVED (Mason departs from the "defer" recommendation): enforced HARD BLOCK.** Mason wants suspensions enforced — including admin-imposed conduct bans (e.g., sexually inappropriate behavior), which must be indefinite-until-lifted. Added a `person_suspensions` table + `SuspensionHelper`, made R-5 auto-suspend a hard block, added admin suspend/lift endpoints + UI, and gate **template-claim, booking, AND check-in** on `IsSuspended` (so "just show up at the door" can't bypass a ban). Folded into §1.3, §1.6, §1.6b, §1.6c, §1.7, §1.9.
 
-## 6. Cross-References
+## 7. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 16.
 - Builds on: [[Classes Phase 5 - Attendance Templates]] (indicated attendance source), [[Classes Phase 8 - Staff Check-in]] (actual attendance source), [[Classes Phase 12 - Specialty Instructor Cost]] (payroll cost snapshots), [[Classes Phase 7 - Class Series and Workshops]] (series-risk source).
+- **CAL-1 (§4)** consolidates the calendar deferrals from [[Classes Phase 2 - Membership-Gated Drop-In]] §6.2, [[Classes Phase 13 - Tags Filters Favorites]] §2.5/§6.5, and the calendar-facing bits of [[Classes Phase 10 - Scheduling Exceptions and Shift Trades]] / [[Classes Phase 11 - Signup Windows and Reminders]]. Backend reuse: `GetDerivedSessionsForRange` from [[Class Schedule Implementations Redesign]].
