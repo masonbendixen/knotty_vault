@@ -176,8 +176,9 @@ Tag color: every class-derived item is tinted by its class's **first-tag color**
 - [ ] **OQ-P13-8. Past occurrences + range.** Show past days greyed, or **today-forward only**? And is fetching **per visible month** (re-fetch on navigation) acceptable for performance, vs. a wider prefetch?
 	- Mason- Yes, that seems like a good idea.
 - [ ] **OQ-P13-9. Service-booking detail route.** Clicking a service booking should open "the details page for the booking." Today bookings live under `/my/...` (e.g. my-bookings/my-events). Is there a dedicated per-booking detail route you want, or should the click deep-link into the existing my-bookings entry / open a detail modal?
-	- Mason- I think we can just open up the my/ entry and possibly expand the relevant bo
+	- Mason- I think we can just open up the my/ entry and possibly expand the relevant booking if that's not too much of a hassle.
 - [ ] **OQ-P13-10. Anonymous booking entry points.** For logged-out users clicking a series/event/workshop "sign-up" item — send them straight to the shop/booking page (which will prompt login at purchase), or intercept with a "sign in to book" step first? Recommendation: straight to the booking page; it already handles the logged-out → login hand-off.
+	- Mason- I'll go with your recommendation.
 
 ## 4. Favorite Instructors
 
