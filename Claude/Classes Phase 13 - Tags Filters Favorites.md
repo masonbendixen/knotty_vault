@@ -185,12 +185,14 @@ The calendar route is now **public** (`app.routes.ts` — was AuthGuard-gated); 
 | Service booking | (not shown) | (not shown) | always the viewer's → bookings page |
 | Members-only / skill-gated | class page | locked → buy-membership / skill popup | n/a |
 
-Candidate follow-ups (state differentiators the feed could drive but doesn't render yet):
-- **Sign-ups not open** — workshops/series/events with `signup_window_open=false` (already in the feed) should show "Sign-ups open {date}" + a Phase 11 "remind me" action instead of the purchase page.
-- **Waitlisted vs confirmed** — distinguish "Waitlisted" from "Booked" (needs the booking status in `BuildBookedEventMap`).
-- **Sold out / capacity** — a full workshop/event → "Sold out" / waitlist CTA (feed would need capacity/remaining).
-- **Substitute instructor** — "Sub: X (for Y)" (feed has the effective instructor but not `has_substitute`/`substitute_for_name`).
-- **Cancelled occurrences** — currently excluded; could render struck-through "Cancelled".
+State differentiators — ALL DONE (2026-06-28):
+- [x] **Sign-ups not open** — workshops/series whose `signup_window_open=false` render "Sign-ups open {date}" + a Phase 11 "Remind me" button (`requestSignupReminder`) instead of the purchase page. Getter `signupsNotOpen` gates on slot-keyed + not booked + not cancelled.
+- [x] **Waitlisted vs confirmed** — `booking_status` now flows through `BuildBookedEventMap` (new `BookedRef{bookingId,status}`) → `bookingStatus`; the chip shows "Waitlisted" (amber) vs "Booked" (green).
+- [x] **Sold out / capacity** — `calendar_helper` emits `capacity`/`remaining_spots` (materialized class sessions via `RemainingSpotsForSession`, standalone events via `capacity - bookedCount`); a full item the viewer hasn't booked shows a "Sold out" badge.
+- [x] **Substitute instructor** — `ResolveInstructor` sets `has_substitute`/`substitute_for_name` from per-session staffing overrides; the chip shows a "Substituting for {Y}" note.
+- [x] **Cancelled occurrences** — no longer excluded; carried with `cancelled=true` and rendered struck-through + greyed with a "Cancelled" badge; clicking routes to the class page (not a booking flow).
+
+Rendered in both the `calendar-event` chip (day/week) and the month-cell chips. Backend: `calendar_helper.h/.cpp`, `scheduling_key_value_table.cpp` + tests. Frontend: `calendar-item.types.ts`, `ServerAccessNetwork.normalizeCalendarItem`, `calendar.types.ts`, `CalendarService._toEvent`, `calendar-navigation.service` (cancelled routing + `requestSignupReminder`), `calendar-event` + `month-view` components/templates/specs, mock demo data. **`ng build` clean; calendar suite 70/70; mock suite 502/502.** Backend `knottyyoga_tests` to be re-run by Mason after rebuild.
 - [x] **Facility filter** dropdown (options derived from the feed), selection **persisted in `localStorage`** (OQ-P13-7); service bookings are personal and never facility-filtered. Default "all".
 - [x] Month/week/day render the live feed (no collapse — OQ-P13-6). Tag-color **legend** (from `getClassTags`). Greyed/lock-badge styling for `members_only`/`needs_skill` items in both the `calendar-event` chip (day/week) and the month-cell chips; tag color drives the left-edge accent.
 - [x] Specs (§3.5): `calendar.service.spec.ts` (mapping, facility + mode filters, option derivation, localStorage persist+reload, `usToWallClockLocalDate`, error path), `calendar-navigation.service.spec.ts` (all six routes), `skill-requirement-dialog.component.spec.ts` (load/render/photo/empty/error), and extended `calendar-event` / `month-view` / `calendar-home` specs (click delegation, lock state, toolbar toggle/legend/facility, mode+facility wiring).
