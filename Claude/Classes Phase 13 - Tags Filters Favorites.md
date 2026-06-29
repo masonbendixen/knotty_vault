@@ -203,6 +203,14 @@ Rendered in both the `calendar-event` chip (day/week) and the month-cell chips. 
   - Backend: `CalendarItem.tags` (`vector<ClassTagInfo>`, sort_order ASC); `CalendarHelper::TagsForClass` replaces `ChipColor` (one `GetTagsForClass` call fills both `tags` and `chipColor`); `CalendarItemToKeyValueTable` emits `tag_count`; `get_calendar.cpp` nests the `tags` array per item (mirrors `get_classes.cpp`). Tests: `calendar_helper_test` (ordered tags / empty), `scheduling_key_value_table_test` (tag_count), `get_calendar_test` (nested ordered array).
   - Frontend: `CalendarItem.tags` (`ClassTagRef[]`) + `normalizeCalendarItem`; `CalendarEvent.tags` (`CalendarEventTag[]`) + `CalendarService._toEvent`; mock seeds tags on its calendar items. **Day view** (`calendar-event` card): a row of named, color-filled tag chips under the title (`chipTextColor` picks readable dark/white text per swatch luminance). **Month + week** cells: a colored tag dot before the title (month dot tooltips the tag names) plus the left-edge accent. Specs added across calendar-event / month-view / week-view / calendar.service / mock-spec. `ng test` 2837/2837 green; `ng build` AOT-clean (only pre-existing size-budget errors). Backend `knottyyoga_tests` to be re-run by Mason after rebuild.
 
+### 3.4.2 Calendar interaction cleanup (2026-06-29, frontend-only)
+Removing leftover placeholder/admin affordances Mason hit while testing:
+- [x] **Dead "Edit event / Delete event" (and "Going / Not Interested") dropdown** removed from month + week event chips — it did nothing and shadowed the real click (attendance dialog / navigation). Dropped both `eventMenu` triggers + definitions.
+- [x] **"Add event" day dropdown** removed from month + week day cells (`dayMenu` trigger + definitions). Clicking a day now just selects it.
+- [x] **"Join" button removed** from the day-view card (`calendar-event`). Classes use the attendance checkbox; bookable items route via the chip — the button was meaningless and showed even for already-booked items. Dropped the `hasJoinButton` input + day-view binding.
+- [x] **Day view opens on the day picked in month/week view, not today.** New `CalendarService.selectedDate` (+ `setSelectedDate`): month/week `clickDate` records the day; day-view `ngOnInit` opens on it (falls back to today when unset); day-view nav (prev/next/today) keeps it in sync.
+- Tests: day-view (opens on selected date), calendar-event (no Join button); existing calendar specs still green. `ng test` 2839/2839.
+
 ### 3.5 Tests — COMPLETE
 - [x] Backend endpoint (§3.3) + frontend service/component specs (§3.4) all written and green. The §6 calendar acceptance assertions (tag colors, lowest-sort_order wins) are exercised via the `CalendarService` mapping + mock-spec chip-color cases. **`ng build` clean; full Karma suite 2793/2793.**
 
