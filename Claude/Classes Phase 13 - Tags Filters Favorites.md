@@ -273,11 +273,14 @@ All ten resolved and folded into §3.1–§3.4 above (each decision is cited inl
 - [ ] **Hook into Phase 10's `InstructorSubstitutionHelper` / `ShiftChangeHelper`** for an *immediate* substitution/shift-trade email — **deferred**: the reusable `NotifyFollowersInstructorTeachesClass` primitive is ready; only the wiring in the Phase 10 substitution + shift endpoints remains (those execute methods don't currently carry a `MailHelper`, so this touches Phase 10 endpoints + their tests — a focused follow-up). Correctness is already covered by the daily job (a substituted-in favorited instructor is caught within a day, substitute-aware); this hook only adds immediacy.
 - **Tests (extensive):** `favorite_instructor_mail_test.cpp` (subject names instructor+class, body substitutions, CRLF) + `favorite_instructor_helper_test.cpp` (add/remove/list passthrough; primitive: opted-in-only + records, per-class dedupe across runs, 24h throttle boundary + doesn't-block-other-follower, null-mail, unknown-class; daily job: notifies scheduled instructor's follower, idempotent second run, opted-out gets nothing, non-followed instructor ignored, null-mail, **substitute notified / replaced-default not**). Registered in `business_logic/scheduling/CMakeLists.txt`. **Backend `knottyyoga_tests` to be built + run by Mason.**
 
-### 4.4 Endpoints
-- [ ] `POST /api/me/favorite_instructor/<personId>` — add. Endpoint test.
-- [ ] `DELETE /api/me/favorite_instructor/<personId>` — remove.
-- [ ] `GET /api/me/favorite_instructors` — list.
-- [ ] `POST /api/admin/send_favorite_instructor_schedule_alerts` — cron-callable, idempotent; runs `NotifyNewScheduleAppearances(now)`. Permission `admin`. Endpoint test (403 + 200 sends-once-then-no-op).
+### 4.4 Endpoints ✅ (2026-06-30)
+- [x] **`me_favorite_instructors.{h,cpp}`** — the three viewer-facing routes in one file (login-gated, follower = session person), delegating to `FavoriteInstructorHelper`:
+  - `POST /api/me/favorite_instructor/<int>` — favorite (idempotent). Pre-checks the target person exists → clean **404** instead of an FK 500. Returns `{ ok: true }`.
+  - `DELETE /api/me/favorite_instructor/<int>` — unfavorite (no-op when absent). `{ ok: true }`.
+  - `GET /api/me/favorite_instructors` — `{ instructor_ids: [...] }` (ascending, viewer-scoped).
+- [x] **`admin_send_favorite_instructor_alerts.{h,cpp}`** — `POST /api/admin/send_favorite_instructor_schedule_alerts`, cron-callable + idempotent; runs `NotifyNewScheduleAppearances(now)` with the injected mail helper. Returns `{ sent_count }`. **Gated on `manage_class_schedule`** (not a bespoke `admin` permission — there is no such constant; this matches the sibling `send_signup_open_reminders` cron, which admins + the scheduler service account already hold). §4.8 will wire the cron caller.
+- [x] Registered all four functions in `web_app.cpp` (includes + reference vars) and `endpoints/CMakeLists.txt` (sources + test files).
+- **Tests (extensive):** `me_favorite_instructors_test.cpp` (10) — POST/DELETE/GET each 401-without-login; POST adds + list reflects, POST idempotent, POST unknown-person 404; DELETE removes, DELETE-absent no-op; list ascending + viewer-scoped. `admin_send_favorite_instructor_alerts_test.cpp` (3) — 403 without permission, 200 sends-once-then-idempotent (sent_count 1 → 0, mail count steady), no-followers → sent 0. **Backend `knottyyoga_tests` to be built + run by Mason.**
 
 ### 4.5 Frontend
 - [ ] Add a "favorite" heart icon on instructor profile pages (4.6 / §5 below) + on class-detail instructor-list rows.
