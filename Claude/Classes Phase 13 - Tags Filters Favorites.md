@@ -237,21 +237,24 @@ All ten resolved and folded into §3.1–§3.4 above (each decision is cited inl
 
 ## 4. Favorite Instructors
 
-### 4.1 Database schema
-- [ ] `db_schema/user_favorite_instructors.h/.cpp`:
+### 4.1 Database schema ✅ (2026-06-30)
+- [x] `db_schema/user_favorite_instructors.h/.cpp`:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)`
   - `instructor_person_id BIGINT NOT NULL REFERENCES people(id)`
   - `notify_on_schedule_change BOOLEAN NOT NULL DEFAULT TRUE`
   - `created_us`
   - `UNIQUE (person_id, instructor_person_id)`
-- [ ] `db_schema/favorite_instructor_notifications.h/.cpp` — **sent-log so the daily first-appearance job fires once per appearance (resolved OQ-P13-2)** and stays idempotent across reruns:
+- [x] `db_schema/favorite_instructor_notifications.h/.cpp` — **sent-log so the daily first-appearance job fires once per appearance (resolved OQ-P13-2)** and stays idempotent across reruns:
   - `id BIGSERIAL PK`
   - `person_id BIGINT NOT NULL REFERENCES people(id)` — the follower
   - `instructor_person_id BIGINT NOT NULL REFERENCES people(id)`
   - `class_id BIGINT NOT NULL REFERENCES classes(id)` — the class the instructor newly appeared on
   - `notified_us BIGINT NOT NULL`
   - `UNIQUE (person_id, instructor_person_id, class_id)` — one "new appearance" email per follower per (instructor, class).
+- **Implementation notes (2026-06-30):** both tables follow the §2.1 `class_tag_assignments` pattern. FKs via `AddColumnForeignKeyRef` (NOT NULL); `notify_on_schedule_change` via `AddColumnNotNullableWithDefault(DB_TYPE_BOOL, TRUE)`; `created_us` via `AddColumnNotNullableWithDefault(DB_TYPE_BIGINT, now_us())`. `notified_us` uses `AddColumnSimple` (NOT NULL, **no default** — `RecordNotified` supplies it in §4.2). Composite UNIQUEs via `AddNamedUniqueConstraint` (`uq_user_favorite_instructors_person_instructor`, `uq_favorite_instructor_notifications_person_instructor_class`); the leading `person_id` column also serves follower lookups, so no extra index. No `CreateXxxIndexes` needed.
+- Wired into DB init: `make_database_info.cpp` (includes + `MakeUserFavoriteInstructorsTable`/`MakeFavoriteInstructorNotificationsTable` after the class_tag block — people + classes already made), `create_database.cpp::CreateTables` (includes + `CreateTable` calls, same position), and `db_schema/CMakeLists.txt` (4 sources + 2 test files). (Admin metadata registration is §4.6, deferred — these are reached via the §4.4 bespoke endpoints, not generic CRUD.)
+- Schema tests: `user_favorite_instructors_test.cpp` (valid insert + defaults, person-FK + instructor-FK rejection, unique-blocks-duplicate-pair / allows-different-instructor) and `favorite_instructor_notifications_test.cpp` (valid insert, notified_us-required, person/instructor/class FK rejection, unique-blocks-duplicate-triple / allows-different-class). **Backend `knottyyoga_tests` to be built + run by Mason.**
 
 ### 4.2 Table helper
 - [ ] `TableHelpers::UserFavoriteInstructors` + tests.
