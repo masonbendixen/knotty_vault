@@ -334,14 +334,18 @@ The favorite heart only appears when you are signed in.
 
 ## 5. Extended Instructor Profile Pages
 
-### 5.1 Business logic
-- [ ] In `business_logic/scheduling/instructor_profile_helper.h/.cpp` (new):
-  - `struct InstructorProfile { int64_t personId; std::string firstName; std::string lastName; std::string bio; std::string photoUrl; std::vector<ClassSummary> classesTaught; std::vector<UpcomingSessionInfo> upcomingSessions; }`.
-  - `InstructorProfile GetInstructorProfile(Transaction&, int64_t personId)` — joins `people` → `event_session_staffing` → distinct `class_id`; pulls upcoming sessions in the next 4 weeks.
+### 5.1 Business logic ✅ (2026-06-30)
+- [x] **`InstructorProfileHelper` (`business_logic/scheduling/instructor_profile_helper.h/.cpp`)** — `std::optional<InstructorProfile> GetInstructorProfile(Transaction&, int64_t personId)` returns nullopt when the person isn't an instructor (no `instructors` row). New structs `ClassSummary { classId, name, kind }` and `InstructorProfile { personId, instructorId, firstName, lastName, bio, hasPhoto, classesTaught, upcomingSessions }`.
+  - **Identity/bio/photo** reuse the existing instructor model: `TableHelpers::Instructors::GetInstructorByPersonId` + `People` + `Images::ImageHelper::HasPhoto`.
+  - **classesTaught** — distinct **active** classes via a custom JOIN/UNION (the documented exception to DbCrud, mirroring `StaffingHelper`): recurring slot defaults (`class_schedule_slots.instructor_person_id`) **UNION** session staffing (`event_session_staffing`, role instructor/substitute → `event_sessions.class_id <> 0`). Richer than the plan's staffing-only join so recurring classes with no materialized sessions still appear. Ordered by name.
+  - **upcomingSessions** — walks `ClassScheduleHelper::GetDerivedSessionsForRange` per class over **[now, now+4 weeks)**, keeping occurrences where the person is the **effective (substitute-aware) instructor** (staffing overrides replace the slot default), resolving facility/room names; sorted by start. Reuses the shared `UpcomingSessionInfo`.
+  - **Deviation from the plan struct:** used `hasPhoto` (bool) + `instructorId` instead of `photoUrl` — consistent with the existing `/api/get_instructors` list (the frontend builds the photo URL from `instructor_id`).
+- [x] **`instructor_profile_key_value_table.{h,cpp}`** — `ClassSummaryToKeyValueTable[Array]` + `InstructorProfileToKeyValueTable` (scalar fields + `class_count`/`upcoming_session_count`; the endpoint nests the two arrays). Dedicated converter file (mirrors `instructor_key_value_table` / `payment_key_value_table`).
 
-### 5.2 Endpoints
-- [ ] `GET /api/instructors/<id>` — public. Endpoint test.
-- [ ] `GET /api/instructors` — listing of active instructors. Public.
+### 5.2 Endpoints ✅ (2026-06-30)
+- [x] **`GET /api/instructors/<personId>`** (`get_instructor_profile.{h,cpp}`) — public; returns the profile JSON (scalar fields + nested `classes_taught` + `upcoming_sessions`, the latter via the shared `UpcomingSessionsToKeyValueTableArray`); **404** when the person isn't an instructor. `<personId>` is the **person id** (same id the favorite heart + list use), not the instructors-table id. Registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [x] **`GET /api/instructors` (list)** — already served by the existing **`GET /api/get_instructors`** (Phase 2 §12: `Auth::InstructorHelper::GetInstructorsForPublicDisplay` → `{items:[{instructor_id, person_id, first_name, last_name, bio, has_photo}]}`; instructors have no `is_active` column, so "active" = all). Not duplicated under a second path.
+- **Tests (extensive):** `instructor_profile_helper_test.cpp` (6) — nullopt-for-non-instructor, basic identity/bio/photo, classes+upcoming via slot default (sorted, facility/room/instructor names), class via staffing override, substituted occurrence excluded from the default instructor, inactive class excluded; `instructor_profile_key_value_table_test.cpp` (4) — converter scalar/array/counts/has_photo; `get_instructor_profile_test.cpp` (3) — 404 (non-instructor + unknown id), identity + empty arrays, nested classes_taught + upcoming_sessions. **Backend `knottyyoga_tests` to be built + run by Mason.**
 
 ### 5.3 Frontend
 - [ ] `ui/src/app/pages/instructors/instructor-detail/instructor-detail.component.*/.spec.ts` (extend if exists).
