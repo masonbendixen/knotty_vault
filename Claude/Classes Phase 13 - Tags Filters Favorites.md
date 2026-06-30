@@ -300,6 +300,39 @@ All ten resolved and folded into §3.1–§3.4 above (each decision is cited inl
 ### 4.8 Scheduled job (resolved OQ-P13-2)
 - [ ] Add a **daily** job to `knottyyoga_helper`: `POST /api/admin/send_favorite_instructor_schedule_alerts`. Idempotent; wired in the three standard places (`scheduler/scheduled_job.cpp` `BuildStandardJobs` via `AppendIfEnabled`, a `JobIntervals::favoriteInstructorAlertSeconds` default 86400s, and a `--favorite_instructor_alert_interval` flag in `scheduler/main.cpp`). Per the existing interval-cron pattern, the endpoint self-gates / is idempotent rather than relying on an exact time. Update `scheduled_job_test` (job count + disable/propagate cases for the new job).
 
+### 4.9 Manual Test Guide — Favorite Instructors
+
+**Two ways to exercise this. Mock mode needs no backend; full-stack needs the C++ server + a reset DB.** The favorite heart only appears when logged in.
+
+#### Path A — Fast path (mock mode, no backend)
+Mock mode is logged in by default and seeds the instructor directory.
+1. From `…\knottyyoga\ui`, run `npx ng serve -c local`, then open `http://localhost:4200`.
+2. **Favorite an instructor.** Top nav **About** → **Instructors** (route `/instructors`). Each instructor card has a heart button in its **top-right corner**; not-favorited shows the outline `favorite_border` icon (tooltip **Add to favorites**). Click it → it becomes a solid red `favorite` icon (tooltip **Remove from favorites**). Click again → back to outline.
+3. **View your favorites.** Top-right user menu (the **[your first name]** button; shows **User** in mock) → **Profile** (route `/my/account`). On the account dashboard, click the **Favorite Instructors** card (heart icon — description "Instructors you follow and get notified about"; route `/my/favorite-instructors`).
+   - The page lists exactly the instructors you favorited (photo + name + bio).
+   - With none favorited it shows: "You haven't favorited any instructors yet…".
+4. **Unfavorite from the list.** On the **Favorite Instructors** page, click the **Remove** button on a row → the row disappears immediately.
+5. **Round-trip check.** Click **← Back to account**, then **About** → **Instructors** — the heart for the removed instructor is empty again.
+
+#### Path B — Full stack (real backend)
+**Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, run `npx ng serve` from `…\ui`, then **log in**: top-right **Sign In** (route `/login`) → fill **Email** and **Password** → **Login**.
+
+**Step 1 — Favorite + manage.** Exactly Path A steps 2–5 (the heart calls `POST`/`DELETE /api/me/favorite_instructor/<personId>`; the page reads `GET /api/me/favorite_instructors`).
+
+**Step 2 — Verify the daily first-appearance alert email.**
+- *Prerequisite:* an instructor must be **assigned to a class slot** with an upcoming occurrence, and your logged-in user must **favorite that instructor** (Step 1). Set the class up via top nav **Admin** → **Manage Products** (route `/manage`) → the **Class Schedules** card (route `/manage/class-schedules`): create a **Recurring** class, then assign an instructor to its weekly slot.
+- *Trigger* (the §4.8 scheduler wiring is still pending, so call it manually). Logged in as a user holding **`manage_class_schedule`** (an admin/manager), open the browser dev console on the site and run:
+  ```js
+  fetch('/api/admin/send_favorite_instructor_schedule_alerts',
+        { method: 'POST', credentials: 'include' })
+    .then(r => r.json()).then(console.log)
+  ```
+  - First call ⇒ `{ sent_count: 1 }` (one email queued to you, the follower).
+  - Immediate re-run ⇒ `{ sent_count: 0 }` (idempotent: sent-log + 24h throttle).
+  - Email subject: "**{Instructor} is teaching {Class}**" — check your dev SMTP sink.
+
+**Step 3 — Scoping checks (optional).** Log in as a **different** user who did NOT favorite that instructor → their **Favorite Instructors** page is empty and the alert won't email them (favorites are per-person).
+
 ## 5. Extended Instructor Profile Pages
 
 ### 5.1 Business logic
