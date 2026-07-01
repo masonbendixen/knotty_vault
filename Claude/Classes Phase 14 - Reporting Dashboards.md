@@ -73,16 +73,22 @@ No new tables; no new table helpers (uses existing reads).
 
 ## 1. AR-1 Schedule Grid
 
-### 1.1 Business logic
-- [ ] `struct ScheduleGridCell { int dayOfWeek; int startMinutes; int durationMinutes; int64_t classScheduleId; std::string className; int64_t capacity; int64_t bookedCount; double fillRate; }`.
-- [ ] `std::vector<ScheduleGridCell> GetScheduleGrid(Transaction&, int64_t facilityId, int64_t dateFromUs, int64_t dateToUs)`:
-  - For each active `class_schedule` at the facility:
-    - For each materialized session in the date range: compute `bookedCount = SELECT COUNT(*) FROM bookings WHERE event_session_id=? AND status IN ('confirmed', 'attended')`.
-    - Average / sum to per-schedule cell.
-  - Return.
+### 1.1 Business logic ✅ (2026-07-01)
+- [x] `struct ScheduleGridCell` — implemented in `business_logic/scheduling/reporting_helper.{h,cpp}` (new `ReportingHelper`, the phase's aggregation home). Extended the plan struct with fields the grid UI needs and that fall out of the reuse approach: `classScheduleSlotId` (stable grid-cell identity / frontend key), `facilityId` + `facilityName` (so an all-facility grid is usable), and `sessionCount` (occurrences in range — the fill-rate denominator alongside `capacity`). Final fields: `classScheduleSlotId, classScheduleId, classId, className, dayOfWeek, startMinutes, durationMinutes, facilityId, facilityName, capacity, sessionCount, bookedCount, fillRate`.
+- [x] `std::vector<ScheduleGridCell> GetScheduleGrid(Transaction&, int64_t facilityId, int64_t dateFromUs, int64_t dateToUs)`:
+  - **Cell = one recurring slot** (a day/time tuple), not one whole implementation — the struct's day/start/duration are slot-level, and "facility × day × time-slot" is the natural grid unit. `classScheduleId` is carried as the parent implementation.
+  - **Reuses `ClassScheduleHelper::GetDerivedSessionsForRange`** per active class (mirrors `CalendarHelper::AppendClassItems`) rather than re-deriving instance/impl windows in raw SQL. This correctly counts **all** occurrences in range (persisted + purely-derived), respects the active instance/implementation windows, and **excludes cancelled** occurrences (`ds.status == "cancelled"`). `facilityId` 0 = all facilities; otherwise filters `ds.facilityId`.
+  - **`bookedCount`** sums held seats over the slot's occurrences; only materialized occurrences (`persistedEventSessionId != 0`) can carry bookings, counted via a new table-helper method (below) using `status IN ('confirmed','attended')` — so waitlisted/cancelled/no_show don't inflate fill.
+  - **`fillRate` = bookedCount / (capacity × sessionCount)**, clamped to 0 when the denominator is 0. `capacity` comes from the derived session (slot `capacity_override` ?? class `default_capacity`). NOT today-forward-clamped — a report can cover past ranges (unlike the calendar).
+  - Ordered by `day_of_week, start_minutes, class name, slot id`.
+- [x] **New table-helper method** `TableHelpers::Bookings::CountConfirmedOrAttendedForSession(tx, eventSessionId)` (`bookings.{h,cpp}`) — the plan's `COUNT(*) … status IN ('confirmed','attended')`, kept in the table-helper layer (per `feedback_no_sql_in_business_logic`, the reporting helper composes it rather than issuing CRUD SQL itself). Tests in `bookings_test.cpp` (held-only + session-scoped; empty/unknown → 0).
+- [x] **KVT converter** `ScheduleGridCellToKeyValueTable` / `…sToKeyValueTableArray` in `scheduling_key_value_table.{h,cpp}` (mirrors `InstructorLoadRow`). `fill_rate` emitted as a locale-independent fixed-point string (`snprintf %.6f`); all other fields via `StringFromInt`. Converter tests in `scheduling_key_value_table_test.cpp`.
+- [x] **Tests:** `reporting_helper_test.cpp` (6) — basic cell fields + counts (held vs waitlisted, persisted + derived occurrence), facility filter, cancelled-occurrence excluded from both counts, fill-rate 0 when no bookings, slot absent when range misses its weekday, sort order (day then start). Uses far-future Monday base dates so derivation is deterministic and now-independent. Registered `reporting_helper.{h,cpp}` + test in `business_logic/scheduling/CMakeLists.txt`.
 
-### 1.2 Endpoint
-- [ ] `GET /api/admin/schedule_grid?facility_id=&date_from=&date_to=`. Permission `manage_class_schedule`. Endpoint test.
+### 1.2 Endpoint ✅ (2026-07-01)
+- [x] `GET /api/admin/schedule_grid?facility_id=&date_from=&date_to=` (`endpoints/admin_schedule_grid.{h,cpp}`) → `{ cells: [...] }`. Thin handler modeled on `admin_instructor_load`: strict int64 param parse (400 on missing/non-numeric/backwards range; `facility_id` optional, 0/omitted = all), permission gate **`manage_class_schedule`**, delegates to `ReportingHelper::GetScheduleGrid`, converts via the KVT array. Registered in `web_app.cpp` (include + `g_GetAdminScheduleGrid`) and `endpoints/CMakeLists.txt`.
+- [x] **Endpoint test** `admin_schedule_grid_test.cpp` (4) — 403 without permission, 400 on the invalid-param matrix, cell with capacity/session_count/booked_count/fill_rate (held vs waitlisted), facility filter (only-A vs all). Finds cells by `class_schedule_slot_id` (seed-noise-robust).
+- **Backend `knottyyoga_tests` to be built + run by Mason.**
 
 ### 1.3 Frontend
 - [ ] `ui/src/app/pages/portal/manage/reports/schedule-grid/schedule-grid.component.*/.spec.ts`.
