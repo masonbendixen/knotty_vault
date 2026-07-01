@@ -347,16 +347,17 @@ The favorite heart only appears when you are signed in.
 - [x] **`GET /api/instructors` (list)** — already served by the existing **`GET /api/get_instructors`** (Phase 2 §12: `Auth::InstructorHelper::GetInstructorsForPublicDisplay` → `{items:[{instructor_id, person_id, first_name, last_name, bio, has_photo}]}`; instructors have no `is_active` column, so "active" = all). Not duplicated under a second path.
 - **Tests (extensive):** `instructor_profile_helper_test.cpp` (6) — nullopt-for-non-instructor, basic identity/bio/photo, classes+upcoming via slot default (sorted, facility/room/instructor names), class via staffing override, substituted occurrence excluded from the default instructor, inactive class excluded; `instructor_profile_key_value_table_test.cpp` (4) — converter scalar/array/counts/has_photo; `get_instructor_profile_test.cpp` (3) — 404 (non-instructor + unknown id), identity + empty arrays, nested classes_taught + upcoming_sessions. **Backend `knottyyoga_tests` to be built + run by Mason.**
 
-### 5.3 Frontend
-- [ ] `ui/src/app/pages/instructors/instructor-detail/instructor-detail.component.*/.spec.ts` (extend if exists).
-- [ ] Hero photo + bio + tag chips (their primary tags) + upcoming sessions list + favorite heart.
-- [ ] Linked from class detail page (each instructor's name is a hyperlink).
+### 5.3 Frontend ⏳ (2026-06-30 — page + link done; tag chips + class-detail link deferred)
+- [x] **`pages/public/instructors/instructor-detail/instructor-detail.component.*`** (+ `.spec.ts`, 13 cases) at route **`/instructors/:id`** (`:id` = person id). Hero photo (from `instructor_id`) + name + bio, a **favorite heart** (logged-in; reuses `getMyFavoriteInstructors`/`addFavoriteInstructor`/`removeFavoriteInstructor`, reflects + toggles state), **classes taught** as chips linking to `/classes/:classId`, and the **upcoming sessions** list (studio-local wall-clock time, facility · room). Loading / not-found (404) / empty-sessions states + back-to-instructors link.
+- [x] **Linked from the instructors list** (`/instructors`): each instructor's name is now a `routerLink` to `/instructors/:person_id` (added `RouterModule`; list spec updated with `RouterTestingModule`).
+- [ ] **Tag chips (their primary tags) — DEFERRED:** the backend profile (`InstructorProfile`) carries no tags, and `classes_taught` is `{class_id, name, kind}` only. Showing an instructor's tags needs backend work (add tags to `classes_taught`, or a dedicated instructor-tags query).
+- [ ] **Class-detail instructor-name hyperlink — DEFERRED:** the class-detail page's per-session instructor names come from a pipe-joined `instructor_names` string with **no person ids**, so they can't be linked without adding instructor person ids to `UpcomingSessionInfo` (a backend change). Navigation to profiles is available from the instructors list instead.
 
-### 5.4 `ServerAccess`
-- [ ] `getInstructor(id)`, `getInstructors()`. Update mock.
+### 5.4 `ServerAccess` ✅ (2026-06-30)
+- [x] `getInstructor(personId)` → `InstructorProfile` across interface / network (`GET /api/instructors/<personId>`, coerces `has_photo` "true"/"false" → bool, guards nested arrays) / proxy (`serialize`) / mock (derives identity from the in-memory `instructors` table; classes/sessions empty in mock mode; 404 for a non-instructor). `getInstructors()` already existed (Phase 2 §12). New shared types `InstructorProfile` + `InstructorClassSummary` (`instructor.types.ts`, re-exported from the ServerAccess barrel). Mock-spec: matched-profile + 404.
 
-### 5.5 Tests
-- [ ] Helper + endpoint + frontend specs.
+### 5.5 Tests ✅ (2026-06-30)
+- [x] Backend helper/endpoint/converter tests (§5.1/§5.2). Frontend specs: `instructor-detail.component.spec.ts` (13), extended `instructors.component.spec.ts` (name link), `ServerAccess.mock.spec.ts` (getInstructor ×2). **`ng test` 2869/2869 green; `ng build` AOT-clean** (only pre-existing SCSS-size-budget errors in untouched files).
 
 ## 6. Cross-Layer Acceptance Criteria
 
