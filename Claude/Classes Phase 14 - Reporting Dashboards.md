@@ -103,30 +103,39 @@ No new tables; no new table helpers (uses existing reads).
 
 ### 1.5 Manual Test Guide — AR-1 Schedule Grid (website only)
 
-The page route is **`/manage/schedule-grid`**; it is reached from the top nav **Manage** → the **Schedule Grid** dashboard card (icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is"). Backend gate: `manage_class_schedule`.
+**Navigation (verified against the real nav + dashboard):** the top nav's admin entry is the top-level link **Manage Products** (this goes straight to the `/manage` dashboard of cards — it is NOT a dropdown, and there is no item literally called "Manage"). On that dashboard, click the **Schedule Grid** card (icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is") → route **`/manage/schedule-grid`**. Backend gate: `manage_class_schedule`.
 
 **Fill-rate colours (the legend on the page):** green = ≥80% full, amber = 30–80%, red = <30%. Fill = booked ÷ (capacity × number of occurrences) over the selected range.
 
 #### Path A — Fast path (mock mode, no backend)
 The mock is always "logged in" and seeds three cells.
 1. Terminal from `...\knottyyoga\ui`: `ng serve -c local` → open `http://localhost:4200`.
-2. Top nav **Manage** → click the **Schedule Grid** card (`/manage/schedule-grid`).
+2. Top nav **Manage Products** → on the dashboard click the **Schedule Grid** card (`/manage/schedule-grid`).
 3. The board shows 7 day-columns (Sun–Sat). With the default range you'll see:
    - **Mon** column: **Knotty Yoga** at **10:00 AM** — **green** tile reading `27/15 · 90%`; below it **Partner Acrobatics** at **6:00 PM** — **amber** tile reading `10/10 · 50%`.
    - **Wed** column: **Aerial 101** at **9:00 AM** — **red** tile reading `3/12 · 13%`.
    - All other day-columns show a "—" placeholder.
 4. Hover any tile → tooltip reads e.g. "Partner Acrobatics · Studio Main · 2 sessions · 10/10 booked (50%)".
-5. **Date range:** the **From**/**To** date pickers re-fetch on change; a backwards range (To before From) shows the inline red message **"Pick a valid date range."** and does not call the server. (Mock returns the same three cells for any valid range — the tiles are keyed by weekday, not the actual dates.)
-6. **Facility** dropdown: in mock mode it shows only **All facilities** (the mock seeds no facilities table), which shows all three tiles. Selecting a facility is exercised in Path B.
+5. **Date range:** the **From** and **To** date-picker fields re-fetch on change; set **To** to a date before **From** → the inline red message **"Pick a valid date range."** appears and no server call is made. (Mock returns the same three cells for any valid range — the tiles are keyed by weekday, not the actual dates.)
+6. **Facility** field (dropdown): in mock mode it offers only **All facilities** (the mock seeds no facilities table), which shows all three tiles. The facility filter is exercised in Path B.
 
 #### Path B — Full stack (real backend)
 **Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, `ng serve` (real backend / `development` config — **not** `-c local`), and log in as a user holding **manage_class_schedule** (an admin/manager).
 
-1. **Create a scheduled class so the grid has a cell.** Top nav **Manage** → **Class Schedules** card (`/manage/class-schedules`). Create a class with a recurring **slot** (day-of-week + start time + facility + room; e.g. **Monday**, **10:00 AM**, **Default capacity 15**). This is the AR-1 cell.
-2. **Open the grid.** Top nav **Manage** → **Schedule Grid** card. Set **From** to today (or the Monday of the current week) and **To** a few days later so the slot's weekday falls in the range. The Monday tile appears — **red at `0/15 · 0%`** because nothing is booked yet.
-3. **Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted/cancelled/no-show don't count). Get some by either: booking the class as a member through the public flow, or marking attendees present via the staff **check-in** page. Re-open the Schedule Grid for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
-4. **Facility filter.** With classes at more than one facility, pick a facility in the **Facility** dropdown → only that facility's tiles remain; **All facilities** shows every facility's tiles.
-5. **Range behaviour.** A range that misses a slot's weekday drops its tile; a backwards range shows "Pick a valid date range." Cancelled occurrences are excluded from both the session and booked counts.
+**Step 1 — Create a recurring class + slot so the grid has a cell.** Top nav **Manage Products** → dashboard → **Class Schedules** card (`/manage/class-schedules`).
+- Click **Add class**. In the **Add class** dialog: **Name** = `Test Grid Class`, **Description** = `Grid demo`, **Default capacity** = `15`, **Kind** = `Recurring`, **Tags** = leave empty. Click **Save**.
+- In the class list, select **Test Grid Class**.
+- Click **Add class instance**. In the **Add class instance** dialog: **Name** = `2026 Run`, **Valid from** = today's date, **Valid to (blank = perpetual)** = leave blank, **Product** = pick any existing class product. Click **Save**.
+- Under that instance click **Add class schedule**. In the **Add class schedule** dialog: **Name** = `Default`, **Priority** = `3`, **Valid from** = today's date, **Valid to (blank = open)** = leave blank. Click **Save**.
+- Under that schedule click **Add class schedule slot**. In the **Add class schedule slot** dialog: **Day** = `Monday`, **Start time** = `10:00 AM`, **Duration (min)** = `60`, **Facility** = pick a facility, **Room** = pick a room, **Instructor (optional)** = leave blank, **Capacity override (optional)** = leave blank. Click **Save**.
+
+**Step 2 — Open the grid.** Top nav **Manage Products** → dashboard → **Schedule Grid** card. Set the **From** field to the Monday of the current week (or today if today is ≤ Monday) and the **To** field a few days later so the Monday falls in the range. The **Mon** column shows a **Test Grid Class** tile at **10:00 AM** — **red**, reading `0/15 · 0%` (nothing booked yet).
+
+**Step 3 — Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted / cancelled / no-show don't count). Get some by booking the class as a member through the public booking flow, or by marking attendees present on the staff check-in page. Re-open **Manage Products → Schedule Grid** for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
+
+**Step 4 — Facility filter.** With classes at more than one facility, choose a facility in the **Facility** field → only that facility's tiles remain; **All facilities** shows every facility's tiles.
+
+**Step 5 — Range behaviour.** Set **From**/**To** to a range that skips Monday → the tile disappears; set **To** before **From** → "Pick a valid date range." Cancelled occurrences are excluded from both the session and booked counts.
 
 **Note:** the tile's `booked/capacity` text is the summed booked count over the range against the **per-occurrence** capacity, so with multiple occurrences booked can read higher than capacity (e.g. `27/15`) — the **percentage and colour** are the accurate signal (they divide by capacity × occurrences).
 
