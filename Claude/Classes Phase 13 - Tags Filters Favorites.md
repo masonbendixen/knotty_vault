@@ -359,6 +359,49 @@ The favorite heart only appears when you are signed in.
 ### 5.5 Tests ✅ (2026-06-30)
 - [x] Backend helper/endpoint/converter tests (§5.1/§5.2). Frontend specs: `instructor-detail.component.spec.ts` (13), extended `instructors.component.spec.ts` (name link), `ServerAccess.mock.spec.ts` (getInstructor ×2). **`ng test` 2869/2869 green; `ng build` AOT-clean** (only pre-existing SCSS-size-budget errors in untouched files).
 
+### 5.6 Manual Test Guide — Extended Instructor Profile Pages (live server, website only)
+
+**Prereqs (full stack).**
+- Reset + initialize the DB with `knottyyoga_database_helper`.
+- Start the C++ server.
+- `cd ui` → `ng serve` (real backend / `development` config, **not** `-c local` — the mock returns empty classes/sessions for a profile).
+- Open `http://localhost:4200`.
+- Have at least **one instructor who is scheduled to teach** (a recurring class with a slot whose instructor is that person, and/or a session staffed to them) so the "Classes" and "Upcoming sessions" sections are non-empty. If the seed data has none, first use **Manage → Class Schedules** to create a recurring class and assign an instructor to a weekly slot, then come back.
+- For the favorite-heart portion, have a normal user account you can sign in with.
+
+The endpoint is `GET /api/instructors/<personId>` where `<personId>` is the **person id** (same id the favorite heart and instructor list use), and the page route is `/instructors/:id`.
+
+**Task 1 — Reach an instructor profile from the directory.**
+1. In the top navigation bar, click **About**, then in the dropdown click **Instructors**.
+2. On the **Instructors** page, click an instructor's **name** (it's a blue hyperlink). This navigates to `/instructors/<person_id>`.
+3. The profile page loads showing: **← Back to instructors** link at top, a hero card with the instructor's **photo** (or a person placeholder icon if they have none) and **name**, and their **bio** text.
+
+**Task 2 — Verify the "Classes" section.**
+1. On the profile page, below the hero card, confirm a **Classes** heading with a row of **class chips** — one per distinct active class this instructor teaches (recurring slot defaults + session staffing, deduped, ordered by class name).
+2. Click a class chip → it navigates to that class's detail page (`/classes/<classId>`).
+3. If the instructor teaches no active classes, the **Classes** section is absent entirely (no empty heading).
+
+**Task 3 — Verify the "Upcoming sessions" section.**
+1. Back on the profile page (browser Back), confirm an **Upcoming sessions** heading.
+2. Each session card shows the **start date/time in studio-local wall-clock time** (e.g. "Wed, Jul 8, 2026, 6:00 PM") and, when present, the **facility name · room name**. Sessions are the instructor's occurrences over the **next 4 weeks**, sorted by start time.
+3. If there are none in the next 4 weeks, it reads **"No upcoming sessions in the next few weeks."**
+4. *(Substitute-awareness check, optional)* If you assign a substitute over one of this instructor's occurrences (Manage scheduling), that occurrence should drop off this instructor's list and appear on the **substitute's** profile instead.
+
+**Task 4 — 404 / not-found handling.**
+1. In the address bar, go to `/instructors/999999` (an id that is not an instructor — either a non-existent person or a person with no `instructors` row).
+2. The page shows the **"Instructor not found."** card (the backend returns 404 for a non-instructor person id).
+
+**Task 5 — Favorite heart on the profile (logged in).**
+1. Sign in: top nav **Sign In** → enter **Email** + **Password** → **Sign in**.
+2. Navigate back to an instructor profile (**About → Instructors → click a name**).
+3. In the hero card next to the name, confirm an outlined **heart** button (tooltip **Add to favorites**). Click it → it turns **solid red** (tooltip **Remove from favorites**).
+4. Cross-check it round-trips: go to **About → Instructors** — that instructor's card heart is now solid; or open **Profile → Favorite Instructors** and confirm the instructor is listed. Click the heart again on the profile to unfavorite → it returns to outlined.
+5. *(Logged-out check)* Sign out and revisit the profile — the heart button is **absent** (it only renders when logged in). The rest of the profile (photo, bio, classes, sessions) still renders.
+
+**Notes / known deferrals (§5.3):**
+- The profile does **not** show tag chips for the instructor's classes — deferred (backend `classes_taught` carries no tags).
+- Instructor names on the **class-detail** page are **not** yet hyperlinks to profiles — deferred (those names come from a pipe-joined string with no person ids). Navigation to profiles is via the **Instructors** directory list.
+
 ## 6. Cross-Layer Acceptance Criteria
 
 - [ ] Admin creates tags "yoga", "aerial", "partner-acro" with distinct colors. Assigns "yoga" to Vinyasa Flow, "aerial" to Aerial 101, "partner-acro" to Partner Acro - All Levels and Partner Acro - Intermediate.
