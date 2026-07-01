@@ -101,6 +101,35 @@ No new tables; no new table helpers (uses existing reads).
 - [x] **`getScheduleGrid(dateFromUs, dateToUs, facilityId?) → ScheduleGridCell[]`** across interface (`types/ServerAccess.ts`) / network (`GET /api/admin/schedule_grid`, **coerces `fill_rate` string→number** since `KeyValueTableToJson` only numifies integers) / proxy (`serialize`) / mock (in-memory 3-cell seed across 2 facilities with high/mid/low fill; 401 logged-out, 400 backwards range). Mock spec: cells + facility filter, backwards-range 400, logged-out 401.
 - [x] **New type `ScheduleGridCell`** in `shared/types/scheduling.types.ts` (re-exported from the ServerAccess barrel). `getInstructorLoad`/`getEnrollmentTrend` (§4) belong to AR-3/AR-2 and are untouched here (`getInstructorLoad` already existed from Phase 10).
 
+### 1.5 Manual Test Guide — AR-1 Schedule Grid (website only)
+
+The page route is **`/manage/schedule-grid`**; it is reached from the top nav **Manage** → the **Schedule Grid** dashboard card (icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is"). Backend gate: `manage_class_schedule`.
+
+**Fill-rate colours (the legend on the page):** green = ≥80% full, amber = 30–80%, red = <30%. Fill = booked ÷ (capacity × number of occurrences) over the selected range.
+
+#### Path A — Fast path (mock mode, no backend)
+The mock is always "logged in" and seeds three cells.
+1. Terminal from `...\knottyyoga\ui`: `ng serve -c local` → open `http://localhost:4200`.
+2. Top nav **Manage** → click the **Schedule Grid** card (`/manage/schedule-grid`).
+3. The board shows 7 day-columns (Sun–Sat). With the default range you'll see:
+   - **Mon** column: **Knotty Yoga** at **10:00 AM** — **green** tile reading `27/15 · 90%`; below it **Partner Acrobatics** at **6:00 PM** — **amber** tile reading `10/10 · 50%`.
+   - **Wed** column: **Aerial 101** at **9:00 AM** — **red** tile reading `3/12 · 13%`.
+   - All other day-columns show a "—" placeholder.
+4. Hover any tile → tooltip reads e.g. "Partner Acrobatics · Studio Main · 2 sessions · 10/10 booked (50%)".
+5. **Date range:** the **From**/**To** date pickers re-fetch on change; a backwards range (To before From) shows the inline red message **"Pick a valid date range."** and does not call the server. (Mock returns the same three cells for any valid range — the tiles are keyed by weekday, not the actual dates.)
+6. **Facility** dropdown: in mock mode it shows only **All facilities** (the mock seeds no facilities table), which shows all three tiles. Selecting a facility is exercised in Path B.
+
+#### Path B — Full stack (real backend)
+**Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, `ng serve` (real backend / `development` config — **not** `-c local`), and log in as a user holding **manage_class_schedule** (an admin/manager).
+
+1. **Create a scheduled class so the grid has a cell.** Top nav **Manage** → **Class Schedules** card (`/manage/class-schedules`). Create a class with a recurring **slot** (day-of-week + start time + facility + room; e.g. **Monday**, **10:00 AM**, **Default capacity 15**). This is the AR-1 cell.
+2. **Open the grid.** Top nav **Manage** → **Schedule Grid** card. Set **From** to today (or the Monday of the current week) and **To** a few days later so the slot's weekday falls in the range. The Monday tile appears — **red at `0/15 · 0%`** because nothing is booked yet.
+3. **Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted/cancelled/no-show don't count). Get some by either: booking the class as a member through the public flow, or marking attendees present via the staff **check-in** page. Re-open the Schedule Grid for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
+4. **Facility filter.** With classes at more than one facility, pick a facility in the **Facility** dropdown → only that facility's tiles remain; **All facilities** shows every facility's tiles.
+5. **Range behaviour.** A range that misses a slot's weekday drops its tile; a backwards range shows "Pick a valid date range." Cancelled occurrences are excluded from both the session and booked counts.
+
+**Note:** the tile's `booked/capacity` text is the summed booked count over the range against the **per-occurrence** capacity, so with multiple occurrences booked can read higher than capacity (e.g. `27/15`) — the **percentage and colour** are the accurate signal (they divide by capacity × occurrences).
+
 ## 2. AR-2 Enrollment Trends
 
 ### 2.1 Business logic
