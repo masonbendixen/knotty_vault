@@ -90,10 +90,16 @@ No new tables; no new table helpers (uses existing reads).
 - [x] **Endpoint test** `admin_schedule_grid_test.cpp` (4) — 403 without permission, 400 on the invalid-param matrix, cell with capacity/session_count/booked_count/fill_rate (held vs waitlisted), facility filter (only-A vs all). Finds cells by `class_schedule_slot_id` (seed-noise-robust).
 - **Backend `knottyyoga_tests` to be built + run by Mason.**
 
-### 1.3 Frontend
-- [ ] `ui/src/app/pages/portal/manage/reports/schedule-grid/schedule-grid.component.*/.spec.ts`.
-- [ ] CSS grid layout (7 columns × N rows of time slots) with cells colored by fill-rate (green ≥80%, amber 30-80%, red <30%).
-- [ ] Date-range picker; facility selector.
+### 1.3 Frontend ✅ (2026-07-01)
+- [x] **`pages/manage/schedule-grid/schedule-grid.component.*` (+ `.spec.ts`, 12 cases)** at route **`/manage/schedule-grid`**. NOTE: the plan's `pages/portal/manage/reports/…` path is stale — the actual admin-report convention is `pages/manage/…` (modeled on the Phase 10 `instructor-load` component, the closest analog: date-range pickers + facility selector + `getTableRows('facilities')`).
+- [x] **7-column CSS grid** (`grid-template-columns: repeat(7,1fr)`), one column per weekday (Sun–Sat), each stacked with its slot **tiles sorted by start time** (then class name). A tile shows the start time (`minutesToTimeStr`), class name, and `booked/capacity · NN%`, with a `matTooltip` (class · facility · N sessions · booked/capacity). Cells **coloured by fill rate** via `fillLevel()`: green `.fill-high` ≥80%, amber `.fill-mid` 30–80%, red `.fill-low` <30% (shared by the tiles and the **legend**). Columns precomputed in `rebuildColumns()` after each load.
+- [x] **Date-range picker + facility selector** — defaults to **today → today + 7 days** ("this week"); loads on init before the admin touches the picker; re-fetches on `dateChange`/`selectionChange`. Backwards range → inline "Pick a valid date range." (no server call). Loading / empty ("No scheduled classes in this range.") / error ("Failed to load schedule grid", clears the grid) states + back-to-Manage link.
+- [x] **Manage-dashboard card** "Schedule Grid" (icon `grid_view`) → `/manage/schedule-grid`; route registered in `manage.routes.ts`; dashboard spec asserts the card + route.
+- **Frontend `ng test` green for the affected specs: schedule-grid 12/12; ServerAccess.mock + manage-dashboard suite 518/518.**
+
+### 1.4 `ServerAccess` + types (AR-1 slice of §4/§5) ✅ (2026-07-01)
+- [x] **`getScheduleGrid(dateFromUs, dateToUs, facilityId?) → ScheduleGridCell[]`** across interface (`types/ServerAccess.ts`) / network (`GET /api/admin/schedule_grid`, **coerces `fill_rate` string→number** since `KeyValueTableToJson` only numifies integers) / proxy (`serialize`) / mock (in-memory 3-cell seed across 2 facilities with high/mid/low fill; 401 logged-out, 400 backwards range). Mock spec: cells + facility filter, backwards-range 400, logged-out 401.
+- [x] **New type `ScheduleGridCell`** in `shared/types/scheduling.types.ts` (re-exported from the ServerAccess barrel). `getInstructorLoad`/`getEnrollmentTrend` (§4) belong to AR-3/AR-2 and are untouched here (`getInstructorLoad` already existed from Phase 10).
 
 ## 2. AR-2 Enrollment Trends
 
