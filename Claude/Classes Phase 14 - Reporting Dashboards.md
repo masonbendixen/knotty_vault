@@ -135,37 +135,38 @@ Lowest layer first:
 ### 1.6 Planned vs Booked metric — Frontend (AR-1 refinement)
 
 #### 1.6.1 Type + `ServerAccess`
-- [ ] Extend `ScheduleGridCell` (`shared/types/scheduling.types.ts`): add `class_kind: string;`, `planned_count: number;`, `planned_fill_rate: number;`.
-- [ ] `ServerAccessNetwork.getScheduleGrid` — also coerce `planned_fill_rate` string→number (same reason as `fill_rate`).
-- [ ] Mock (`ServerAccess.mock.ts`): add `class_kind` / `planned_count` / `planned_fill_rate` to the seed cells; make **Knotty Yoga** recurring with `planned_count` ≠ `booked_count` (e.g. 12 planned, 3 checked in / 15), and seed one **paid** workshop/series cell (planned 0, booked/capacity only). Update `ServerAccess.mock.spec.ts`.
+- [x] Extended `ScheduleGridCell` (`shared/types/scheduling.types.ts`): added `class_kind: string;`, `planned_count: number;`, `planned_fill_rate: number;`.
+- [x] `ServerAccessNetwork.getScheduleGrid` — also coerces `planned_fill_rate` string→number (same reason as `fill_rate`).
+- [x] Mock (`ServerAccess.mock.ts`): the three recurring seed cells now carry `class_kind: 'recurring'` + planned counts distinct from booked (Knotty Yoga 27 planned / 9 checked in / 15, planned fill 0.9; Partner Acrobatics 10/4; Aerial 101 3/1) and a **new paid workshop cell** (504 "Handstand Workshop", `class_kind: 'workshop'`, planned 0, 8 booked / 10, fill 0.8). Updated `ServerAccess.mock.spec.ts` (4 cells + planned assertions + a dedicated paid-cell test).
 
-#### 1.6.2 Component display
-- [ ] `schedule-grid.component.ts`: add `isMembership(cell) = cell.class_kind === 'recurring'`, `primaryFillRate(cell)` (planned for recurring, booked for paid); make `fillLevel` / `fillPercent` key off `primaryFillRate`. Tooltip spells out both for recurring ("12 planned, 3 checked in / 15 — planned 80%") and collapses for paid ("10 booked / 15 — 67%").
-- [ ] `schedule-grid.component.html`: recurring tile stacks two lines — **`{{ planned_count }} planned`** and **`{{ booked_count }} checked in / {{ capacity }}`** — coloured by planned; paid tile keeps the single **`{{ booked_count }}/{{ capacity }} · NN%`** line coloured by booked. Legend clarifies the colours track the tile's **primary** metric (planned for membership, booked for paid).
-- [ ] Update `schedule-grid.component.spec.ts`: recurring tile renders both numbers and colours by planned; paid tile renders one number and colours by booked; tooltip text per kind.
-- **Frontend `ng test` green for the affected specs (schedule-grid + ServerAccess.mock + manage-dashboard).**
+#### 1.6.2 Component display ✅ (2026-07-02)
+- [x] `schedule-grid.component.ts`: added `isMembership(cell) = cell.class_kind === 'recurring'` and `primaryFillRate(cell)` (planned for recurring, booked for paid); `fillLevel` / `fillPercent` now key off `primaryFillRate`. Tooltip spells out both for recurring ("10 planned, 4 checked in / 10 (planned 50%)") and collapses for paid ("8/10 booked (80%)").
+- [x] `schedule-grid.component.html`: recurring tile stacks **`{{ planned_count }} planned`** (bold) + **`{{ booked_count }} checked in / {{ capacity }}`** coloured by planned; paid tile keeps the single **`{{ booked_count }}/{{ capacity }} · NN%`** line coloured by booked (`data-test` `cell-planned` / `cell-booked` to disambiguate). Added a legend note that colour tracks planned for membership, booked for paid. SCSS: full-weight planned line, dimmer checked-in line.
+- [x] Updated `schedule-grid.component.spec.ts` (18 cases): recurring tile renders both numbers and colours by planned; paid tile renders one number and colours by booked; `isMembership` / `primaryFillRate` unit checks; thresholds + percentage key off the primary metric; per-kind tooltips.
+- **Frontend `ng test` green: schedule-grid 16/16, ServerAccess.mock 512/512; app type-checks clean (`tsc -p tsconfig.app.json --noEmit`).**
 
 ### 1.7 Manual Test Guide — AR-1 Schedule Grid (website only)
 
-> **Heads-up (2026-07-02):** the steps below describe the **pre-1.5/1.6** single-`booked` behaviour. Once the planned-vs-booked refinement (§1.5/§1.6) lands, revise the mock values in Path A and the "raise the fill" expectations in Path B: recurring tiles will show **planned** (attendance-template) + **checked-in** counts coloured by planned, and paid workshop/series tiles keep a single booked count.
+> **Updated 2026-07-02 — reflects the shipped §1.5/§1.6 planned-vs-booked behaviour.** Recurring (membership) tiles show two numbers — **N planned** (attendance-template) and **N checked in / capacity** — and are coloured by the **planned** fill. Paid workshop/series tiles keep a single **booked/capacity · %** line coloured by the **booked** fill.
 
 **Navigation (verified against `mockHeaderResponse.ts` — the builder used in BOTH mock and real modes via `HeaderService.emitHeaderData` — the dashboard HTML, and `manage.routes.ts`):** the admin entry is a **top-level nav dropdown titled `Admin`** (only rendered when logged in as `isAdmin` OR holding `manage_products`). Open the **Admin** dropdown → click **Manage Products** (this is the sub-menu item; `goTo: '/manage'`). For a full admin the dropdown also shows **Manage Data** (→ `/admin`) above it; a manage-products-only user sees just **Manage Products**. `/manage` is the dashboard of cards. On that dashboard, click the **Schedule Grid** card (`mat-card-title` = **Schedule Grid**, avatar icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is") → route **`/manage/schedule-grid`**. Backend gate: `manage_class_schedule`.
 
 > **Correction (2026-07-02):** an earlier version of this section claimed "Manage Products" was a top-level link and "NOT a dropdown." That was wrong. It is a sub-item **inside the `Admin` dropdown**. Verified in `mockHeaderResponse.ts` lines 75–199.
 
-**Fill-rate colours (the legend on the page):** green = ≥80% full, amber = 30–80%, red = <30%. Fill = booked ÷ (capacity × number of occurrences) over the selected range.
+**Fill colours (the legend on the page):** green = ≥80% full, amber = 30–80%, red = <30%. The colour tracks the tile's **primary** metric — **planned** ÷ (capacity × occurrences) for membership recurring slots, **booked** ÷ (capacity × occurrences) for paid workshops/series. A legend note on the page states this.
 
 #### Path A — Fast path (mock mode, no backend)
-The mock is always "logged in" and seeds three cells.
+The mock is always "logged in" and seeds four cells (three recurring + one paid workshop).
 1. Terminal from `...\knottyyoga\ui`: `ng serve -c local` → open `http://localhost:4200`.
 2. Top nav **Admin** dropdown → **Manage Products** → on the `/manage` dashboard click the **Schedule Grid** card (`/manage/schedule-grid`).
 3. The board shows 7 day-columns (Sun–Sat). With the default range you'll see:
-   - **Mon** column: **Knotty Yoga** at **10:00 AM** — **green** tile reading `27/15 · 90%`; below it **Partner Acrobatics** at **6:00 PM** — **amber** tile reading `10/10 · 50%`.
-   - **Wed** column: **Aerial 101** at **9:00 AM** — **red** tile reading `3/12 · 13%`.
+   - **Mon** column: **Knotty Yoga** at **10:00 AM** — **green** tile (planned fill 90%) reading **`27 planned`** / `9 checked in / 15`; below it **Partner Acrobatics** at **6:00 PM** — **amber** tile (planned 50%) reading **`10 planned`** / `4 checked in / 10`.
+   - **Wed** column: **Aerial 101** at **9:00 AM** — **red** tile (planned ~13%) reading **`3 planned`** / `1 checked in / 12`.
+   - **Fri** column: **Handstand Workshop** at **2:00 PM** — **green** tile (paid) reading the single line `8/10 · 80%` (no planned line).
    - All other day-columns show a "—" placeholder.
-4. Hover any tile → tooltip reads e.g. "Partner Acrobatics · Studio Main · 2 sessions · 10/10 booked (50%)".
-5. **Date range:** the **From** and **To** date-picker fields re-fetch on change; set **To** to a date before **From** → the inline red message **"Pick a valid date range."** appears and no server call is made. (Mock returns the same three cells for any valid range — the tiles are keyed by weekday, not the actual dates.)
-6. **Facility** field (dropdown): in mock mode it offers only **All facilities** (the mock seeds no facilities table), which shows all three tiles. The facility filter is exercised in Path B.
+4. Hover a recurring tile → tooltip reads e.g. "Partner Acrobatics · Studio Main · 2 sessions · 10 planned, 4 checked in / 10 (planned 50%)". Hover the workshop tile → "Handstand Workshop · Studio Main · 1 session · 8/10 booked (80%)".
+5. **Date range:** the **From** and **To** date-picker fields re-fetch on change; set **To** to a date before **From** → the inline red message **"Pick a valid date range."** appears and no server call is made. (Mock returns the same four cells for any valid range — the tiles are keyed by weekday, not the actual dates.)
+6. **Facility** field (dropdown): in mock mode it offers only **All facilities** (the mock seeds no facilities table), which shows all four tiles. The facility filter is exercised in Path B.
 
 #### Path B — Full stack (real backend)
 **Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, `ng serve` (real backend / `development` config — **not** `-c local`), and log in as a user holding **manage_class_schedule** (an admin/manager).
@@ -177,15 +178,17 @@ The mock is always "logged in" and seeds three cells.
 - Under that instance click **Add class schedule**. In the **Add class schedule** dialog: **Name** = `Default`, **Priority** = `3` (dropdown), **Valid from** = today's date, **Valid to (blank = open)** = leave blank, **Copy slots from class schedule** = leave `— none —`. Click **Save**.
 - Under that schedule click **Add class schedule slot**. In the **Add class schedule slot** dialog: **Day** = `Monday` (dropdown), **Start time** = `10:00 AM` (time picker), **Duration (min)** = `60`, **Facility** = pick a facility (dropdown), **Room** = pick a room (dropdown; populates from the chosen facility), **Instructor (optional)** = leave blank (autocomplete search), **Requires attending (optional)** = leave `— none —`, **Capacity override (optional)** = leave blank. Click **Save**.
 
-**Step 2 — Open the grid.** Top nav **Admin** dropdown → **Manage Products** → dashboard → **Schedule Grid** card. Set the **From** field to the Monday of the current week (or today if today is ≤ Monday) and the **To** field a few days later so the Monday falls in the range. The **Mon** column shows a **Test Grid Class** tile at **10:00 AM** — **red**, reading `0/15 · 0%` (nothing booked yet).
+**Step 2 — Open the grid.** Top nav **Admin** dropdown → **Manage Products** → dashboard → **Schedule Grid** card. Set the **From** field to the Monday of the current week (or today if today is ≤ Monday) and the **To** field a few days later so the Monday falls in the range. Because `Test Grid Class` is a **Recurring** class, the **Mon** column shows a **Test Grid Class** tile at **10:00 AM** — **red**, reading **`0 planned`** / `0 checked in / 15` (nobody has planned or checked in yet).
 
-**Step 3 — Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted / cancelled / no-show don't count). Get some by booking the class as a member through the public booking flow, or by marking attendees present on the staff check-in page. Re-open **Admin → Manage Products → Schedule Grid** for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
+**Step 3a — Raise the PLANNED count (the colour driver for membership classes).** Planned = members with this slot on their attendance template (minus per-occurrence skips, plus one-off drop-ins). As a member who can access this class, go to **your-name/avatar menu → My Schedule** (or the weekly planner) and mark yourself as planning to attend `Test Grid Class`. Do this for a few members. Re-open **Admin → Manage Products → Schedule Grid** for the same range → the tile's **`N planned`** rises and its colour shifts red → amber (≥30% of capacity×occurrences) → green (≥80%). This is the fix for the original problem: planned attendance now shows immediately, without waiting for check-in.
+
+**Step 3b — Raise the CHECKED-IN count.** For a **recurring** class the second number (`N checked in`) only counts bookings whose status is **attended** — i.e. members marked present on the **staff check-in** page for a materialized occurrence. Confirmed-but-not-checked-in reservations do **not** count here (that is the paid-class metric). After checking a member in, re-open the grid → `checked in` rises. (For a **paid** Workshop/Series class the tile instead shows a single `booked/capacity · %` where booked = confirmed+attended held seats.)
 
 **Step 4 — Facility filter.** With classes at more than one facility, choose a facility in the **Facility** field → only that facility's tiles remain; **All facilities** shows every facility's tiles.
 
-**Step 5 — Range behaviour.** Set **From**/**To** to a range that skips Monday → the tile disappears; set **To** before **From** → "Pick a valid date range." Cancelled occurrences are excluded from both the session and booked counts.
+**Step 5 — Range behaviour.** Set **From**/**To** to a range that skips Monday → the tile disappears; set **To** before **From** → "Pick a valid date range." Cancelled occurrences are excluded from the session, planned, and booked counts.
 
-**Note:** the tile's `booked/capacity` text is the summed booked count over the range against the **per-occurrence** capacity, so with multiple occurrences booked can read higher than capacity (e.g. `27/15`) — the **percentage and colour** are the accurate signal (they divide by capacity × occurrences).
+**Note:** the counts are **summed over every occurrence** in the range against the **per-occurrence** capacity, so with multiple occurrences the planned (or booked) number can read higher than capacity (e.g. `27 planned` against a capacity of 15) — the **percentage and colour** are the accurate signal (they divide by capacity × occurrences).
 
 ## 2. AR-2 Enrollment Trends
 
