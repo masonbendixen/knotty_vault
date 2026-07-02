@@ -101,7 +101,56 @@ No new tables; no new table helpers (uses existing reads).
 - [x] **`getScheduleGrid(dateFromUs, dateToUs, facilityId?) → ScheduleGridCell[]`** across interface (`types/ServerAccess.ts`) / network (`GET /api/admin/schedule_grid`, **coerces `fill_rate` string→number** since `KeyValueTableToJson` only numifies integers) / proxy (`serialize`) / mock (in-memory 3-cell seed across 2 facilities with high/mid/low fill; 401 logged-out, 400 backwards range). Mock spec: cells + facility filter, backwards-range 400, logged-out 401.
 - [x] **New type `ScheduleGridCell`** in `shared/types/scheduling.types.ts` (re-exported from the ServerAccess barrel). `getInstructorLoad`/`getEnrollmentTrend` (§4) belong to AR-3/AR-2 and are untouched here (`getInstructorLoad` already existed from Phase 10).
 
-### 1.5 Manual Test Guide — AR-1 Schedule Grid (website only)
+### 1.5 Planned vs Booked metric — Backend (AR-1 refinement)
+
+**Motivation (Mason, 2026-07-02):** the shipped grid counts only `bookings` rows (`status IN ('confirmed','attended')`) on a materialized `event_session`. For membership-included recurring classes members plan via the **attendance template** (`AttendanceTemplateHelper` — explicitly *NOT a booking*, creates no session, consumes no capacity), so their planned attendance is invisible and the grid reads empty until check-in. Fix (**Option C, kind-aware collapse**):
+
+- **Recurring (membership-included) slot** → show **two** numbers: **planned** = people who marked the occurrence on their attendance template; **booked** = people **checked in** by staff (`status = 'attended'`). Colour the tile by the **planned** fill (the leading capacity signal).
+- **Workshop / series (paid) slot** → planned and booked are the same act (paying = reserving), so **collapse to a single `booked`** = held seats (`status IN ('confirmed','attended')`). No planned number (avoids a confusing duplicate). Colour by the **booked** fill.
+
+The switch is `classes.kind` (`kClassesKindRecurring` vs `workshop`/`series`) — the structural proxy for "does the attendance-template/planned flow apply." See OQ-P14-3 for the permission-based-inclusion nuance.
+
+Lowest layer first:
+
+#### 1.5.1 Table helper — planned attendee count
+- [ ] New `TableHelpers::AttendanceTemplateEntries::CountPlannedForSlotOccurrence(Transaction&, int64_t classScheduleSlotId, int64_t occurrenceDateUs) const` → count of **active** templates (one per person) whose *effective* attendance for that occurrence is "attending": has an entry for the slot **AND** no skip exception (`attending = false`) on that `occurrence_date_us`, **OR** a one-off drop-in exception (`attending = true`) on that date (even with no standing entry). SQL joins `attendance_templates` (filtered `is_active = true`) against `attendance_template_entries` + `attendance_template_exceptions` using the `kAttendanceTemplates*` / `kAttendanceTemplateEntries*` / `kAttendanceTemplateExceptions*` schema constants. Mirrors the effective-attending resolution the helper already does per occurrence, but as a COUNT.
+- [ ] **Tests** in `attendance_template_entries_test.cpp`: entry-only counts 1; entry + skip exception on that date counts 0 (but still counts on a *different* date); drop-in exception with no entry counts 1; inactive template excluded; two people → 2; unknown slot/date → 0.
+
+#### 1.5.2 Table helper — attended-only booking count
+- [ ] New `TableHelpers::Bookings::CountAttendedForSession(Transaction&, int64_t eventSessionId) const` → `COUNT(*) … WHERE event_session_id = $1 AND status = 'attended'` (checked-in only), for the recurring "booked" number. Keep the existing `CountConfirmedOrAttendedForSession` (held seats) for the paid "booked" number.
+- [ ] **Tests** in `bookings_test.cpp`: confirmed-not-checked-in → 0 for attended-count but 1 for held-count; attended → 1 for both; waitlisted/cancelled/no_show → 0 for both; session-scoped.
+
+#### 1.5.3 Reporting helper — kind-aware aggregation
+- [ ] Extend `struct ScheduleGridCell` (`reporting_helper.h`): add `std::string classKind;`, `int64_t plannedCount = 0;`, `double plannedFillRate = 0.0;`. Keep `bookedCount` / `fillRate` but redefine `bookedCount` per kind: **recurring → attended-only**; **workshop/series → confirmed+attended**. `fillRate = bookedCount / (capacity * sessionCount)`; `plannedFillRate = plannedCount / (capacity * sessionCount)` (0 for paid), both clamped to 0 on a 0 denominator.
+- [ ] In `GetScheduleGrid` (`reporting_helper.cpp`): read `kClassesKind` from each `classRow` into the accumulator; carry it onto the cell. Per non-cancelled occurrence:
+  - **booked:** only when `persistedEventSessionId != 0` — `bookedCount += isRecurring ? bookings_.CountAttendedForSession(...) : bookings_.CountConfirmedOrAttendedForSession(...)`.
+  - **planned (recurring only):** `plannedCount += entries_.CountPlannedForSlotOccurrence(tx, ds.classScheduleSlotId, ds.occurrenceDateUs)` for **every** occurrence — planned is **not** gated on a persisted session (the leading signal exists on purely-derived future occurrences). Paid slots leave `plannedCount = 0`.
+  - Add the `AttendanceTemplateEntries entries_;` member to `ReportingHelper` (ctor-init from `databaseHelper`).
+- [ ] **Tests** in `reporting_helper_test.cpp`: recurring slot — planned counted across derived + persisted occurrences; skip exception lowers planned; drop-in raises it; booked = attended-only (a confirmed-not-checked-in booking does NOT raise recurring booked). Workshop/series slot — `plannedCount == 0`, booked = confirmed+attended. `class_kind` surfaced. Fill-rate math for both metrics.
+
+#### 1.5.4 KVT converter
+- [ ] Extend `ScheduleGridCellToKeyValueTable` (`scheduling_key_value_table.cpp`) to emit `class_kind` (string), `planned_count` (`StringFromInt`), and `planned_fill_rate` (locale-independent `%.6f`, same treatment as `fill_rate`). Update `scheduling_key_value_table_test.cpp`.
+
+#### 1.5.5 Endpoint
+- [ ] `GET /api/admin/schedule_grid` signature unchanged — it just serializes the richer cell. Update `admin_schedule_grid_test.cpp`: a recurring cell exposes `planned_count` / `planned_fill_rate` / attended-only `booked_count`; a workshop/series cell exposes `planned_count = 0` and confirmed+attended `booked_count`; `class_kind` present.
+- **Backend `knottyyoga_tests` to be built + run by Mason.**
+
+### 1.6 Planned vs Booked metric — Frontend (AR-1 refinement)
+
+#### 1.6.1 Type + `ServerAccess`
+- [ ] Extend `ScheduleGridCell` (`shared/types/scheduling.types.ts`): add `class_kind: string;`, `planned_count: number;`, `planned_fill_rate: number;`.
+- [ ] `ServerAccessNetwork.getScheduleGrid` — also coerce `planned_fill_rate` string→number (same reason as `fill_rate`).
+- [ ] Mock (`ServerAccess.mock.ts`): add `class_kind` / `planned_count` / `planned_fill_rate` to the seed cells; make **Knotty Yoga** recurring with `planned_count` ≠ `booked_count` (e.g. 12 planned, 3 checked in / 15), and seed one **paid** workshop/series cell (planned 0, booked/capacity only). Update `ServerAccess.mock.spec.ts`.
+
+#### 1.6.2 Component display
+- [ ] `schedule-grid.component.ts`: add `isMembership(cell) = cell.class_kind === 'recurring'`, `primaryFillRate(cell)` (planned for recurring, booked for paid); make `fillLevel` / `fillPercent` key off `primaryFillRate`. Tooltip spells out both for recurring ("12 planned, 3 checked in / 15 — planned 80%") and collapses for paid ("10 booked / 15 — 67%").
+- [ ] `schedule-grid.component.html`: recurring tile stacks two lines — **`{{ planned_count }} planned`** and **`{{ booked_count }} checked in / {{ capacity }}`** — coloured by planned; paid tile keeps the single **`{{ booked_count }}/{{ capacity }} · NN%`** line coloured by booked. Legend clarifies the colours track the tile's **primary** metric (planned for membership, booked for paid).
+- [ ] Update `schedule-grid.component.spec.ts`: recurring tile renders both numbers and colours by planned; paid tile renders one number and colours by booked; tooltip text per kind.
+- **Frontend `ng test` green for the affected specs (schedule-grid + ServerAccess.mock + manage-dashboard).**
+
+### 1.7 Manual Test Guide — AR-1 Schedule Grid (website only)
+
+> **Heads-up (2026-07-02):** the steps below describe the **pre-1.5/1.6** single-`booked` behaviour. Once the planned-vs-booked refinement (§1.5/§1.6) lands, revise the mock values in Path A and the "raise the fill" expectations in Path B: recurring tiles will show **planned** (attendance-template) + **checked-in** counts coloured by planned, and paid workshop/series tiles keep a single booked count.
 
 **Navigation (verified against `mockHeaderResponse.ts` — the builder used in BOTH mock and real modes via `HeaderService.emitHeaderData` — the dashboard HTML, and `manage.routes.ts`):** the admin entry is a **top-level nav dropdown titled `Admin`** (only rendered when logged in as `isAdmin` OR holding `manage_products`). Open the **Admin** dropdown → click **Manage Products** (this is the sub-menu item; `goTo: '/manage'`). For a full admin the dropdown also shows **Manage Data** (→ `/admin`) above it; a manage-products-only user sees just **Manage Products**. `/manage` is the dashboard of cards. On that dashboard, click the **Schedule Grid** card (`mat-card-title` = **Schedule Grid**, avatar icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is") → route **`/manage/schedule-grid`**. Backend gate: `manage_class_schedule`.
 
@@ -194,6 +243,7 @@ Both resolved (Mason, 2026-06-09) and folded into the plan above (Layering ▸ R
 
 - **OQ-P14-1. — RESOLVED (Mason: "that sounds fine").** No chart dependency — AR-2/AR-3 use minimal CSS-only Material bar/line visuals; `ng2-charts` deferred to a follow-up only if needed. Folded into Layering, §2.3, §3.2, §7.
 - **OQ-P14-2. — RESOLVED (Mason: "go with your recommendation").** AR-2 weekly buckets key off `event_sessions.start_time_us` in facility-local TZ (`AT TIME ZONE f.timezone`), same as Phase 9. Folded into Layering, §2.1, §7.
+- **OQ-P14-3 (planned-vs-booked switch).** §1.5 keys "membership (planned+booked) vs paid (booked only)" off `classes.kind == recurring`. But class *inclusion* is permission-based, not a kind flag (see [[project_permission_based_class_access]] / the auto-memory), so a recurring class could in principle be permission-gated to a paid tier. **Recommendation (adopt unless Mason objects):** keep the switch on `kind`, because the *planned* concept is structurally tied to the recurring attendance-template flow — a workshop/series never has template entries, so its planned count would always be 0 regardless. Keying off kind is therefore both correct for the metric and cheaper than a per-slot access-gate evaluation. Revisit only if a paid *recurring* offering appears.
 
 ## 10. Cross-References
 
