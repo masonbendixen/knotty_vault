@@ -204,9 +204,15 @@ The mock is always "logged in" and seeds four cells (three recurring + one paid 
 - [x] **Endpoint test** `admin_enrollment_trend_test.cpp` (5): 403 without permission; 400 matrix (`class_id`/`weeks_back` non-int, `weeks_back` 0/negative) with missing-params→200; weekly attendance point for a class (attended-only, capacity, `week_start_us` present); `weeks_back` windows out a 6-week-old session at 4 but includes it at 12; `class_id` filter narrows to one class. Seeds sessions relative to the DB's real `now_us()`; finds points by `class_id` (seed-noise-robust).
 - **Backend `knottyyoga_tests` to be built + run by Mason.**
 
-### 2.3 Frontend
-- [ ] `enrollment-trend.component.*/.spec.ts`.
-- [ ] **CSS-only** line/bar visualization over weeks (Material, no chart dependency — resolved OQ-P14-1); tooltip per week with attendee count.
+### 2.3 Frontend ✅ (2026-07-02)
+- [x] **`pages/manage/enrollment-trend/enrollment-trend.component.*` (+ `.spec.ts`, 13 cases)** at route **`/manage/enrollment-trend`**. Modeled on the AR-1/AR-3 admin-report convention (`pages/manage/…`). Filters: **Class** dropdown (All classes + `getTableRows('classes')`) and a **Range** dropdown (Last 4/8/12/26/52 weeks; default 12). Loads on init before the admin touches a filter; re-fetches on either `selectionChange`. Loading / empty ("No attendance recorded in this range.") / error ("Failed to load enrollment trend", clears the chart) states + back-to-Manage link.
+- [x] **CSS-only weekly bar visualization** (no chart dependency — resolved OQ-P14-1). Points are grouped into one **series per class** (sorted by class name), each a row of weekly bars **ordered oldest-first**; bar heights are **normalized to the class's busiest week** so the trend shape reads even at low absolute fill. Each bar shows the attendee count + a compact week label (`week_start_us` rendered as a UTC date via `usToPickerDate`), with a `matTooltip` ("Week of {long date} · {N} attended / {capacity} ({fill}%)"). `week_start_us` is the wall-clock-encoded-as-UTC Monday-midnight, rendered with the existing `class-schedule-date-util` UTC helpers.
+- **Manage-dashboard card** "Enrollment Trends" (icon `trending_up`) → `/manage/enrollment-trend`; route registered in `manage.routes.ts`; dashboard spec asserts the card + route.
+- **Frontend `ng test` green: enrollment-trend 13/13; ServerAccess.mock + manage-dashboard 523/523; app type-checks clean (`tsc -p tsconfig.app.json --noEmit`).**
+
+#### AR-2 slice of §4 `ServerAccess` + §5 Types ✅ (2026-07-02)
+- [x] **`getEnrollmentTrend(weeksBack, classId?) → EnrollmentTrendPoint[]`** across interface (`types/ServerAccess.ts`) / network (`GET /api/admin/enrollment_trend`; all fields integer, so no numeric coercion needed) / proxy (`serialize`) / mock (two seeded classes — Knotty Yoga rising across 4 weeks + Aerial 101 across 2; `weeks_back < 1` → 400, logged-out → 401, `class_id` filter). Mock spec: points + weekly spacing + class filter, 400 on non-positive weeks_back, 401 logged-out.
+- [x] **New type `EnrollmentTrendPoint`** in `shared/types/scheduling.types.ts` (`class_id`, `class_name`, `week_start_us`, `attendee_count`, `capacity`). (The plan's `reports.types.ts` filename is stale — the AR-1/AR-2 report types live in `scheduling.types.ts` alongside `ScheduleGridCell`.)
 
 ## 3. AR-3 Instructor Load (UI polish)
 
