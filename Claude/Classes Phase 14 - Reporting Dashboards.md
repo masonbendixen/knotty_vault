@@ -214,33 +214,38 @@ The mock is always "logged in" and seeds four cells (three recurring + one paid 
 - [x] **`getEnrollmentTrend(weeksBack, classId?) → EnrollmentTrendPoint[]`** across interface (`types/ServerAccess.ts`) / network (`GET /api/admin/enrollment_trend`; all fields integer, so no numeric coercion needed) / proxy (`serialize`) / mock (two seeded classes — Knotty Yoga rising across 4 weeks + Aerial 101 across 2; `weeks_back < 1` → 400, logged-out → 401, `class_id` filter). Mock spec: points + weekly spacing + class filter, 400 on non-positive weeks_back, 401 logged-out.
 - [x] **New type `EnrollmentTrendPoint`** in `shared/types/scheduling.types.ts` (`class_id`, `class_name`, `week_start_us`, `attendee_count`, `capacity`). (The plan's `reports.types.ts` filename is stale — the AR-1/AR-2 report types live in `scheduling.types.ts` alongside `ScheduleGridCell`.)
 
-## 3. AR-3 Instructor Load (UI polish)
+## 3. AR-3 Instructor Load (UI polish) ✅ (2026-07-02)
 
 ### 3.1 Reuse Phase 10's `GetInstructorLoad`
-- [ ] No new business logic.
+- [x] No new business logic — the page reuses Phase 10's `GET /api/admin/instructor_load` / `getInstructorLoad` unchanged.
 
-### 3.2 Frontend
-- [ ] `instructor-load-dashboard.component.*/.spec.ts`.
-- [ ] Sortable table + **CSS-only** bar visualization (Material, no chart dependency — resolved OQ-P14-1); date range picker + facility filter.
+### 3.2 Frontend ✅ (2026-07-02)
+- [x] **Polished the existing `pages/manage/instructor-load/instructor-load.component.*`** (route `/manage/instructor-load`; date-range pickers + facility filter already shipped in Phase 10). Note the plan's `instructor-load-dashboard` filename is stale — the component is `instructor-load`.
+- [x] **Sortable columns**: clickable header buttons for **Instructor** (last, then first name), **Sessions**, and **Confirmed Attendees**. Same-column click flips asc/desc; a new column resets to its natural default (name A→Z, counts high→low). Active column shows a ▲/▼ arrow. Default sort is **attendees descending** (busiest instructor first). Raw `rows` kept separate from the sorted `displayRows` view.
+- [x] **CSS-only "Relative load" bar column** (no chart dependency — resolved OQ-P14-1): a horizontal bar per instructor, width normalized to the busiest instructor's attendee count (`barPercent`), with a `matTooltip` ("{name}: {N} confirmed attendees across {M} sessions"). Zero-attendee / all-zero result guarded (0% width, keeps a 2px stub).
+- **Frontend `ng test` green: instructor-load 14/14 (6 new sort/bar cases); app type-checks clean (`tsc -p tsconfig.app.json --noEmit`).**
 
-## 4. `ServerAccess`
+## 4. `ServerAccess` ✅ (2026-07-02)
 
-- [ ] `getScheduleGrid(facilityId, from, to)`, `getEnrollmentTrend(classId, weeksBack)`, `getInstructorLoad(facilityId, from, to)` (reuse Phase 10's API).
-- [ ] Update `ServerAccess.mock.spec.ts`.
+- [x] All three methods present and exercised end-to-end (interface / network / proxy / mock):
+  - **`getScheduleGrid(dateFromUs, dateToUs, facilityId?)`** — AR-1 (§1.6).
+  - **`getEnrollmentTrend(weeksBack, classId?)`** — AR-2 (§2.3). (Signature deviates from the plan's `(classId, weeksBack)`: required `weeksBack` first, optional `classId` trailing — matches the endpoint's "class_id optional / weeks_back defaulted" shape and the schedule-grid convention of trailing optional filters.)
+  - **`getInstructorLoad(dateFromUs, dateToUs, facilityId?)`** — AR-3, reused unchanged from Phase 10.
+- [x] `ServerAccess.mock.spec.ts` covers all three (schedule-grid: cells + facility filter + paid-workshop cell + backwards-range 400 + logged-out 401; enrollment-trend: points + weekly spacing + class filter + non-positive weeks_back 400 + logged-out 401; instructor-load: grid + facility filter + backwards-range 400 + logged-out 401).
 
-## 5. Types
+## 5. Types ✅ (2026-07-02)
 
-- [ ] `reports.types.ts`: `ScheduleGridCell`, `EnrollmentTrendPoint`.
+- [x] `ScheduleGridCell` (AR-1) and `EnrollmentTrendPoint` (AR-2) defined; `InstructorLoadRow` (AR-3) reused from Phase 10. **All live in `shared/types/scheduling.types.ts`, not a new `reports.types.ts`** — the plan's `reports.types.ts` filename is stale; the report types sit alongside the other scheduling types.
 
-## 6. Admin Metadata
+## 6. Admin Metadata ✅ (2026-07-02)
 
-- [ ] No new tables.
+- [x] No new tables — all three reports are read-only aggregate endpoints over existing tables (`class_schedule_slots`, `event_sessions`, `bookings`, `attendance_template*`, `classes`, `facilities`). No `admin_top_level_tables` / `admin_nested_tables` registration needed.
 
-## 7. Tests-Required Summary
+## 7. Tests-Required Summary ✅ (2026-07-02)
 
-- [ ] Business-logic tests for both new aggregation helpers (capacity / booked count joins; **week bucketing in facility-local TZ — a session straddling midnight UTC lands in the correct local week, resolved OQ-P14-2**).
-- [ ] Endpoint tests for both new endpoints.
-- [ ] Frontend specs for all three pages, asserting the **CSS-only** Material visualizations render (no chart library — resolved OQ-P14-1).
+- [x] Business-logic tests for both new aggregation helpers — `reporting_helper_test.cpp`: `GetScheduleGrid` (§1.5, recurring planned+booked vs paid booked-only; kind-aware split) and `GetEnrollmentTrend` (§2.1, 7 tests incl. exact week bucketing off `start_time_us` read `AT TIME ZONE 'UTC'` — the wall-clock-encoded-as-UTC Phase 9 convention, reconciled in OQ-P14-2; capacity/booked-count summing without double counting). *(Backend `knottyyoga_tests` build+run is Mason's step.)*
+- [x] Endpoint tests for both new endpoints — `admin_schedule_grid_test.cpp` and `admin_enrollment_trend_test.cpp` (403 no-permission, 400 param matrices, aggregate correctness, window/filter behavior).
+- [x] Frontend specs for all three pages asserting the **CSS-only** visualizations render (no chart library — resolved OQ-P14-1): schedule-grid 16 cases (fill-coloured cells), enrollment-trend 13 cases (per-class weekly bars + normalization + tooltip), instructor-load 14 cases (sortable columns + relative-load bars). All green under `ng test`.
 
 ## 8. Cross-Layer Acceptance Criteria
 
