@@ -192,12 +192,17 @@ The mock is always "logged in" and seeds four cells (three recurring + one paid 
 
 ## 2. AR-2 Enrollment Trends
 
-### 2.1 Business logic
-- [ ] `struct EnrollmentTrendPoint { int64_t classId; std::string className; int64_t weekStartUs; int64_t attendeeCount; int64_t capacity; }`.
-- [ ] `std::vector<EnrollmentTrendPoint> GetEnrollmentTrend(Transaction&, int64_t classId, int weeksBack)`. Returns weekly buckets for the last N weeks for one class (or `classId=0` for all classes overlaid). **Weeks are bucketed by `event_sessions.start_time_us` in facility-local TZ (`AT TIME ZONE f.timezone`), resolved OQ-P14-2** — same TZ-aware approach as Phase 9, so an 11pm-Pacific session on a week boundary lands in the correct local week, not the UTC one.
+### 2.1 Business logic ✅ (2026-07-02)
+- [x] `struct EnrollmentTrendPoint { int64_t classId; std::string className; int64_t weekStartUs; int64_t attendeeCount; int64_t capacity; }` in `reporting_helper.h`.
+- [x] `std::vector<EnrollmentTrendPoint> ReportingHelper::GetEnrollmentTrend(Transaction&, int64_t classId, int weeksBack, int64_t nowUs)`. Weekly buckets for the last `weeksBack` weeks up to and including the current week (`classId == 0` = every class, one point per (class, week)). **Added `nowUs` to the plan signature** so the window is injectable/deterministic in tests (the endpoint passes `now_us()`). `weeksBack` clamped to `[1, kMaxTrendWeeks=104]`. `attendeeCount` = `'attended'` bookings only (checked-in); `capacity` = summed per-session capacity (inner subquery counts attended per session so the outer `SUM(capacity)` isn't multiplied by the booking count); cancelled sessions excluded from both.
+  - **Reconciliation — supersedes OQ-P14-2's `AT TIME ZONE f.timezone`.** Class-session `start_time_us` is the facility **wall-clock ENCODED AS UTC** (occurrence UTC-midnight + slot minutes), so weeks are bucketed with `date_trunc('week', to_timestamp(start_time_us/1e6) AT TIME ZONE 'UTC')` and re-encoded via `EXTRACT(EPOCH …) * 1e6` — reading AS UTC **is** the facility-local calendar. Applying `f.timezone` would double-convert (this is exactly the Phase 9 `AttendanceHistoryHelper::LocalCalendarPart` reconciliation; see its header note). `weekStartUs` is therefore a Monday-midnight in the same wall-clock-encoded-as-UTC space as every other class time.
+- [x] **KVT converter** `EnrollmentTrendPointToKeyValueTable` / `…sToKeyValueTableArray` in `scheduling_key_value_table.{h,cpp}` (+ converter tests).
+- [x] **Tests** in `reporting_helper_test.cpp` (7 new): week bucketing + attended-only counting + oldest-first order (exact `weekStartUs` asserted); window excludes the week exactly N back (strict lower bound); all-classes vs single-class; multi-session-per-week sums capacity + attendance without inflating capacity; cancelled sessions excluded from both counts; `weeksBack` clamped to ≥1; empty when no sessions. Deterministic via `nowUs = kFarMondayUs` and Monday-noon session times.
 
-### 2.2 Endpoint
-- [ ] `GET /api/admin/enrollment_trend?class_id=&weeks_back=`. Permission `manage_class_schedule`. Endpoint test.
+### 2.2 Endpoint ✅ (2026-07-02)
+- [x] `GET /api/admin/enrollment_trend?class_id=&weeks_back=` (`endpoints/admin_enrollment_trend.{h,cpp}`) → `{ points: [...] }`. Thin handler modeled on `admin_schedule_grid`: strict int parse (`class_id` optional, 0/omitted = all; `weeks_back` optional, default 12, must be a positive int → 400 otherwise), permission gate **`manage_class_schedule`**, derives `nowUs` from `SELECT now_us()`, delegates to `ReportingHelper::GetEnrollmentTrend`, converts via the KVT array. Registered in `web_app.cpp` (include + `g_GetAdminEnrollmentTrend`) and `endpoints/CMakeLists.txt` (source + test).
+- [x] **Endpoint test** `admin_enrollment_trend_test.cpp` (5): 403 without permission; 400 matrix (`class_id`/`weeks_back` non-int, `weeks_back` 0/negative) with missing-params→200; weekly attendance point for a class (attended-only, capacity, `week_start_us` present); `weeks_back` windows out a 6-week-old session at 4 but includes it at 12; `class_id` filter narrows to one class. Seeds sessions relative to the DB's real `now_us()`; finds points by `class_id` (seed-noise-robust).
+- **Backend `knottyyoga_tests` to be built + run by Mason.**
 
 ### 2.3 Frontend
 - [ ] `enrollment-trend.component.*/.spec.ts`.
@@ -242,7 +247,7 @@ The mock is always "logged in" and seeds four cells (three recurring + one paid 
 Both resolved (Mason, 2026-06-09) and folded into the plan above (Layering ▸ Resolved decisions + the cited sections).
 
 - **OQ-P14-1. — RESOLVED (Mason: "that sounds fine").** No chart dependency — AR-2/AR-3 use minimal CSS-only Material bar/line visuals; `ng2-charts` deferred to a follow-up only if needed. Folded into Layering, §2.3, §3.2, §7.
-- **OQ-P14-2. — RESOLVED (Mason: "go with your recommendation").** AR-2 weekly buckets key off `event_sessions.start_time_us` in facility-local TZ (`AT TIME ZONE f.timezone`), same as Phase 9. Folded into Layering, §2.1, §7.
+- **OQ-P14-2. — RESOLVED, then RECONCILED at implementation (2026-07-02).** AR-2 weekly buckets key off `event_sessions.start_time_us` in the facility-local calendar. The resolution named `AT TIME ZONE f.timezone`, but the actual Phase 9 convention (and the correct one) is `AT TIME ZONE 'UTC'`: class-session times are the facility wall-clock **encoded as UTC**, so reading them AS UTC already yields the facility-local calendar; `f.timezone` would double-convert. Implemented per the Phase 9 `AttendanceHistoryHelper` reconciliation. See §2.1.
 - **OQ-P14-3 (planned-vs-booked switch).** §1.5 keys "membership (planned+booked) vs paid (booked only)" off `classes.kind == recurring`. But class *inclusion* is permission-based, not a kind flag (see [[project_permission_based_class_access]] / the auto-memory), so a recurring class could in principle be permission-gated to a paid tier. **Recommendation (adopt unless Mason objects):** keep the switch on `kind`, because the *planned* concept is structurally tied to the recurring attendance-template flow — a workshop/series never has template entries, so its planned count would always be 0 regardless. Keying off kind is therefore both correct for the metric and cheaper than a per-slot access-gate evaluation. Revisit only if a paid *recurring* offering appears.
 
 ## 10. Cross-References
