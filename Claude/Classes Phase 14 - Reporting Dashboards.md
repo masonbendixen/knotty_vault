@@ -103,14 +103,16 @@ No new tables; no new table helpers (uses existing reads).
 
 ### 1.5 Manual Test Guide — AR-1 Schedule Grid (website only)
 
-**Navigation (verified against the real nav + dashboard):** the top nav's admin entry is the top-level link **Manage Products** (this goes straight to the `/manage` dashboard of cards — it is NOT a dropdown, and there is no item literally called "Manage"). On that dashboard, click the **Schedule Grid** card (icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is") → route **`/manage/schedule-grid`**. Backend gate: `manage_class_schedule`.
+**Navigation (verified against `mockHeaderResponse.ts` — the builder used in BOTH mock and real modes via `HeaderService.emitHeaderData` — the dashboard HTML, and `manage.routes.ts`):** the admin entry is a **top-level nav dropdown titled `Admin`** (only rendered when logged in as `isAdmin` OR holding `manage_products`). Open the **Admin** dropdown → click **Manage Products** (this is the sub-menu item; `goTo: '/manage'`). For a full admin the dropdown also shows **Manage Data** (→ `/admin`) above it; a manage-products-only user sees just **Manage Products**. `/manage` is the dashboard of cards. On that dashboard, click the **Schedule Grid** card (`mat-card-title` = **Schedule Grid**, avatar icon `grid_view`, subtitle "Weekly class schedule coloured by how full each slot is") → route **`/manage/schedule-grid`**. Backend gate: `manage_class_schedule`.
+
+> **Correction (2026-07-02):** an earlier version of this section claimed "Manage Products" was a top-level link and "NOT a dropdown." That was wrong. It is a sub-item **inside the `Admin` dropdown**. Verified in `mockHeaderResponse.ts` lines 75–199.
 
 **Fill-rate colours (the legend on the page):** green = ≥80% full, amber = 30–80%, red = <30%. Fill = booked ÷ (capacity × number of occurrences) over the selected range.
 
 #### Path A — Fast path (mock mode, no backend)
 The mock is always "logged in" and seeds three cells.
 1. Terminal from `...\knottyyoga\ui`: `ng serve -c local` → open `http://localhost:4200`.
-2. Top nav **Manage Products** → on the dashboard click the **Schedule Grid** card (`/manage/schedule-grid`).
+2. Top nav **Admin** dropdown → **Manage Products** → on the `/manage` dashboard click the **Schedule Grid** card (`/manage/schedule-grid`).
 3. The board shows 7 day-columns (Sun–Sat). With the default range you'll see:
    - **Mon** column: **Knotty Yoga** at **10:00 AM** — **green** tile reading `27/15 · 90%`; below it **Partner Acrobatics** at **6:00 PM** — **amber** tile reading `10/10 · 50%`.
    - **Wed** column: **Aerial 101** at **9:00 AM** — **red** tile reading `3/12 · 13%`.
@@ -122,16 +124,16 @@ The mock is always "logged in" and seeds three cells.
 #### Path B — Full stack (real backend)
 **Prereqs:** reset the DB with `knottyyoga_database_helper`, start the C++ server, `ng serve` (real backend / `development` config — **not** `-c local`), and log in as a user holding **manage_class_schedule** (an admin/manager).
 
-**Step 1 — Create a recurring class + slot so the grid has a cell.** Top nav **Manage Products** → dashboard → **Class Schedules** card (`/manage/class-schedules`).
-- Click **Add class**. In the **Add class** dialog: **Name** = `Test Grid Class`, **Description** = `Grid demo`, **Default capacity** = `15`, **Kind** = `Recurring`, **Tags** = leave empty. Click **Save**.
+**Step 1 — Create a recurring class + slot so the grid has a cell.** Top nav **Admin** dropdown → **Manage Products** → on the `/manage` dashboard click the **Class Schedules** card (`/manage/class-schedules`). The page is a 4-level nesting: **Class → Class Instances → Class Schedules → Class Schedule Slots**.
+- Click **Add class** (button text `add Add class`). In the **Add class** dialog fill: **Name** = `Test Grid Class`, **Description** = `Grid demo`, **Default capacity** = `15`, **Kind** = `Recurring` (dropdown; options Recurring / Workshop / Series), **Tags** = leave empty (field only appears if tags exist), leave **Active (shown in the public catalog)** checkbox ticked. Click **Save**.
 - In the class list, select **Test Grid Class**.
-- Click **Add class instance**. In the **Add class instance** dialog: **Name** = `2026 Run`, **Valid from** = today's date, **Valid to (blank = perpetual)** = leave blank, **Product** = pick any existing class product. Click **Save**.
-- Under that instance click **Add class schedule**. In the **Add class schedule** dialog: **Name** = `Default`, **Priority** = `3`, **Valid from** = today's date, **Valid to (blank = open)** = leave blank. Click **Save**.
-- Under that schedule click **Add class schedule slot**. In the **Add class schedule slot** dialog: **Day** = `Monday`, **Start time** = `10:00 AM`, **Duration (min)** = `60`, **Facility** = pick a facility, **Room** = pick a room, **Instructor (optional)** = leave blank, **Capacity override (optional)** = leave blank. Click **Save**.
+- Click **Add class instance**. In the **Add class instance** dialog: **Name** = `2026 Run`, **Valid from** = today's date (date picker), **Valid to (blank = perpetual)** = leave blank, **Product** = pick any existing class product (dropdown). Click **Save**.
+- Under that instance click **Add class schedule**. In the **Add class schedule** dialog: **Name** = `Default`, **Priority** = `3` (dropdown), **Valid from** = today's date, **Valid to (blank = open)** = leave blank, **Copy slots from class schedule** = leave `— none —`. Click **Save**.
+- Under that schedule click **Add class schedule slot**. In the **Add class schedule slot** dialog: **Day** = `Monday` (dropdown), **Start time** = `10:00 AM` (time picker), **Duration (min)** = `60`, **Facility** = pick a facility (dropdown), **Room** = pick a room (dropdown; populates from the chosen facility), **Instructor (optional)** = leave blank (autocomplete search), **Requires attending (optional)** = leave `— none —`, **Capacity override (optional)** = leave blank. Click **Save**.
 
-**Step 2 — Open the grid.** Top nav **Manage Products** → dashboard → **Schedule Grid** card. Set the **From** field to the Monday of the current week (or today if today is ≤ Monday) and the **To** field a few days later so the Monday falls in the range. The **Mon** column shows a **Test Grid Class** tile at **10:00 AM** — **red**, reading `0/15 · 0%` (nothing booked yet).
+**Step 2 — Open the grid.** Top nav **Admin** dropdown → **Manage Products** → dashboard → **Schedule Grid** card. Set the **From** field to the Monday of the current week (or today if today is ≤ Monday) and the **To** field a few days later so the Monday falls in the range. The **Mon** column shows a **Test Grid Class** tile at **10:00 AM** — **red**, reading `0/15 · 0%` (nothing booked yet).
 
-**Step 3 — Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted / cancelled / no-show don't count). Get some by booking the class as a member through the public booking flow, or by marking attendees present on the staff check-in page. Re-open **Manage Products → Schedule Grid** for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
+**Step 3 — Add bookings to raise the fill.** Booked count = bookings on the materialized occurrence whose status is **confirmed** or **attended** (waitlisted / cancelled / no-show don't count). Get some by booking the class as a member through the public booking flow, or by marking attendees present on the staff check-in page. Re-open **Admin → Manage Products → Schedule Grid** for the same range → the tile's `booked/capacity · %` rises and its colour shifts red → amber (≥30%) → green (≥80%).
 
 **Step 4 — Facility filter.** With classes at more than one facility, choose a facility in the **Facility** field → only that facility's tiles remain; **All facilities** shows every facility's tiles.
 
