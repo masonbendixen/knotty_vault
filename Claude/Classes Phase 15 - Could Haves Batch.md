@@ -113,6 +113,74 @@ Reset/seed the DB first with `knottyyoga_database_helper`, then launch `knottyyo
 
 The sweep is registered as the hourly `expire_stale_waitlist` job (`POST /api/admin/expire_stale_waitlist`, permission `manage_subscriptions`, run by the `scheduler` service account). To exercise the endpoint directly against a running server, POST to `/api/admin/expire_stale_waitlist` while authenticated as a user with `manage_subscriptions`; the JSON response is `{ "total_expired": <n> }`.
 
+### 1.2 Live-server web walkthrough (from a blank database)
+
+This is a click-by-click run against a real running server + Angular app, using only the seed accounts. It exercises the two observable CAP-8 behaviors: (1) a capped waitlister is **skipped** when a seat opens too close to start, and (2) the **expire sweep** drops them. Because *no bookable sessions are seeded*, step 1 creates one.
+
+**Timing model.** The cap bites only when `now` is inside the final `max_hours` before start. We create a session **~24 h out** and set the tested member's cap to **"At least 48 hours before"** (48 > 24 → inside the window). The 48/24 gap is deliberately wide so it's robust regardless of the exact minute you pick.
+
+**Prerequisites**
+- Reset the DB from scratch with `knottyyoga_database_helper`, and start the C++ server (Windows: port 18080) and the Angular app (`npx ng serve` from `...\knottyyoga\ui`, then open http://localhost:4200). Dev `ng serve` uses the real backend via the Angular proxy.
+- **Square sandbox must be configured** (`square_environment=sandbox` + a sandbox access token in `config_secrets`) — every booking, including a waitlist join, is a real "Book and Pay". See [[Square credentials and Sandbox setup]]. Sandbox test card: **4111 1111 1111 1111**, any future expiry, any 3-digit CVV, any postal code (e.g. 94103).
+
+**Seed accounts used** (all pre-verified, so no email-verification step; booking the seed event is *not* permission-gated, so any of them can book):
+
+| Role in test | Email | Password |
+|---|---|---|
+| Admin operator (creates session, runs sweep) | `masonbendixen@gmail.com` | `pass` |
+| Member A — confirmed, will cancel | `kiteagle@gmail.com` (Kit) | `kit` |
+| Member B — capped waitlister (gets skipped/dropped) | `mr.calebault@gmail.com` (Caleb) | `caleb` |
+| Member C — uncapped waitlister (optional 3-person variant) | `masonbendixen@hotmail.com` | `mason` |
+
+Use separate browsers / private windows per member so sessions don't collide.
+
+**Part 1 — Admin creates a capacity-1 session ~24 h out**
+1. Log in as the **admin operator** (`masonbendixen@gmail.com` / `pass`) at **`/login`**.
+2. Top nav **Admin → Manage Products** (→ `/manage`). Click the **"Event Sessions"** card (→ `/manage/events`).
+3. Click **"Create Event Session"** (→ `/manage/events/create`). Fill the form:
+   - **Product**: `Intro Workshop` (the seed event product, $9).
+   - **Facility**: `Knotty Yoga Studio`; **Room**: `Main Gym` (optional but fine to set).
+   - **Capacity**: `1`.
+   - **Recurring sessions**: leave the toggle **OFF**.
+   - **Date**: **tomorrow's date**.
+   - **Start Time**: `12:00 PM`; **End Time**: `1:00 PM` (any ~1 h block tomorrow works).
+   - Leave the visibility checkboxes at their defaults.
+4. Click **"Create Session"**. You return to `/manage/events`. On the new session's card, **note its numeric id** (shown on the card / in the **Edit** link `…/event_sessions/edit/<id>`). Call it **`SID`**. The session's booking URL is **`/shop/event/SID`**.
+
+**Part 2 — Fill the seat, then create a waitlister**
+5. In Member A's browser, log in as **Kit** (`kiteagle@gmail.com` / `kit`). Go to **`/shop/event/SID`** (or **Services → Upcoming Events** → the Intro Workshop card → the tomorrow session).
+6. The button reads **"Book and Pay $9.00"**. Enter sandbox card **4111 1111 1111 1111**, future expiry, CVV `111`, postal `94103`, click it. You should land on **"Booking Confirmed!"**. (Capacity 1 is now full.)
+7. In Member B's browser, log in as **Caleb** (`mr.calebault@gmail.com` / `caleb`). Go to **`/shop/event/SID`**. The capacity line now reads **"Sold out — you can join the waitlist"** and the button reads **"Join Waitlist and Pay $9.00"**. Pay with the same sandbox card. You should land on **"You're on the Waitlist!"**.
+
+**Part 3 — Member B sets a cap that the freed seat won't satisfy**
+8. Still as **Caleb**, open **`/my/account`** (nav: account dropdown → **Profile**) and click the **"Notifications"** card (→ `/my/notification-preferences`).
+9. In the **"Waitlist auto-confirm"** card, set **"Only auto-confirm me if a spot opens"** to **"At least 48 hours before"**, click **"Save preferences"** (green **"Saved."** appears). Caleb now requires 48 h notice, but the session is only ~24 h away.
+
+**Part 4 — Free the seat and observe the skip**
+10. In Member A's browser (**Kit**), open **`/my/events`** ("My Bookings"). On the Intro Workshop booking click **"Cancel Booking"**, then **"Yes, Cancel"** (accept whatever refund line is shown).
+11. **Verify the skip.** As the **admin operator**, open **`/admin/event-session/SID/attendees`** (type the URL — this page has no menu link). Expected:
+    - **Confirmed (0)** — the seat is **left open** (Caleb was skipped because the opening came <48 h before start).
+    - **Waitlist (1)** — Caleb is still listed.
+    This is the core CAP-8 behavior: a normal build would have auto-promoted Caleb; with the cap, he is passed over.
+
+**Part 5 — Expire sweep drops the stale waitlister**
+12. As the **admin operator** (logged in, on any app page so the cookie is sent), open the browser **DevTools console** and run:
+    ```js
+    fetch('/api/admin/expire_stale_waitlist', {method:'POST', credentials:'include'})
+      .then(r => r.json()).then(console.log)
+    ```
+    Expected output: **`{ total_expired: 1 }`**.
+13. Reload **`/admin/event-session/SID/attendees`** → Caleb now appears under **Cancelled / No-Show**, and **Waitlist (0)**. Re-running the `fetch` returns **`{ total_expired: 0 }`** (idempotent).
+
+**Variant V1 — cap does NOT skip when there's enough notice (control).** Repeat Parts 1–4 but in step 9 have Caleb pick **"At least 12 hours before"** (12 < ~24 → outside the blackout window). At step 10, cancelling Kit's booking **auto-promotes Caleb**: `/admin/event-session/SID/attendees` shows **Confirmed (1)** = Caleb, **Waitlist (0)**. The sweep in Part 5 then reports **`{ total_expired: 0 }`** (he's confirmed, not waitlisted).
+
+**Variant V2 — skip B, promote the next eligible (C).** After step 7, also log in as **Member C** (`masonbendixen@hotmail.com` / `mason`), go to **`/shop/event/SID`**, and **"Join Waitlist and Pay"** (C sets no cap). Keep Caleb's 48 h cap from step 9. At step 10, cancelling Kit's booking **skips Caleb and promotes C**: attendees shows **Confirmed (1)** = the `masonbendixen@hotmail.com` account, **Waitlist (1)** = Caleb. Then Part 5 drops Caleb.
+
+**Notes / gotchas**
+- The `/admin/…` verification pages require the **admin** role; the seed operator account has it. A `manage_products`-only account can create sessions but will be bounced from `/admin/event-session/…/attendees`.
+- Everything except the `expire_stale_waitlist` POST is a real web page. That endpoint has no UI surface, so it's triggered via the console `fetch` above (equivalently, it's what the hourly scheduler job calls in production).
+- The 48/24-hour split keeps `now` firmly inside the blackout window for the whole test; you don't need to race the clock. If you'd rather use minutes, the invariant is simply: **chosen cap (hours) > hours until the session starts** for a skip/drop, and **cap < hours-until-start** for a normal promotion (Variant V1). Available cap choices in the UI are 1, 2, 3, 6, 12, 24, 48, 72 h.
+
 ## 2. M-13 Per-Session Price Override
 
 **Goal:** Admin sets a higher / lower price for a single class series / workshop instance (special guest teacher week, holiday discount, sliding scale). Override is tied to the specific session, not the schedule.
