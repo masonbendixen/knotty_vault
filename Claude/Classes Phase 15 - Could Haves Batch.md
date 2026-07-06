@@ -57,13 +57,61 @@ Lowest layer first per item; each item respects the standard layering and tests 
 
 ## 1. CAP-8 Waitlist Auto-Confirm Cap
 
-**Goal:** "Auto-confirm me if a spot opens within N hours of class start, otherwise drop me from the waitlist."
+**Goal:** "Only auto-confirm me from a waitlist if a spot opens with at least N hours of notice before class start; otherwise leave me off (and eventually drop me)."
 
-- [ ] DB: extend `user_notification_preferences` (Phase 6 table) with `waitlist_auto_confirm_max_hours_before INT` NULL, **default NULL = no cap (resolved OQ-P15-1)** — preserves today's behavior (auto-promote at any time before start). Only when a user sets a value does the promotion process honor the window.
-- [ ] Business logic: extend `BookingHelper`'s waitlist-auto-promote path. When a paid attendee cancels and the next-waitlisted is up, check the preference — if a `waitlist_auto_confirm_max_hours_before` exists and `now > session.start_time_us - max_hours * 3600_000_000`, skip the user and check the next.
-- [ ] Add an hourly job: `POST /api/admin/expire_stale_waitlist` — drops users from waitlists for sessions where their `max_hours_before` window has elapsed. Idempotent.
-- [ ] Frontend: extend Phase 6's preferences page with the new input — defaults to empty / "No cap (auto-confirm any time)" (the NULL default, resolved OQ-P15-1).
-- [ ] Tests at all layers (incl. NULL = current behavior preserved; a set window skips a too-early promotion).
+**Semantics (precise — the one-line goal above is loosely worded).** `waitlist_auto_confirm_max_hours_before` = the required *advance notice*, in whole hours before a session's start. It carves a **blackout window** out of the final `max_hours` before start. A waitlisted person is auto-promoted **only while `now ≤ start − max_hours·3600e6`**; once `now` crosses into that final window (`now > start − max_hours·3600e6`) the spot has opened with less lead time than they require, so they are **skipped** for promotion and later **dropped** by the expire sweep. `NULL` = no cap = today's behavior (auto-promote at any time before start). This is the exact condition in the plan's business-logic bullet and the only reading consistent with the expire job. (Implemented per resolved OQ-P15-1.)
+
+- [x] DB: extend `user_notification_preferences` (Phase 6 table) with `waitlist_auto_confirm_max_hours_before INT` NULL, **default NULL = no cap (resolved OQ-P15-1)** — preserves today's behavior (auto-promote at any time before start). Only when a user sets a value does the promotion process honor the window. *(`db_schema/user_notification_preferences.h/.cpp` via `AddColumnNullable`; admin metadata in `create_database.cpp` `PopulateAdminColumnDataInfo`/`PopulateAdminColumnFriendlyNames`.)*
+- [x] Business logic: extend `BookingHelper`'s waitlist-auto-promote path. When a paid attendee cancels and the next-waitlisted is up, check the preference — if a `waitlist_auto_confirm_max_hours_before` exists and `now > session.start_time_us - max_hours * 3600_000_000`, skip the user and check the next. *(`BookingHelper::CancelBooking` now walks the FIFO waitlist and promotes the first eligible person via new `IsWaitlistPromotionAllowedForPerson`; `CancelBookingResult.waitlistPromotionSkipped` flags a pass-over. Reads the pref through `TableHelpers::UserNotificationPreferences` — no CRUD SQL in business logic.)*
+- [x] Add an hourly job: `POST /api/admin/expire_stale_waitlist` — drops users from waitlists for sessions where their `max_hours_before` window has elapsed. Idempotent. *(New endpoint `admin_expire_stale_waitlist.cpp` → `BookingHelper::ExpireStaleWaitlistEntries(tx, nowUs)`; permission `manage_subscriptions`; wired into the scheduler at hourly cadence — `scheduler_config.h`, `scheduler/main.cpp`, `scheduled_job.cpp`.)*
+- [x] Frontend: extend Phase 6's preferences page with the new input — defaults to empty / "No cap (auto-confirm any time)" (the NULL default, resolved OQ-P15-1). *(New "Waitlist auto-confirm" card on `/my/notification-preferences`; `waitlistCapOptions` dropdown, null = "No cap". Types, `ServerAccessNetwork` normalizer, and mock updated.)*
+- [x] Tests at all layers (incl. NULL = current behavior preserved; a set window skips a too-early promotion). *(Table helper: default-NULL/set/clear. BookingHelper: skip-inside-window-promotes-next, promote-when-window-open, seat-left-open, expire drops/ignores/idempotent. Endpoints: expire 200/401/403/idempotent + prefs GET/PUT set/clear/reject. Frontend: component specs + `ServerAccess.mock.spec.ts`.)*
+
+### 1.1 Manual Testing
+
+There are two surfaces to exercise: the **member-facing preference UI** and the **cap behavior** (skip-on-promote + expire sweep). The cap behavior is time-relative and the server reads the real clock (`now_us()`), so the test-helper commands *set the session start relative to now* to land inside/outside the blackout window.
+
+**A. Preference UI (`ui/`)**
+
+1. Run the frontend: from `...\knottyyoga\ui`, `npx ng serve` (with the C++ server running) — or `npx ng serve -c local` to use the in-memory mock.
+2. Log in as any member, then navigate to route **`/my/notification-preferences`** (Account → **Notification Preferences**).
+3. In the **"Waitlist auto-confirm"** card, open the **"Only auto-confirm me if a spot opens"** dropdown. Confirm the first option is **"No cap (auto-confirm any time)"** and there are hour options (1, 2, 3, 6, 12, 24, 48, 72).
+4. Select **"At least 12 hours before"** and click **"Save preferences"** → the green **"Saved."** indicator appears.
+5. Reload the page → the dropdown still reads **"At least 12 hours before"** (persisted).
+6. Set it back to **"No cap (auto-confirm any time)"**, Save, reload → confirms clearing (NULL) round-trips.
+
+**B. Cap behavior via the test helper (`knottyyoga_test_helper`)**
+
+Reset/seed the DB first with `knottyyoga_database_helper`, then launch `knottyyoga_test_helper` (dashboard mode). Use the **Events & Bookings** screen, or `:` to drop into command mode / `--repl`. Commands (category *Events & Bookings*):
+
+- `set_waitlist_auto_confirm_cap` (alias `wac`) — `--person_id=<id> --max_hours=<n>` sets a cap; `--person_id=<id> --clear` removes it. (Dashboard: **[c]**.)
+- `expire_stale_waitlist` (alias `esw`) — runs the CAP-8 sweep at the current time. (Dashboard: **[e]**.)
+- Supporting: `list_event_sessions` (`les`), `list_bookings` (`lb`), `simulate_sold_out_event`, `cancel_booking` (`cb`), `set_event_session_time` (`--session_id --hours_offset`).
+
+**Scenario B1 — capped person is skipped, next person promoted:**
+1. Pick a future event session with **capacity 1** (or note its id from `les`; use one with an upcoming start).
+2. Book three members onto it through the app/UI so person 1 is **confirmed** and persons 2 and 3 are **waitlisted** (person 2 ahead of person 3). Confirm with `lb --session_id=<sid>`.
+3. `wac --person_id=<person2_id> --max_hours=2` — person 2 now requires ≥2h notice. Leave person 3 uncapped.
+4. `set_event_session_time --session_id=<sid> --hours_offset=1` — the session now starts in **1 hour**, inside person 2's 2h blackout window.
+5. `cb --booking_id=<person1_booking_id>` — cancel person 1's confirmed booking.
+6. **Expected:** the command prints "Auto-promoted booking … (person `<person3_id>`)". `lb --session_id=<sid>` shows person 2 still **waitlisted**, person 3 **confirmed**. (Person 2 was skipped because the seat opened <2h before start.)
+
+**Scenario B2 — cap does NOT skip when there's ample notice:**
+1. Same setup, but keep the session start far in the future (don't run `set_event_session_time`, or use `--hours_offset=100`).
+2. `wac --person_id=<person2_id> --max_hours=2`.
+3. `cb --booking_id=<person1_booking_id>` → **person 2 is promoted normally** (window still open).
+
+**Scenario B3 — expire sweep drops a stale entry:**
+1. Future capacity-1 session; person 1 confirmed, person 2 waitlisted.
+2. `wac --person_id=<person2_id> --max_hours=2`.
+3. `set_event_session_time --session_id=<sid> --hours_offset=1` (inside the 2h window).
+4. `expire_stale_waitlist` → prints **"Expired 1 stale waitlist entr(ies)."** `lb` shows person 2 now **cancelled**.
+5. Run `expire_stale_waitlist` again → **"Expired 0"** (idempotent).
+6. Control: repeat with **no** cap set (skip step 2) → sweep reports **0** (a person with no cap is never dropped).
+
+**C. The scheduled job**
+
+The sweep is registered as the hourly `expire_stale_waitlist` job (`POST /api/admin/expire_stale_waitlist`, permission `manage_subscriptions`, run by the `scheduler` service account). To exercise the endpoint directly against a running server, POST to `/api/admin/expire_stale_waitlist` while authenticated as a user with `manage_subscriptions`; the JSON response is `{ "total_expired": <n> }`.
 
 ## 2. M-13 Per-Session Price Override
 
