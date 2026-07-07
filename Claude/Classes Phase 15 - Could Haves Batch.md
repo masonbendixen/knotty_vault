@@ -187,19 +187,83 @@ The sweep has no web page, so run it from **`knottyyoga_test_helper`**. The help
 
 **Goal:** Admin sets a higher / lower price for a single class series / workshop instance (special guest teacher week, holiday discount, sliding scale). Override is tied to the specific session, not the schedule.
 
-- [ ] DB: new table `event_session_price_overrides`:
+- [x] DB: new table `event_session_price_overrides`:
   - `id BIGSERIAL PK`
   - `event_session_id BIGINT NOT NULL REFERENCES event_sessions(id)`
   - `permission_id BIGINT` NULL (NULL = base override)
   - `price_cents BIGINT NOT NULL`
   - `created_us`, `updated_us`
   - `UNIQUE (event_session_id, permission_id)`
-- [ ] Business logic: extend `CatalogHelper::ResolveBestPriceForPerson` to first look up `event_session_price_overrides` for the specific session; if any match the user's permission set, use the lowest of those. Falls back to `product_prices` otherwise.
-- [ ] Existing bookings are grandfathered (per parent OQ-41) — the override only affects future bookings.
-- [ ] Endpoints: **bespoke admin CRUD, NOT the Manage Data generic editor** (memory `feedback_manage_data_is_debug_only.md`). Setting a one-off session price is a real admin workflow and is done from the §below "Price override" section on event-session-detail. Add `GET /api/admin/event_session/<id>/price_overrides`, `POST /api/admin/event_session_price_override`, `PUT`/`DELETE /api/admin/event_session_price_override/<id>` (permission `manage_class_schedule`; thin handlers → table helper → KeyValueTable). (These MAY be backed by the generic CRUD REST endpoints called from the bespoke section — the accepted Phase 1 `class-requirements-editor` pattern — but the authoring surface is the bespoke section, never the Manage Data table editor.)
-- [ ] Frontend: extend the admin event-session-detail page with a bespoke "Price override" section (per-tier price rows: add/edit/delete inline, money inputs) — this is the workflow; do not send admins to Manage Data.
-- [ ] Admin metadata: registering `event_session_price_overrides` for Manage Data is a debug/inspection fallback only (money column gets the cents edit type), never the authoring path.
-- [ ] Tests at all layers (incl. the bespoke endpoints' 403 / validation / persist, the price-override section spec, and the `ServerAccess.mock.spec.ts` cases).
+  *(`db_schema/event_session_price_overrides.h/.cpp`; registered in `make_database_info.cpp` + `create_database.cpp` (`CreateTables`, admin-top-level + admin-nested allow-sets, table permission, column-data-info, friendly names, display template) + both CMakeLists. Ordered after `event_sessions` **and** `permissions` for the FKs.)*
+- [x] Business logic: consult `event_session_price_overrides` for the specific session; if any match the user's permission set, use the lowest of those. Falls back to `product_prices` otherwise. **Correction to the original plan:** the injection point is **`CatalogHelper::ResolvePriceForProduct`**, not `ResolveBestPriceForPerson`. `ResolvePriceForProduct` is the single choke point shared by *both* the display path (`GetProduct` → `EventSessionHelper::ResolveSessionPricing`) and the charge path (`QuoteLineItem` → `GetQuote` → `PurchaseHelper::CreatePurchase` → `BookingHelper::BookEvent`); `ResolveBestPriceForPerson` is a *different* M-5 path not used for event booking. A new optional `eventSessionId` is threaded through `QuoteLineItem`, `GetProduct`, and `ResolvePriceForProduct`; the override is consulted only for product-level (no-variant) prices, and the lowest matching override (held tier or base) **replaces** the `product_prices` result. Resolution lives in `TableHelpers::EventSessionPriceOverrides::GetBestOverrideForSessionPermissions` (mirrors `ProductPrices`' lowest-matching-tier query — no CRUD SQL in business logic).
+- [x] Existing bookings are grandfathered (per parent OQ-41) — the override only affects future bookings. *(Automatic: the price is snapshotted onto the `purchase_item` at booking time; changing/adding an override never rewrites an existing purchase. Proven by `BookingHelperTest.SessionPriceOverrideGrandfathersExistingBooking`.)*
+- [x] Endpoints: **generic admin CRUD via the blessed `class-requirements-editor` pattern** — no new bespoke endpoints. The authoring surface is the bespoke "Price Overrides" section (below), which calls the generic CRUD REST (`addItemFetchPrimaryKey`/`getFilteredTableRows`/`updateItem`/`deleteItem`) against `event_session_price_overrides`; the Manage Data table editor is never the authoring path (memory `feedback_manage_data_is_debug_only.md`). **Correction to the original plan:** the table permission is **`manage_products`**, not `manage_class_schedule` — it matches its sibling event-session child tables (`event_session_staffing`) and, crucially, the Manage Products event-session card the section lives in, so any admin who can see the card can also save an override (a `manage_class_schedule`-only gate would 403 a pure-`manage_products` admin mid-form).
+- [x] Frontend: bespoke **`event-session-price-override-editor`** component embedded as a **"Price Overrides"** expandable section on the (management-only) `event-session-card` — per-tier price rows with inline money inputs (add via a Tier picker + $ price, edit price inline on blur, delete). Base override option hides once one exists; used tiers drop out of the picker. *(New standalone component under `shared/components/event-session-price-override-editor/`; toggled by `[p]`-style "Price Overrides" button on the card. `event_session_price_overrides` seeded in `ServerAccess.mock.ts`.)*
+- [x] Admin metadata: `event_session_price_overrides` is registered for Manage Data as a **debug/inspection fallback only** (price column gets the `number`/cents edit type; friendly names + display template set), never the authoring path.
+- [x] Tests at all layers. *(Table helper `event_session_price_overrides_test.cpp`: CRUD + resolver base/tier/unheld-tier/empty. `CatalogHelperTest`: base override in `GetProduct`, per-tier only-for-holders, fallback-to-product-prices, override in `GetQuote`. `BookingHelperTest`: booking charges the override, and grandfathering. `EventSessionDetailTest.GetSessionReflectsPriceOverride`: the member-facing quote reflects a base override. Frontend: `event-session-price-override-editor.component.spec.ts` (load/add base+tier/validate/edit/delete/rounding/error) + two `event-session-card` toggle specs.)*
+
+### 2.1 Live-server web walkthrough (from a blank database)
+
+A click-by-click run against a real running server + Angular app, using only the seed accounts. It exercises the three observable M-13 behaviors: (1) a **base** override changes the price a member sees and pays; (2) an **existing** booking is **grandfathered** (keeps its old price); (3) a **per-tier** override applies only to members who hold that tier. Because *no bookable sessions are seeded*, Part 1 creates one.
+
+**Prerequisites**
+- Reset the DB from scratch with `knottyyoga_database_helper`, start the C++ server (Windows: port 18080) and the Angular app (`npx ng serve` from `...\knottyyoga\ui`, then open http://localhost:4200). Dev `ng serve` uses the real backend via the Angular proxy.
+- **Square sandbox must be configured** (`square_environment=sandbox` + a sandbox access token in `config_secrets`) — every booking is a real "Book and Pay". See [[Square credentials and Sandbox setup]]. Sandbox test card: **4111 1111 1111 1111**, any future expiry, any 3-digit CVV, any postal (e.g. 94103).
+
+**Seed accounts used** (all pre-verified):
+
+| Role in test | Email | Password |
+|---|---|---|
+| Admin operator (creates session, sets overrides) | `masonbendixen@gmail.com` | `pass` |
+| Member A — books at the base override, then is grandfathered | `kiteagle@gmail.com` (Kit) | `kit` |
+| Member B — books after a price change | `mr.calebault@gmail.com` (Caleb) | `caleb` |
+
+Use separate browsers / private windows per member so sessions don't collide.
+
+**Part 1 — Admin creates a future session**
+1. Log in as the **admin operator** (`masonbendixen@gmail.com` / `pass`) at **`/login`**.
+2. Top nav **Admin → Manage Products** (→ `/manage`). Click the **"Event Sessions"** card (→ `/manage/events`).
+3. Click **"Create Event Session"** (→ `/manage/events/create`). Fill the form:
+   - **Product**: `Intro Workshop` (the seed event product, standard price **$9.00**).
+   - **Facility**: `Knotty Yoga Studio`; **Room**: `Main Gym` (optional).
+   - **Capacity**: `5`.
+   - **Recurring sessions**: leave the toggle **OFF**.
+   - **Date**: **tomorrow's date**. **Start Time**: `12:00 PM`; **End Time**: `1:00 PM`.
+4. Click **"Create Session"** → back on `/manage/events`. On the new session's card, **note its numeric id** (the **Edit** link is `…/event_sessions/edit/<id>`). Call it **`SID`**; its booking URL is **`/shop/event/SID`**.
+
+**Part 2 — Confirm the standard price, then set a base override**
+5. Still as admin on **`/manage/events`**, find the session's card and confirm the price it advertises is the product default (**$9.00**). *(Optional: open `/shop/event/SID` in a private window to see the public "Book and Pay $9.00" button before the override.)*
+6. On the session's card, click **"Price Overrides"** to expand the section. It reads *"No overrides — this session uses the product's standard pricing."*
+7. In the add row: leave **Tier** = **"All members (base price)"**, type **`25`** in the **Price** ($) field, click **"Add override"**. A row appears: **All members (base price) — $25.00**.
+
+**Part 3 — A member sees and pays the override**
+8. In Member A's browser, log in as **Kit** (`kiteagle@gmail.com` / `kit`). Go to **`/shop/event/SID`**. The button now reads **"Book and Pay $25.00"** (the override, not $9.00).
+9. Pay with sandbox card **4111 1111 1111 1111**, future expiry, CVV `111`, postal `94103` → **"Booking Confirmed!"**.
+10. **Verify what was charged.** As admin, open the session card → **"Payment Info"** (`/manage/events/SID/payments`), or **"Attendees"** → Kit's row → **purchase** — the line total is **$25.00**.
+
+**Part 4 — Grandfathering: change the price, old booking is untouched**
+11. As admin on the session card → **"Price Overrides"**, change Kit-era **$25.00** row's **Price** to **`40`** (edit the field, click/tab out of it). The row now shows **$40.00**.
+12. In Member B's browser, log in as **Caleb** (`mr.calebault@gmail.com` / `caleb`), go to **`/shop/event/SID`** → the button reads **"Book and Pay $40.00"**. Pay → **"Booking Confirmed!"**.
+13. **Verify:** admin → **"Payment Info"** for `SID`. **Kit's** purchase is still **$25.00** (grandfathered — the price change did not touch it); **Caleb's** is **$40.00**. This is the core grandfathering behavior.
+
+**Part 5 — Delete the override (revert to standard)**
+14. As admin → **"Price Overrides"**, click the **delete** (trash) icon on the override row. The section returns to *"No overrides…"*.
+15. Open `/shop/event/SID` in a private window → the button is back to **"Book and Pay $9.00"** (the product default). Existing bookings (Kit $25, Caleb $40) are unchanged.
+
+**Variant — per-tier override (members-only discount).** M-13 also supports a per-tier override that applies only to holders of a membership permission:
+1. As admin → **"Price Overrides"**, in the add row pick a **Tier** other than base (the picker lists the pricing-eligible membership tiers) and a lower **Price**, then **"Add override"**. Keep a base override too (e.g. base **$25**, gold-tier **$15**).
+2. A member who **holds** that tier sees/pays **$15** at `/shop/event/SID`; a member who does not sees/pays the base **$25**. (The lowest override among the tiers a member qualifies for wins — exactly like `product_prices`.)
+3. To grant a seed member a tier for this check, assign the tier's role to them via the test helper or Manage Users, then re-open the booking page.
+
+**Test-helper shortcuts (optional).** Everything above is doable from the web UI. To set/inspect overrides straight in the DB (the helper talks to the same DB the server uses), launch `knottyyoga_test_helper`, **Events & Bookings** screen (category commands):
+- `set_session_price_override` / alias `spo` — `--session_id=SID --price=25` (base) or add `--permission_id=<tierId>` for a tier override. Updates in place if one already exists. (Dashboard: **[p]**.)
+- `list_session_price_overrides` / alias `lspo` — `--session_id=SID` lists tier + price. (Dashboard: **[o]**.)
+- `clear_session_price_override` / alias `cspo` — `--override_id=<id>` deletes one, or `--session_id=SID` deletes all for the session.
+
+**Notes / gotchas**
+- The "Price Overrides" section lives on the **management** event-session card (Manage Products → Event Sessions), gated by `manage_products` — it never appears on the member-facing booking page. The seed admin has the permission.
+- Overrides only change **future** bookings; existing purchases keep their snapshotted price. There is intentionally no "reprice existing bookings" action.
+- A **base** override (Tier = "All members") replaces the price for everyone; a **tier** override replaces it only for holders of that membership. At most one base override per session (the base option disappears from the picker once set).
 
 ## 3. M-14 Partner / Friend Multi-Attendee Booking
 
