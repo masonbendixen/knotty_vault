@@ -163,14 +163,15 @@ Use separate browsers / private windows per member so sessions don't collide.
     - **Waitlist (1)** — Caleb is still listed.
     This is the core CAP-8 behavior: a normal build would have auto-promoted Caleb; with the cap, he is passed over.
 
-**Part 5 — Expire sweep drops the stale waitlister**
-12. As the **admin operator** (logged in, on any app page so the cookie is sent), open the browser **DevTools console** and run:
-    ```js
-    fetch('/api/admin/expire_stale_waitlist', {method:'POST', credentials:'include'})
-      .then(r => r.json()).then(console.log)
-    ```
-    Expected output: **`{ total_expired: 1 }`**.
-13. Reload **`/admin/event-session/SID/attendees`** → Caleb now appears under **Cancelled / No-Show**, and **Waitlist (0)**. Re-running the `fetch` returns **`{ total_expired: 0 }`** (idempotent).
+**Part 5 — Expire sweep drops the stale waitlister (via the test helper)**
+
+The sweep has no web page, so run it from **`knottyyoga_test_helper`**. The helper connects to the same production DB the running server uses, so it acts on exactly the data the web app just created. Any one of these forms works:
+- **One-shot:** `knottyyoga_test_helper --command=expire_stale_waitlist`
+- **REPL:** `knottyyoga_test_helper --repl`, then type `expire_stale_waitlist` (or the alias `esw`).
+- **Dashboard:** `knottyyoga_test_helper`, choose **"Events & Bookings"**, press **`[e]`** (labeled *expire stale waitlist*).
+
+12. Run it. Expected output: **`Expired 1 stale waitlist entr(ies).`**
+13. Verify: reload **`/admin/event-session/SID/attendees`** → Caleb now appears under **Cancelled / No-Show**, and **Waitlist (0)**. (Or, still in the helper, run `list_bookings --session_id=SID` / alias `lb` — Caleb's row shows `cancelled`.) Run `expire_stale_waitlist` a second time → **`Expired 0 stale waitlist entr(ies).`** (idempotent).
 
 **Variant V1 — cap does NOT skip when there's enough notice (control).** Repeat Parts 1–4 but in step 9 have Caleb pick **"At least 12 hours before"** (12 < ~24 → outside the blackout window). At step 10, cancelling Kit's booking **auto-promotes Caleb**: `/admin/event-session/SID/attendees` shows **Confirmed (1)** = Caleb, **Waitlist (0)**. The sweep in Part 5 then reports **`{ total_expired: 0 }`** (he's confirmed, not waitlisted).
 
@@ -178,7 +179,8 @@ Use separate browsers / private windows per member so sessions don't collide.
 
 **Notes / gotchas**
 - The `/admin/…` verification pages require the **admin** role; the seed operator account has it. A `manage_products`-only account can create sessions but will be bounced from `/admin/event-session/…/attendees`.
-- Everything except the `expire_stale_waitlist` POST is a real web page. That endpoint has no UI surface, so it's triggered via the console `fetch` above (equivalently, it's what the hourly scheduler job calls in production).
+- Everything except the sweep is a real web page. The sweep has no UI surface, so it's run from `knottyyoga_test_helper` (`expire_stale_waitlist` / `esw` / dashboard **[e]**) — the same endpoint the hourly scheduler job POSTs in production. The helper talks to the same DB as the running server, so no extra wiring is needed.
+- Bonus helper commands for this feature: `set_waitlist_auto_confirm_cap` / alias `wac` (`--person_id=<id> --max_hours=<n>`, or `--clear`) sets/clears a member's cap straight in the DB — handy if you'd rather not click through the preferences page in Part 3; and `list_bookings` / `lb` inspects a session's booking statuses.
 - The 48/24-hour split keeps `now` firmly inside the blackout window for the whole test; you don't need to race the clock. If you'd rather use minutes, the invariant is simply: **chosen cap (hours) > hours until the session starts** for a skip/drop, and **cap < hours-until-start** for a normal promotion (Variant V1). Available cap choices in the UI are 1, 2, 3, 6, 12, 24, 48, 72 h.
 
 ## 2. M-13 Per-Session Price Override
