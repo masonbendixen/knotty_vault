@@ -166,13 +166,13 @@ How the app (and future sites) consume the component repo:
 
 **Option P5 — git submodule.** ❌ Not recommended — submodule ergonomics (detached heads, forgotten `--recursive`, sync pain for collaborators) are worse than P1 for no benefit.
 
-**Suggestion: P1 (FetchContent) for Phase 4, graduating to P4 or P2 once the component API stabilizes.** While you and friends are actively co-developing both sides, source-based consumption with git-SHA pinning has the least ceremony and the fewest moving parts; during local co-development you can point FetchContent at a local checkout (`FETCHCONTENT_SOURCE_DIR_<NAME>`) for instant edit-rebuild across repos. Adopt versioned Conan packages when a component is stable enough that consumers *shouldn't* track head — that's also the natural moment to decide P2 vs P3/P4 based on where the repos ended up. **Status: pending Q3 discussion below (how fetch-by-SHA actually works).**
+**Decided (Q3): P1 (FetchContent, SHA-pinned) for Phase 4, graduating to P4 or P2 once the component API stabilizes.** While you and friends are actively co-developing both sides, source-based consumption with git-SHA pinning has the least ceremony and the fewest moving parts; during local co-development you can point FetchContent at a local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`) for instant edit-rebuild across repos. honuware's third-party Conan requirements live in one shared list the app's `conanfile.py` imports so the two can't drift. Adopt versioned Conan packages when a component is stable enough that consumers *shouldn't* track head — that's also the natural moment to decide P2 vs P3/P4 based on how the registries have matured.
 
 # Cross-Cutting Decisions
 
 **Naming (decided, Q1): `honuware`.** Repo name `honuware`, CMake target prefix `honuware_`, env-var prefix `HONUWARE_` (e.g. `HONUWARE_LOG_DEST`). Existing C++ namespaces (`Auth`, `SqlUtil`, `Json`, `Secrets`, `Mail`, `Http`) are already brand-neutral and stay; only file-level constants, env vars, and target names change.
 
-**License.** A public component repo needs one. Suggest **Apache-2.0** (explicit patent grant, employer-friendly) or MIT (shorter). **Open — see Q5 discussion below for the full comparison.**
+**License (decided, Q5): Apache-2.0.** Explicit patent grant, patent-retaliation clause, §5 contribution licensing (built-in lightweight CLA for the friends' PRs), and trademark carve-out for the honuware name. Repo gets `LICENSE` + `NOTICE` files at creation (Phase 4.1).
 
 **Versioning.** With Option C: single version for the whole component repo, tagged releases (`v0.x` semantics — breaking changes allowed — until a second consumer exists). The app pins a SHA/tag and upgrades deliberately.
 
@@ -186,7 +186,7 @@ How the app (and future sites) consume the component repo:
 
 Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no packaging, no behavior changes. This is deliberate: extraction is trivial once the boundaries are real, and every phase leaves the app shippable. Phase 4 is the actual extraction; Phase 5 proves reusability. Within each phase, work proceeds lower layers first.
 
-**Sequencing vs multi-tenancy (Q6, tentatively):** componentize (1–3) → extract (4–5) so the friends' site can start → multi-tenant conversion → first deploy. Extraction comes before tenancy because friends are waiting on the components; tenancy stays before deploy, which is the cheapest possible window for it (no production data to migrate). See the Q6 discussion in Open Questions for why this ordering is fine and what friction to expect.
+**Sequencing vs multi-tenancy (decided, Q6):** componentize (1–3) → extract (4–5) so the friends' site can start → multi-tenant conversion → first deploy. Extraction comes before tenancy because friends are waiting on the components; tenancy stays before deploy, which is the cheapest possible window for it (no production data to migrate). See the Q6 discussion in Open Questions for the trade-off analysis and expected cross-repo friction during the tenancy work.
 
 ## Phase 1 — Break the coupling (in-place refactors)
 
@@ -257,7 +257,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 ## Phase 4 — Extract to the shared repo
 
 ### 4.1 Repo creation
-- [ ] Create the `honuware` repo on GitHub (public, per Q2), with license (per Q5), README, CLAUDE.md (layering rules, Windows gotchas, testing conventions), and the `components/` tree moved over with fresh history + "extracted from knottyyoga at SHA …" note (per Q11).
+- [ ] Create the `honuware` repo on GitHub (public, per Q2), with Apache-2.0 `LICENSE` + `NOTICE` (per Q5), README, CLAUDE.md (layering rules, Windows gotchas, testing conventions), and the `components/` tree moved over with fresh history + "extracted from knottyyoga at SHA …" note (per Q11).
 - [ ] Component repo builds standalone: own `conanfile.py` (subset of deps), own CMake, own test executable for component tests (data/platform/testing tests need a Postgres container — reuse the `test_container` pattern).
 
 ### 4.2 Consumption from the app
@@ -269,7 +269,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] App CI keeps working against the pinned component version.
 
 ### 4.4 Packaging graduation (deferred until API stabilizes)
-- [ ] Add a `conanfile.py` package recipe to the component repo and publish v0.x to the chosen registry (P2 GitLab / P3 Cloudsmith-Artifactory / P4 local-recipes-index per Open Question 3); switch the app from FetchContent to `conan install` of the pinned version.
+- [ ] Add a `conanfile.py` package recipe to the component repo and publish v0.x to a registry (P2 GitLab / P3 Cloudsmith-Artifactory / P4 local-recipes-index — pick when we get here, based on how the registries have matured); switch the app from FetchContent to `conan install` of the pinned version.
 
 ## Phase 5 — Prove reuse with a second consumer
 
@@ -289,7 +289,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 # Open Questions
 
-**Status:** Q1, Q2, Q4, Q7, Q8, Q9, Q10, Q11, Q12 are decided and have been folded into the plan above. **Q3, Q5, Q6 are under discussion** — my responses are inline below each; add your follow-up underneath.
+**Status: all 12 questions are resolved (7/8/2026)** and folded into the plan above. The Q&A below is kept as the decision record. Summary: Q1 name = `honuware`; Q2 hosting = components + new sites public on GitHub, app private on GitLab; Q3 packaging = FetchContent SHA-pinned now, Conan registry later; Q4 granularity = one repo/one version/layered targets; Q5 license = Apache-2.0; Q6 sequencing = componentize → extract → tenancy → deploy; Q7 frontend sharing = separate future job; Q8 quick accounts = framework with hook; Q9 Square client = `honuware_square` component now; Q10 = Linux-only CI, manual Windows; Q11 = fresh git history; Q12 admin_alerts = framework.
 
 1. **Component name/namespace?** Needs to be brand-neutral: repo name, CMake target prefix (`honuware_platform`), env-var prefix. Ideas to react to: `crowbase`, `croft`, `stonework`, `keystone`, `loom` — or pick your own. (Also: is this maybe a product someday, which would argue for a more distinctive name and Apache-2.0?)
 	- Mason- let's go with honuware
