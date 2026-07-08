@@ -267,15 +267,50 @@ Use separate browsers / private windows per member so sessions don't collide.
 
 ## 3. M-14 Partner / Friend Multi-Attendee Booking
 
-**Goal:** An active member books a single additional adult (partner / friend) for a session using a multi-seat entitlement. Explicitly NOT for children.
+**Goal:** An active member books a single additional adult (partner / friend) for a session. The guest is a **second paid seat** on the same purchase. Explicitly NOT for children.
 
-- [ ] DB: reuse the existing multi-seat entitlement model (`entitlements.seats_total > 1`). Add `bookings.guest_person_id BIGINT` NULL `REFERENCES people(id)` — when set, indicates the primary attendee booked a guest under the same booking.
-- [ ] Or alternatively: create a separate `booking` row for the guest tied to the same `purchase_id`. This is cleaner. Recommend separate bookings.
-- [ ] **Guest is a real account, not a lightweight contact (resolved OQ-P15-2).** When the guest has no existing `people` row, create a **real `people` account** (email required), reusing the **M-9 guest-pass auto-account flow** rather than a name-only contact. So `guest_person_id` always references a genuine account.
-- [ ] Business logic: extend `BookingHelper::BookEvent` to accept an optional `guest_person_id` (or `guest_first_name + guest_last_name + guest_email` → creates the real account via the M-9 flow). Validate: the booker has an active multi-seat membership / paid booking that supports the extra seat; the guest is an adult; an email is present when creating a new guest account.
-- [ ] Endpoints: extend `POST /api/book_event/<id>` body with the new fields.
-- [ ] Frontend: extend the booking-confirmation dialog with a "Add a partner / friend" toggle and form (first / last / email — email required, since the guest gets a real account).
-- [ ] Tests at all layers (incl. new-guest creates a real `people` account via the M-9 flow; existing-person path links by `guest_person_id`; adult-only + seat-availability validation; missing-email rejected when creating a new guest).
+**Status: IMPLEMENTED (2026-07-08).** Built the "separate booking row" design (the recommended alternative), not a `guest_person_id` column on `bookings`. The guest is a second confirmed `bookings` row on the same `purchase_id` (quantity-2 line item), tied to the member's booking via a **booking group** so cancelling the member cascades to the guest. A new `bookings.booked_by_person_id` records who booked the guest seat (NULL for self-booking).
+
+> **Pricing note:** the guest is a **paid** second seat (quantity 2 on the event line item), NOT a free seat consumed from a multi-seat entitlement. Event bookings are pay-per-seat today; free-with-multi-seat-entitlement is deferred (entitlement seat-consumption is not wired for events).
+
+- [x] DB: added `bookings.booked_by_person_id BIGINT` NULL `REFERENCES people(id)` (`db_schema/bookings.{h,cpp}`), registered in `create_database.cpp` (column-data-info + friendly name). The guest is a **separate booking row** tied to the same `purchase_id` and to the member's booking via a `booking_groups` / `booking_group_members` group (roles `base` / `guest`).
+- [x] **Guest is a real account (resolved OQ-P15-2).** When the guest has no existing `people` row, a **real account** is created via the **M-9 quick-account flow** (`Auth::QuickAccountHelper::EnsureAccountWithWelcome`, email required, welcome email sent). An existing email resolves to that account.
+- [x] Business logic: `BookingHelper::BookEvent` accepts `bring_guest` + `guest_person_id` **or** `guest_first_name/last/email` + `guest_is_adult`. `ResolveGuestForBooking` validates adult attestation, resolves/creates the guest account, and rejects self-as-guest / overlapping-guest-conflict / not-enough-seats — all failable checks for an *existing* guest run before any account is created (no orphan accounts). `BookingHelper` now takes optional `secrets` + `mail` for the quick-account flow. (`business_logic/scheduling/booking_helper.{h,cpp}`, tests in `booking_helper_test.cpp`.)
+- [x] Endpoints: `POST /api/book_event/<id>` body extended with `bring_guest`, `guest_person_id`, `guest_first_name`, `guest_last_name`, `guest_email`, `guest_is_adult`; response adds `guest_booked`, `guest_person_id`, `guest_booking`. Guest conflict maps to 409. (`endpoints/book_event.cpp`, tests in `book_event_test.cpp`.)
+- [x] Frontend: event-booking page (`pages/shop/event-booking/`) gains a "Bring a partner or friend" toggle + first/last/email fields + adult-attestation checkbox; total shows 2× the per-seat price; `ServerAccess.bookEvent` gains a `guest` param (interface, network, proxy, mock). Tests: `ServerAccess.mock.spec.ts`, `event-booking.component.spec.ts`.
+- [x] Test helper: `list_bookings` (`lb`) now shows a **Booked By (guest)** column so the member→guest pairing is visible.
+- [x] Tests at all layers (new-guest account creation via M-9; existing-person path; adult-only + seat-availability + self + conflict validation; missing name/email rejected; cancel-member-cancels-guest).
+
+### Live-server test walkthrough (M-14)
+
+Prereqs: reset + seed the DB with `knottyyoga_database_helper`, start the server, start the client. Seed data used below: member **Kit Williams** (`kiteagle@gmail.com` / `kit`), event product **Intro Workshop** ($9.00) at **Knotty Yoga Studio**.
+
+**A. Book yourself + a brand-new guest (happy path)**
+1. Log in as **Kit Williams** (`kiteagle@gmail.com` / `kit`).
+2. Top nav **Events** → click the **Intro Workshop** card → the **Book Event** page opens.
+3. Check **"Bring a partner or friend (adds one paid seat)"**.
+4. Fill the revealed fields — **Guest first name:** `Robin`, **Guest last name:** `Fern`, **Guest email:** `robin.fern@example.com`.
+5. Check **"I confirm my guest is an adult (18 or older)."**
+6. Confirm the **Total** now reads **$18.00** (2 × $9.00) and the button reads **Book and Pay $18.00**.
+7. Enter test card `4111 1111 1111 1111`, any future expiry, any CVV, then click **Book and Pay $18.00**.
+8. Expect **Booking Confirmed!**. In the test helper, run **`lb --session_id <id>`** — you should see two confirmed rows: Kit's (Booked By = `—`) and **Robin Fern** (Booked By = **Kit Williams**). Robin now has a real account (a welcome email was captured).
+
+**B. Adult attestation is required**
+1. Repeat A steps 1–4 but **leave the adult checkbox unchecked**, then click Book and Pay.
+2. Expect the inline error **"Please confirm your guest is an adult (18 or older)."** and no charge.
+
+**C. Bring an existing member as a guest**
+1. As Kit, start a new Intro Workshop booking, check the guest toggle, and enter an **existing** person's details — **email:** `robin.fern@example.com` (created in A) — plus adult checked, and pay.
+2. Expect success with no duplicate account created (the existing account is reused as the second seat).
+
+**D. Guest already booked (conflict → 409)**
+1. Ensure `robin.fern@example.com` already has a confirmed booking on the session (from A).
+2. As Kit, try to bring `robin.fern@example.com` as a guest on the **same** session again.
+3. Expect the error **"You already have a booking that overlaps with this event."** (HTTP 409).
+
+**E. Not enough seats**
+1. In the test helper, shrink the session: **`simulate_sold_out_event --session_id <id>`** leaves 0 seats, or set capacity so only 1 remains.
+2. As Kit, try to book with a guest → expect a validation error (needs two open seats). A solo booking (guest toggle off) still waitlists as before.
 
 ## 4. AR-4 Open-Seat Heatmap
 
