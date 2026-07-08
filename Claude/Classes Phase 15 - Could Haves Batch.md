@@ -316,10 +316,36 @@ Prereqs: reset + seed the DB with `knottyyoga_database_helper`, start the server
 
 **Goal:** Visual report showing which time slots are routinely underfilling — candidates for cuts or marketing.
 
-- [ ] Business logic: `GetOpenSeatHeatmap(Transaction&, facilityId, weeksBack)` returns per (day-of-week, hour-of-day) cell: average fill rate over the last N weeks.
-- [ ] Endpoint: `GET /api/admin/open_seat_heatmap?facility_id=&weeks_back=`.
-- [ ] Frontend: heatmap component (CSS grid with color intensity scaled by fill rate, red = empty, green = full).
-- [ ] Tests.
+**Status: IMPLEMENTED (2026-07-08).** Mirrors the AR-2 enrollment-trend end-to-end pattern (shared `ReportingHelper`, thin admin endpoint, standalone manage-portal component, CSS-only visual).
+
+- [x] Business logic: `ReportingHelper::GetOpenSeatHeatmap(Transaction&, facilityId, weeksBack, nowUs)` returns one `OpenSeatHeatmapCell` per (day-of-week, hour-of-day): summed capacity + booked, `open_seats`, and `fill_rate` over the last N weeks. Reads `event_sessions.start_time_us` **AT TIME ZONE 'UTC'** (the facility wall-clock encoding — the same convention as `GetEnrollmentTrend`, NOT `f.timezone`). Only non-cancelled sessions with capacity > 0 count. `weeksBack` clamped to `[1, kMaxTrendWeeks]`; `facilityId` 0 = all. (`business_logic/scheduling/reporting_helper.{h,cpp}`; KVT converter in `scheduling_key_value_table.{h,cpp}`; tests in `reporting_helper_test.cpp` + `scheduling_key_value_table_test.cpp`.)
+- [x] Endpoint: `GET /api/admin/open_seat_heatmap?facility_id=&weeks_back=` → `{ "cells": [...] }`. Permission `manage_class_schedule`; strict int param parsing (400 on garbage/`weeks_back<1`). Registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. (`endpoints/admin_open_seat_heatmap.{h,cpp}`, tests in `admin_open_seat_heatmap_test.cpp`.)
+- [x] Frontend: `getOpenSeatHeatmap(weeksBack, facilityId?)` on ServerAccess (interface/network/proxy/mock + `OpenSeatHeatmapCell` type; network coerces the decimal `fill_rate` via `Number()`). New standalone `OpenSeatHeatmapComponent` (`pages/manage/open-seat-heatmap/`): a CSS-grid heatmap — hour rows × Monday-first day columns, each cell coloured red (empty) → green (full) by `hsl(fill_rate*120, …)`, with a facility + range filter, tooltip, legend, and empty/error states. Manage-dashboard **Open-Seat Heatmap** card + `/manage/open-seat-heatmap` route. Specs: `open-seat-heatmap.component.spec.ts`, `ServerAccess.mock.spec.ts`, dashboard card spec.
+- [x] Test helper: `seed_heatmap_session` (`shs`) creates a PAST session at a given weekday+hour with capacity/booked so the heatmap has data (past sessions aren't creatable through the booking UI).
+- [x] Tests at all layers (bucketing, same-cell aggregation, cancelled/zero-capacity exclusion, facility filter, window + weeks_back clamp; endpoint auth/params/aggregation/filter; component grid/colour/tooltip/filters/empty/error).
+
+### Live-server test walkthrough (AR-4)
+
+Prereqs: reset + seed the DB with `knottyyoga_database_helper`, start the server, start the client. Seed facility **Knotty Yoga Studio** (id 1), event product **Intro Workshop** (id 1). The heatmap only shows **past** sessions that had seats, so we seed those via the test helper (they can't be created through the booking UI).
+
+**A. Seed some past sessions with varying fill (test helper)**
+Run these in `knottyyoga_test_helper` (they insert past Intro-Workshop sessions at facility 1):
+1. `shs --day Mon --hour 18 --capacity 30 --booked 27` — Monday 6 PM, 90% full (green).
+2. `shs --day Wed --hour 18 --capacity 30 --booked 15` — Wednesday 6 PM, 50% (amber).
+3. `shs --day Sat --hour 10 --capacity 20 --booked 2` — Saturday 10 AM, 10% (red — underfilling).
+   (Add `--weeks_ago 2` etc. to spread sessions across weeks; each call is one more session in that cell.)
+
+**B. View the heatmap**
+1. Log in as an admin (`masonbendixen@gmail.com` / `pass`).
+2. Top nav **Admin** → **Manage Products** → click the **Open-Seat Heatmap** card.
+3. On the **Open-Seat Heatmap** page, confirm a grid with hour rows and **Mon…Sun** columns. Expect a **green** cell at **Mon / 18:00**, an **amber** cell at **Wed / 18:00**, and a **red** cell at **Sat / 10:00**. Each cell shows its fill %; hover for booked/capacity, open seats, and session count.
+
+**C. Filters**
+1. Change the **Range** dropdown (e.g. **Last 4 weeks**) — the grid reloads; sessions seeded further back (via `--weeks_ago`) drop out beyond the window.
+2. Set **Facility** to **Knotty Yoga Studio** — cells are unchanged (all seeded at facility 1). Seed a session at another facility (`shs --day Tue --hour 12 --capacity 10 --booked 5 --facility_id <id>`) and confirm it appears only under **All facilities** and that facility's filter.
+
+**D. Empty state**
+1. With **Range = Last 4 weeks**, seed only an old session (`shs --day Mon --hour 9 --capacity 10 --booked 4 --weeks_ago 10`) on a fresh DB and confirm the page shows **"No sessions with seats ran in this range."**
 
 ## 5. AR-5 Refund Effectiveness Report
 
