@@ -295,10 +295,13 @@ Please add answers inline; I'll fold them into the plan and adjust phases.
 5. **License** for the public repo: Apache-2.0 (my suggestion) or MIT?
 	- Mason- Can you list the advantages of each?
 6. **Timing vs multi-tenancy:** Phases 1–2 here overlap heavily with the tenant plan's "de-singleton" prep and make it easier. Do components come first, tenancy first, or interleaved (my suggestion: Phases 1–2 now, then tenancy, then extraction — tenancy lands *inside* the platform component)?
-	- Mason- I haven't deployed the site yet. I was waiting to finish a few features and do multi ten
+	- Mason- I haven't deployed the site yet. I was waiting to finish a few features and do multi tenant but I have friends wanting to work on a site now that uses my components. If I do the switch to multi tenant after doing this componentization but before deploying, will it be that hard?
 7. **Frontend sharing:** in scope eventually? (Shared Angular admin CRUD UI, auth pages, header/footer as an npm package.) I've kept it out of this plan; confirm or ask me to add a frontend track.
+	- Mason- I can see sharing some frontend components later but I think that we can tackle that as a separate job. I still need to figure that out for the multi tenant thing eventually.
 8. **Quick accounts:** framework feature (with the gift-permission hook) or app-specific? I leaned framework-with-hook; fine either way.
+	- Mason- I like putting this into the framework. The quick accounts kick ass and will be useful in all sites.
 9. **`util/square`:** stay app-side for now (my suggestion) or extract as a `<ns>_square` component immediately?
+	- Mason- I'd like to extract this as a component now. I can see many sites wanting to take payment.
 10. **Windows CI** for the component repo: worth a Windows MSVC job from day one (you develop on Windows), or Linux-only CI with Windows verified manually?
 11. **Git history:** fresh component repo with an "extracted from" note (my suggestion), or `git filter-repo` to preserve per-file history?
 12. **Who owns `admin_alerts` + the digest stored procedure?** I classified them framework (any site wants ops alerts). Confirm.
