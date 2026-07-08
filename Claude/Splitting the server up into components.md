@@ -65,40 +65,44 @@ The layering (db_schema → sql_util → util services → business_logic → en
 
 ## Proposed layered components
 
-Names use a placeholder namespace `<ns>` until we pick one (Open Question 1). Each component depends only on those above it in this list:
+Component namespace: **`honuware`** (decided, Q1). It becomes the repo name, CMake target prefix, and env-var prefix (`HONUWARE_*`). Each component depends only on those above it in this list (scheduler and square depend only on foundation):
 
 ```
-<ns>_foundation      util core: types, json_value/json_util, logging, thread_pool,
+honuware_foundation      util core: types, json_value/json_util, logging, thread_pool,
                      date_time_util, error_codes/error_response, file_util,
                      bounding_rect, image_resize, destructive_guard, http/
         ▲
-<ns>_data            sql_util core: database_access, schema, json,
+honuware_data            sql_util core: database_access, schema, json,
                      stored_procedures (generic), database_common (parameterized)
         ▲
-<ns>_services        util/secrets (incl. secrets_at_rest moved down), util/mail
+honuware_services        util/secrets (incl. secrets_at_rest moved down), util/mail
         ▲
-<ns>_platform        framework db_schema + table_helpers (~33 tables),
+honuware_platform        framework db_schema + table_helpers (~33 tables),
                      business_logic/auth core, business_logic/images,
                      business_logic/migration (runner), web core (web_app,
                      middleware guards, endpoint_auth_helper, generic CRUD
                      endpoints + admin metadata), future business_logic/tenancy
         ▲
-<ns>_scheduler       scheduler engine (job_scheduler, scheduler, api_client,
+honuware_scheduler       scheduler engine (job_scheduler, scheduler, api_client,
                      ScheduledJob struct) — depends only on foundation
         ▲
-<ns>_testing         GlobalDatabaseTestSupport, TestDatabaseUtil,
+honuware_square          util/square Square API client (client constructed with
+                     token; HTTP via foundation) — depends only on foundation
+        ▲
+honuware_testing         GlobalDatabaseTestSupport, TestDatabaseUtil,
                      TestTransactionProvider, matchers, EndpointTestHelper,
-                     test doubles (TestMailHelper, SecretsHelperTest, ...)
+                     test doubles (TestMailHelper, SecretsHelperTest,
+                     TestSquareClient ...)
 ─────────────────────────────────────────────────────────────────────────
 knottyyoga app       app db_schema/table_helpers (~55 tables), payment/,
 (stays in app repo)  scheduling/, skills/, app endpoints, ical branding config,
-                     Square client?, database_helper, test_helper, main.cpp,
-                     scheduler job catalog
+                     database_helper, test_helper, main.cpp,
+                     scheduler job catalog, app secret keys/defaults
 ```
 
 Notes:
-- `util/square` is a judgment call: it is generic "Square API client" code (reusable by any site that takes payments via Square) but is payment-specific. Suggest: keep it app-side initially, promote to a component later if a second site needs Square (Open Question 9).
-- `util/ical_generator` is generic once the PRODID/UID domain are parameterized — goes in `<ns>_foundation` or `<ns>_platform`.
+- `util/square` becomes **`honuware_square`** (decided, Q9): the Square API client is generic (any site taking payments can use it) and already has no includes outside `util/` — client is constructed with a token, so no secrets coupling. Its test double (`square_client_test_util`) ships in `honuware_testing`. The *payment business logic* (PaymentHelper, purchases, entitlements) stays app-side — only the raw Square client is shared.
+- `util/ical_generator` is generic once the PRODID/UID domain are parameterized — goes in `honuware_foundation` or `honuware_platform`.
 - The generic table CRUD endpoints (`get_row`, `add_item`, `update_item`, `delete_item`, `get_fk_options`, `db_schema`, etc.) plus the `admin_*` metadata system are one of the most valuable reusable assets — they give any new site a free admin data editor.
 
 ## Granularity options
@@ -111,11 +115,11 @@ Notes:
 - ✅ Precise dependencies; clean layering enforced by packaging.
 - ❌ Heavy version-management ceremony (bump foundation → rev data → rev services → …) while the code is still evolving fast. This is the classic "too many packages too early" trap.
 
-**Option C (recommended) — one repo, multiple CMake targets, one version.** A single shared repo (and later a single Conan package, or one package per target with lockstep versions) exposing `<ns>_foundation`, `<ns>_data`, `<ns>_services`, `<ns>_platform`, `<ns>_scheduler`, `<ns>_testing` as separate link targets. Layering is enforced by target link rules inside the repo, but you release everything together.
+**Option C (recommended) — one repo, multiple CMake targets, one version.** A single shared repo (and later a single Conan package, or one package per target with lockstep versions) exposing `honuware_foundation`, `honuware_data`, `honuware_services`, `honuware_platform`, `honuware_scheduler`, `honuware_testing` as separate link targets. Layering is enforced by target link rules inside the repo, but you release everything together.
 - ✅ One version to pin, one CI, layering still build-enforced, consumers link only the targets they need. Easy to split into Option B later (the target boundaries are already the package boundaries).
 - ❌ A consumer's `conan install` builds the whole repo even if it links one target (acceptable at this scale).
 
-**Suggestion: Option C.** Fine-grained packaging is easy to add later and painful to retract.
+**Decided (Q4): Option C** — one repo, one version, layered CMake targets (now seven, with `honuware_square` added). Fine-grained packaging is easy to add later and painful to retract.
 
 # Repository Hosting Options
 
@@ -138,7 +142,7 @@ Context: server code is in GitLab; friends want portfolio-visible work on GitHub
 - ✅ No workflow change for you.
 - ❌ Mirrors are read-only second-class citizens: friends' PRs would still happen on GitLab, and a mirrored repo with no issues/PR activity looks dead to employers. Weak portfolio value.
 
-**Suggestion: R2 now, revisit R3 later.** If it turns out the friends mostly want to build the *new sites* with you (not just the components), R3 becomes more attractive and the app can migrate then. Migrating a git repo between hosts is cheap; nothing here is one-way.
+**Decided (Q2): R2.** The `honuware` components and the friends' new sites live on GitHub; the knottyyoga app stays private on GitLab (friends won't work on the app). Note this means the new sites' CI is GitHub Actions while knottyyoga's stays GitLab CI — the component repo's CI setup (Phase 4.3) doubles as the template for the new sites.
 
 # Packaging & Distribution Options
 
@@ -162,31 +166,33 @@ How the app (and future sites) consume the component repo:
 
 **Option P5 — git submodule.** ❌ Not recommended — submodule ergonomics (detached heads, forgotten `--recursive`, sync pain for collaborators) are worse than P1 for no benefit.
 
-**Suggestion: P1 (FetchContent) for Phase 5, graduating to P4 or P2 once the component API stabilizes.** While you and friends are actively co-developing both sides, source-based consumption with git-SHA pinning has the least ceremony and the fewest moving parts; during local co-development you can point FetchContent at a local checkout (`FETCHCONTENT_SOURCE_DIR_<NAME>`) for instant edit-rebuild across repos. Adopt versioned Conan packages when a component is stable enough that consumers *shouldn't* track head — that's also the natural moment to decide P2 vs P3/P4 based on where the repos ended up.
+**Suggestion: P1 (FetchContent) for Phase 4, graduating to P4 or P2 once the component API stabilizes.** While you and friends are actively co-developing both sides, source-based consumption with git-SHA pinning has the least ceremony and the fewest moving parts; during local co-development you can point FetchContent at a local checkout (`FETCHCONTENT_SOURCE_DIR_<NAME>`) for instant edit-rebuild across repos. Adopt versioned Conan packages when a component is stable enough that consumers *shouldn't* track head — that's also the natural moment to decide P2 vs P3/P4 based on where the repos ended up. **Status: pending Q3 discussion below (how fetch-by-SHA actually works).**
 
 # Cross-Cutting Decisions
 
-**Naming.** The components need a brand-neutral name — it becomes the repo name, CMake target prefix, C++ namespace flavor, and env-var prefix (`<NS>_LOG_DEST`). See Open Question 1. Existing C++ namespaces (`Auth`, `SqlUtil`, `Json`, `Secrets`, `Mail`, `Http`) are already brand-neutral and can stay; only file-level constants and target names need renaming.
+**Naming (decided, Q1): `honuware`.** Repo name `honuware`, CMake target prefix `honuware_`, env-var prefix `HONUWARE_` (e.g. `HONUWARE_LOG_DEST`). Existing C++ namespaces (`Auth`, `SqlUtil`, `Json`, `Secrets`, `Mail`, `Http`) are already brand-neutral and stay; only file-level constants, env vars, and target names change.
 
-**License.** A public component repo needs one. Suggest **Apache-2.0** (explicit patent grant, employer-friendly) or MIT (shorter). Open Question 5.
+**License.** A public component repo needs one. Suggest **Apache-2.0** (explicit patent grant, employer-friendly) or MIT (shorter). **Open — see Q5 discussion below for the full comparison.**
 
 **Versioning.** With Option C: single version for the whole component repo, tagged releases (`v0.x` semantics — breaking changes allowed — until a second consumer exists). The app pins a SHA/tag and upgrades deliberately.
 
-**History.** When extracting, either start the component repo fresh (simplest; GitLab history remains the archaeology) or use `git filter-repo` to carry per-file history over. Suggest fresh start with a "extracted from knottyyoga at SHA …" note. Open Question 11.
+**History (decided, Q11).** Fresh component repo with an "extracted from knottyyoga at SHA …" note in the initial commit; GitLab keeps the archaeology.
 
 **Deployment invariant.** Through every phase, one Docker build must keep producing one image with all binaries and one version string. FetchContent keeps this true automatically (the builder clones the pinned component SHA during `cmake` configure; the Dockerfile needs git + network in the build stage, or a vendored source tarball).
 
-**Windows + Linux.** Components must build in both (you develop on Windows/VS, deploy and test on Linux). Component CI should cover at least Linux (container, matching app CI) and ideally a Windows MSVC job. The Crow `HTTPMethod` PascalCase rule and other Windows gotchas move into the component repo's CLAUDE.md.
+**Windows + Linux (decided, Q10).** Components must build in both (you develop on Windows/VS, deploy and test on Linux). Component CI is Linux-only (container with Postgres service); Windows/MSVC is verified manually. The Crow `HTTPMethod` PascalCase rule and other Windows gotchas move into the component repo's CLAUDE.md so manual Windows verification stays cheap.
 
 # Phased Implementation Plan
 
-Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no packaging, no behavior changes. This is deliberate: extraction is trivial once the boundaries are real, and every phase leaves the app shippable. Phase 5 is the actual extraction; Phase 6 proves reusability. Within each phase, work proceeds lower layers first.
+Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no packaging, no behavior changes. This is deliberate: extraction is trivial once the boundaries are real, and every phase leaves the app shippable. Phase 4 is the actual extraction; Phase 5 proves reusability. Within each phase, work proceeds lower layers first.
+
+**Sequencing vs multi-tenancy (Q6, tentatively):** componentize (1–3) → extract (4–5) so the friends' site can start → multi-tenant conversion → first deploy. Extraction comes before tenancy because friends are waiting on the components; tenancy stays before deploy, which is the cheapest possible window for it (no production data to migrate). See the Q6 discussion in Open Questions for why this ordering is fine and what friction to expect.
 
 ## Phase 1 — Break the coupling (in-place refactors)
 
 ### 1.1 util foundation cleanup
 - [ ] Parameterize `util/ical_generator` — PRODID and UID domain become constructor/function parameters; knottyyoga values supplied at call sites (likely via a secret/config). Update all call sites + `ical_generator_test.cpp`.
-- [ ] Decide env-var naming for `util/logging` (`KNOTTYYOGA_LOG_DEST`) and `util/destructive_guard` (`KNOTTYYOGA_ALLOW_DESTRUCTIVE`): make the prefix a compile-time constant the app sets, or accept a neutral name (`<NS>_LOG_DEST`) with the old name honored during transition. Implement + tests.
+- [ ] Rename env vars in `util/logging` and `util/destructive_guard` to the honuware prefix (`HONUWARE_LOG_DEST`, `HONUWARE_ALLOW_DESTRUCTIVE`), honoring the old `KNOTTYYOGA_*` names during transition (read new name first, fall back to old). Update the env-var table in the server CLAUDE.md + tests.
 
 ### 1.2 sql_util core cleanup
 - [ ] Parameterize `kDatabaseName` in `sql_util/database_common.h` — database name becomes a runtime parameter owned by the app (this also aligns with the multi-tenant plan where DB name is per-tenant). Update call sites + tests.
@@ -202,7 +208,7 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 ### 1.5 auth cleanup
 - [ ] Move `instructor_helper.*` and `instructor_key_value_table.*` (+ tests) out of `business_logic/auth/` into `business_logic/scheduling/` (they're yoga-domain instructor profile code and scheduling already owns instructor concepts). Update includes + CMake.
-- [ ] Break `quick_account_helper.cpp` → `payment/gift_permission_helper.h`: add an optional post-creation hook (`std::function<void(Transaction&, int64_t personId)>` or small interface) that the app wires to gift-permission granting at the endpoint layer. Alternative if the hook feels forced: declare `quick_account_helper` app-side and exclude it from the framework (decide during implementation; hook preferred). Tests for both the hook path and the no-hook path.
+- [ ] Break `quick_account_helper.cpp` → `payment/gift_permission_helper.h`: add an optional post-creation hook (`std::function<void(Transaction&, int64_t personId)>` or small interface) that the app wires to gift-permission granting at the endpoint layer. **Decided (Q8): quick accounts are a framework feature** — the hook approach is the path; knottyyoga wires gift permissions into the hook. Tests for both the hook path and the no-hook path.
 - [ ] Break `server_config.h` / `cookie_manager.h` → `endpoints/web_app.h`: extract the Crow app typedef + middleware context types into a new lower-level header (e.g. `endpoints/web_app_types.h`) included by both; `web_app.h` re-exports it. (In Phase 2 this header lands in the web-core part of the platform target.) Update includes + tests.
 
 ### 1.6 endpoint façade generalization
@@ -214,24 +220,25 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 ## Phase 2 — Enforce boundaries with CMake targets (still one repo)
 
 ### 2.1 Foundation and data targets
-- [ ] Create `<ns>_foundation` static lib target (util core files per the architecture section) and `<ns>_data` (sql_util core); move `target_sources` entries from `knotty_yoga_core`; wire Conan lib links (Boost, date, PNG/TIFF/ZLIB/jpeg on foundation; PQXX/CURL on data).
+- [ ] Create `honuware_foundation` static lib target (util core files per the architecture section) and `honuware_data` (sql_util core); move `target_sources` entries from `knotty_yoga_core`; wire Conan lib links (Boost, date, PNG/TIFF/ZLIB/jpeg on foundation; PQXX/CURL on data).
 - [ ] `knotty_yoga_core` links the new targets PUBLIC so nothing else changes yet.
 
-### 2.2 Services target
-- [ ] Create `<ns>_services` (util/secrets, util/mail) linking foundation + data (+ mailio/OpenSSL).
+### 2.2 Services and Square targets
+- [ ] Create `honuware_services` (util/secrets, util/mail) linking foundation + data (+ mailio/OpenSSL).
+- [ ] Create `honuware_square` (util/square) linking foundation only (+ CURL via http). Its test double joins `honuware_testing` in 2.6. Verify no secret-key or app includes remain in `square_client.*` (per the coupling audit there are none — the client takes its token at construction).
 
 ### 2.3 Platform target
-- [ ] Create `<ns>_platform`: framework db_schema + framework table_helpers (~33 tables per the assessment list), `business_logic/auth` core, `business_logic/images`, `business_logic/migration`, web core (web_app, middleware guards, endpoint_auth_helper, generic CRUD + admin metadata endpoints, health). This is the big one — expect several sittings; move one sub-group at a time, keeping the build green.
+- [ ] Create `honuware_platform`: framework db_schema + framework table_helpers (~33 tables per the assessment list), `business_logic/auth` core, `business_logic/images`, `business_logic/migration`, web core (web_app, middleware guards, endpoint_auth_helper, generic CRUD + admin metadata endpoints, health). This is the big one — expect several sittings; move one sub-group at a time, keeping the build green.
 - [ ] Split `db_schema/make_database_info` into framework-table assembly (platform) + app-table assembly (app), composed by the app (preserves FK ordering and the test-speed create-once contract).
 
 ### 2.4 App target
-- [ ] What remains of `knotty_yoga_core` becomes the app library (app schema/table_helpers, payment/, scheduling/, skills/, app endpoints, util/square, ical branding wiring); rename or keep name (cosmetic).
+- [ ] What remains of `knotty_yoga_core` becomes the app library (app schema/table_helpers, payment/, scheduling/, skills/, app endpoints, app secret keys/defaults, ical branding wiring); rename or keep name (cosmetic). Payment business logic links `honuware_square` for the client.
 
 ### 2.5 Scheduler target hygiene
-- [ ] `knotty_yoga_scheduler` links `<ns>_foundation` only (post-1.7 it no longer needs core); `main.cpp` (app-side job catalog + service-account env var) keeps its app deps.
+- [ ] `knotty_yoga_scheduler` links `honuware_foundation` only (post-1.7 it no longer needs core); `main.cpp` (app-side job catalog + service-account env var) keeps its app deps.
 
 ### 2.6 Test target split
-- [ ] Create `<ns>_testing` from `test/src/util/` (GlobalDatabaseTestSupport, TestDatabaseUtil, TestTransactionProvider, matchers, json/table test utils) + `endpoint_test_helper` + the test doubles (`*_test_util` for secrets/mail/cookies). Fix the duplicate source listing between `test/CMakeLists.txt` and `test/src/util/CMakeLists.txt` while at it.
+- [ ] Create `honuware_testing` from `test/src/util/` (GlobalDatabaseTestSupport, TestDatabaseUtil, TestTransactionProvider, matchers, json/table test utils) + `endpoint_test_helper` + the test doubles (`*_test_util` for secrets/mail/cookies/square). Fix the duplicate source listing between `test/CMakeLists.txt` and `test/src/util/CMakeLists.txt` while at it.
 - [ ] `GlobalDatabaseTestSupport` takes the composed `DatabaseInfo` (framework + app tables) as input rather than calling `MakeDatabaseInfo()` directly, preserving the create-all-tables-once optimization for any consumer. Tests.
 - [ ] Keep the single `knottyyoga_tests` executable; it now links app + platform + testing targets.
 
@@ -250,7 +257,7 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 ## Phase 4 — Extract to the shared repo
 
 ### 4.1 Repo creation
-- [ ] Create the component repo (host per Open Question 2), with license, README, CLAUDE.md (layering rules, Windows gotchas, testing conventions), and the `components/` tree moved over (fresh history unless Q11 says otherwise).
+- [ ] Create the `honuware` repo on GitHub (public, per Q2), with license (per Q5), README, CLAUDE.md (layering rules, Windows gotchas, testing conventions), and the `components/` tree moved over with fresh history + "extracted from knottyyoga at SHA …" note (per Q11).
 - [ ] Component repo builds standalone: own `conanfile.py` (subset of deps), own CMake, own test executable for component tests (data/platform/testing tests need a Postgres container — reuse the `test_container` pattern).
 
 ### 4.2 Consumption from the app
@@ -258,7 +265,7 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Update `package/Dockerfile` / `build_linux_release.sh` so the single-image build fetches the pinned component source (git in builder stage or vendored tarball). One image, all binaries, one version string — unchanged contract.
 
 ### 4.3 CI
-- [ ] Component repo CI (GitHub Actions if R2/R3): Linux build + full component test run with Postgres service; optionally a Windows MSVC build job.
+- [ ] Component repo CI (GitHub Actions, per Q2): Linux build + full component test run with Postgres service. No Windows CI job — Windows/MSVC verified manually (per Q10).
 - [ ] App CI keeps working against the pinned component version.
 
 ### 4.4 Packaging graduation (deferred until API stabilizes)
@@ -277,30 +284,45 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 - **Copy-paste fork per new site.** Fast to start, but you named the goal: shared code across sites with friends. Divergence cost arrives within months. Rejected.
 - **Extract first, decouple later** (move code to a new repo now, fix coupling there). The back-edges make the code un-liftable today — you'd copy the whole core and be back to a fork. Decouple-in-place first is strictly safer; every Phase 1–3 step ships. Rejected.
-- **One mega "platform" repo including the frontend.** Angular admin-UI sharing is genuinely valuable (the generic CRUD UI pairs with the generic endpoints) but is a separate npm-flavored effort with different packaging; scoping it in now doubles the project. Deferred — see Open Question 7.
+- **One mega "platform" repo including the frontend.** Angular admin-UI sharing is genuinely valuable (the generic CRUD UI pairs with the generic endpoints) but is a separate npm-flavored effort with different packaging; scoping it in now doubles the project. **Decided (Q7): deferred to a separate future job**, to be designed together with the multi-tenant frontend/branding question.
 - **Microservice split** (auth service, image service as separate processes). Massive operational cost for a single-EC2 deployment; the multi-tenant plan already chose one process serving all tenants. Library components, not services. Rejected.
 
 # Open Questions
 
-Please add answers inline; I'll fold them into the plan and adjust phases.
+**Status:** Q1, Q2, Q4, Q7, Q8, Q9, Q10, Q11, Q12 are decided and have been folded into the plan above. **Q3, Q5, Q6 are under discussion** — my responses are inline below each; add your follow-up underneath.
 
-1. **Component name/namespace?** Needs to be brand-neutral: repo name, CMake target prefix (`<ns>_platform`), env-var prefix. Ideas to react to: `crowbase`, `croft`, `stonework`, `keystone`, `loom` — or pick your own. (Also: is this maybe a product someday, which would argue for a more distinctive name and Apache-2.0?)
+1. **Component name/namespace?** Needs to be brand-neutral: repo name, CMake target prefix (`honuware_platform`), env-var prefix. Ideas to react to: `crowbase`, `croft`, `stonework`, `keystone`, `loom` — or pick your own. (Also: is this maybe a product someday, which would argue for a more distinctive name and Apache-2.0?)
 	- Mason- let's go with honuware
 2. **Repo hosting:** I recommend R2 (components public on GitHub, app stays private on GitLab). Confirm? And: will the friends work only on the components, or also on the new sites / the yoga app itself? (If the latter, R3 — everything on GitHub — gets stronger.)
 	- Mason- The components and new sites will be on Github. I kind of like the app staying on Gitlab and keeping that private. I don't see any of them working on the app in general.
 3. **Packaging:** I recommend P1 (FetchContent, SHA-pinned) first, graduating to a Conan registry later (GitLab's Conan 2 registry is Beta as of 18.10; Cloudsmith/Artifactory or local-recipes-index are the GitHub-side options). OK, or do you want real Conan packages from day one?
 	- Mason- So CMake or Conan would fetch things from git by SHA?
+	- Claude- They're two different mechanisms, and only the CMake one fetches from git directly:
+		- **CMake FetchContent (P1) — yes, straight from git by SHA.** knottyyoga's top-level CMakeLists gains: `FetchContent_Declare(honuware GIT_REPOSITORY https://github.com/<you>/honuware.git GIT_TAG <full commit SHA or tag>)` + `FetchContent_MakeAvailable(honuware)`. At configure time CMake clones exactly that commit into the build tree and `add_subdirectory()`s it, so `honuware_platform` etc. become ordinary targets you link. Upgrading = edit the SHA, reconfigure. Identical behavior in Visual Studio on Windows and in the Docker build.
+		- Conan is still in the picture, but only for **third-party** deps (boost, crow, libpqxx, …). honuware itself is not a Conan package in this mode. One wrinkle: knottyyoga's `conanfile.py` must also list honuware's third-party requirements; we'll keep honuware's requirement list in one file the app's conanfile imports, so the two can't drift.
+		- Local co-development: passing `-DFETCHCONTENT_SOURCE_DIR_HONUWARE=C:\...\honuware` makes the build use your working checkout instead of cloning — you edit both repos and build once, no commit/push cycle needed.
+		- **Conan registry (P2/P3) — fetches by version, not SHA.** `conan install` pulls `honuware/0.4.0` from a registry; the recipe maps version → source. That's the graduation step once the API stabilizes.
+		- **Local-recipes-index (P4) — the hybrid.** Conan reads recipes from a git repo and builds from the tag each recipe references; "Conan from git," but versioned by recipe rather than raw SHA.
+		- So the plan is: CMake-fetches-git-by-SHA now (P1), Conan-fetches-by-version later. OK to mark decided?
 4. **Granularity:** I recommend Option C (one repo/version, six CMake targets). OK, or do you prefer a single monolithic target (simpler) / fully separate packages (Option B)?
 	- Mason- I'll go with your recommendation.
 5. **License** for the public repo: Apache-2.0 (my suggestion) or MIT?
 	- Mason- Can you list the advantages of each?
+	- Claude- Both are permissive: anyone (including you) can use the code in closed-source commercial products, and neither imposes obligations beyond keeping the attribution notice. The differences:
+		- **MIT advantages:** ~170 words and instantly understood by everyone; the most common license on GitHub, so zero friction for contributors and for employers skimming the repo; no patent language to reason about; nobody ever has to think about compliance beyond "keep the notice".
+		- **Apache-2.0 advantages:** an explicit **patent grant** — every contributor automatically licenses any patents covering their contribution, so users of honuware can't later be patent-sued by a contributor; a **patent-retaliation clause** (sue the project over patents → lose your license) that deters trolling; **§5 makes every contribution automatically licensed under the project license** — a built-in lightweight CLA, which genuinely matters once several friends are submitting PRs; an explicit **trademark carve-out** (the "honuware" name isn't licensed with the code — relevant if it becomes a product); and it's the license enterprise legal reviews are most comfortable depending on. Costs: much longer text, plus minor NOTICE-file/"state your changes" housekeeping.
+		- My recommendation stays **Apache-2.0** for this repo specifically: multiple outside contributors from day one (§5 earns its keep) and you've flagged possible productization (patent + trademark clauses earn theirs). MIT is the right choice if maximum simplicity outweighs those. Pick one and I'll fold it in.
 6. **Timing vs multi-tenancy:** Phases 1–2 here overlap heavily with the tenant plan's "de-singleton" prep and make it easier. Do components come first, tenancy first, or interleaved (my suggestion: Phases 1–2 now, then tenancy, then extraction — tenancy lands *inside* the platform component)?
 	- Mason- I haven't deployed the site yet. I was waiting to finish a few features and do multi tenant but I have friends wanting to work on a site now that uses my components. If I do the switch to multi tenant after doing this componentization but before deploying, will it be that hard?
+	- Claude- No — and pre-deploy is actually the *cheapest possible* window for tenancy. What makes late tenancy conversions painful in general is production data: migrating a live single-tenant database, backfilling, cutting over users. You'll have none of that, so tenancy stays pure code + provisioning work no matter when it lands relative to this project.
+		- Componentization does most of tenancy's prep for free: parameterized database name (1.2), secrets defaults via registration (1.3), the generalized `EndpointAuthHelper` (1.6), and the no-global-singletons audit (3.2). The tenant plan's `TenantContext`/`TenantResources` design drops into exactly those seams.
+		- The one real (and modest) cost of doing tenancy *after* extraction: tenancy touches honuware surfaces — `EndpointAuthHelper` grows tenant resolution, provider factories move behind the per-tenant registry, the scheduler's `ApiClient` gains the site header, and `business_logic/tenancy/` is born inside the platform component. Expect a few weeks of editing both repos together and a handful of honuware version bumps. The `FETCHCONTENT_SOURCE_DIR` override makes both repos build as one during that stretch, so day-to-day it feels like working in a single repo.
+		- Net: the tenancy project stays the same size it was going to be, plus a little cross-repo ceremony, and your friends aren't blocked waiting for it. I've updated the plan's sequencing to **componentize (Phases 1–3) → extract (4–5) → multi-tenant conversion → first deploy**. Confirm this ordering and I'll mark Q6 decided.
 7. **Frontend sharing:** in scope eventually? (Shared Angular admin CRUD UI, auth pages, header/footer as an npm package.) I've kept it out of this plan; confirm or ask me to add a frontend track.
 	- Mason- I can see sharing some frontend components later but I think that we can tackle that as a separate job. I still need to figure that out for the multi tenant thing eventually.
 8. **Quick accounts:** framework feature (with the gift-permission hook) or app-specific? I leaned framework-with-hook; fine either way.
 	- Mason- I like putting this into the framework. The quick accounts kick ass and will be useful in all sites.
-9. **`util/square`:** stay app-side for now (my suggestion) or extract as a `<ns>_square` component immediately?
+9. **`util/square`:** stay app-side for now (my suggestion) or extract as a `honuware_square` component immediately?
 	- Mason- I'd like to extract this as a component now. I can see many sites wanting to take payment.
 10. **Windows CI** for the component repo: worth a Windows MSVC job from day one (you develop on Windows), or Linux-only CI with Windows verified manually?
 	- Mason- I think we can verify Windows manually.
