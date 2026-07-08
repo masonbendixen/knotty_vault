@@ -303,8 +303,11 @@ Please add answers inline; I'll fold them into the plan and adjust phases.
 9. **`util/square`:** stay app-side for now (my suggestion) or extract as a `<ns>_square` component immediately?
 	- Mason- I'd like to extract this as a component now. I can see many sites wanting to take payment.
 10. **Windows CI** for the component repo: worth a Windows MSVC job from day one (you develop on Windows), or Linux-only CI with Windows verified manually?
+	- Mason- I think we can verify Windows manually.
 11. **Git history:** fresh component repo with an "extracted from" note (my suggestion), or `git filter-repo` to preserve per-file history?
+	- Mason- I'll go with your recommendation.
 12. **Who owns `admin_alerts` + the digest stored procedure?** I classified them framework (any site wants ops alerts). Confirm.
+	- Mason- Yes, I think that should be framework.
 
 # Sources
 
