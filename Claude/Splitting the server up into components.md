@@ -285,11 +285,17 @@ Phases 1–4 happen **entirely inside the knottyyoga repo** — no new repos, no
 Please add answers inline; I'll fold them into the plan and adjust phases.
 
 1. **Component name/namespace?** Needs to be brand-neutral: repo name, CMake target prefix (`<ns>_platform`), env-var prefix. Ideas to react to: `crowbase`, `croft`, `stonework`, `keystone`, `loom` — or pick your own. (Also: is this maybe a product someday, which would argue for a more distinctive name and Apache-2.0?)
+	- Mason- let's go with honuware
 2. **Repo hosting:** I recommend R2 (components public on GitHub, app stays private on GitLab). Confirm? And: will the friends work only on the components, or also on the new sites / the yoga app itself? (If the latter, R3 — everything on GitHub — gets stronger.)
+	- Mason- The components and new sites will be on Github. I kind of like the app staying on Gitlab and keeping that private. I don't see any of them working on the app in general.
 3. **Packaging:** I recommend P1 (FetchContent, SHA-pinned) first, graduating to a Conan registry later (GitLab's Conan 2 registry is Beta as of 18.10; Cloudsmith/Artifactory or local-recipes-index are the GitHub-side options). OK, or do you want real Conan packages from day one?
+	- Mason- So CMake or Conan would fetch things from git by SHA?
 4. **Granularity:** I recommend Option C (one repo/version, six CMake targets). OK, or do you prefer a single monolithic target (simpler) / fully separate packages (Option B)?
+	- Mason- I'll go with your recommendation.
 5. **License** for the public repo: Apache-2.0 (my suggestion) or MIT?
+	- Mason- Can you list the advantages of each?
 6. **Timing vs multi-tenancy:** Phases 1–2 here overlap heavily with the tenant plan's "de-singleton" prep and make it easier. Do components come first, tenancy first, or interleaved (my suggestion: Phases 1–2 now, then tenancy, then extraction — tenancy lands *inside* the platform component)?
+	- Mason- I haven't deployed the site yet. I was waiting to finish a few features and do multi ten
 7. **Frontend sharing:** in scope eventually? (Shared Angular admin CRUD UI, auth pages, header/footer as an npm package.) I've kept it out of this plan; confirm or ask me to add a frontend track.
 8. **Quick accounts:** framework feature (with the gift-permission hook) or app-specific? I leaned framework-with-hook; fine either way.
 9. **`util/square`:** stay app-side for now (my suggestion) or extract as a `<ns>_square` component immediately?
