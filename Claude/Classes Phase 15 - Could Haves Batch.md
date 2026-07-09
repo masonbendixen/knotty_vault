@@ -389,10 +389,60 @@ Prereqs: reset + seed the DB with `knottyyoga_database_helper`, start the server
 
 **Goal:** Surface the audit trail of who got which skill, who assigned it, who revoked it.
 
-- [ ] Business logic: extend `SkillLevelHelper::GetPersonSkills` to include the revocation history (rows where `removed_us IS NOT NULL`).
-- [ ] Endpoint: extend `GET /api/admin/person/<id>/skills?include_history=true`.
-- [ ] Frontend: in the staff portal person-skills page (Phase 3), add a collapsible "History" section listing revoked + reassigned entries with timestamps + actor.
-- [ ] Tests.
+**Status: IMPLEMENTED (2026-07-09).** The audit trail already existed at the data layer from Phase 3 — every grant is a `skill_level_assignments` row and revocation is a soft stamp (`removed_us`/`removed_by_person_id`/`removed_reason`), and the table helper already exposed `GetAllAssignmentsForPerson` (active **and** revoked, newest first). SL-9 is the read/endpoint/UI surface over that history. No schema or table-helper change was needed.
+
+- [x] Business logic: added `SkillLevelHelper::GetPersonSkillHistory(tx, personId)` returning the full audit trail (active + soft-revoked rows, newest first) as a new `PersonSkillHistoryEntry` struct. **Correction to the original plan:** rather than *mutating* `GetPersonSkills` (active-only, consumed by the default staff view and the class-access gate), history is a **separate method + struct** — the audit entry carries fields that don't belong on the active-grant struct (`is_active`, `assigned_by_person_id/name`, `removed_us`, `removed_by_person_id/name`, `removed_reason`). It reads the existing `GetAllAssignmentsForPerson` and resolves each assigner/revoker id to a display name via `TableHelpers::People`, cached per call so a coach who touched many rows is looked up once. Rows whose skill level was deleted are omitted (same as `GetPersonSkills`). *(`business_logic/skills/skill_level_helper.{h,cpp}`.)*
+- [x] KVT converter: `PersonSkillHistoryEntryToKeyValueTable` + array form in `business_logic/skills/skill_key_value_table.{h,cpp}` (the domain→KVT layer, per the layering rule — no `ToJson` in the endpoint).
+- [x] Endpoint: extended the **existing** `GET /api/staff/person/<id>/skills` with an optional `?include_history=true`. **Correction to the original plan:** the plan wrote `/api/admin/person/<id>/skills`, but the real Phase 3 endpoint is the staff one (permission gate `manage_skills`, held by the **admin** and **Studio Manager** roles) and the frontend is the staff page — so history rides the same route/gate rather than a new `/api/admin/...` surface. Without the flag the response is unchanged (`{ items }`, active only). With it, the response adds a `history` array alongside `items`. *(`endpoints/staff_get_person_skills.{h,cpp}`.)*
+- [x] Frontend: added a collapsible **"History"** section to the staff `person-skills` page. It is **lazy-loaded on first expand** (a dedicated `getPersonSkillHistory()` call, so the default page load is unchanged) and **auto-refreshes after an assign/revoke while open**. Each row shows the skill, a **Active/Revoked** status badge, the Assigned date + "by {assigner}" + note, and (for revoked rows) the Revoked date + "by {revoker}" + reason. Types + `ServerAccess` interface/network/proxy/mock all updated (mock retains a real audit trail across assign/revoke). *(`pages/staff/person-skills/*`, `shared/types/skill.types.ts`, `shared/services/network/*`.)*
+- [x] Tests at all layers. **Backend:** `skill_level_helper_test.cpp` (history includes revoked with actor names; reassign shows as two rows; empty when none), `skill_key_value_table_test.cpp` (active + revoked entry conversion, array, empty), `staff_get_person_skills_test.cpp` (history omitted by default; `include_history=true` returns active + revoked with resolved actor/reason). **Frontend (run green, 2026-07-09):** `person-skills.component.spec.ts` (collapsed by default, toggle loads + renders badges, no-reload-on-recollapse, empty/error states, person-switch resets, revoke-refreshes-while-open — 20/20) and `ServerAccess.mock.spec.ts` (seeded history, id validation, assign-then-revoke soft-stamp — 532/532).
+
+### 6.1 Live-server web walkthrough (from a blank database)
+
+A click-by-click run against a real running server + Angular app using only seed accounts. It exercises the SL-9 audit trail: a skill is **assigned**, then **revoked**, then **re-assigned**, and the **History** section shows every step with who/when/why. Everything is done from web pages — no test helper needed (the fresh DB seeds **no** skill catalog, so Part 1 creates one; assign/revoke are the Phase 3 web flows).
+
+**Prerequisites**
+- Reset the DB from scratch with `knottyyoga_database_helper`, start the C++ server (Windows: port 18080), and start the Angular app (`npx ng serve` from `...\knottyyoga\ui`, then open http://localhost:4200). Dev `ng serve` uses the real backend via the Angular proxy. (No Square needed — assigning skills is not a payment flow.)
+
+**Seed accounts used** (all pre-verified):
+
+| Role in test | Email | Password |
+|---|---|---|
+| Admin operator (has `manage_skills` via the admin role) | `masonbendixen@gmail.com` | `pass` |
+| Member whose skill history we build | `kiteagle@gmail.com` (Kit Williams) | `kit` |
+
+**Part 1 — Create a skill (the catalog is empty on a fresh DB)**
+1. Log in as the **admin operator** (`masonbendixen@gmail.com` / `pass`) at **`/login`**.
+2. Go to the Skills admin page at route **`/manage/skills`** (type the URL — the Manage dashboard has no Skills card; the page title reads **"Skills"** with a *"No skills yet. Add one to get started."* empty state).
+3. Click **"Add skill"**. In the **"Add a skill"** panel fill: **Code** = `handstand_l1`, **Name** = `Wall Handstand`, **Description** = `Can hold a wall handstand for 10 seconds`, leave **Sort order** = `0`, keep the **Active** toggle **ON**. Click **"Create"**. The list now shows **Wall Handstand** with an **Active** chip.
+
+**Part 2 — Open the member's skills in the Staff portal**
+4. In the top navigation click **Staff** (visible because the admin has staff access) → the **Staff** portal (`/staff`).
+5. Click the **"Person Skills"** card (→ `/staff/person-skills`, subtitle *"Assign and revoke client skill levels"*).
+6. In **"Search for a person"** type `Kit` (or `kiteagle`), then click the **Kit Williams** result. The card opens showing **"This person has no skills assigned yet."**
+
+**Part 3 — Assign, then revoke, then re-assign**
+7. Click **"Assign new skill"**. In the **"Assign a skill"** dialog pick **Skill** = **Wall Handstand**, **Note (optional)** = `Demonstrated cleanly in class`, click **"Assign"**. The active-skills table now lists **Wall Handstand** with its assigned date and note, plus a **Revoke** button.
+8. Click **"Revoke"** on that row. In the **"Revoke skill"** dialog set **Reason (optional)** = `Re-evaluate next term`, click **"Revoke"**. The active table returns to the empty state (the grant is soft-revoked, not deleted).
+9. Click **"Assign new skill"** again, pick **Wall Handstand**, **Note** = `Re-earned after assessment`, **"Assign"**. Wall Handstand is active again — this creates a *second* grant row, so history will show two rows for the same skill.
+
+**Part 4 — Read the history**
+10. Click **"Show history"** (below the active-skills table). The **History** table appears with **two rows** for Wall Handstand:
+    - The **current** grant — **Active** green badge; **Assigned** = today "by Mason …" with the note *"Re-earned after assessment"*; **Revoked** column shows **—**.
+    - The **earlier** grant — **Revoked** red badge; **Assigned** = today "by Mason …" with *"Demonstrated cleanly in class"*; **Revoked** = today "by Mason …" with the reason *"Re-evaluate next term"*.
+    Newest is on top. This is the SL-9 audit trail: who got the skill, who assigned it, who revoked it, and why.
+11. Click **"Hide history"** to collapse, **"Show history"** to re-expand — it does not re-fetch (cached). Now **Revoke** the active grant again: the panel **auto-refreshes** and the formerly-active row flips to a **Revoked** badge with the new reason.
+
+**Variant — empty history.** Search a different seed member who has never been granted a skill (e.g. `mr.calebault@gmail.com`, Caleb), select them, and click **"Show history"** → the section reads **"No skill history for this person yet."**
+
+**Notes / gotchas**
+- The **Person Skills** page (and its History) is gated by `manage_skills`, held by the **admin** and **Studio Manager** roles; the seed admin operator has it. A member without it is bounced.
+- History is only fetched when you expand the section (one call to `/api/staff/person/<id>/skills?include_history=true`), so the default page load is exactly the Phase 3 behavior.
+- Actor names are resolved server-side; if an assigner/revoker account was later deleted the cell reads **"Unknown"** rather than an id.
+
+### 6.2 Test-helper option (optional)
+
+There is no bespoke skill-history helper command — every step above is a real web page. If you want to seed grants/revocations straight in the DB instead of clicking, the existing Phase 3 web flows (assign/revoke) are the supported path; the helper's generic table tools can inspect `skill_level_assignments` rows (`removed_us IS NOT NULL` marks a revoked row) if you need to verify the raw audit data.
 
 ## 7. Tests-Required Summary
 
