@@ -231,7 +231,7 @@ Phases are ordered lowest-layer-first. Within each phase, subsections are number
 Goal: a queryable source of truth that maps a CloudFront site key to a tenant + its database name, plus an in-memory resolver. No request path touches this yet. **Lands in:** honuware `platform` (framework db_schema / table_helpers / business_logic).
 
 ### 1.1 Control-database schema (`db_schema` layer)
-- [ ] Add `db_schema/tenants.{h,cpp}` defining the `tenants` table with `BIGSERIAL id` PK and columns: `site_key` (UNIQUE, the value CloudFront sends in `X-Knotty-Site`), `database_name` (UNIQUE), `display_name`, `status` (e.g. `active`/`suspended`, default `active`), `created_us`, `updated_us`. Follow the column-constant + `MakeTenantsTable(DatabaseInfo)` pattern used by `classes.cpp`.
+- [ ] Add `db_schema/tenants.{h,cpp}` defining the `tenants` table with `BIGSERIAL id` PK and columns: `site_key` (UNIQUE, the value CloudFront sends in `X-Honuware-Site`), `database_name` (UNIQUE), `display_name`, `status` (e.g. `active`/`suspended`, default `active`), `max_connections` (default 1 — the per-tenant pool size knob from Open Question 4), `created_us`, `updated_us`. Follow the column-constant + `MakeTenantsTable(DatabaseInfo)` pattern used by `classes.cpp`.
 - [ ] Decide the control DB's schema assembly: a dedicated, minimal `MakeControlDatabaseInfo()` (it needs only `tenants`, and optionally `schema_migrations` for its own evolution) rather than reusing the full `MakeDatabaseInfo()`.
 - [ ] Add both files to `db_schema/CMakeLists.txt`.
 
@@ -246,22 +246,22 @@ Goal: a queryable source of truth that maps a CloudFront site key to a tenant + 
 
 ### 1.4 Tenant resolver (business-logic layer, no request coupling yet)
 - [ ] Add `business_logic/tenancy/tenant_context.h` — a small immutable `TenantContext { int64_t tenantId; std::string siteKey; std::string databaseName; std::string displayName; }`.
-- [ ] Add `business_logic/tenancy/tenant_resolver.{h,cpp}` — `TenantResolver` holding the control `TransactionProvider`; `Resolve(siteKey) → optional<TenantContext>` backed by an in-memory cache (map + mutex) with explicit `Invalidate(siteKey)` / `InvalidateAll()` for onboarding/suspension. Start with cache-on-read; no TTL needed if invalidation is wired into provisioning (Phase 5).
-- [ ] `tenant_resolver_test.cpp`: resolves a seeded tenant, caches (second lookup doesn't re-query — inject a counting provider), unknown key returns empty, `Invalidate` forces a re-query, suspended tenant is not resolved (or resolved with status so the edge can 403). Wire into a new `business_logic/tenancy/CMakeLists.txt`.
+- [ ] Add `business_logic/tenancy/tenant_resolver.{h,cpp}` — a small `TenantResolver` interface with two implementations (§1.8.1): `ControlDbTenantResolver` holding the control `TransactionProvider`, with `Resolve(siteKey) → optional<TenantContext>` backed by an in-memory cache (map + mutex) and explicit `Invalidate(siteKey)` / `InvalidateAll()` for onboarding/suspension; and `FixedTenantResolver` returning one configured `TenantContext` (single-tenant consumers + local dev — no control DB required). Start with cache-on-read; no TTL needed if invalidation is wired into provisioning (Phase 5).
+- [ ] `tenant_resolver_test.cpp`: resolves a seeded tenant, caches (second lookup doesn't re-query — inject a counting provider), unknown key returns empty, `Invalidate` forces a re-query, suspended tenant is not resolved (or resolved with status so the edge can 403); `FixedTenantResolver` returns its context with and without a site key. Wire into a new `business_logic/tenancy/CMakeLists.txt`.
 
 ## Phase 2 — Per-tenant connection & transaction routing (database-access layer)
 
-Goal: turn "one connection baked at startup" into "a lazily-built, cached per-tenant `TransactionProvider`," behind an interface that hides Model C vs B.
+Goal: turn "one connection baked at startup" into "a lazily-built, cached per-tenant `TransactionProvider`," behind an interface that hides Model C vs B. **Lands in:** honuware `data` + `platform`.
 
 ### 2.1 Tenant resource registry (database-access + DI layer)
-- [ ] Add `business_logic/tenancy/tenant_resources.{h,cpp}` — `TenantResources` owns the per-tenant `{DatabaseHelper, TransactionProviderPtr}` (helpers from Phase 4 are added to this struct later). Add `TenantResourceRegistry` with `GetOrCreate(const TenantContext&) → shared_ptr<TenantResources>` (map keyed by tenantId, mutex-guarded, lazy). Document the connection-count guardrail (one connection per active tenant; revisit with PgBouncer beyond ~50 tenants — Open Question 4).
-- [ ] `tenant_resources_test.cpp`: `GetOrCreate` builds once and caches (same pointer on second call), distinct tenants get distinct providers. Use the test transaction-provider seam so no real second DB is needed.
+- [ ] Add `business_logic/tenancy/tenant_resources.{h,cpp}` — `TenantResources` owns the per-tenant `{DatabaseHelper, TransactionProviderPtr}` (helpers from Phase 4 are added to this struct later). Add `TenantResourceRegistry` with `GetOrCreate(const TenantContext&) → shared_ptr<TenantResources>` (map keyed by tenantId, mutex-guarded, lazy). The registry is constructed with an **app-supplied factory** (`std::function<std::shared_ptr<TenantResources>(const TenantContext&)>`, defaulting to the framework type) so the app can return a derived type carrying app services — knottyyoga's adds the per-tenant `SquareClient` (§1.8.3 #1); the framework never references Square. Document the connection-count guardrail (default one connection per active tenant; revisit with PgBouncer beyond ~50 tenants — Open Question 4).
+- [ ] `tenant_resources_test.cpp`: `GetOrCreate` builds once and caches (same pointer on second call), distinct tenants get distinct providers, a registry given a custom factory yields the derived type. Use the test transaction-provider seam so no real second DB is needed.
 
 ### 2.2 Pluggable isolation mechanism (the ONLY place Model C vs B differs)
 - [ ] Define how a tenant's `TransactionProvider` acquires its connection:
-  - **Model C (recommended):** `MakeProductionTransactionProvider(MakeProductionDatabaseHelper(tenant.databaseName))` — a distinct connection per database. No SQL-layer change.
+  - **Model C (recommended):** `MakeProductionTransactionProvider(MakeProductionDatabaseHelper(tenant.databaseName))` — a distinct connection per database. No SQL-layer change. Per Open Question 4, implement the provider as a **bounded lazy connection pool defaulting to max 1 connection per tenant** (acquire/release over a free-list; a pool of 1 is exactly today's mutex-plus-connection shape, so launch behavior is unchanged). Per-tenant override via a `max_connections` column on the control `tenants` row; log a process-wide warning as aggregate connections approach the instance ceiling; record an acquire-wait metric so raising a tenant's limit is a data-driven config change.
   - **Model B (fallback):** a `TransactionProvider` wrapper that issues `SET search_path = <schema>` (via `SET LOCAL search_path`) as the first statement of every transaction on a shared connection. Implement as a thin decorator around the existing provider so it's swappable.
-- [ ] Keep this behind a single factory function (`MakeTenantTransactionProvider(TenantContext)`) so switching models is a one-file change. Add a test asserting the factory yields a provider bound to the expected database name (Model C) / sets search_path (Model B) — use the existing transaction-provider test seams.
+- [ ] Keep this behind a single factory function (`MakeTenantTransactionProvider(TenantContext)`) so switching models is a one-file change. Add a test asserting the factory yields a provider bound to the expected database name (Model C) / sets search_path (Model B) — use the existing transaction-provider test seams. Pool tests: a pool of 1 preserves current serialization semantics; two concurrent transactions on a pool of 2 don't block each other; the acquire-wait metric records contention.
 
 ### 2.3 Wire the registry into `WebApp`
 - [ ] `WebApp` gains a `TenantResolver` + `TenantResourceRegistry` (constructed in `main.cpp` from the control DB) **in addition to** the existing globals for now (don't rip out the single-tenant path yet — keep tests green; the legacy global provider becomes the fallback used only by tenant-agnostic endpoints like health).
@@ -270,15 +270,15 @@ Goal: turn "one connection baked at startup" into "a lazily-built, cached per-te
 
 ## Phase 3 — Request-edge tenant resolution (endpoints / auth layer)
 
-Goal: every request resolves its tenant before touching the DB, and endpoints transparently use the tenant's provider. This is the layer where the multiplexing actually happens.
+Goal: every request resolves its tenant before touching the DB, and endpoints transparently use the tenant's provider. This is the layer where the multiplexing actually happens. **Lands in:** honuware `platform` (web core) + `testing` (EndpointTestHelper).
 
 ### 3.1 Read the site header
-- [ ] Decide the header name: `X-Knotty-Site` (documented constant in one header). Read it via `req.get_header_value(...)` — same mechanism as `cloudfront_origin_guard.cpp`.
-- [ ] Add a dev/local escape hatch: when the header is absent and a `KNOTTYYOGA_DEV_SITE_KEY` env var is set (or a single-tenant fallback flag), resolve to that tenant — so local `ng serve` + a single dev DB keeps working without CloudFront. (Mirrors the existing `KNOTTYYOGA_DEV_CORS_ORIGIN` dev-only pattern.)
+- [ ] Header name (decided, Q2): **`X-Honuware-Site`** (documented constant in one header). Read it via `req.get_header_value(...)` — same mechanism as `cloudfront_origin_guard.cpp`.
+- [ ] Single-tenant / dev path: the composition root selects `FixedTenantResolver` (§1.8.1), configured via `HONUWARE_FIXED_SITE_KEY` (+ the existing database-name config) — so local `ng serve` + a single dev DB keeps working without CloudFront, and single-tenant honuware consumers run the exact same way in production with no control DB. If a request carries a site header that contradicts the fixed tenant, reject it (400) rather than silently serving the fixed tenant.
 
 ### 3.2 Resolve tenant in `EndpointAuthHelper` before session init
 - [ ] In `EndpointAuthHelper::Initialize()` (`endpoints/endpoint_auth_helper.cpp`): (1) read the site header; (2) `TenantResolver::Resolve`; (3) on miss → record the failure and surface a clean error (see 3.3); (4) `TenantResourceRegistry::GetOrCreate`; (5) store the resolved `TenantContext` + `shared_ptr<TenantResources>` on the helper; (6) initialize the session against the **tenant** provider.
-- [ ] Add `EndpointAuthHelper::GetTransactionProvider()` to return the **tenant** provider (today it delegates to `WebApp`). Add `GetTenantContext()`, and tenant-scoped `GetSecretsHelper()/GetSquareClient()/GetMailHelper()` accessors (these return the tenant resources; Phase 4 fills them in — until then they can delegate to the global helper so the build stays green).
+- [ ] Add `EndpointAuthHelper::GetTransactionProvider()` to return the **tenant** provider (today it delegates to `WebApp`). Add `GetTenantContext()`, and tenant-scoped `GetSecretsHelper()`/`GetMailHelper()` accessors on the framework façade (these return the tenant resources; Phase 4 fills them in — until then they can delegate to the global helper so the build stays green). `GetSquareClient()` lives on the **app-derived** helper over `KnottyTenantResources` (§1.8.3 #1), matching the component plan's Phase 1.6 façade split.
 
 ### 3.3 Tenant-resolution failure handling
 - [ ] Define behavior for missing/unknown/suspended tenant on a normal `/api/*` request: respond `400`/`421 Misdirected Request` with a JSON error (`{"error":"unknown_site"}`), rate-limit the log like the origin guard does. Never fall through to a default tenant in prod (that would cross-serve data).
@@ -286,19 +286,20 @@ Goal: every request resolves its tenant before touching the DB, and endpoints tr
 
 ### 3.4 Migrate endpoints + test harness to the tenant provider
 - [ ] Mechanically replace `webApp.GetTransactionProvider()` / `app_.GetTransactionProvider()` usage in endpoint and business-logic call sites with `endpointAuthHelper.GetTransactionProvider()` (the tenant one). This is the broadest-but-shallowest change; do it endpoint-by-endpoint. Most endpoints already go through `EndpointAuthHelper`, so the edit is localized.
-- [ ] Update `endpoints/endpoint_test_helper.{h,cpp}` so tests construct a `TenantResolver`/registry pointing at the existing single test database under a known dev site key, and inject the `X-Knotty-Site` header (or use the dev fallback). **Goal: existing endpoint tests pass with minimal per-test edits** — ideally the test helper defaults a tenant so current tests need zero changes. Add a focused test proving two different site keys route to two different providers (can use the same physical test DB twice under two control rows to validate routing without a second schema).
-- [ ] Add edge tests: missing header → error; unknown site → error; suspended → error; health works headerless.
+- [ ] Update `endpoint_test_helper.{h,cpp}` (which moves into `honuware_testing` at component Phase 2.6) so tests construct a `TenantResolver`/registry pointing at the existing single test database under a known test site key, and inject the `X-Honuware-Site` header (or use the fixed resolver). **Goal: existing endpoint tests pass with minimal per-test edits** — ideally the test helper defaults a tenant so current tests need zero changes. Add a focused test proving two different site keys route to two different providers (two control rows over the same physical test DB — the Open Question 5 default).
+- [ ] Physical-isolation smoke suite (Open Question 5): `GlobalDatabaseTestSupport` additionally creates a second real database (`test_honuware_tenant_b`) once per run — same create-once pattern the test-speed work established. Keep it to a handful of tests proving what two-rows-same-DB structurally can't: a row written via tenant A's provider is invisible via tenant B's (through the generic CRUD path), PK sequences advance independently, and per-DB `config_secrets` values are independent.
+- [ ] Add edge tests: missing header → error; unknown site → error; suspended → error; health works headerless; fixed-resolver mode rejects a contradicting header.
 
 ## Phase 4 — Per-tenant services (secrets, payments, mail, site config)
 
-Goal: the helpers that currently bake a single tenant's identity become per-tenant, sourced from the tenant DB and cached in `TenantResources`. Each subsection is lower-layer (util) before higher-layer (business-logic email bodies).
+Goal: the helpers that currently bake a single tenant's identity become per-tenant, sourced from the tenant DB and cached in `TenantResources`. Each subsection is lower-layer (util) before higher-layer (business-logic email bodies). **Lands in:** honuware `services`/`platform`, except Square wiring (app, 4.2) and the app-side mail builders (4.5).
 
 ### 4.1 Per-tenant `SecretsHelper`
 - [ ] Build the tenant's `SecretsHelper` from its own `DatabaseHelper` inside `TenantResources` (lazy). Keep the global at-rest `KNOTTYYOGA_SECRET_KEY` master key (it decrypts each tenant's `config_secrets.value`). Confirm `SecretsHelper` needs no interface change — only a different `DatabaseHelper`.
-- [ ] Tests: a `SecretsHelper` built against tenant-A resources reads tenant-A values; ensure no cross-tenant bleed (two control rows → two helpers → distinct values). Reuse the test DB with two seeded secret sets if a second DB is impractical (Open Question 5).
+- [ ] Tests: a `SecretsHelper` built against tenant-A resources reads tenant-A values; ensure no cross-tenant bleed. Per Open Question 5, the cross-tenant-bleed case uses the second physical test DB from Phase 3.4's isolation suite (two helpers → two databases → distinct values).
 
 ### 4.2 Per-tenant `SquareClient`
-- [ ] Move Square client construction out of `main.cpp` startup into `TenantResources` (lazy): read `square_access_token` + `square_environment` from the **tenant** secrets; build the client (sandbox/prod per tenant). Payment endpoints/business logic obtain the client via `endpointAuthHelper.GetSquareClient()`.
+- [ ] Move Square client construction out of `main.cpp` startup into the **app-derived `KnottyTenantResources`** (lazy; §1.8.3 #1 — the framework `TenantResources` knows nothing of Square): read `square_access_token` + `square_environment` from the **tenant** secrets; build the client (sandbox/prod per tenant) from the `honuware_square` component. Payment endpoints/business logic obtain the client via the app-derived helper's `GetSquareClient()`.
 - [ ] Tests: tenant on sandbox vs tenant on prod yield correctly-configured clients; payment business-logic tests inject a test Square client per tenant (existing `MakeTestSquareClient` seam).
 
 ### 4.3 Per-tenant `MailHelper`
@@ -311,42 +312,43 @@ Goal: the helpers that currently bake a single tenant's identity become per-tena
 - [ ] Tests: cookie `Domain`/`Secure` derive from the tenant's website address (extend the existing `SessionTest.InitializeFromLoginProdMode…` test to assert per-tenant domain); CORS accepts the tenant origin and rejects others.
 
 ### 4.5 Parameterize email templates by tenant branding
-- [ ] Introduce a `TenantBranding { studioName; senderName; senderAddress; websiteUrl; }` assembled from tenant secrets, threaded into each mail-body builder. Replace hardcoded `"Knotty Yoga"` / `"Knotty Yoga and Spa"` literals in the ~15 `*_mail.cpp` builders with `FormatString` placeholders (per the project's template-constant convention; keep `NormalizeCrLf`).
+- [ ] Introduce a `TenantBranding { studioName; senderName; senderAddress; websiteUrl; }` assembled from tenant secrets. **Framework** mail builders (e.g. `person_verify_mail.cpp`) are already parameterized by the time this phase runs — that slice was pulled forward into the componentization work as an extraction prerequisite (§1.8.3 #4). This phase covers the **app-side** builders: replace hardcoded `"Knotty Yoga"` / `"Knotty Yoga and Spa"` literals in the payment/scheduling `*_mail.cpp` builders with `FormatString` placeholders (per the project's template-constant convention; keep `NormalizeCrLf`), and thread the per-tenant `TenantBranding` into all builders, framework and app alike.
 - [ ] Tests: each mail builder with an existing `*_test.cpp` gets a case asserting the branding placeholder is substituted (studio name appears, no hardcoded literal). Enumerate the mail builders and check off one-by-one so none is missed.
 
 ## Phase 5 — Provisioning & migrations (database_helper / ops)
 
-Goal: stand up and evolve tenant databases repeatably.
+Goal: stand up and evolve tenant databases repeatably. **Lands in:** framework provisioning/migration functions in honuware; the CLI + composed framework-and-app `DatabaseInfo`/migration lists stay in the app's `database_helper` (§1.8.3 #3).
 
 ### 5.1 `--create-tenant` command
-- [ ] Add a `knottyyoga_database_helper --create-tenant --site-key=<k> --db-name=<n> --display-name=<…>` mode: create the tenant database, run `CreateAndPopulateDatabases()` against it, provision the scheduler service account (`EnsureSchedulerServiceAccount`), then insert the `tenants` row in the control DB and `Invalidate` the resolver cache. Guard destructive re-create with the existing `KNOTTYYOGA_ALLOW_DESTRUCTIVE` gate.
+- [ ] Framework function `ProvisionTenant(controlProvider, TenantSpec, const DatabaseInfo&)` in honuware; the app's `knottyyoga_database_helper --create-tenant --site-key=<k> --db-name=<n> --display-name=<…>` mode passes the **composed** framework+app `DatabaseInfo` down (component Phase 2.3 split): create the tenant database, run the create/populate path against it, provision the scheduler service account (`EnsureSchedulerServiceAccount`), then insert the `tenants` row in the control DB and `Invalidate` the resolver cache. Guard destructive re-create with the existing destructive gate (`HONUWARE_ALLOW_DESTRUCTIVE` after the component rename).
 - [ ] A companion `--seed-tenant-secrets --site-key=<k> --file=secrets.json` step (or reuse the existing secret-seeding workflow) to set that tenant's Square/mail/website secrets. Document the order: create-tenant → seed-secrets → tenant live.
 - [ ] Tests for the control-row insert + idempotency (re-running create-tenant for an existing site key is a clean no-op or explicit error, not a duplicate).
 
 ### 5.2 Per-tenant migration loop
-- [ ] Extend `--migrate` to iterate every active tenant from the control DB and run `MigrationRunner::ApplyPending(BuildAllMigrations())` against **each** tenant database (plus the control DB's own migration list). Per-tenant transaction semantics already hold (each migration in its own txn). Log per-tenant progress; on a tenant failure, record it and continue or abort per Open Question 6.
+- [ ] Extend `--migrate` to iterate every active tenant from the control DB and run `MigrationRunner::ApplyPending(...)` against **each** tenant database (plus the control DB's own migration list). The migration list is **composed**: framework migrations (shipped with honuware) then app migrations, tracked under separate id namespaces in `schema_migrations` (§1.8.3 #3) so honuware upgrades and app changes can't collide. Per-tenant transaction semantics already hold (each migration in its own txn). Log per-tenant progress; **abort on first failure** (decided, Q6) — re-runs skip already-migrated tenants.
 - [ ] Tests: a fixture migration list applies to N tenant DBs (or N control rows over the test DB) and is idempotent on re-run; a failing migration in one tenant is reported without silently skipping the rest unrecorded.
 
 ### 5.3 Onboarding runbook
-- [ ] Document the end-to-end onboard: create DB + populate → seed secrets → create CloudFront distribution + S3 bundle + ACM cert + DNS → set the distribution's `X-Knotty-Site` (and shared `X-Origin-Secret`) origin headers → smoke-test `/api/health` then a tenant request. (Cross-references Phase 8 and `Deploying to AWS.md`.)
+- [ ] Document the end-to-end onboard: create DB + populate → seed secrets → create CloudFront distribution + S3 bundle + ACM cert + DNS → set the distribution's `X-Honuware-Site` (and shared `X-Origin-Secret`) origin headers → smoke-test `/api/health` then a tenant request. (Cross-references Phase 8 and `Deploying to AWS.md`.)
 
 ## Phase 6 — Scheduler multi-tenant
 
-Goal: background jobs run for every tenant, not just one.
+Goal: background jobs run for every tenant, not just one. **The engine stays tenancy-agnostic** (`honuware_scheduler`, foundation-only — §1.8.3 #2); tenancy lives in the app-side job catalog.
 
-### 6.1 Tenant iteration
-- [ ] `knottyyoga_helper` reads the active-tenant list from the control DB (or a config file mirroring it) at startup and on a refresh interval.
+### 6.1 Tenant-aware job list (app-side `scheduler/main.cpp`)
+- [ ] `ScheduledJob` (the engine struct) grows per-job request headers and login credentials so each job is self-describing; the engine just executes the list. (Composes with component Phase 1.7's data-driven catalog — the engine never learns what a tenant is.)
+- [ ] App-side `scheduler/main.cpp` reads the active-tenant list from the control DB at startup and on a refresh interval, and builds the job catalog × tenants — each tenant's jobs carry `X-Honuware-Site: <site_key>` plus the shared origin secret.
 
 ### 6.2 Per-tenant authenticated calls
-- [ ] The scheduler's `api_client` sends `X-Knotty-Site: <site_key>` (and the existing `X-Origin-Secret`) on every call, and logs in per tenant as that tenant's `scheduler@knottyyoga.local` (each tenant DB has its own service-account row from Phase 5.1). Loop: for each active tenant → login → run the job set → logout/expire.
-- [ ] Decide service-account password scope: shared `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` across tenants (simplest) vs per-tenant (Open Question 7). Tests for header injection + per-tenant login sequencing (existing scheduler test seams).
+- [ ] The scheduler's `api_client` sends the per-job headers on every call, and logs in per tenant as that tenant's scheduler service account (each tenant DB has its own service-account row from Phase 5.1). Loop: for each active tenant → login → run the job set → logout/expire.
+- [ ] Service-account password scope: **shared** `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` across tenants (decided, Q7 — each tenant still has its own service-account row, just the same secret). Tests: engine-with-arbitrary-headers in the honuware repo; catalog-×-tenants construction + per-tenant login sequencing app-side (existing scheduler test seams).
 
 ## Phase 7 — Frontend per-tenant branding
 
 Goal: one Angular bundle serves all tenants; branding arrives at boot from the API. (Full theming is Website Makeover Phase 5; this is the minimal hook.)
 
 ### 7.1 `/api/site_info` endpoint (backend first, per layering)
-- [ ] Add `endpoints/site_info.cpp` returning the resolved tenant's public branding (`display_name`, `logo_url`, `website_url`, theme tokens if available) — sourced from tenant secrets/branding; unauthenticated; cacheable. Reads the tenant via the same edge resolution.
+- [ ] Add `endpoints/site_info.cpp` returning the resolved tenant's public branding (`display_name`, `logo_url`, `website_url`, theme tokens if available) — sourced from tenant secrets/branding; unauthenticated; cacheable. Reads the tenant via the same edge resolution. (This endpoint is framework — honuware `platform`, generic branding fields; the Angular work below is app-side.)
 - [ ] `site_info_test.cpp`: returns the resolved tenant's branding; unknown site → error; no auth required.
 
 ### 7.2 ServerAccess method
@@ -367,7 +369,7 @@ Goal: the AWS wiring that makes one origin serve many branded sites. (Ops, owned
 - [ ] Per tenant: S3 bundle (same artifact), CloudFront distribution, ACM cert (us-east-1), Route 53 records — following `Deploying to AWS.md` Phase 4/5 conventions.
 
 ### 8.2 Header injection
-- [ ] On each distribution's `/api/*` behavior, set origin custom headers: the shared `X-Origin-Secret` (existing) **and** that tenant's `X-Knotty-Site=<site_key>`.
+- [ ] On each distribution's `/api/*` behavior, set origin custom headers: the shared `X-Origin-Secret` (existing) **and** that tenant's `X-Honuware-Site=<site_key>`.
 
 ### 8.3 Origin-secret strategy
 - [ ] Keep `X-Origin-Secret` deployment-wide for now (origin protection, not identity). Record the option to make it per-tenant later for defense-in-depth (Open Question 8).
@@ -376,20 +378,25 @@ Goal: the AWS wiring that makes one origin serve many branded sites. (Ops, owned
 
 # Part 3 — Open Questions
 
-These are decisions I need from you rather than ones I should silently make. I've recommended a default for each so implementation can proceed if you don't object.
+**Status (7/9/2026): 8 of 10 questions decided** and folded into the plan above. Q4 and Q5 came back as questions to me — answered below with recommendations that are **adopted as defaults** (Phases 2.2 and 3.4/4.1 already reflect them); flag if you disagree. Summary: Q1 = Model C; Q2 = `X-Honuware-Site`; Q3 = `honuware_control` control DB; Q4 = bounded pool defaulting to 1 connection/tenant (recommended, see below); Q5 = two-control-rows default + one real second test DB for isolation (recommended, see below); Q6 = abort on first migration failure; Q7 = shared scheduler password; Q8 = deployment-wide origin secret; Q9 = identical catalog baseline; Q10 = shared frontend bundle.
 
 Mason- Please look at [[Splitting the server up into components]] and update this document based on the componentization effort.
+	- Claude- Done — the componentization impact is analyzed in the new **§1.8** and threaded through every affected phase in Part 2. The headline changes: the tenancy machinery becomes honuware **framework** code with a per-phase repo map (§1.8.1–1.8.2); `TenantResolver` gains a `FixedTenantResolver` so single-tenant consumers (the friends' sites, local dev) need no control DB or CloudFront header; `TenantResources` gains an app-factory extension point so Square stays app-side, matching the component plan's `EndpointAuthHelper` façade split; the scheduler engine stays foundation-only with tenancy expressed in the app-built job list; provisioning/migrations take the composed framework+app `DatabaseInfo`/migration lists (framework migrations in their own id namespace); framework mail-builder branding is **pulled forward into the componentization work** as an extraction prerequisite — that one item should be fed back into the component plan's Phase 1 when executing it; and all new names are honuware-branded per Q2/Q3. Sequencing is now: componentize → extract → **this plan** → first deploy, mostly as cross-repo work via `FETCHCONTENT_SOURCE_DIR_HONUWARE`.
 
 1. **Isolation model — confirm Model C (database-per-tenant).** Part 1 recommends C with B as a swappable fallback and rejects A. *Default: proceed with C.* Confirm, or pick B/A.
 	- Mason- I'll go with your recommendation.
 2. **Header name & semantics.** I propose `X-Knotty-Site: <site_key>` where `site_key` is a short stable slug (e.g. `knotty`, `acme`). *Default: `X-Knotty-Site`.* OK, or different name/value (e.g. send the database name directly, or a UUID)?
 	- Mason- Per [[Splitting the server up into components]], let's go with X-Honuware-Site
+	- Claude- Decided — renamed throughout (§1.7 diagram, Phases 3.1, 6.1, 8.2).
 3. **Control-plane location.** A dedicated `knottyyoga_control` database on the same RDS instance holding `tenants`. *Default: dedicated control DB.* Alternative: a JSON/env tenant manifest for the very first soft-launch (simpler, not dynamic) — acceptable, or go straight to the control DB?
 	- Mason- Let's go with honuware_control and do the control db.
+	- Claude- Decided — `honuware_control` + the `HONUWARE_CONTROL_DB_NAME` override threaded through §1.5 and Phases 1.3/5. Two notes from the componentization pass: the control DB is **per deployment** (each honuware consumer runs its own — §1.8.1), and single-tenant consumers skip it entirely via `FixedTenantResolver`, so the control DB only exists where multi-tenancy is actually in play.
 4. **Connection-count ceiling.** One persistent libpqxx connection per active tenant. Fine to dozens; beyond ~50 we'd add PgBouncer or a bounded/evicting pool. *Default: one-per-tenant now, document the PgBouncer trigger.* Any near-term tenant-count target that would change this?
 	- Mason- Do you think one connection for tenant will be too limited? Would it be worth it to have a pool of connections per tenant?
+	- Claude- One connection per tenant will **not** be a *throughput* problem at studio scale: transactions are milliseconds, so a single connection sustains on the order of a hundred-plus transactions/second per tenant — far above real load. The genuine risk is **head-of-line blocking**: a transaction that holds the tenant's connection across a slow external call (a Square request can take seconds) queues every other request for that tenant behind it. And the budget cuts against fat pools: pool size multiplies against tenant count (`N × P`) into the ~80–100 `max_connections` ceiling on a t3.micro — 20 tenants × pool-of-4 is already the wall. So my recommendation is the middle path: **build the provider as a bounded lazy pool whose size defaults to 1**. Today's design (one connection + one mutex) *is* a pool of 1, so this generalizes the existing shape rather than adding machinery — and "give this busy tenant 2–3 connections" becomes a per-tenant config knob (a `max_connections` column on the control `tenants` row) instead of a refactor. Pair it with an acquire-wait metric and an aggregate-connection warning so raising a limit is data-driven, keep Square/external HTTP out of the DB critical section where feasible (the cheaper fix for head-of-line blocking), and reach for PgBouncer only if aggregate demand ever approaches the instance ceiling. **Adopted as the default and folded into Phase 2.2** — flag if you'd rather ship the plain single-connection provider and defer any pool shape entirely.
 5. **Test strategy for multi-tenant routing.** The suite uses one shared test DB (`test_knottyyoga`). To test routing without standing up many DBs, I'll register **two control rows pointing at the same physical test DB under two site keys** and assert routing/caching/independence. *Default: that approach.* Or do you want a second real test database provisioned in the harness?
 	- Mason- What do you recommend?
+	- Claude- Both, weighted heavily toward the cheap one. **(a) Default for the bulk of tests: two control rows → the same physical test DB.** This proves resolution, caching, invalidation, suspension, header edge cases, and that two site keys yield two distinct providers/resources — zero new infrastructure, fast, and these tests move to the honuware repo's CI after extraction. **(b) Plus a tiny physical-isolation suite on one real second database.** Two-rows-same-DB structurally *cannot* prove the thing Model C exists for — that tenant A's data is invisible to tenant B. Have `GlobalDatabaseTestSupport` create `test_honuware_tenant_b` once per run (the same create-once pattern the test-speed work established; one extra `CREATE DATABASE` per run is cheap) and keep the suite to a handful of tests: a row written via tenant A's provider is invisible via tenant B's through the generic CRUD path, PK sequences advance independently, per-DB `config_secrets` values are independent. **Adopted as the default and folded into Phases 3.4/4.1.**
 6. **Migration failure policy across tenants.** When `--migrate` hits a failure on tenant K of N, do we **abort** (stop, surface, fix, re-run — re-runs skip already-migrated tenants) or **continue** and report all failures at the end? *Default: abort on first failure* (safest; matches the existing single-DB runner's stop-on-failure semantics).
 	- Mason- Let's go with the safer option. Fail fast is generally good.
 7. **Scheduler service-account password scope.** Shared `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` across all tenants, or per-tenant passwords? *Default: shared* (simplest; each tenant still has its own service-account row, just the same secret).
@@ -400,6 +407,7 @@ Mason- Please look at [[Splitting the server up into components]] and update thi
 	- Mason- Confirmed. That sounds reasonable.
 10. **Frontend strategy.** One shared bundle + runtime branding from `/api/site_info` (recommended; minimal), vs. separate per-client app bundles sharing components (max flexibility, more build/deploy machinery). *Default: shared bundle + runtime branding*, deferring full theming to Website Makeover Phase 5. Confirm.
 	- Mason- Let's do shared bundle for now. Will probably componentize later but I want to get this done server side for now.
+	- Claude- Decided — this also matches the component plan's Q7 (frontend sharing deferred to its own future job). Phase 7 stays the minimal `/api/site_info` hook: the endpoint is framework, the Angular consumption is app-side.
 
 ---
 
