@@ -3,7 +3,7 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 7/8/2026
+Last Updated: 7/9/2026
 Version: 0.1
 tags: 
 ---
@@ -56,10 +56,22 @@ The layering (db_schema → sql_util → util services → business_logic → en
 
 ## Constraints from other active plans
 
-- **Multi-tenant SaaS plan (not yet implemented):** components must stay tenancy-agnostic. Providers (`DatabaseHelper`, `SecretsHelper`, `SquareClient`, `MailHelper`) will move behind a per-tenant registry — so components must accept these as injected parameters, never as global singletons. The planned `business_logic/tenancy/` module is itself future shared surface. `EndpointAuthHelper` is the load-bearing seam for both tenancy and this split.
+- **Multi-tenant SaaS plan (fully decided 7/9/2026, runs after the extraction):** components must stay tenancy-agnostic. Providers (`DatabaseHelper`, `SecretsHelper`, `SquareClient`, `MailHelper`) move behind a per-tenant registry — so components must accept these as injected parameters, never as global singletons. `business_logic/tenancy/` will be born inside `honuware_platform`. `EndpointAuthHelper` is the load-bearing seam for both tenancy and this split. The tenant plan's new §1.8 (in [[Converting the server to a multi tenant Saas architecture]]) maps its phases onto these components and hands five concrete requirements back to this plan — see **Hand-off requirements from the tenancy plan** below; the affected work items are tagged `⇦ tenancy`.
 - **Test-speed work (implemented):** the 88% speedup depends on assembling the *complete* `DatabaseInfo` once (`GlobalDatabaseTestSupport::SetupAllTables()` + `SetIfNotExistsMode`). Splitting the schema must preserve a way to compose framework tables + app tables into one `DatabaseInfo` and run the one-time committed setup.
 - **AWS deployment (implemented):** one multi-stage Dockerfile produces one image with all binaries and one version string, built by GitLab CI. Packaging changes must not break the single-image pipeline.
 - **Scheduler (implemented):** communicates with the server purely over HTTP; only drags in `knotty_yoga_core` for `HttpClient` + logging. Extracting `util/http` frees it.
+
+## Hand-off requirements from the tenancy plan (added 7/9/2026)
+
+The multi-tenant plan is now fully decided and sequenced immediately after this project (componentize → extract → tenancy → deploy). Its §1.8 analyzed the interaction between the two plans; five of its requirements land **here** because doing them during componentization is free (or mandatory), while retrofitting them during the tenancy project would mean churning freshly-extracted honuware surfaces. Each is folded into the phase items below, tagged `⇦ tenancy`:
+
+1. **Framework mail-builder branding is an extraction prerequisite** (Phase 1.3). `person_verify_mail.cpp` (and any other framework mail body) hardcodes "Knotty Yoga" — it cannot move into the *public* honuware repo with the brand baked in. The branding struct introduced here is the same one the tenant plan later sources per-tenant.
+2. **Env-var renames go beyond `LOG_DEST`/`ALLOW_DESTRUCTIVE`** (Phase 1.1). Every env var read by code that moves into honuware renames to `HONUWARE_*`: `KNOTTYYOGA_ORIGIN_SECRET`, `KNOTTYYOGA_TRUST_PROXY`, `KNOTTYYOGA_SECRET_KEY`, `KNOTTYYOGA_DEV_CORS_ORIGIN`. The tenant plan references the new names throughout.
+3. **`ScheduledJob` carries per-job request headers + login credentials** (Phase 1.7). The tenant plan expresses multi-tenancy purely as catalog × tenants built in app-side `main.cpp` — the engine never learns what a tenant is, which only works if a job is fully self-describing.
+4. **The migration list splits framework/app alongside `DatabaseInfo`** (Phase 2.3), as two composed streams tracked under separate `schema_migrations` id namespaces, so honuware upgrades and app migrations can't collide once tenant databases are migrated in a loop.
+5. **`GlobalDatabaseTestSupport` can create additional named test databases** (Phase 2.6). The tenant plan adds a physical-isolation test suite on a second real database (`test_honuware_tenant_b`), reusing the create-once pattern.
+
+Confirmations flowing the other way (no work here): tenancy adopts the Phase 1.6 façade shape for its `TenantResources` app-factory (Square stays app-side, exactly as 1.6 designs it); the site header is `X-Honuware-Site` and the control DB is `honuware_control`, per this plan's naming; and single-tenant honuware consumers get a `FixedTenantResolver` needing no control DB and no CloudFront header — which is also how the Phase 5 example server and the friends' sites will run.
 
 # Target Component Architecture
 
@@ -192,7 +204,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 ### 1.1 util foundation cleanup
 - [ ] Parameterize `util/ical_generator` — PRODID and UID domain become constructor/function parameters; knottyyoga values supplied at call sites (likely via a secret/config). Update all call sites + `ical_generator_test.cpp`.
-- [ ] Rename env vars in `util/logging` and `util/destructive_guard` to the honuware prefix (`HONUWARE_LOG_DEST`, `HONUWARE_ALLOW_DESTRUCTIVE`), honoring the old `KNOTTYYOGA_*` names during transition (read new name first, fall back to old). Update the env-var table in the server CLAUDE.md + tests.
+- [ ] Rename env vars in `util/logging` and `util/destructive_guard` to the honuware prefix (`HONUWARE_LOG_DEST`, `HONUWARE_ALLOW_DESTRUCTIVE`), honoring the old `KNOTTYYOGA_*` names during transition (read new name first, fall back to old). `⇦ tenancy`: apply the same convention to the other env vars read by moving code — `KNOTTYYOGA_ORIGIN_SECRET`, `KNOTTYYOGA_TRUST_PROXY`, `KNOTTYYOGA_SECRET_KEY`, `KNOTTYYOGA_DEV_CORS_ORIGIN` → `HONUWARE_*` (rename each when its code is touched here, or all at once — the tenant plan uses the new names). Update the env-var table in the server CLAUDE.md + tests.
 
 ### 1.2 sql_util core cleanup
 - [ ] Parameterize `kDatabaseName` in `sql_util/database_common.h` — database name becomes a runtime parameter owned by the app (this also aligns with the multi-tenant plan where DB name is per-tenant). Update call sites + tests.
@@ -202,6 +214,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Move `secrets_at_rest.{h,cpp}` (+ its test) from `business_logic/auth/` into `util/secrets/` — verify its own includes are util-level (libsodium, types); adjust include paths and both CMakeLists.
 - [ ] Split `util/secrets/secret_keys.h` into framework keys (mail, auth/argon2, rate-limit, image sizing) kept in `util/secrets/` and app keys (Square, subscription, scheduling, class check-in, provider, facility) moved to a new app-side header (e.g. `business_logic/app_secret_keys.h` — final location per the Phase 2 target split). Update all includers.
 - [ ] Move brand defaults out of `util/secrets/secret_values.cpp` ("Knotty Yoga and Spa", gmail address, subjects, `www.knottyyoga.com`) into an app-side default-registration (secrets framework exposes `RegisterDefaults(...)`; `create_database`/app startup supplies the values). Tests for the registration mechanism + updated existing tests.
+- [ ] `⇦ tenancy` (extraction prerequisite): parameterize the **framework** mail builders' branding. `person_verify_mail.cpp` (and any other auth/framework mail body) hardcodes "Knotty Yoga" and can't ship to the public repo that way. Introduce a branding struct (`TenantBranding { studioName; senderName; senderAddress; websiteUrl; }` — the same struct the tenant plan later sources per-tenant), populated from secrets/registered defaults, and replace the literals with `FormatString` placeholders (keep `NormalizeCrLf`). App-side mail builders (payment/scheduling) stay as-is until the tenancy project's Phase 4.5. Tests: each framework builder asserts the branding substitution and the absence of hardcoded literals.
 
 ### 1.4 mail layer position
 - [ ] Document the intended layer order (foundation → data → services) in the server CLAUDE.md; `util/mail`'s include of `sql_util/database_access/transaction.h` is *conformant* under that order (services sit above data). No code change — just make the layering explicit so Phase 2 target boundaries are uncontroversial.
@@ -215,7 +228,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Restructure `EndpointAuthHelper` so the injected-service set isn't hard-wired to Square: framework façade exposes session/cookies/secrets/mail/db; the app layer provides an extended accessor for `SquareClient` (derived helper, or a typed service-registry on `WebApp`). Keep call-site ergonomics (`helper.GetSquareClient()`) via the app-derived type. Update `endpoint_test_helper` symmetrically. Tests.
 
 ### 1.7 scheduler catalog extraction
-- [ ] Replace `BuildStandardJobs()`'s hard-coded yoga endpoint list and the fixed `SchedulerConfig::intervals` struct with a data-driven job list: engine consumes `std::vector<ScheduledJob>` + per-job interval config; the knottyyoga catalog moves next to `scheduler/main.cpp` (app-side). Flags stay generated from the job list. Tests for engine-with-arbitrary-jobs + existing catalog tests.
+- [ ] Replace `BuildStandardJobs()`'s hard-coded yoga endpoint list and the fixed `SchedulerConfig::intervals` struct with a data-driven job list: engine consumes `std::vector<ScheduledJob>` + per-job interval config; the knottyyoga catalog moves next to `scheduler/main.cpp` (app-side). Flags stay generated from the job list. `⇦ tenancy`: give `ScheduledJob` per-job request headers and login credentials so each job is fully self-describing — the tenant plan later expresses multi-tenancy purely as catalog × tenants built in app-side `main.cpp`, with the engine never learning what a tenant is. Tests for engine-with-arbitrary-jobs (including arbitrary per-job headers) + existing catalog tests.
 
 ## Phase 2 — Enforce boundaries with CMake targets (still one repo)
 
@@ -229,7 +242,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 ### 2.3 Platform target
 - [ ] Create `honuware_platform`: framework db_schema + framework table_helpers (~33 tables per the assessment list), `business_logic/auth` core, `business_logic/images`, `business_logic/migration`, web core (web_app, middleware guards, endpoint_auth_helper, generic CRUD + admin metadata endpoints, health). This is the big one — expect several sittings; move one sub-group at a time, keeping the build green.
-- [ ] Split `db_schema/make_database_info` into framework-table assembly (platform) + app-table assembly (app), composed by the app (preserves FK ordering and the test-speed create-once contract).
+- [ ] Split `db_schema/make_database_info` into framework-table assembly (platform) + app-table assembly (app), composed by the app (preserves FK ordering and the test-speed create-once contract). `⇦ tenancy`: split the **migration list** the same way at the same time — framework migrations (shipped with honuware) and app migrations as two composed streams, tracked under separate `schema_migrations` id namespaces so honuware upgrades and app changes can't collide once the tenant plan migrates every tenant DB in a loop. Tests for composed-list application + namespace independence.
 
 ### 2.4 App target
 - [ ] What remains of `knotty_yoga_core` becomes the app library (app schema/table_helpers, payment/, scheduling/, skills/, app endpoints, app secret keys/defaults, ical branding wiring); rename or keep name (cosmetic). Payment business logic links `honuware_square` for the client.
@@ -239,7 +252,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 ### 2.6 Test target split
 - [ ] Create `honuware_testing` from `test/src/util/` (GlobalDatabaseTestSupport, TestDatabaseUtil, TestTransactionProvider, matchers, json/table test utils) + `endpoint_test_helper` + the test doubles (`*_test_util` for secrets/mail/cookies/square). Fix the duplicate source listing between `test/CMakeLists.txt` and `test/src/util/CMakeLists.txt` while at it.
-- [ ] `GlobalDatabaseTestSupport` takes the composed `DatabaseInfo` (framework + app tables) as input rather than calling `MakeDatabaseInfo()` directly, preserving the create-all-tables-once optimization for any consumer. Tests.
+- [ ] `GlobalDatabaseTestSupport` takes the composed `DatabaseInfo` (framework + app tables) as input rather than calling `MakeDatabaseInfo()` directly, preserving the create-all-tables-once optimization for any consumer. `⇦ tenancy`: support creating **additional named test databases** once per run with the same create-once pattern — the tenant plan adds a physical-isolation suite on a second real database (`test_honuware_tenant_b`). Tests.
 - [ ] Keep the single `knottyyoga_tests` executable; it now links app + platform + testing targets.
 
 ### 2.7 Layering enforcement
