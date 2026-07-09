@@ -353,10 +353,13 @@ Mason- Please look at [[Splitting the server up into components]] and update thi
 5. **Test strategy for multi-tenant routing.** The suite uses one shared test DB (`test_knottyyoga`). To test routing without standing up many DBs, I'll register **two control rows pointing at the same physical test DB under two site keys** and assert routing/caching/independence. *Default: that approach.* Or do you want a second real test database provisioned in the harness?
 	- Mason- What do you recommend?
 6. **Migration failure policy across tenants.** When `--migrate` hits a failure on tenant K of N, do we **abort** (stop, surface, fix, re-run — re-runs skip already-migrated tenants) or **continue** and report all failures at the end? *Default: abort on first failure* (safest; matches the existing single-DB runner's stop-on-failure semantics).
-
+	- Mason- Let's go with the safer option. Fail fast is generally good.
 7. **Scheduler service-account password scope.** Shared `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` across all tenants, or per-tenant passwords? *Default: shared* (simplest; each tenant still has its own service-account row, just the same secret).
+	- Mason- I'm fine with your recommendation.
 8. **Origin-secret scope.** Keep one deployment-wide `X-Origin-Secret`, or make it per-tenant for defense-in-depth? *Default: deployment-wide now, per-tenant later.*
+	- Mason- I'll go with your recommendation.
 9. **Global-catalog drift.** Catalog tables (`admin_*`, `permissions`/`roles`) are re-seeded per tenant DB. If you ever want a tenant to customize, say, its admin column labels, Model C supports it for free (it's just their row), but the *baseline* is identical everywhere. *Default: identical baseline, per-tenant customization allowed but not built.* Confirm you don't need per-tenant permission catalogs on day one.
+	- Mason- Confirmed. That sounds reasonable.
 10. **Frontend strategy.** One shared bundle + runtime branding from `/api/site_info` (recommended; minimal), vs. separate per-client app bundles sharing components (max flexibility, more build/deploy machinery). *Default: shared bundle + runtime branding*, deferring full theming to Website Makeover Phase 5. Confirm.
 
 ---
