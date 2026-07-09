@@ -340,8 +340,12 @@ Goal: the AWS wiring that makes one origin serve many branded sites. (Ops, owned
 
 These are decisions I need from you rather than ones I should silently make. I've recommended a default for each so implementation can proceed if you don't object.
 
+Mason- Please look at [[Splitting the server up into components]] and update this document based on the componentization effort.
+
 1. **Isolation model — confirm Model C (database-per-tenant).** Part 1 recommends C with B as a swappable fallback and rejects A. *Default: proceed with C.* Confirm, or pick B/A.
+	- Mason- I'll go with your recommendation.
 2. **Header name & semantics.** I propose `X-Knotty-Site: <site_key>` where `site_key` is a short stable slug (e.g. `knotty`, `acme`). *Default: `X-Knotty-Site`.* OK, or different name/value (e.g. send the database name directly, or a UUID)?
+	- Per [[Splitting the server up into components]], let's go with 
 3. **Control-plane location.** A dedicated `knottyyoga_control` database on the same RDS instance holding `tenants`. *Default: dedicated control DB.* Alternative: a JSON/env tenant manifest for the very first soft-launch (simpler, not dynamic) — acceptable, or go straight to the control DB?
 4. **Connection-count ceiling.** One persistent libpqxx connection per active tenant. Fine to dozens; beyond ~50 we'd add PgBouncer or a bounded/evicting pool. *Default: one-per-tenant now, document the PgBouncer trigger.* Any near-term tenant-count target that would change this?
 5. **Test strategy for multi-tenant routing.** The suite uses one shared test DB (`test_knottyyoga`). To test routing without standing up many DBs, I'll register **two control rows pointing at the same physical test DB under two site keys** and assert routing/caching/independence. *Default: that approach.* Or do you want a second real test database provisioned in the harness?
