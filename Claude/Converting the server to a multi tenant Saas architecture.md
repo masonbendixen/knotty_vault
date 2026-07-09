@@ -345,12 +345,15 @@ Mason- Please look at [[Splitting the server up into components]] and update thi
 1. **Isolation model — confirm Model C (database-per-tenant).** Part 1 recommends C with B as a swappable fallback and rejects A. *Default: proceed with C.* Confirm, or pick B/A.
 	- Mason- I'll go with your recommendation.
 2. **Header name & semantics.** I propose `X-Knotty-Site: <site_key>` where `site_key` is a short stable slug (e.g. `knotty`, `acme`). *Default: `X-Knotty-Site`.* OK, or different name/value (e.g. send the database name directly, or a UUID)?
-	- Per [[Splitting the server up into components]], let's go with X-Honuware-Site
+	- Mason- Per [[Splitting the server up into components]], let's go with X-Honuware-Site
 3. **Control-plane location.** A dedicated `knottyyoga_control` database on the same RDS instance holding `tenants`. *Default: dedicated control DB.* Alternative: a JSON/env tenant manifest for the very first soft-launch (simpler, not dynamic) — acceptable, or go straight to the control DB?
-	- Let's go with honuware_control and do the control db.
+	- Mason- Let's go with honuware_control and do the control db.
 4. **Connection-count ceiling.** One persistent libpqxx connection per active tenant. Fine to dozens; beyond ~50 we'd add PgBouncer or a bounded/evicting pool. *Default: one-per-tenant now, document the PgBouncer trigger.* Any near-term tenant-count target that would change this?
+	- Mason- Do you think one connection for tenant will be too limited? Would it be worth it to have a pool of connections per tenant?
 5. **Test strategy for multi-tenant routing.** The suite uses one shared test DB (`test_knottyyoga`). To test routing without standing up many DBs, I'll register **two control rows pointing at the same physical test DB under two site keys** and assert routing/caching/independence. *Default: that approach.* Or do you want a second real test database provisioned in the harness?
+	- Mason- What do you recommend?
 6. **Migration failure policy across tenants.** When `--migrate` hits a failure on tenant K of N, do we **abort** (stop, surface, fix, re-run — re-runs skip already-migrated tenants) or **continue** and report all failures at the end? *Default: abort on first failure* (safest; matches the existing single-DB runner's stop-on-failure semantics).
+
 7. **Scheduler service-account password scope.** Shared `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` across all tenants, or per-tenant passwords? *Default: shared* (simplest; each tenant still has its own service-account row, just the same secret).
 8. **Origin-secret scope.** Keep one deployment-wide `X-Origin-Secret`, or make it per-tenant for defense-in-depth? *Default: deployment-wide now, per-tenant later.*
 9. **Global-catalog drift.** Catalog tables (`admin_*`, `permissions`/`roles`) are re-seeded per tenant DB. If you ever want a tenant to customize, say, its admin column labels, Model C supports it for free (it's just their row), but the *baseline* is identical everywhere. *Default: identical baseline, per-tenant customization allowed but not built.* Confirm you don't need per-tenant permission catalogs on day one.
