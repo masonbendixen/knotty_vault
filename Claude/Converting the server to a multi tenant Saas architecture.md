@@ -361,6 +361,7 @@ Mason- Please look at [[Splitting the server up into components]] and update thi
 9. **Global-catalog drift.** Catalog tables (`admin_*`, `permissions`/`roles`) are re-seeded per tenant DB. If you ever want a tenant to customize, say, its admin column labels, Model C supports it for free (it's just their row), but the *baseline* is identical everywhere. *Default: identical baseline, per-tenant customization allowed but not built.* Confirm you don't need per-tenant permission catalogs on day one.
 	- Mason- Confirmed. That sounds reasonable.
 10. **Frontend strategy.** One shared bundle + runtime branding from `/api/site_info` (recommended; minimal), vs. separate per-client app bundles sharing components (max flexibility, more build/deploy machinery). *Default: shared bundle + runtime branding*, deferring full theming to Website Makeover Phase 5. Confirm.
+	- Mason- Let's do shared bundle for now. Will probably componentize later but I want to get this done server side for now.
 
 ---
 
