@@ -3,7 +3,7 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 6/1/2026
+Last Updated: 7/9/2026
 Version: 0.1
 tags: 
 ---
@@ -136,7 +136,7 @@ Under Model C these are simply re-seeded in each tenant DB by the existing `Crea
 - `config_secrets` — and therefore **every per-tenant setting it holds**: `square_access_token`, `square_environment`, `mail_*` (SMTP/SES creds + sender name/address), `website_address`, `website_address_login`, `production_mode_on`, and the email-subject strings.
 
 **New GLOBAL control-plane state (the one genuinely new concept):**
-- A small **control database** (`knottyyoga_control`) with a `tenants` table mapping the CloudFront site key → database name + display metadata + status. This is the registry the server consults to resolve and route tenants. (Details in Phase 1.)
+- A small **control database** (`honuware_control`, per Open Question 3) with a `tenants` table mapping the CloudFront site key → database name + display metadata + status. This is the registry the server consults to resolve and route tenants. (Details in Phase 1.)
 
 ## 1.6 What is global today and must change (the singleton inventory)
 
@@ -159,7 +159,7 @@ Confirmed process-wide singletons that embed a single-tenant assumption and must
 CloudFront distribution for tenant "acme"
   origin custom headers on /api/*:
     X-Origin-Secret: <deployment-wide secret>     (existing, unchanged)
-    X-Knotty-Site:   acme                          (NEW: per-distribution tenant key)
+    X-Honuware-Site: acme                          (NEW: per-distribution tenant key)
         │
         ▼
 EC2 Crow server (one process, all tenants)
@@ -168,7 +168,7 @@ EC2 Crow server (one process, all tenants)
         ▼
   Endpoint handler:
     EndpointAuthHelper::Initialize()
-      1. read X-Knotty-Site header                              ── NEW
+      1. read X-Honuware-Site header                            ── NEW
       2. TenantResolver: site key → TenantContext{tenantId, dbName, ...}   ── NEW (control DB, cached)
       3. TenantResources registry: get-or-build {provider, secrets, square, mail, siteConfig}  ── NEW
       4. session.InitializeFromCookie(tenantProvider)           ── now runs against the TENANT db
@@ -180,17 +180,55 @@ EC2 Crow server (one process, all tenants)
 
 Cookies are naturally tenant-scoped because each tenant has its own domain (its own CloudFront distribution); the `session_token` only resolves inside that tenant's `sessions` table. Health (`/api/health`) stays tenant-agnostic and is already allow-listed in the origin guard.
 
+## 1.8 Componentization impact — how [[Splitting the server up into components]] reshapes this plan
+
+The componentization plan is now fully decided (all 12 of its questions resolved) and sequenced **ahead** of this project: componentize in-place (its Phases 1–3) → extract to the public `honuware` repo on GitHub (its Phases 4–5) → **this multi-tenant conversion** → first deploy. That ordering changes where this plan's code lives, what several things are named, and a few real pieces of the design. This section is the delta; the phase text in Part 2 has been updated to match.
+
+### 1.8.1 Tenancy becomes a honuware framework feature
+
+The component architecture already reserves a slot for `business_logic/tenancy/` inside `honuware_platform`. Making that explicit:
+
+- The `tenants` control schema, `TableHelpers::Tenants`, `TenantContext`, `TenantResolver`, `TenantResourceRegistry`, the edge resolution in `EndpointAuthHelper`, the provisioning/migration loops, and `/api/site_info` are all **framework code** — zero yoga specifics, and every honuware consumer (the friends' sites included) gets multi-site support for free.
+- Their tests ship in the honuware repo and run under its GitHub Actions CI (Linux + Postgres service container).
+- **Single-tenant consumers must pay ~zero ceremony.** Make `TenantResolver` an interface with two implementations: the control-DB resolver (multi-tenant deployments) and a `FixedTenantResolver` that serves one configured `TenantContext` with **no control DB and no CloudFront header at all**. The friends' sites and local dev both run the fixed resolver; the knottyyoga deployment runs the control-DB one. This subsumes (and upgrades) the dev escape hatch in Phase 3.1.
+- The control DB is **per deployment** (one per RDS instance/consumer), not a shared global service — `honuware_control` is just its default name.
+
+### 1.8.2 Repo map — where each phase's work lands
+
+| Phase | Lands in |
+|---|---|
+| 1 — control plane (schema, helper, resolver) | honuware `platform` |
+| 2 — per-tenant connections & registry | honuware `data` + `platform` |
+| 3 — request-edge resolution | honuware `platform` (web core) + `testing` (EndpointTestHelper) |
+| 4.1–4.4 — secrets, mail, config | honuware `services`/`platform`; **Square wiring → app** (§1.8.3 #1) |
+| 4.5 — email branding | split: framework mail builders → honuware (pulled forward, §1.8.3 #4); payment/scheduling builders → app |
+| 5 — provisioning & migrations | framework functions in honuware; `--create-tenant`/`--migrate` CLI + composed `DatabaseInfo` stay in the app's `database_helper` |
+| 6 — scheduler | engine stays `honuware_scheduler` (foundation-only, tenancy-agnostic); tenant iteration + job catalog in app-side `scheduler/main.cpp` |
+| 7 — frontend branding | app (frontend sharing deferred per the component plan's Q7); the `/api/site_info` endpoint itself is framework |
+| 8 — infra | ops (unchanged) |
+
+Practical consequence: most of this project is **cross-repo work** — honuware and knottyyoga edited together with `FETCHCONTENT_SOURCE_DIR_HONUWARE` pointed at the local checkout, and a honuware version bump when each slice stabilizes. The component plan's Q6 discussion priced this in ("a few weeks of editing both repos together"); the phases here are already sliced so each is a clean bump point.
+
+### 1.8.3 Design changes forced (or gifted) by the component boundaries
+
+1. **`TenantResources` gains an app extension point (Square).** Component Phase 1.6 removes `SquareClient` from the framework `EndpointAuthHelper` façade: the framework exposes session/cookies/db/secrets/mail, and the app supplies a derived accessor for Square. Tenancy follows the same shape — the framework `TenantResources` holds `{DatabaseHelper, TransactionProvider, SecretsHelper, MailHelper, site config/branding}`, and `TenantResourceRegistry` is constructed with an **app-supplied factory** (`std::function<std::shared_ptr<TenantResources>(const TenantContext&)>`, wired in `main.cpp` — the composition root the component plan's Phase 3.2 establishes). knottyyoga's factory returns a derived `KnottyTenantResources` adding the per-tenant `SquareClient` (built from tenant secrets using the `honuware_square` client component); the app-derived endpoint helper preserves the `helper.GetSquareClient()` call-site ergonomics. The framework never references Square. (Phases 2.1, 3.2, 4.2 updated.)
+2. **The scheduler engine stays tenancy-agnostic.** After component Phase 1.7 the engine consumes a data-driven `std::vector<ScheduledJob>` and links foundation only — it cannot read the control DB, and shouldn't. Multi-tenancy is expressed in the *job list*: `ScheduledJob` grows per-job request headers and login credentials; app-side `scheduler/main.cpp` reads the active-tenant list from the control DB (the app-side main keeps app-layer deps anyway) and builds catalog × tenants, each job carrying `X-Honuware-Site: <site_key>`. (Phase 6 updated.)
+3. **Provisioning and migrations take composed inputs.** Component Phase 2.3 splits `MakeDatabaseInfo()` into framework-table + app-table assembly composed by the app. So the framework provisioning function is shaped `ProvisionTenant(controlProvider, TenantSpec, const DatabaseInfo&)`, and the per-tenant migration loop takes a composed migration list — **framework migrations and app migrations are two streams, applied framework-first, tracked in `schema_migrations` under separate id namespaces** so honuware upgrades and app changes can't collide. The CLI surface stays in `knottyyoga_database_helper`. (Phases 5.1/5.2 updated.)
+4. **Framework mail-builder branding moves earlier.** `person_verify_mail.cpp` (and any other framework mail body) hardcodes "Knotty Yoga" today but is slated to move into the *public* honuware repo — it can't ship with the brand baked in. The `TenantBranding` parameterization of the **framework** builders therefore becomes a prerequisite of the extraction and should be executed during the componentization work (its Phase 1.3 secrets-defaults registration is the natural mechanism; a single-tenant consumer registers one branding). Phase 4.5 here then covers only the app-side builders (payment/scheduling) plus sourcing the branding struct per-tenant. **Action: fold this item into the component plan's Phase 1 when executing it.**
+5. **Naming.** Everything new in this plan is honuware-branded (Q2/Q3 below): header `X-Honuware-Site`, control DB `honuware_control`, env vars `HONUWARE_CONTROL_DB_NAME` and `HONUWARE_FIXED_SITE_KEY`. Existing env vars this plan references (`KNOTTYYOGA_ORIGIN_SECRET`, `KNOTTYYOGA_TRUST_PROXY`, `KNOTTYYOGA_SECRET_KEY`, `KNOTTYYOGA_DEV_CORS_ORIGIN`, `KNOTTYYOGA_ALLOW_DESTRUCTIVE`) belong to code that moves into honuware and will be renamed `HONUWARE_*` (new name read first, old name as fallback) per the component plan's convention — this plan uses the new names.
+6. **What componentization hands tenancy for free.** Parameterized database name (component 1.2), secrets defaults via registration (1.3), the de-Square'd `EndpointAuthHelper` (1.6), the data-driven scheduler (1.7), the framework/app `DatabaseInfo` split (2.3), `GlobalDatabaseTestSupport` taking composed inputs (2.6), and the "everything app-specific enters at the composition root" audit (3.2). These were previously implicit prep inside this plan's phases; by the time this plan executes they already exist, which shrinks Phases 2–4 noticeably.
+
 ---
 
 # Part 2 — Implementation Plan
 
-Phases are ordered lowest-layer-first. Within each phase, subsections are numbered and also ordered lowest-layer-first. Every code change lists its test work as a checkbox (per the "always add tests" rule). The isolation mechanism (Model C dbname vs Model B search_path) is confined to Phase 2.2 so the rest of the plan is mechanism-agnostic.
+Phases are ordered lowest-layer-first. Within each phase, subsections are numbered and also ordered lowest-layer-first. Every code change lists its test work as a checkbox (per the "always add tests" rule). The isolation mechanism (Model C dbname vs Model B search_path) is confined to Phase 2.2 so the rest of the plan is mechanism-agnostic. Each phase also notes **where the code lands** after the honuware extraction (repo map in §1.8.2); during this project the two repos are edited together via the `FETCHCONTENT_SOURCE_DIR_HONUWARE` override.
 
 > **Build/test/git:** I will not build the C++ server, run the suite, or run git — you do those. Each phase is sized so you can build + run tests between phases.
 
 ## Phase 1 — Control plane & tenant model (lowest layer: new control DB + registry)
 
-Goal: a queryable source of truth that maps a CloudFront site key to a tenant + its database name, plus an in-memory resolver. No request path touches this yet.
+Goal: a queryable source of truth that maps a CloudFront site key to a tenant + its database name, plus an in-memory resolver. No request path touches this yet. **Lands in:** honuware `platform` (framework db_schema / table_helpers / business_logic).
 
 ### 1.1 Control-database schema (`db_schema` layer)
 - [ ] Add `db_schema/tenants.{h,cpp}` defining the `tenants` table with `BIGSERIAL id` PK and columns: `site_key` (UNIQUE, the value CloudFront sends in `X-Knotty-Site`), `database_name` (UNIQUE), `display_name`, `status` (e.g. `active`/`suspended`, default `active`), `created_us`, `updated_us`. Follow the column-constant + `MakeTenantsTable(DatabaseInfo)` pattern used by `classes.cpp`.
@@ -202,8 +240,8 @@ Goal: a queryable source of truth that maps a CloudFront site key to a tenant + 
 - [ ] Add `tenants_test.cpp`: insert/lookup, unknown site key returns empty, duplicate site_key/database_name throws, `ListActive` filters by status. Add helper + test to `table_helpers/CMakeLists.txt`.
 
 ### 1.3 Control-database bootstrap (`database_helper` layer)
-- [ ] In `database_helper/`, add a code path to create + populate the control DB (create database `knottyyoga_control`, create the `tenants` table). Model it on the existing `CreateAndPopulateDatabases()` structure but minimal.
-- [ ] Add a `MakeControlDatabaseHelper()` convenience (wraps `MakeProductionDatabaseHelper("knottyyoga_control")`), reading an optional `KNOTTYYOGA_CONTROL_DB_NAME` env override (fallback `knottyyoga_control`).
+- [ ] Add a code path to create + populate the control DB (create database `honuware_control`, create the `tenants` table). Model it on the existing `CreateAndPopulateDatabases()` structure but minimal. The function itself is framework (honuware); the app's `database_helper` CLI invokes it.
+- [ ] Add a `MakeControlDatabaseHelper()` convenience (wraps `MakeProductionDatabaseHelper("honuware_control")`), reading an optional `HONUWARE_CONTROL_DB_NAME` env override (fallback `honuware_control`).
 - [ ] Tests for the control-DB info assembly (table present, columns/constraints as expected) mirroring existing `make_database_info`-style tests.
 
 ### 1.4 Tenant resolver (business-logic layer, no request coupling yet)
