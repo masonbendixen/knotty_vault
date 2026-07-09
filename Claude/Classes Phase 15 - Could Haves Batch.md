@@ -351,14 +351,39 @@ Run these in `knottyyoga_test_helper` (they insert past Intro-Workshop sessions 
 
 **Goal:** Report on how many refunds happened under the no-refund policy vs as voucher / case-by-case grants.
 
-- [ ] Business logic: `GetRefundEffectivenessReport(Transaction&, from, to)`:
-  - Total user-initiated cancellations.
-  - Total admin-issued vouchers (BC-6 / D-3) and total dollars.
-  - Total admin-cancelled-session refunds and total dollars.
-  - Total auto-cancelled-series refunds and total dollars.
-- [ ] Endpoint: `GET /api/admin/refund_effectiveness?from=&to=`. Permission `admin`.
-- [ ] Frontend: simple table view.
-- [ ] Tests.
+**Status: IMPLEMENTED (2026-07-08).** Mirrors the AR-4 pattern (shared `ReportingHelper`, thin admin endpoint, standalone manage-portal component, CSS-only table). There is **no refunds table** — refunds are negative `payments` rows (`refund_for_payment_id IS NOT NULL`, `amount_cents < 0`), so each category is a targeted count/sum over `payments`, `vouchers`, and `bookings`.
+
+- [x] Shared constants: extracted `business_logic/scheduling/refund_reasons.h` (`kRefundReasonSessionCancelledPrefix` = `"Session cancelled: "`, `kRefundReasonSeriesCancelledPrefix` = `"Series cancelled: "`, `kRefundReasonSeriesMinAttendanceNotMet` = `"Minimum attendance not met"`) and switched the producers (`session_cancellation_helper.cpp`, `class_series_helper.cpp`) to use them, so the report's filters and the refund writers can never drift (behavior-preserving).
+- [x] Business logic: `ReportingHelper::GetRefundEffectivenessReport(Transaction&, fromUs, toUs)` over the half-open window `[from, to)` (`to <= from` short-circuits to zeros). Four queries: (1) member cancellations = `bookings` `status='cancelled'` with `cancelled_us` in window and `notes` NOT LIKE the admin prefixes; (2) admin vouchers = `vouchers` with `issued_by_person_id IS NOT NULL` (count + `SUM(initial_value_cents)`); (3) session-cancel refunds = negative `payments` with `refund_reason LIKE 'Session cancelled: %'` (count + `SUM(-amount_cents)`); (4) series auto-cancel refunds = negative `payments` with `refund_reason = 'Series cancelled: Minimum attendance not met'`. (`reporting_helper.{h,cpp}`; KVT converter `RefundEffectivenessReportToKeyValueTable` in `scheduling_key_value_table.{h,cpp}`; tests in `reporting_helper_test.cpp` + `scheduling_key_value_table_test.cpp`.)
+- [x] Endpoint: `GET /api/admin/refund_effectiveness?from=&to=` (both required µs timestamps, strict int parse → 400 on garbage / `to<=from`). Permission: `admin` (via `session.IsAdmin`). Registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. (`endpoints/admin_refund_effectiveness.{h,cpp}`, tests in `admin_refund_effectiveness_test.cpp` — 401/403/400/aggregated-200.)
+- [x] Frontend: `getRefundEffectiveness(fromUs, toUs)` on ServerAccess (interface/network/proxy/mock + `RefundEffectivenessReport` type). New standalone `RefundEffectivenessComponent` (`pages/manage/refund-effectiveness/`): a From/To date-picker filter (both inclusive; default last 30 days) and a summary table — one row per category with count + dollars and a total row; empty/error states. Manage-dashboard **Refund Effectiveness** card (`currency_exchange` icon) + `/manage/refund-effectiveness` route. Specs: `refund-effectiveness.component.spec.ts`, `ServerAccess.mock.spec.ts`, dashboard card spec.
+- [x] Test helper: `seed_refund_scenario` (`srs`) seeds one session-cancel refund + one series-auto-cancel refund (the two categories impractical to drive live), using the shared `refund_reasons.h` strings so they match the report filters. `--email`/`--amount_cents`/`--days_ago`.
+- [x] Tests at all layers (four-metric aggregation, half-open window, empty range → zeros; endpoint auth/params/aggregation; component rows/total/empty/error/date-range).
+
+### Live-server test walkthrough (AR-5)
+
+Prereqs: reset + seed the DB with `knottyyoga_database_helper`, start the server, start the client. Seed accounts: admin **Mason** (`masonbendixen@gmail.com` / `pass`), member **Kit Williams** (`kiteagle@gmail.com` / `kit`). The four categories are populated as follows — two via real UI flows, two via the test helper (they need Square refunds / a failed series, impractical to drive by hand).
+
+**A. Member cancellation (category 1) — via the website**
+1. Log in as **Kit Williams** (`kiteagle@gmail.com` / `kit`). Book a session you can later cancel (top nav **Events** → **Intro Workshop** → **Book and Pay** with sandbox card `4111 1111 1111 1111`).
+2. Go to **My Account → My Bookings**, find that booking, click **Cancel Booking**, confirm. This writes a `bookings` row with `status='cancelled'` and a member `cancelled_us` (no admin prefix) → counts as one **member cancellation**.
+
+**B. Goodwill voucher (category 2) — via the website**
+1. Log in as admin **Mason** (`masonbendixen@gmail.com` / `pass`). Top nav **Admin** → **Manage Products** → **Vouchers**.
+2. Issue a voucher to a member (e.g. **Issued to:** Kit, **Amount:** `50`). The endpoint stamps `issued_by_person_id` = you → counts as one **goodwill voucher** worth $50.
+
+**C. Session-cancel & series-auto-cancel refunds (categories 3 & 4) — via the test helper**
+1. In `knottyyoga_test_helper`, **Events & Bookings** screen, run **`srs`** (`seed_refund_scenario`). With no args it seeds, for `kiteagle@gmail.com` dated **1 day ago**, one **session-cancel refund** ($25.00) and one **series-auto-cancel refund** ($25.00), using the exact refund-reason strings the report matches. (Options: `--email`, `--amount_cents`, `--days_ago`.)
+   - *Organic alternative for category 3:* cancel a real session that has a paid booking with **`cs --session_id <id>`** — it drives the true refund path (`"Session cancelled: …"`).
+
+**D. View the report**
+1. As admin **Mason**, top nav **Admin** → **Manage Products** → click the **Refund Effectiveness** card.
+2. On the **Refund Effectiveness** page, leave the default **From/To** (last 30 days — it must span steps A–C, all dated within the last day) or widen it.
+3. Confirm the table shows: **Member cancellations** count ≥ 1 (no amount), **Goodwill vouchers** 1 · $50.00, **Session-cancel refunds** 1 · $25.00, **Series auto-cancel refunds** 1 · $25.00, and a **Total refunded / issued** of **$100.00** (50 + 25 + 25).
+
+**E. Date-range & empty state**
+1. Set **From** and **To** to a past week with no activity → the page shows **"No refund activity in this range."**
+2. Set **From** later than **To** → inline **"Pick a valid date range."** and no server call.
 
 ## 6. SL-9 Skill Assignment History UI
 
