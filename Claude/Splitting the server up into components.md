@@ -243,12 +243,23 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Keep the single `knottyyoga_tests` executable; it now links app + platform + testing targets.
 
 ### 2.7 Layering enforcement
-- [ ] Verify no include violations remain across the new target boundaries (each target's headers only reference its own layer or below). Add a small CI-runnable check script (path-prefix include audit) to keep it true.
+
+Build-system enforcement comes in tiers of increasing strength; each phase turns on the next tier:
+- **Link-level (this phase, automatic):** layered static libs catch upward *calls* as undefined symbols at link time. Leaky — header-only usage (inline/templates/structs) generates no symbol, and CMake permits cycles between static libraries, so this alone is not enough.
+- **Include-path-level (activates with 3.1):** once each component owns its include root and include paths propagate only via `target_link_libraries`, an upward `#include` fails at compile time ("header not found") — the violation becomes inexpressible. Blocked until the physical file move because today `src/` is one shared PUBLIC include root.
+- **Repo-level (Phase 4):** app code doesn't exist in the honuware repo, so component→app coupling can't compile; standalone CI proves it continuously, and the Phase 5 example server does the same for the API surface.
+
+Work items:
+- [ ] Add a `honuware_add_component(NAME <c> DEPENDS <lower components...>)` CMake wrapper that declares each component against an explicit allowed-layer DAG and fatals on anything else — closes the static-lib-cycle loophole and makes the layer diagram executable.
+- [ ] Set `CMAKE_LINK_LIBRARIES_ONLY_TARGETS ON` (CMake 3.23+) so raw/typo'd library names error instead of silently resolving.
+- [ ] Add a small CI-runnable path-prefix include-audit script. This is the gap-coverage tier: it's the only check that catches violations *within* a single target (possible while all components still share the `src/` include root) and it works from day one. Keep it even after 3.1 as a fast pre-build check.
+- [ ] Verify no include violations remain across the new target boundaries (each target's headers only reference its own layer or below).
 
 ## Phase 3 — Dry-run the extraction inside the repo
 
 ### 3.1 Physical layout
 - [ ] Move component-target sources into a top-level `components/` directory tree inside the knottyyoga repo mirroring the future repo layout (`components/foundation/`, `components/data/`, …), updating include prefixes once (mechanical, like the 2023 refactor — ~300 includes). App code keeps `src/`.
+- [ ] Give each component its own include root (`target_include_directories` per component, propagated only via `target_link_libraries`) instead of the single shared `src/` root. **This is the step that turns on compile-time layering enforcement** — an upward `#include` becomes "header not found" (see 2.7). Verify a deliberate violation fails to configure/compile on both Windows and Linux.
 - [ ] Component tests live with their code (per testing conventions) and still feed the single test executable.
 
 ### 3.2 Bootstrap seam
