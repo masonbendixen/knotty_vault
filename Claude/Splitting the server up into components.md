@@ -346,9 +346,33 @@ Work items:
 ## Phase 3 — Dry-run the extraction inside the repo
 
 ### 3.1 Physical layout
-- [ ] Move component-target sources into a top-level `components/` directory tree inside the knottyyoga repo mirroring the future repo layout (`components/foundation/`, `components/data/`, …), updating include prefixes once (mechanical, like the 2023 refactor — ~300 includes). App code keeps `src/`.
-- [ ] Give each component its own include root (`target_include_directories` per component, propagated only via `target_link_libraries`) instead of the single shared `src/` root. **This is the step that turns on compile-time layering enforcement** — an upward `#include` becomes "header not found" (see 2.7). Verify a deliberate violation fails to configure/compile on both Windows and Linux.
-- [ ] Component tests live with their code (per testing conventions) and still feed the single test executable.
+
+**Decision (this session):** execute Option A — move the **lower four components**
+(foundation, data, services, square) now; `platform` (carved file-by-file out of
+db_schema/table_helpers/business_logic/endpoints) is a dedicated follow-up. And
+**preserve include prefixes**: files move to `components/<layer>/<original-subpath>/`
+so existing `#include "util/..."` / `"sql_util/..."` lines are unchanged (~0 include
+edits) — the ~300-include prefix flatten is deferred to the real extraction (Phase 4).
+Scale that drove this: 1,686 files, 27 CMakeLists, `platform` split through the four
+largest dirs; no C++ build available to Claude, so lower-4-first keeps each diff
+buildable-and-reviewable per the one-layer-at-a-time rule.
+
+- [ ] Move component-target sources into a top-level `components/` directory tree … **(lower 4 DONE; platform pending)**
+    - Moved: `src/util/` core + `http` → `components/foundation/util/`; `src/util/{secrets,mail}` → `components/services/util/`; `src/util/square` → `components/square/util/square`; `src/sql_util/{database_access,schema,stored_procedures,database_common.h,json/key_value_table_json}` → `components/data/sql_util/`; config_secrets (db_schema + table_helper) → `components/services/`. `src/util/` no longer exists. Prefixes preserved, so no `#include` line changed.
+    - Split dirs handled: `sql_util/json` (kv → data, `database_rest_helper` stays platform in `src/`), `db_schema`/`sql_util/table_helpers` (config_secrets → services, framework/app stay in `src/`) — each got a small new CMakeLists at the moved location and its `src/` CMakeLists trimmed.
+- [ ] Give each component its own include root … **This is the step that turns on compile-time layering enforcement** … Verify a deliberate violation fails to configure/compile on both Windows and Linux. **(lower 4 DONE; Win/Linux compile check is the user's build)**
+    - Each of `components/{foundation,data,services,square}/CMakeLists.txt` sets `target_include_directories(honuware_<c> PUBLIC ${CMAKE_CURRENT_LIST_DIR})`; the four were **removed** from `src/CMakeLists.txt`'s shared-root list. So they no longer see `src/` — an upward `#include` is now a compile-time "file not found". Consumers still resolve lower headers via the components' PUBLIC include dirs propagated through the existing Phase-2 DAG links.
+    - **User build check:** add e.g. `#include "sql_util/database_common.h"` to `components/foundation/util/types.cpp` → it must fail to compile ("file not found"). Confirm on Windows + Linux.
+- [ ] Component tests live with their code (per testing conventions) and still feed the single test executable. **(lower 4 DONE)**
+    - Test files (`*_test.cpp`) and doubles (`*_test_util.*`) moved with their component's directory; their CMakeLists still assign them to `knotty_yoga_tests` / `honuware_testing`, which keep the `src/` + server-root include roots and link the components, so they resolve everything.
+
+**Verification performed (no C++ compile available to Claude):**
+- Physical move clean: `src/util/` gone, `components/` tree correct, `database_rest_helper` correctly stayed in `src/sql_util/json/`.
+- Include-audit (`tools/check_include_layering.py`, updated to scan `components/` + classify by location): self-test **20/20**, real audit **OK — no upward includes** across the moved lower 4 (proves the move preserved layering; nothing needed `src/`).
+- Structural check (dangling refs / broken `add_subdirectory` / orphans): **0 dangling, 0 broken subdirs**; the only 3 orphans are pre-existing/unrelated (`refund_reasons.h`, a pre-existing `endpoints` test omission, `src/main.cpp` via `${SOURCE_FILES}`).
+- **Stub CMake configure** of the four component CMakeLists (Conan/targets stubbed): parses + generates cleanly (`STUB-CONFIG-OK`), so all `add_subdirectory` chains resolve and every `target_sources` file exists.
+
+**Remaining follow-ups (per the earlier estimate):** `platform` carve-out (~2–3 steps: `business_logic/{auth,images,migration}` subdirs; the `db_schema`/`table_helpers`/`json` framework split; the 601-file `endpoints` framework split) + optionally the `testing` harness → `components/testing/`.
 
 ### 3.2 Bootstrap seam
 - [ ] Ensure everything app-specific enters via explicit registration at startup: database name, secret defaults, admin-metadata population, scheduler job catalog, DatabaseInfo composition, endpoint registration. `main.cpp` + `create_database.cpp` become the single composition roots. (Most of this falls out of Phases 1–2; this item is the audit.)
