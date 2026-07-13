@@ -432,7 +432,7 @@ Compile-time layering enforcement (3.1.5 flip + the audit tool's platform check)
 - Claude: prepare the full pushable tree + resolve the standalone-build blockers below.
 
 **Top-level files Claude prepares (new, repo root):**
-- [ ] `LICENSE` (Apache-2.0 text) + `NOTICE` (copyright holder — default "Knotty Yoga" unless Mason picks his name / "The honuware authors" — plus the "extracted from knottyyoga@\<SHA>" line).
+- [ ] `LICENSE` (Apache-2.0 text) + `NOTICE` (copyright holder — default "Knotty Yoga" unless Mason picks his name / "The honuware authors" — plus the "extracted from knottyyoga@\<SHA\>" line).
 - [ ] `README.md` (what it is, the foundation→data→services→platform layer stack + square/testing side targets, quick-start build/test) and a component-scoped `CLAUDE.md` (layering rules, the Windows Crow `HTTPMethod` PascalCase gotcha, no-fixture/self-contained test conventions, the `::Mail::` + `MakeTestSecretsHelper` patterns).
 - [ ] Top-level `CMakeLists.txt`: declares the **six** component targets via `honuware_add_component` (foundation, data, services, square, platform, testing) — NOT `knotty_yoga_core`/`_tests`/app libs — `add_subdirectory`s `components/*`, builds a **component test executable** in place of `knotty_yoga_tests`, and calls `honuware_validate_layering()`. Carry over `cmake/honuware_layering.cmake` and the `ConanLibImports.cmake` generation + `certs/cacert.pem` (Square/HTTP SSL).
 - [ ] `conanfile.py` **trimmed** to the components' third-party deps only. Drop app/CLI-only ones — `ftxui`, `replxx` (test-helper TUI), and audit `abseil`/`date`/`libcurl` usage. Keep: boost, crowcpp-crow, libpqxx, openssl, libsodium, mailio, gtest, the image libs (libjpeg/libpng/libtiff/zlib) used by `platform/business_logic/images`.
