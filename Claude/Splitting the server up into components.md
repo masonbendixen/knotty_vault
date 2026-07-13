@@ -425,8 +425,25 @@ Compile-time layering enforcement (3.1.5 flip + the audit tool's platform check)
 ## Phase 4 — Extract to the shared repo
 
 ### 4.1 Repo creation
-- [ ] Create the `honuware` repo on GitHub (public, per Q2), with Apache-2.0 `LICENSE` + `NOTICE` (per Q5), README, CLAUDE.md (layering rules, Windows gotchas, testing conventions), and the `components/` tree moved over with fresh history + "extracted from knottyyoga at SHA …" note (per Q11).
-- [ ] Component repo builds standalone: own `conanfile.py` (subset of deps), own CMake, own test executable for component tests (data/platform/testing tests need a Postgres container — reuse the `test_container` pattern).
+
+**Division of labor.** Repo creation + all git/push is Mason's (his account, a public *publish* action); everything that goes *inside* the tree + the standalone decoupling is Claude's. Because Q11 = **fresh history**, extraction is just "assemble a clean folder → `git init` → one commit → push" — no `git-filter-repo` / history rewriting.
+
+- Mason: create an **empty** public `honuware` repo (personal or a `honuware` org — org preferred if friends contribute; cosmetic). **Do NOT auto-init** README/.gitignore/license — the first commit must be our clean extraction commit. Then from the prepared tree: one commit `Initial extraction from knottyyoga@<SHA>`, push. (FetchContent SHA wiring in the app is 4.2.)
+- Claude: prepare the full pushable tree + resolve the standalone-build blockers below.
+
+**Top-level files Claude prepares (new, repo root):**
+- [ ] `LICENSE` (Apache-2.0 text) + `NOTICE` (copyright holder — default "Knotty Yoga" unless Mason picks his name / "The honuware authors" — plus the "extracted from knottyyoga@<SHA>" line).
+- [ ] `README.md` (what it is, the foundation→data→services→platform layer stack + square/testing side targets, quick-start build/test) and a component-scoped `CLAUDE.md` (layering rules, the Windows Crow `HTTPMethod` PascalCase gotcha, no-fixture/self-contained test conventions, the `::Mail::` + `MakeTestSecretsHelper` patterns).
+- [ ] Top-level `CMakeLists.txt`: declares the **six** component targets via `honuware_add_component` (foundation, data, services, square, platform, testing) — NOT `knotty_yoga_core`/`_tests`/app libs — `add_subdirectory`s `components/*`, builds a **component test executable** in place of `knotty_yoga_tests`, and calls `honuware_validate_layering()`. Carry over `cmake/honuware_layering.cmake` and the `ConanLibImports.cmake` generation + `certs/cacert.pem` (Square/HTTP SSL).
+- [ ] `conanfile.py` **trimmed** to the components' third-party deps only. Drop app/CLI-only ones — `ftxui`, `replxx` (test-helper TUI), and audit `abseil`/`date`/`libcurl` usage. Keep: boost, crowcpp-crow, libpqxx, openssl, libsodium, mailio, gtest, the image libs (libjpeg/libpng/libtiff/zlib) used by `platform/business_logic/images`.
+
+**Standalone-build blockers Claude must resolve (the real work — the components have never compiled without the app):**
+- [ ] **Sever `honuware_testing → knotty_yoga_core`.** The test harness currently links the app core (root `CMakeLists.txt` comment) — `endpoint_test_helper` reaches app-core headers. Make the harness depend only on `platform` (+square). This is the "one documented app edge" that must dissolve on extraction.
+- [ ] **Cut the `secrets_helper_test_util.cpp → business_logic/app_secret_values.h` reverse dep.** The in-memory test secrets double auto-loads the *app's* brand defaults; in standalone there's no app. Supply neutral in-repo defaults instead.
+- [ ] Sweep all of `components/` for any lingering `#include` of a `business_logic/{payment,scheduling,skills}` or app `endpoints/*` header (should be none post-3.2, but verify — a hit is a broken boundary).
+- [ ] Component test executable: its own `main` + wire the data/platform/testing tests to the Postgres `test_container` pattern.
+
+**Caveat:** components have not yet been compiled in isolation — expect a round or two of "app symbol leaked / missing include." Full proof is the Phase-5 example server; 4.1's bar is the six components + their tests building with zero `knottyyoga` headers.
 
 ### 4.2 Consumption from the app
 - [ ] knottyyoga consumes via FetchContent pinned to a tag/SHA (P1), with `FETCHCONTENT_SOURCE_DIR` override documented for local co-development. Component tests that moved out are removed from the app's test lib; app test suite still green.
