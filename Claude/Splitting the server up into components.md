@@ -390,7 +390,29 @@ Claude, so each step is user-built before the next).
 **Phase 3.1 (physical layout) complete** — every honuware component (`foundation`, `data`, `services`, `square`, `platform`, `testing`) now lives under `components/<layer>/` with its own include root; only the Knotty Yoga app (`knotty_yoga_core`) + app-side helper/scheduler libs remain in `src/`.
 
 ### 3.2 Bootstrap seam
-- [ ] Ensure everything app-specific enters via explicit registration at startup: database name, secret defaults, admin-metadata population, scheduler job catalog, DatabaseInfo composition, endpoint registration. `main.cpp` + `create_database.cpp` become the single composition roots. (Most of this falls out of Phases 1–2; this item is the audit.)
+- [x] **Bootstrap-seam audit.** *(DONE this session — audit complete; 3 residual-leak fixes tracked below.)*
+
+**Positive seams — all app-specific composition enters via explicit registration at the two composition roots (confirmed):**
+| Seam | Where injected | Mechanism |
+|---|---|---|
+| Database name | `main.cpp:27,32`; `create_database.cpp:2982` | `App::kDatabaseName` → `MakeProductionDatabaseHelper(name)` / `MakeDatabaseInfo(name)` (framework takes it as a param) |
+| DatabaseInfo composition | both roots | `DbSchema::MakeDatabaseInfo(App::kDatabaseName)` composes framework + app tables app-side |
+| Secret defaults | `create_database.cpp:2153,2157` | framework `Secrets::Values::FillInSecretsStringView` + app/brand `App::FillInAppSecretDefaults` |
+| Admin-metadata population | `create_database.cpp:2840–2852` | the app-side `PopulateAdmin*` calls |
+| Endpoint registration | `main.cpp:110` | `Endpoints::RegisterAllEndpoints()` anchor |
+| App Square service | `main.cpp:106` | `webApp.SetService<Square::SquareClient>(...)` — framework `WebApp` stays Square-free (Phase 1.6) |
+| iCal identity | app call sites | `App::AppICalConfig()` passed into the generic `ICalGenerator` |
+| Scheduler job catalog | scheduler executable (`scheduler/main.cpp`) | its own composition root; job list is app-defined there |
+
+Compile-time layering enforcement (3.1.5 flip + the audit tool's platform check) already guarantees no framework→app **include** edge. The audit's remaining job was the thing the compiler can't see: **hardcoded app literals in framework production code.**
+
+**Negative findings — residual brand literals in `components/` production code:**
+- [x] **(cosmetic, FIXED)** `foundation/util/logging.cpp` — internal Crow log-handler class named `KnottyyogaCrowLogHandler` (anonymous-namespace, 2 lines, no external refs) → renamed `CrowLogHandler`. Zero behavior change; foundation is first-to-extract.
+- [ ] **(HIGH) mail-sender identity baked into framework `secret_keys.h`.** `kMailSenderName = "Knotty Yoga and Spa"` and `kMailSenderAddress = "knottyyogaandspa@gmail.com"` put brand VALUES where the key-name string belongs (every other key is `kXxx = "snake_case_key"`). Worse, ~40 call sites use `std::string(Secrets::kMailSenderName)` **directly as the value** rather than `LookupSecret`, so `app_secret_values.cpp`'s registered default (which sets key `"Knotty Yoga and Spa"` = value `"Knotty Yoga and Spa"`) is dead for those paths — the brand ships inside honuware_services. **Fix (own change, needs build):** rename the two constants to real key names, and convert all consumers (business_logic/payment + scheduling, several endpoints, auth `person.cpp`/`quick_account_helper.cpp`) to look the value up via `SecretsHelper` (populate a `Mail::TenantBranding` — the abstraction already exists in `services/util/mail/tenant_branding.h`).
+- [ ] **(MEDIUM) server banner.** `platform/endpoints/security_headers.cpp` hardcodes `kServerBanner = "Knotty Yoga"` for the HTTP `Server:` header. **Fix:** inject the banner into `SecurityHeaders` at construction (framework default neutral/empty; app passes its name in `main.cpp`/web-app wiring); update `security_headers_test.cpp`.
+- [ ] **(MEDIUM) service-account identity.** `platform/business_logic/auth/service_account.h` hardcodes `"@knottyyoga.local"` / `"scheduler@knottyyoga.local"`. App/deployment-specific. **Fix:** app-supply the service-account email domain (thread through `service_account.cpp` + the DB-helper seed + scheduler login).
+
+**Accepted / not-leaks:** the `KNOTTYYOGA_*` env-var names are the documented legacy fallbacks of the `HONUWARE_*` transition (CLAUDE.md env table) — removed once no deploy relies on them; `services/util/mail/tenant_branding.h` is the intended brand-injection abstraction, not a leak; brand strings in `*_test.cpp` under `components/` are app test fixtures (compiled into `knotty_yoga_tests`), genericized later if desired. `create_database.cpp`/`main.cpp` are the app composition roots and legitimately hold brand values.
 
 ## Phase 4 — Extract to the shared repo
 
