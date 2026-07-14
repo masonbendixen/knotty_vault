@@ -469,6 +469,7 @@ git branch -M main
 git push -u origin main
 ```
 - [ ] **Step 6 [M+C] — Standalone build shakeout.** [M] configure+build the six components + test exe in the new repo (against a `honuware_test` Postgres DB) with **no** `knottyyoga`/`src` on the include path; [C] fixes any residual leak. *(Known follow-up: `tenant_branding_test.cpp`'s two brand-asserting tests must set their own values — standalone registers no app defaults.)*
+- Mason- Note that I had to copy conan_provider.cmake and CMakeSettings.json
 
 **Caveat:** components have not yet been compiled in isolation — expect a round or two of "app symbol leaked / missing include." Full proof is the Phase-5 example server; 4.1's bar is the six components + their tests building with zero `knottyyoga` headers.
 
