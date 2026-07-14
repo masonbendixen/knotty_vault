@@ -458,13 +458,13 @@ Legend: **[C]** = Claude edits files · **[M]** = Mason runs configure/build/git
 git rev-parse HEAD
 ```
 
-	Copy that hash, then from `C:\Users\mason\source\repos\server_components` run (paste the hash in place of `<SHA>`; use `master` instead of `main` if that's your convention):
+	Copy that hash (4f94de9ca1cd2759b56535ad905bbb30d7836f5e), then from `C:\Users\mason\source\repos\server_components` run (paste the hash in place of `<SHA>`; use `master` instead of `main` if that's your convention):
 
 ```
 git init
 git remote add origin https://github.com/honuware/server_components.git
 git add -A
-git commit -m "Initial extraction from knottyyoga@<SHA>"
+git commit -m "Initial extraction from knottyyoga@4f94de9ca1cd2759b56535ad905bbb30d7836f5e"
 git branch -M main
 git push -u origin main
 ```
