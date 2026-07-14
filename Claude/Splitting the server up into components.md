@@ -452,7 +452,22 @@ Legend: **[C]** = Claude edits files · **[M]** = Mason runs configure/build/git
 	- [x] **Step 3 verify [M]:** *(done — Mason built everything and ran tests, all green, checked in.)*
 - [x] **Step 4 [C] — Author the honuware repo's own top-level files** *(done this session)* — all written to `C:\Users\mason\source\repos\server_components\`: top-level `CMakeLists.txt` (7 targets: foundation/data/services/square/platform/testing/tests + the `honuware_test_runner` exe, framework-only DAG), framework-only `cmake/honuware_layering.cmake` (drops the `knotty_yoga_*` app targets; adds `honuware_tests` allow-list), `conanfile.py` trimmed (dropped `ftxui`/`replxx`; class renamed `HonuwareRecipe`), `LICENSE` (Apache-2.0), `NOTICE` (Copyright 2026 Knotty Yoga; SHA carried in the commit msg), `README.md`, component-scoped `CLAUDE.md`, `.gitignore` (ignores generated `ConanLibImports.cmake`), and `test/main.cpp` (composes a framework-only `DatabaseInfo` via `MakeFrameworkTables`, db name `honuware_test`; no app registration).
 - [x] **Step 5 [C] — Assemble the tree** *(done this session)* — copied `components/` (457 files) + `certs/` into `C:\Users\mason\source\repos\server_components\`. `cmake/` and the top-level files were authored there directly in Step 4. Verified zero `(knotty_yoga_core`/`(knotty_yoga_tests` CMake commands in the copied tree (only explanatory comments remain).
-	- [ ] **Step 5 action [M]:** in `C:\Users\mason\source\repos\server_components`, `git init` → `git remote add origin https://github.com/honuware/server_components.git` → `git add -A` → one commit `Initial extraction from knottyyoga@<SHA>` (SHA = current knottyyoga HEAD) → `git push -u origin <branch>`.
+	- [ ] **Step 5 action [M]:** first get the extraction SHA — from the **knottyyoga** repo (`C:\Users\mason\source\repos\knottyyoga`), run:
+
+```
+git rev-parse HEAD
+```
+
+	Copy that hash, then from `C:\Users\mason\source\repos\server_components` run (paste the hash in place of `<SHA>`; use `master` instead of `main` if that's your convention):
+
+```
+git init
+git remote add origin https://github.com/honuware/server_components.git
+git add -A
+git commit -m "Initial extraction from knottyyoga@<SHA>"
+git branch -M main
+git push -u origin main
+```
 - [ ] **Step 6 [M+C] — Standalone build shakeout.** [M] configure+build the six components + test exe in the new repo (against a `honuware_test` Postgres DB) with **no** `knottyyoga`/`src` on the include path; [C] fixes any residual leak. *(Known follow-up: `tenant_branding_test.cpp`'s two brand-asserting tests must set their own values — standalone registers no app defaults.)*
 
 **Caveat:** components have not yet been compiled in isolation — expect a round or two of "app symbol leaked / missing include." Full proof is the Phase-5 example server; 4.1's bar is the six components + their tests building with zero `knottyyoga` headers.
