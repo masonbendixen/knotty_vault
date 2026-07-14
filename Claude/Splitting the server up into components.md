@@ -469,6 +469,9 @@ git branch -M main
 git push -u origin main
 ```
 - [ ] **Step 6 [M+C] — Standalone build shakeout.** [M] configure+build the six components + test exe in the new repo (against a `honuware_test` Postgres DB) with **no** `knottyyoga`/`src` on the include path; [C] fixes any residual leak. *(Known follow-up: `tenant_branding_test.cpp`'s two brand-asserting tests must set their own values — standalone registers no app defaults.)*
+	- **Shakeout log:**
+		- *Configure:* [M] copied `conan_provider.cmake` + `CMakeSettings.json` over from knottyyoga (the Conan/CMake toolchain glue); CMake then configured. *(These two should be added to the repo tree so a fresh clone configures — TODO fold into Step 4/5 file set.)*
+		- *Build fail #1 (FIXED [C]):* `honuware_platform` and `honuware_testing` had **no component link edges**, so every `util/...`/`sql_util/...`/`crow.h`/`gtest/gtest.h` include failed. Root cause: those two edges (`platform → services/data/foundation`; `testing → platform/square/gtest/pqxx/crow`) lived in knottyyoga's app-side `src/CMakeLists.txt` + `test/CMakeLists.txt`, which were not copied. Added both to the honuware top-level `CMakeLists.txt`. → [M] reconfigure + rebuild.
 - Mason- Note that I had to copy conan_provider.cmake and CMakeSettings.json
 
 **Caveat:** components have not yet been compiled in isolation — expect a round or two of "app symbol leaked / missing include." Full proof is the Phase-5 example server; 4.1's bar is the six components + their tests building with zero `knottyyoga` headers.
