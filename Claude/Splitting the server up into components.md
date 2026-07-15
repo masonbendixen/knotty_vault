@@ -468,7 +468,7 @@ git commit -m "Initial extraction from knottyyoga@4f94de9ca1cd2759b56535ad905bbb
 git branch -M main
 git push -u origin main
 ```
-- [ ] **Step 6 [M+C] — Standalone build shakeout.** [M] configure+build the six components + test exe in the new repo (against a `honuware_test` Postgres DB) with **no** `knottyyoga`/`src` on the include path; [C] fixes any residual leak. *(Known follow-up: `tenant_branding_test.cpp`'s two brand-asserting tests must set their own values — standalone registers no app defaults.)*
+- [x] **Step 6 [M+C] — Standalone build shakeout — DONE (7/14/2026).** Six shakeout findings, all fixed (see log). Both trees now build + pass green, and Mason pushed both. **Phase 4.1 COMPLETE: the extraction is proven** — the six honuware components + their tests build and pass standalone with zero application code, live at `github.com/honuware/server_components`.
 	- **Shakeout log:**
 		- *Configure:* [M] copied `conan_provider.cmake` + `CMakeSettings.json` over from knottyyoga (the Conan/CMake toolchain glue); CMake then configured. *(These two should be added to the repo tree so a fresh clone configures — TODO fold into Step 4/5 file set.)*
 		- *Build fail #1 (FIXED [C]):* `honuware_platform` and `honuware_testing` had **no component link edges**, so every `util/...`/`sql_util/...`/`crow.h`/`gtest/gtest.h` include failed. Root cause: those two edges (`platform → services/data/foundation`; `testing → platform/square/gtest/pqxx/crow`) lived in knottyyoga's app-side `src/CMakeLists.txt` + `test/CMakeLists.txt`, which were not copied. Added both to the honuware top-level `CMakeLists.txt`. → [M] reconfigure + rebuild.
@@ -483,8 +483,21 @@ git push -u origin main
 **Caveat:** components have not yet been compiled in isolation — expect a round or two of "app symbol leaked / missing include." Full proof is the Phase-5 example server; 4.1's bar is the six components + their tests building with zero `knottyyoga` headers.
 
 ### 4.2 Consumption from the app
-- [ ] knottyyoga consumes via FetchContent pinned to a tag/SHA (P1), with `FETCHCONTENT_SOURCE_DIR` override documented for local co-development. Component tests that moved out are removed from the app's test lib; app test suite still green.
-- [ ] Update `package/Dockerfile` / `build_linux_release.sh` so the single-image build fetches the pinned component source (git in builder stage or vendored tarball). One image, all binaries, one version string — unchanged contract.
+
+**Goal:** knottyyoga stops maintaining its own copy of `components/` and pulls honuware in via CMake FetchContent pinned to a SHA. This ends the "edit knottyyoga → sync → push honuware" dance (honuware becomes the single source of truth for the components) and is the real payoff of the extraction.
+
+**The core challenge:** honuware's top-level `CMakeLists.txt` is a *standalone project* (it calls `project()`, runs Conan, builds `honuware_test_runner`). When knottyyoga `add_subdirectory()`s it via FetchContent, only the component-library declarations should run — knottyyoga owns `project()` / Conan / the `${XXX_LIB}` variables. So honuware's top-level must become **dual-mode**.
+
+Legend: **[C]** Claude edits · **[M]** Mason builds/git. This rewires knottyyoga's whole build, so review before executing; do one build between steps.
+
+- [ ] **4.2.1 [C] — Make honuware's top-level `CMakeLists.txt` dual-mode.** Guard the standalone-only scaffolding behind `if(PROJECT_IS_TOP_LEVEL)`: `project()`, C++/compiler flags, `CMAKE_LINK_LIBRARIES_ONLY_TARGETS`, `find_package(Boost)` + `include(ConanLibImports.cmake)`, the gssapi link, and the `honuware_test_runner` exe + certs copy. **Always run** (both modes): `include(honuware_layering.cmake)`, the `honuware_add_component` declarations, `set(HONUWARE_TESTS_TARGET honuware_tests)`, the platform/testing link edges, `add_subdirectory(components/*)`, and `honuware_validate_layering()`. Standalone build must still pass. → push honuware, note the new SHA.
+- [ ] **4.2.2 [C] — Rewire knottyyoga's root `CMakeLists.txt` to consume honuware.** Replace the local `honuware_add_component` declarations + `add_subdirectory(components/*)` with `FetchContent_Declare(honuware GIT_REPOSITORY https://github.com/honuware/server_components.git GIT_TAG <SHA>)` + `FetchContent_MakeAvailable(honuware)`, placed **after** knottyyoga's `include(ConanLibImports.cmake)` (honuware's components resolve `${CROW_LIB}` etc. from knottyyoga's ConanLibImports — knottyyoga's conanfile is a superset). knottyyoga keeps its own `project()`/Conan and its `knotty_yoga_core/_tests/_scheduler` declarations, and **stops** setting `HONUWARE_TESTS_TARGET` (honuware's top-level now sets it to `honuware_tests`, so the component tests build into honuware's target, not `knotty_yoga_tests` — that IS "component tests removed from the app test lib").
+- [ ] **4.2.3 [C] — Delete knottyyoga's local `components/` tree.** It now comes from FetchContent. The app-side files previously relocated OUT of `components/` (`app_migrations`, `all_migrations`, `get_table_rows_test`, `database_rest_helper_test`) stay in `src/`. Retire the `sync_honuware_tree.py` workflow.
+- [ ] **4.2.4 [M] — Build + test knottyyoga.** Green with the components pulled from the pinned honuware SHA. (First configure will `git clone` honuware into the build tree.)
+- [ ] **4.2.5 [C] — Document the `FETCHCONTENT_SOURCE_DIR_HONUWARE` override** (already in honuware's README) in knottyyoga so local co-development can point at a working tree instead of the pinned SHA.
+- [ ] **4.2.6 [C] — Dockerfile / `build_linux_release.sh`:** ensure the single-image build can reach the pinned honuware source (git available in the builder stage, or a vendored tarball). One image, all binaries, one version string — unchanged contract.
+
+**Sequencing note:** the two logged follow-ups (port `get_table_rows_test`/`database_rest_helper_test` back to framework tables; cosmetic comment scrub) are independent of 4.2 and can be done before it (via the current sync workflow) or after (editing honuware directly). They restore honuware coverage but don't block consumption.
 
 ### 4.3 CI
 - [ ] Component repo CI (GitHub Actions, per Q2): Linux build + full component test run with Postgres service. No Windows CI job — Windows/MSVC verified manually (per Q10).
