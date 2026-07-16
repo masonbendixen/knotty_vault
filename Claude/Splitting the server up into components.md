@@ -192,6 +192,19 @@ How the app (and future sites) consume the component repo:
 
 **Deployment invariant.** Through every phase, one Docker build must keep producing one image with all binaries and one version string. FetchContent keeps this true automatically (the builder clones the pinned component SHA during `cmake` configure; the Dockerfile needs git + network in the build stage, or a vendored source tarball).
 
+**Builder/runtime glibc pairing — LOGGED FOLLOW-UP, not yet fixed (found 7\16\2026 while scoping 4.3 CI; belongs to deploy/4.4, not 4.3).** `package/Dockerfile` **builds on a newer glibc than it runs on**, which is the unsupported direction (glibc is backward- but not forward-compatible):
+
+| Stage | Image | glibc |
+|---|---|---|
+| Builder | `gcc:14.2.0` (Debian bookworm) | 2.36 |
+| Runtime | `ubuntu:22.04` | 2.35 |
+
+- **Why libstdc++ is fine but glibc is not.** The official `gcc` image installs its GCC to `/usr/local`, so `libstdc++.so.6` resolves to `/usr/local/lib64/…`, which `build_linux_release.sh`'s `is_system_lib()` (matching only `/lib/*`, `/lib64/*`, `/usr/lib/*`, `/usr/lib64/*`) does **not** match → it gets **bundled** into `stage/lib/` with `$ORIGIN/../lib` RPATH. That is why the GCC-14 libstdc++ isn't a problem. But glibc lives in `/lib/x86_64-linux-gnu/`, **matches**, and is deliberately **not** bundled — so the binary must satisfy its `GLIBC_2.36`-versioned symbol references against the runtime's 2.35.
+- **Status: reasoned from the Dockerfile + staging script, NOT an observed failure.** It may pass by luck (typical server code rarely references brand-new glibc symbols; the classic triggers are things like `__isoc23_strtol`). Plausibly never exercised in this exact configuration, since the `CMP0167` bug (4.3 finding #1) meant the Docker build could not configure at all. **Testable the moment the Docker build runs** — now unblocked.
+- **The rule this implies: `glibc(runtime) >= glibc(builder)`, so the compiler and the runtime base must move as a PAIR.** This directly answers "should we move to a more modern gcc?" — **no, not on its own**: `gcc:15` is Debian trixie (glibc 2.41), which would widen the gap against `ubuntu:22.04` from one version to six. Moving the compiler *without* the runtime makes the deploy **less** compatible, not more.
+- **Recommended order (deferred, Mason's call):** (1) get 4.3 CI green on gcc 14.2 — it also reveals empirically whether ConanCenter has gcc-14 binaries or `--build=missing` compiles the world; (2) separately consider bumping the **runtime** to `ubuntu:24.04` (glibc 2.39 ≥ 2.36), which fixes the skew on its own merits, independent of the compiler; (3) revisit GCC only when something concrete demands it, and then move both bases together. **A GCC bump is not otherwise motivated** — the code is C++17/20 and GCC 14.2 covers C++20 fully, while the pinned deps are old enough (`abseil/20220623.1`, `libjpeg/9e`, `date/3.0.4`, `boost/1.86`) that a newer major's tightened diagnostics are a real recipe-patching risk for zero feature gain.
+- **Scope note:** `build_linux_release.sh`'s header and the systemd units also target Ubuntu 22.04, so a runtime bump touches the **tarball** deploy path too, not just Docker.
+
 **Windows + Linux (decided, Q10).** Components must build in both (you develop on Windows/VS, deploy and test on Linux). Component CI is Linux-only (container with Postgres service); Windows/MSVC is verified manually. The Crow `HTTPMethod` PascalCase rule and other Windows gotchas move into the component repo's CLAUDE.md so manual Windows verification stays cheap.
 
 # Phased Implementation Plan
