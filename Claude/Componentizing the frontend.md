@@ -27,6 +27,8 @@ I'm not sure what the best mechanism is for a separate component. I imagine we w
 
 Eventually, I'd like to do deeper frontend componentization to have a family of frontend sites for other studios that reuse a lot of this code in the frontend but that's a bigger task and for now, I mostly want to do a fairly unrelated website that just makes use of the CRUD editor, auth, photo support, possibly payment, and other generic non fitness studio / spa functionality that is generally applicable to most any website.
 
+Please be creative and give me a number of ideas and options. Please start an open questions / discussion section with me. Please extensively review the code base and this vault.
+
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
 # Place plan here
