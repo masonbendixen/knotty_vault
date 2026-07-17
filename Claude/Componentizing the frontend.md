@@ -89,14 +89,14 @@ Everything else (payments, subscriptions, scheduling, classes, providers, skills
 
 - **[[Splitting the server up into components]] (done through extraction).** `github.com/honuware/server_components` exists and is consumed via FetchContent SHA-pinning. Its Q7 explicitly deferred frontend sharing to *this* job, "to be designed together with the multi-tenant frontend/branding question." Decisions that carry over unchanged: the `honuware` name/org, components public on GitHub, Apache-2.0 + NOTICE, fresh git history, one-repo/one-version/many-targets granularity.
 - **[[Converting the server to a multi tenant Saas architecture]].** The frontend strategy for more studio sites is decided (its Q10): **one shared Angular bundle + runtime branding**, per-tenant CloudFront distributions serving the same artifact. `X-Honuware-Site` is injected by CloudFront at the `/api/*` behavior — **the SPA never sets it, so the library needs zero tenant awareness.** Its Phase 7 adds `/api/site_info` (a `honuware_platform` endpoint) + an app-side `SiteConfigService` to de-hardcode header/footer/about. Consequence for this plan: library components take branding via DI with static defaults now; when tenancy Phase 7 lands, `SiteConfigService` becomes the provider of that same token. We must not build against `/api/site_info` before it exists.
-- **[[Website Makeover]].** Owns design tokens (two-layer), the M2→M3 re-theme, `.surface-card`, and DB-driven per-tenant theming (`/api/site_theme`). This plan does **not** duplicate any of that; it only (a) removes hardcoded colors from extracted components in favor of CSS custom properties with fallbacks, so the makeover can restyle the library without code changes, and (b) raises a sequencing question (OQ5).
-- **The unrelated website** (Overview): needs CRUD editor + auth + photos + possibly payment — exactly the framework subset. It becomes the second consumer that proves the extraction (Phase 5), the same role the example server played in the server plan.
+- **[[Website Makeover]].** Owns design tokens (two-layer), the M2→M3 re-theme, `.surface-card`, and DB-driven per-tenant theming (`/api/site_theme`). This plan does **not** duplicate any of that; it only (a) removes hardcoded colors from extracted components in favor of CSS custom properties with fallbacks, so the makeover can restyle the library without code changes, and (b) **sequencing decided (Q5): extraction first** — the makeover then restyles the library like any other folder via ordinary version bumps, with the co-dev override making the cross-repo stretch painless.
+- **CommunityFinder — the first consumer (decided, Q11).** The "fairly unrelated website" from the Overview is the CommunityFinder project, planned in its own vault (`C:\Users\mason\Documents\Obsidian\CommunityFinder\Claude\Setting up the project.md`). It needs CRUD editor + auth + photos + possibly payment — exactly the framework subset — and it is the effort driving this plan. It plays the proving-consumer role the example server played for `server_components` (Phase 5); once this document is final, Mason folds the `@honuware/ui` consumption model into that project's doc.
 
 # Target Component Architecture
 
 ## Proposed layered entry points
 
-**One npm package with layered secondary entry points** — the frontend expression of the server's Option C (one repo, one version, multiple targets). ng-packagr builds each secondary entry point as a separately importable unit and **fails the build on cycles between entry points**, giving the same build-enforced layering CMake target link rules give the server. Working names (OQ1): repo `honuware/web_components`, package `@honuware/ui`.
+**One npm package with layered secondary entry points** — the frontend expression of the server's Option C (one repo, one version, multiple targets). ng-packagr builds each secondary entry point as a separately importable unit and **fails the build on cycles between entry points**, giving the same build-enforced layering CMake target link rules give the server. Decided (Q1): repo `honuware/web_components`, package `@honuware/ui`.
 
 ```
 @honuware/ui/foundation   ToastService, ConfirmDialogComponent, fuseAnimations,
@@ -160,25 +160,27 @@ This is the Overview's "indirection layer on top of ServerAccess," designed so *
 
 - **Option A — one flat package, no entry points.** Simplest, but a site wanting only `ToastService` drags in the CRUD editor's compiled output, and nothing enforces internal layering. Rejected.
 - **Option B — separate npm packages per layer** (`@honuware/ui-foundation`, `@honuware/ui-auth`, …). Precise, but version-bump ceremony across 6–8 packages while the API churns weekly — the same "too many packages too early" trap the server plan rejected. Rejected.
-- **Option C (recommended) — one package, layered secondary entry points, one version.** Consumers import only the entries they use (tree-shaking keeps bundles honest), layering is build-enforced, and splitting into Option B later is mechanical because the entry-point boundaries *are* the package boundaries. Decided-by-precedent (server Q4) unless you object — confirm in OQ1.
+- **Option C — one package, layered secondary entry points, one version.** Consumers import only the entries they use (tree-shaking keeps bundles honest), layering is build-enforced, and splitting into Option B later is mechanical because the entry-point boundaries *are* the package boundaries.
+
+**Decided (Q1): Option C** — repo `honuware/web_components`, one npm package `@honuware/ui`, layered secondary entry points, selector prefix `hw-`.
 
 # Repository, Packaging & Distribution
 
 ## Hosting
 
-Carried from server Q2: **public GitHub repo under the `honuware` org**, sibling of `server_components`; the knottyyoga app stays private on GitLab. Repo name in OQ1 (recommendation: `web_components`). Apache-2.0 + NOTICE, fresh history with an "extracted from knottyyoga at SHA …" note (server Q5/Q11 precedents).
+Carried from server Q2: **public GitHub repo under the `honuware` org**, sibling of `server_components`; the knottyyoga app stays private on GitLab. **Decided (Q1): repo `honuware/web_components`** — mirrors `server_components`. Apache-2.0 + NOTICE, fresh history with an "extracted from knottyyoga at SHA …" note (server Q5/Q11 precedents).
 
 ## Distribution options — how consumers pull it down
 
 This is where the frontend story is *simpler* than C++: a free, zero-auth public registry exists, so the FetchContent workaround isn't needed for distribution.
 
-- **N1 (recommended steady state) — publish `@honuware/ui` to the public npm registry.** Real semver, `npm install @honuware/ui@0.4.0`, lockfiles, provenance attestation from GitHub Actions. Free for public scoped packages; requires claiming the `honuware` npm org once (verify name availability at implementation). Consumers (friends' sites) do nothing special.
+- **N1 (decided, Q2 — from day one) — publish `@honuware/ui` to the public npm registry.** Real semver, `npm install @honuware/ui@0.4.0`, lockfiles, provenance attestation from GitHub Actions. Free for public scoped packages; requires claiming the `honuware` npm org once (verify name availability at implementation). Consumers (friends' sites) do nothing special.
 - **N2 — GitHub Packages npm registry.** Rejected: GitHub Packages requires an auth token to install npm packages **even when they're public** — permanent friction for every consumer for zero benefit.
 - **N3 — GitHub Release tarball URLs.** CI attaches `ng build` + `npm pack` output to each release; consumers depend on the URL (`npm i https://github.com/honuware/web_components/releases/download/v0.1.0/honuware-ui-0.1.0.tgz`). Registry-free, pin-by-URL — the closest FetchContent analog. Viable interim before the first npm publish; loses semver ranges.
 - **N4 — git dependency with a `prepare` build.** Rejected: an Angular workspace's repo root isn't the publishable package (the built `dist/honuware-ui` is), and build-on-install is slow and fragile — the frontend equivalent of the rejected submodule option.
 - **N5 — source consumption via tsconfig paths** at a pinned checkout. Not a distribution mechanism — it's the co-development mode, below.
 
-**Recommendation:** N3 while the API churns hard (or skip straight to N1 with 0.x semantics and publish liberally — 0.x makes no stability promise); N1 as the steady state. Decide in OQ2.
+**Decided (Q2): N1 from day one.** Mason's call: if the goal is public npm anyway and the API won't rev that much, skip the tarball interim — publish `@honuware/ui` starting at `0.1.0` and rev freely under 0.x semantics (no stability promise until 1.0). CI publishes on tag with provenance (Phase 4.2); claiming the `@honuware` npm org is a Phase 4.1 item.
 
 ## Local co-development — the `FETCHCONTENT_SOURCE_DIR` analog
 
@@ -189,7 +191,7 @@ Day-to-day, you and the friends will edit library + consumer together. The docum
 The extracted components must render correctly in a consumer that has *none* of knottyyoga's global styles. Options:
 
 - **S1 — library stays Tailwind-dependent.** Ship a Tailwind preset; every consumer must run Tailwind with a content glob over `node_modules/@honuware/ui/**/*.mjs` and adopt the CSS-var palette. Works, standard practice — but forces Tailwind (and our config) on every consumer forever.
-- **S2 (recommended) — de-Tailwind the library components.** The candidate set uses only a handful of utilities (essentially the `flex flex-row gap-2` field wrapper; the CRUD containers and photo-upload are already custom-SCSS). Move those few rules into component SCSS during Phase 1. The library becomes CSS-framework-agnostic: consumers need **only an Angular Material theme**. Knottyyoga and any new site remain free to use Tailwind in their own pages.
+- **S2 (decided, Q4) — de-Tailwind the library components.** The candidate set uses only a handful of utilities (essentially the `flex flex-row gap-2` field wrapper; the CRUD containers and photo-upload are already custom-SCSS). Move those few rules into component SCSS during Phase 1. The library becomes CSS-framework-agnostic: consumers need **only an Angular Material theme**. Knottyyoga and any new site remain free to use Tailwind in their own pages.
 - **S3 — compile Tailwind into the library's CSS at build time.** Rejected: build complexity and rule duplication for no gain over S2 at this scale.
 
 Cross-cutting styling rules regardless of option:
@@ -200,7 +202,7 @@ Cross-cutting styling rules regardless of option:
 
 # Cross-Cutting Decisions
 
-- **Naming:** package `@honuware/ui`; component selector prefix changes `app-` → **`hw-`** as components move (a public library exporting `app-*` selectors invites collisions). The rename is mechanical (bounded template edits in composite-control, the table pages, manage pages, account page; specs catch misses) and happens once, at move time (Phase 2.2).
+- **Naming (decided, Q1):** repo `honuware/web_components`, package `@honuware/ui`; component selector prefix changes `app-` → **`hw-`** as components move (a public library exporting `app-*` selectors invites collisions). The rename is mechanical (bounded template edits in composite-control, the table pages, manage pages, account page; specs catch misses) and happens once, at move time (Phase 2.2).
 - **License:** Apache-2.0 + NOTICE (server Q5 precedent — same contributors, same productization logic).
 - **Versioning:** single version for the whole package, tags, `0.x` until a second consumer exists; knottyyoga pins exact versions and upgrades deliberately.
 - **Angular version policy:** the library's peerDependencies target the major it's born on; consumers match; the library upgrades majors first, consumers follow. v19's LTS window ends around Nov 2026 and fresh `ng new` apps (friends' sites) will scaffold on a newer major — so OQ3 recommends upgrading the knottyyoga workspace to the current stable major *before* extraction (verify the exact current major at implementation time).
@@ -349,5 +351,6 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 10. **Mock strategy for `/testing`.** Recommendation: write **fresh, minimal, spec'd framework mocks** in the library (schema-driven CRUD store + auth/photo sims) and leave knottyyoga's 253KB `ServerAccessMock` untouched (it must cover ~250 methods regardless). Accepted trade-off: two implementations of the framework subset exist, with drift possible; the optional later cleanup is delegating the app mock's framework subset to the library mocks. Or do you want that delegation done as part of Phase 2 (more churn in a giant file, single source of truth sooner)?
 	- Mason- I'll go with your recommendation.
 11. **The second consumer.** Is the Phase 5 showcase *literally the seed of your unrelated website* (my assumption — tell me its rough shape: content pages + auth + admin CRUD + photos + payment?), or do you want the showcase kept as a sterile demo and the real site started separately from the template? This decides how opinionated the showcase's shell (header/nav/theming) should be, and which entry points get built first if you want to prioritize.
-	- Mason- 
+	- Mason- I'm working on this site (C:\Users\mason\Documents\Obsidian\CommunityFinder\Claude\Setting up the project.md) to be the first consumer of this componentization effort. Once this document is complete, I will update that document to incorporate it and that effort is driving the need for this document and the work it will involve.
 12. **Branding token timing.** Recommendation: introduce `HONUWARE_BRANDING` (display name, logo URL, website URL) in the library with static app-provided values, consumed only where library components genuinely need it (auth pages' headings, future shared shells); when the tenancy plan's Phase 7 `SiteConfigService`/`/api/site_info` lands, it becomes the token's provider. No library code touches `/api/site_info` before the endpoint exists. Confirm?
+	- Mason- I'll go with your recommendation.
