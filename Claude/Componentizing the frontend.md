@@ -205,10 +205,10 @@ Cross-cutting styling rules regardless of option:
 - **Naming (decided, Q1):** repo `honuware/web_components`, package `@honuware/ui`; component selector prefix changes `app-` → **`hw-`** as components move (a public library exporting `app-*` selectors invites collisions). The rename is mechanical (bounded template edits in composite-control, the table pages, manage pages, account page; specs catch misses) and happens once, at move time (Phase 2.2).
 - **License:** Apache-2.0 + NOTICE (server Q5 precedent — same contributors, same productization logic).
 - **Versioning:** single version for the whole package, tags, `0.x` until a second consumer exists; knottyyoga pins exact versions and upgrades deliberately.
-- **Angular version policy:** the library's peerDependencies target the major it's born on; consumers match; the library upgrades majors first, consumers follow. v19's LTS window ends around Nov 2026 and fresh `ng new` apps (friends' sites) will scaffold on a newer major — so OQ3 recommends upgrading the knottyyoga workspace to the current stable major *before* extraction (verify the exact current major at implementation time).
+- **Angular version policy (decided, Q3):** upgrade the knottyyoga workspace to the current stable major **now**, before any library work — new Phase 1.0 (verify the exact current major + Material availability when starting; v19's LTS window ends around Nov 2026 and fresh `ng new` apps will scaffold newer). The library's peerDependencies target the major it's born on; consumers match; thereafter the library upgrades majors first, consumers follow.
 - **Testing policy:** every entry point ships its specs; the `/testing` mocks are themselves tested (the "test utilities have tests" rule); CI runs headless Chrome. Per the repo-wide rule: every Phase item below includes its tests in the same change.
 - **Boundary enforcement:** consolidate to one Angular-aware ESLint flat config, then `no-restricted-imports` zones: library code may not import `@app/@core/@pages/@shared` or any app-relative path; entry points may only import downward; the app may import the library freely. ng-packagr's cycle check backs this at build time.
-- **Branding/tenancy alignment:** a `HONUWARE_BRANDING` token (studio/site display name, logo URL, website URL) with static per-app values now; when the tenancy plan's Phase 7 `SiteConfigService` exists, it becomes the provider of this token. The library never reads `X-Honuware-Site` (CloudFront injects it) and never calls `/api/site_info` until that endpoint exists — no premature upgrade-path code.
+- **Branding/tenancy alignment (decided, Q12):** a `HONUWARE_BRANDING` token (studio/site display name, logo URL, website URL) with static per-app values now; when the tenancy plan's Phase 7 `SiteConfigService` exists, it becomes the provider of this token. The library never reads `X-Honuware-Site` (CloudFront injects it) and never calls `/api/site_info` until that endpoint exists — no premature upgrade-path code.
 
 # Ideas Beyond the Core (a menu, not commitments)
 
@@ -226,6 +226,10 @@ Cross-cutting styling rules regardless of option:
 Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no packaging, no behavior changes; the app ships after every item. Phase 4 is the extraction; Phase 5 proves reuse. Within each phase, lower layers first. Every item lands with its tests in the same change. (Angular tests run with `npx ng test` from `ui\`; no C++ or git involvement anywhere in this plan — where a step needs a repo created or pushed, it's marked **[Mason]**.)
 
 ## Phase 1 — Break the coupling (in-place refactors)
+
+### 1.0 Angular platform upgrade (decided, Q3 — do this first)
+- [ ] Verify the current stable Angular major + matching Material/CDK releases (implementation-time check), then upgrade the `ui` workspace stepwise — `ng update` one major at a time from 19, Material/CDK in lockstep — applying each major's migration schematics and release-note items (builder/Karma/TypeScript versions ride along).
+- [ ] After each major hop: `npx ng lint`, full `npx ng test`, and all **three** `ng build` configurations green (production, development, and `local` — the mock file replacement is the piece most worth re-verifying per hop); fix any deprecations the migrations surface before taking the next hop.
 
 ### 1.1 Hygiene + dead code (foundation)
 - [ ] Fix the `ErrorInterceptor` redirect `/auth/login` → `/login`; add a spec case pinning the redirect target.
@@ -245,7 +249,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] `simple-date`: replace the `@pages/calendar` `TIME_SEGMENT_INCREMENT_MIN` import with an `@Input() timeIncrementMinutes` (default 20) — callers that need the calendar constant pass it; drop the `SharedModule` barrel for explicit Material imports; specs.
 - [ ] Sweep the remaining extraction-set controls off `SharedModule` onto explicit imports (audit: the five leaf controls, composite-control, fk-picker); specs stay green.
 - [ ] `composite-row-control`: replace the hardcoded `#3f51b5`/`#e0e0e0` submit/cancel buttons with Material buttons (theme-driven); visual parity check in the running app; spec.
-- [ ] De-Tailwind the extraction-set control templates (the `form-fields flex flex-row gap-2` wrapper and friends → component SCSS) — **contingent on OQ4/S2**; skip if S1 is chosen.
+- [ ] De-Tailwind the extraction-set control templates (the `form-fields flex flex-row gap-2` wrapper and friends → component SCSS) — decided S2 (Q4); the library ends Tailwind-free.
 
 ### 1.4 Photos
 - [ ] `photo-upload`: migrate to `HONUWARE_PHOTO_ACCESS` + `PhotoUrlBuilder` (removes the literal `/api/get_scaled_photo/...`); specs updated (upload, defer mode, userMode, delete, URL building).
@@ -259,7 +263,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Break the `controls` ⇄ `pages/admin` loop: move `DatabaseSchemaService` + `table-binding.utils` out of `pages/admin/services` into the framework staging area (`src/app/crud/`); update all importers (both CRUD containers, the three table pages, `pages/manage` consumers). **Write the missing `DatabaseSchemaService` spec** (cache, polling, auth-triggered refresh).
 - [ ] Migrate `table-view-control`, `composite-row-control`, and the three table pages to `HONUWARE_CRUD_ACCESS` (+ `PhotoUrlBuilder` for the 50×50 thumbnails); specs.
 - [ ] Parameterize editor routing: a `CRUD_EDITOR_ROUTES` token `{ basePath: '/admin/tables', adminHome: '/admin' }`; replace the 7+ hardcoded `router.navigate`/`routerLink` sites in the containers and table pages; specs cover default + custom base.
-- [ ] Remove the legacy generation — `EditDbTableComponent`, `TableEntryFormDialogComponent`, the `:tableName` route (+ their specs), and `TableManagementService` if the admin shell's table picker is its last consumer (rework the shell onto `DatabaseSchemaService` directly) — after a reference sweep. **Contingent on OQ8.**
+- [ ] Remove the legacy generation — `EditDbTableComponent`, `TableEntryFormDialogComponent`, the `:tableName` route (+ their specs), and `TableManagementService` if the admin shell's table picker is its last consumer (rework the shell onto `DatabaseSchemaService` directly) — after a reference sweep. Decided (Q8): delete, don't port.
 
 ### 1.7 Square (side)
 - [ ] `SquarePaymentService`: replace the direct `environment` import with a `SQUARE_CONFIG` token (`applicationId`, `locationId`, `scriptUrl`) provided in `app.config.ts` from the environment; specs (config injection, script URL selection).
@@ -277,7 +281,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 - [ ] Move **auth** (AuthService, auth.types, guards, ErrorInterceptor, three pages, AUTH_ROUTES/branding tokens, `tryTokenLogin` initializer factory); app routes/`app.config.ts` import from `@honuware/ui/auth`; specs green.
 - [ ] Move **crud** (DatabaseSchemaService, binding utils, containers, three pages, route token/factory); admin routes import from `@honuware/ui/crud`; specs green.
 - [ ] Move **square** (`SquarePaymentService` + `SQUARE_CONFIG`); `card-picker`/`payment-method` (app-side) import it from `@honuware/ui/square`; specs green.
-- [ ] Build **testing**: fresh, minimal in-memory framework mocks — a schema-driven `CrudAccess` store (tables/rows/FK options honoring `DatabaseSchema`), an `AuthAccess` session simulator (login/logout/me/remember/register/verify), a `PhotoAccess` simulator — plus `provideHonuwareAccess({ mode: 'mock' })`; the mocks get their own specs. (Knottyyoga's 253KB `ServerAccessMock` stays untouched app-side — it must mock all ~250 methods regardless; optionally refactor it later to delegate its framework subset to these mocks. OQ10.)
+- [ ] Build **testing**: fresh, minimal in-memory framework mocks — a schema-driven `CrudAccess` store (tables/rows/FK options honoring `DatabaseSchema`), an `AuthAccess` session simulator (login/logout/me/remember/register/verify), a `PhotoAccess` simulator — plus `provideHonuwareAccess({ mode: 'mock' })`; the mocks get their own specs. (Knottyyoga's 253KB `ServerAccessMock` stays untouched app-side — it must mock all ~250 methods regardless; optionally refactor it later to delegate its framework subset to these mocks — decided, Q10: fresh mocks now, delegation stays an optional later cleanup.)
 
 ### 2.3 Enforcement
 - [ ] Consolidate ESLint to a single Angular-aware **flat config** (port the legacy `.eslintrc.json` rules incl. selector prefixes — now `app` for the app, `hw` for the lib — and delete the stale config); add the boundary rules: library entries may not import app paths; entry-point imports only flow downward; run against both projects, fix any stragglers the rules catch.
@@ -296,21 +300,22 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 ## Phase 4 — Extract to the shared repo
 
 ### 4.1 Repo creation
-- [ ] **[Mason]** Create `github.com/honuware/<OQ1 name>` (fresh history). Then: scaffold the workspace on the chosen Angular major (OQ3), copy `projects/honuware-ui`, port the flat-config lint + boundary rules + headless Karma, add `LICENSE` (Apache-2.0) + `NOTICE` + `README` + `CONTRIBUTING` + the "extracted from knottyyoga at SHA …" note; full lint+test+build green.
+- [ ] **[Mason]** Create `github.com/honuware/web_components` (fresh history) and claim the `@honuware` org on the public npm registry (needed before the first publish — verify name availability; decided Q2). Then: scaffold the workspace on the current stable Angular major (the app already matches after 1.0), copy `projects/honuware-ui`, port the flat-config lint + boundary rules + headless Karma, add `LICENSE` (Apache-2.0) + `NOTICE` + `README` + `CONTRIBUTING` + the "extracted from knottyyoga at SHA …" note; full lint+test+build green.
 
 ### 4.2 CI
-- [ ] GitHub Actions: PR/push → `npm ci`, lint, headless-Chrome tests, `ng build honuware-ui`, `npm pack`, upload the tarball artifact; on tag → publish per OQ2 (npm publish with provenance, or attach to a GitHub Release). This workflow doubles as the CI template for the friends' sites (same role the server repo's CI plays).
+- [ ] GitHub Actions: PR/push → `npm ci`, lint, headless-Chrome tests, `ng build honuware-ui`, `npm pack`, upload the tarball artifact; on tag → `npm publish` to the public registry with provenance (decided, Q2 — npm from day one, 0.x). This workflow doubles as the CI template for the friends' sites (same role the server repo's CI plays).
 
 ### 4.3 Consumption from knottyyoga
 - [ ] Remove `projects/honuware-ui` from the app repo; add the pinned `@honuware/ui` dependency (exact version); delete the source path aliases; commit the documented-but-commented local co-dev paths override (the `FETCHCONTENT_SOURCE_DIR` analog); all three app build configs + the full suite green against the published package. **[Mason]** pushes both repos.
 
-## Phase 5 — Prove reuse with a second consumer
+## Phase 5 — Prove reuse (CommunityFinder + showcase)
 
-### 5.1 Showcase site
-- [ ] `projects/showcase` app in the component repo: login/register/verify flow, the generic data editor over the honuware framework tables, photo upload, toast/confirm/error handling — running on `@honuware/ui/testing` mocks by default (`ng serve` works with zero backend), with a `-c server` configuration proxying to the honuware example server (server plan Phase 5.1) for full-stack integration. This is the seed of the unrelated website and the friends' template. Component specs for the showcase's own pages.
+### 5.1 Dev-harness / showcase app
+- [ ] `projects/showcase` app in the component repo — **a dev harness + living documentation, not the seed of a real site** (decided, Q11: CommunityFinder is the real first consumer, in its own repo): login/register/verify flow, the generic data editor over the honuware framework tables, photo upload, toast/confirm/error handling — running on `@honuware/ui/testing` mocks by default (`ng serve` works with zero backend), with a `-c server` configuration proxying to the honuware example server (server plan Phase 5.1) for full-stack integration. Still the friends' quick-start template. Component specs for the showcase's own pages.
 
-### 5.2 Docs & onboarding
-- [ ] Quickstart: "new site from `ng new`" — install, `provideHonuwareAccess`, theme include, proxy.conf, routes + guards wiring, branding token; a "which entry point do I need" table; entry-point API notes.
+### 5.2 CommunityFinder consumption + docs (the real proof)
+- [ ] Quickstart: "new site from `ng new`" — install, `provideHonuwareAccess`, theme include, proxy.conf, routes + guards wiring, branding token; a "which entry point do I need" table; entry-point API notes. Written against the showcase, validated by CommunityFinder.
+- [ ] **CommunityFinder onboarding (decided, Q11):** its plan lives at `C:\Users\mason\Documents\Obsidian\CommunityFinder\Claude\Setting up the project.md` — once this document is final, Mason folds the `@honuware/ui` consumption model into that doc. CommunityFinder is the extraction's driving consumer; gaps or friction it hits flow back here as work items, and the extraction counts as *proven* when CommunityFinder ships auth + CRUD + photos on the published package.
 
 ### 5.3 Stretch
 - [ ] `ng add @honuware/ui` schematic automating 5.2's wiring.
@@ -328,7 +333,7 @@ Phases 1–3 happen **entirely inside the knottyyoga repo** — no new repos, no
 
 # Open Questions / Discussion
 
-*(Numbered like the server plan's decision record — recommendations inline; reply under each and I'll fold the decisions into the plan and mark items decided.)*
+**Status: all 12 questions are resolved (7/17/2026)** and folded into the plan above. The Q&A below is kept as the decision record. Summary: Q1 repo `honuware/web_components` + package `@honuware/ui` + `hw-` prefix + Option C entry points; Q2 public npm from day one (0.x, CI publish with provenance, org claim in Phase 4.1); Q3 upgrade Angular to the current stable major now (new Phase 1.0); Q4 styling = S2 (de-Tailwind the library; a Material theme is the only consumer requirement); Q5 extraction before Website Makeover; Q6 auth pages ship in the library; Q7 ControlValueAccessor deferred (additive in the library later); Q8 legacy admin editor deleted, not ported; Q9 `@honuware/ui/square` = SDK wrapper only, card/checkout UI stays app-side; Q10 fresh library mocks, app's ServerAccessMock untouched; Q11 CommunityFinder (own vault/repo) is the first consumer — showcase demoted to dev harness; Q12 `HONUWARE_BRANDING` as a static token now, tenancy Phase 7's SiteConfigService feeds it later.
 
 1. **Repo + package naming.** Recommendation: repo `honuware/web_components` (sibling symmetry with `server_components`), npm package `@honuware/ui` with the entry points as designed, selector prefix `hw-`. Alternatives: repo `ui_components`/`honuware-ui`; package-per-layer (Option B) if you disagree with C. Also note: the `@honuware` npm org name needs claiming (N1) — worth doing early even if we start with N3.
 	- Mason- I like honuware/web_components. It mirrors the server_components nicely.
