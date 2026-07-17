@@ -23,7 +23,9 @@ A lot of these things use ServerAccess so we might want to create some kind of i
 
 Please scan the code base for other possible nuggets that are good candidates for componentization.
 
-I'm not sure what the best mechanism is for a separate component. I imagine we will have a new repo on github that is a sibling to 
+I'm not sure what the best mechanism is for a separate component. I imagine we will have a new repo on github that is a sibling to https://github.com/honuware/server_components. We will probably eventually have its own CI/CD pipeline. I'm not sure what is the best way to pull this component down to our existing front end and other frontends.
+
+Eventually, I'd like to do deeper frontend componentization to have a family of frontend sites for other studios that reuse a lot of this code in the frontend but that's a bigger task and for now, I mostly want to do a fairly unrelated website that just makes use of the CRUD editor, auth, photo support, possibly payment, and other generic non fitness studio / spa functionality that is generally applicable to most any website.
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
