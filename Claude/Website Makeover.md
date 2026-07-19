@@ -69,10 +69,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 For each, drop a `- Designer- ...` bullet under the corresponding Open Question further down this document.
 
 - **Open Question 19 (Calendar on mobile).** Default to day view with swipe-between-days, or do you have a different vision?
+	- Mason- Yeah, day view probably makes the most sense for mobile.
 - **Open Question 20 (Tablet support).** Willing to design tablet (768px) frames for the calendar and admin tables specifically, or skip tablet entirely?
+	- Mason- I think desktop and mobile are enough. I don't think we need to design explicitly for tablet.
 - **Open Question 21 (Pages without mockups).** Of the existing pages listed in [[Component Inventory for Designer]] Part 2, which specific ones are you *not* redesigning?
+	- Mason- We aren't redoing any of the admin or staff dashboards.
 - **Open Question 24 (Animation / motion).** Are you planning any motion — transitions, micro-interactions, animated empty states, loading skeletons? If yes, please annotate in Dev Mode.
+	- Mason- No plans currently. Mainly want to get a nice looking, functional website. Bells and whistles can wait.
 - **Figma plan decision** (Open Question 3). Pro (~$15/month) unlocks multi-mode Variables — the convenient one-toggle path for dark mode and the ability to preview light/dark in Figma. **You don't need Pro for dark mode to ship** — there's a free-tier workaround using paired `*-light`/`*-dark` semantic tokens (described in Phase 1.1.A below) that produces identical runtime behaviour. Pro is therefore a quality-of-life choice. Do you want to upgrade for the smoother workflow, or stay free and maintain paired tokens manually?
+	- Mason- Don't we need pro to connect in dev mode through
 
 ---
 
