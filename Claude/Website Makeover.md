@@ -77,7 +77,7 @@ For each, drop a `- Designer- ...` bullet under the corresponding Open Question 
 - **Open Question 24 (Animation / motion).** Are you planning any motion — transitions, micro-interactions, animated empty states, loading skeletons? If yes, please annotate in Dev Mode.
 	- Mason- No plans currently. Mainly want to get a nice looking, functional website. Bells and whistles can wait.
 - **Figma plan decision** (Open Question 3). Pro (~$15/month) unlocks multi-mode Variables — the convenient one-toggle path for dark mode and the ability to preview light/dark in Figma. **You don't need Pro for dark mode to ship** — there's a free-tier workaround using paired `*-light`/`*-dark` semantic tokens (described in Phase 1.1.A below) that produces identical runtime behaviour. Pro is therefore a quality-of-life choice. Do you want to upgrade for the smoother workflow, or stay free and maintain paired tokens manually?
-	- Mason- Don't we need pro to connect in dev mode through
+	- Mason- Don't we need pro to connect in dev mode through the MCP server?
 
 ---
 
