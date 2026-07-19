@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 5/19/2026
-Version: 0.1
+Last Updated: 7/19/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -48,9 +48,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 - ✅ **Dark mode is in scope.** Two ways to implement it on your side:
     - **Pro path (cleaner):** add a `Dark` mode to your Colors Variable collection so a single semantic token like `color/brand` switches values between modes. Requires Figma Professional (see Open Question 3).
     - **Free path (workaround, also fine):** keep one mode per collection and define *paired* semantic tokens — `color/brand-light` and `color/brand-dark`, both referencing the shared primitive layer. The engineer ingests the JSON, pairs them up, and emits matching CSS variables under `:root` and `:root[data-theme="dark"]`. Trade-off: you can't toggle light/dark inside Figma to preview, and you have to remember to add a `-dark` for every `-light`. Otherwise the user-facing result is identical. (Closes Open Question 9. See Open Question 3 for whether to upgrade.)
-- ✅ **Breakpoints** — design at 375 (mobile, the primary canvas), 1280 (desktop), and optionally 768 (tablet) for dense screens. (Closes Open Question 10.)
+- ✅ **Breakpoints** — design at 375 (mobile, the primary canvas) and 1280 (desktop) **only. No tablet frames** — Mason confirmed desktop + mobile are enough. (Closes Open Questions 10 and 20.)
 - ✅ **Mobile is the primary canvas.** Start every screen at the 375-wide mobile frame and expand outward — never the other way around. Most of this app's traffic is mobile.
 - ✅ **Mobile navigation stays as a hamburger menu** — no bottom tab bar. (Closes Open Question 15.)
+- ✅ **Calendar on mobile defaults to day view** with swipe-between-days; week/month stay desktop views. (Closes Open Question 19.)
+- ✅ **No motion / animation work in this pass** — transitions and micro-interactions wait until the functional redesign ships. (Closes Open Question 24.)
+- ✅ **The back-office portals are NOT being redesigned** — no Figma frames for anything in the inventory's Manage / Staff / Admin sections; those screens pick up the new look automatically from the shared building blocks. (Closes Open Question 21. One optional exception flagged in the inventory: Staff / Check-In, the lone back-office screen used on a phone in-studio.)
 
 ### What to do, in order
 
@@ -66,6 +69,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 ### Questions for you (please answer here while you're with Mason)
 
+> ✅ **All five answered with Mason 7/19/2026.** Each answer has been propagated to its numbered Open Question further down this document (with Claude's follow-ups), and the affected plan items + the [[Component Inventory for Designer]] have been updated. Kept here for the record.
+
 For each, drop a `- Designer- ...` bullet under the corresponding Open Question further down this document.
 
 - **Open Question 19 (Calendar on mobile).** Default to day view with swipe-between-days, or do you have a different vision?
@@ -78,6 +83,7 @@ For each, drop a `- Designer- ...` bullet under the corresponding Open Question 
 	- Mason- No plans currently. Mainly want to get a nice looking, functional website. Bells and whistles can wait.
 - **Figma plan decision** (Open Question 3). Pro (~$15/month) unlocks multi-mode Variables — the convenient one-toggle path for dark mode and the ability to preview light/dark in Figma. **You don't need Pro for dark mode to ship** — there's a free-tier workaround using paired `*-light`/`*-dark` semantic tokens (described in Phase 1.1.A below) that produces identical runtime behaviour. Pro is therefore a quality-of-life choice. Do you want to upgrade for the smoother workflow, or stay free and maintain paired tokens manually?
 	- Mason- Don't we need pro to connect in dev mode through the MCP server?
+	- Claude- Short answer: **for practical purposes, yes — but it's a rate-limit gate, not a connection gate.** Figma's MCP server now technically works on every plan, but free Starter seats are capped at **6 tool calls per month** (a single screen inspection burns that), while a **Dev or Full seat on Professional** gets **200 calls/day**. Variables ARE readable through the MCP server with a paid seat, so Pro-tier access covers both the token pull and per-frame inspection. Full breakdown, costs, and recommendation under Open Question 3 below (researched 7/19/2026).
 
 ---
 
@@ -492,7 +498,11 @@ This is the SaaS-enablement phase. The Phase 2 token layer is the prerequisite t
 	- Mason- that sounds fine.
 	- Claude- ✅ Locked in. The `responsive-data-table` work item in the Mobile section now records the per-page assignment so Phase 3 doesn't have to re-decide.
 19. **Calendar on mobile.** Recommended: default to day view, swipe between days, "jump to month" opens a bottom-sheet picker. Week view exists but is borderline on phones — punt to tablet+. OK to default-to-day, or do you want week view as the mobile default?
+	- Mason- (7/19/2026) Yeah, day view probably makes the most sense for mobile.
+	- Claude- ✅ Locked in. Mobile (below `md`) defaults to day view with swipe-between-days and a bottom-sheet month picker; week/month views stay desktop. Recorded in the Phase 3 calendar work item and the Decisions list. Note the calendar itself was substantially rebuilt since this plan was written (Classes Phase 13: now public, live data, My Schedule / Full Schedule toggle, facility filter, tag colours) — the [[Component Inventory for Designer]] entry describes the current state.
 20. **Tablet support.** Today the breakpoint guidance is "design mobile + desktop, tablet optional". Confirm tablet isn't a priority surface, or call out which screens specifically should be designed for 768 (calendar and admin tables are the obvious candidates).
+	- Mason- (7/19/2026) I think desktop and mobile are enough. I don't think we need to design explicitly for tablet.
+	- Claude- ✅ Locked in. Design deliverables are 375 + 1280 frames only — no 768 frames anywhere, including the calendar and data tables. Engineering still keeps a `md` (768) breakpoint in the CSS for where layouts collapse; the in-between behaviour comes from per-screen Dev Mode annotations instead of dedicated tablet mockups. Updated the Decisions list, Phase 1.1.C, Open Question 10, and the inventory's Part 2 preamble.
 
 ### Can be answered any time
 
