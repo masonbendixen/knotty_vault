@@ -384,7 +384,60 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 ## Phase 4 — Extract to the shared repo
 
 ### 4.1 Repo creation
-- [ ] **[Mason]** Create `github.com/honuware/web_components` (fresh history) and claim the `@honuware` org on the public npm registry (needed before the first publish — verify name availability; decided Q2). Then: scaffold the workspace on the current stable Angular major (the app already matches after 1.0), copy `projects/honuware-ui`, port the flat-config lint + boundary rules + headless Karma, add `LICENSE` (Apache-2.0) + `NOTICE` + `README` + `CONTRIBUTING` + the "extracted from knottyyoga at SHA …" note; full lint+test+build green.
+
+**All of 4.1 is a [Mason] task** — it needs a new GitHub repo, an npm org, and git commits/pushes (none of which the assistant can do). Run the subsections top-to-bottom; 4.1.9 gates green before 4.1.10. Every file path below is relative to the **new** `web_components` repo unless it says `ui/…` (that's the source in knottyyoga to copy from).
+
+#### 4.1.1 Provision the GitHub repo and the npm org (accounts first)
+- [ ] Create the empty public repo **`github.com/honuware/web_components`** — do **not** auto-init a README/license/.gitignore (we push a clean, fresh-history tree). Mirrors `honuware/server_components`.
+- [ ] Verify the npm org name is free (`npm org ls honuware`, or browse `npmjs.com/org/honuware`). If free, create the **`@honuware`** org on the public registry — required before any publish (decided Q2). If taken, pick the fallback per Q1 and update the package `name` (4.1.7) before 4.2.
+- [ ] Decide the publishing account now (CI uses it in 4.2): enable 2FA and reserve an automation/publish token slot.
+- [ ] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** (Phase 1.0's target — currently the 21→22 hop is blocked on Node; see the Phase 1.0 item). The repo and the copied source must match so the tree compiles unchanged.
+
+#### 4.1.2 Scaffold the empty workspace
+- [ ] Clone the empty repo locally (or `git init` a fresh tree — **fresh history, do NOT import knottyyoga's git log**; decided).
+- [ ] `ng new honuware-web-components --no-create-application --package-manager npm --strict` — a workspace with **no default app** (the library is added as a project; the showcase comes in Phase 5.1). This emits the root `angular.json`, `tsconfig.json`, `package.json`, `.gitignore`, `.editorconfig`.
+- [ ] Match the toolchain versions to `ui/package.json` `devDependencies`: `@angular/cli`, `@angular/build`, `@angular-devkit/build-angular`, `@angular/compiler-cli`, `ng-packagr`, `angular-eslint`, `eslint`, `typescript-eslint`, `typescript`, `karma` + `karma-chrome-launcher`/`-jasmine`/`-jasmine-html-reporter`/`-coverage`, `jasmine-core`, `@types/jasmine`. (Drop app-only `jsdom`/`vitest`/`globals` unless a ported spec needs them.)
+
+#### 4.1.3 Copy the library source verbatim
+- [ ] Copy the entire `ui/projects/honuware-ui/` tree to the same path `projects/honuware-ui/` in the new repo: all 8 entry dirs (`foundation`, `access`, `controls`, `photos`, `auth`, `crud`, `square`, `testing`) + the root `src/` (`public-api.ts`/`.spec.ts`), every per-entry `ng-package.json`, plus `ng-package.json`, `tsconfig.lib.json`, `tsconfig.lib.prod.json`, `tsconfig.spec.json`, `package.json`, `README.md`. Nothing here imports an app path (enforced since 2.3), so it moves unchanged.
+- [ ] Do **not** copy anything under `ui/src/` — that's the app.
+
+#### 4.1.4 Wire the workspace config (angular.json + tsconfig + path aliases)
+- [ ] Add the `honuware-ui` project to the new `angular.json` — copy the block verbatim from `ui/angular.json` (`projectType: library`, `root`/`sourceRoot: projects/honuware-ui`, `prefix: hw`, builder `@angular/build:ng-packagr` with prod/dev tsConfigs, the `@angular-devkit/build-angular:karma` test target, the `@angular-eslint/builder:lint` target). **Preserve `sourceRoot: projects/honuware-ui`** — the 2.1 fix that lets karma discover specs inside the secondary-entry dirs. **One change:** the test target's `"styles": ["src/styles.scss"]` points at the *app's* stylesheet, which won't exist here → replace per 4.1.6.
+- [ ] In the root `tsconfig.json`, add the **9 `@honuware/ui/*` path aliases** exactly as in `ui/tsconfig.json` (`@honuware/ui` → `projects/honuware-ui/src/public-api.ts`; one per entry → `projects/honuware-ui/<entry>/src/public-api.ts`). These resolve cross-entry imports (e.g. `crud` → `@honuware/ui/auth`) and the future showcase against source. **Drop** the 7 app aliases (`@core`, `@shared`, `@pages`, `@controls`, `@crud`, `@app`, `@access`).
+- [ ] Confirm the root `compilerOptions` (target/module/lib/strict/paths base) match the app's so the copied source type-checks identically.
+
+#### 4.1.5 Port the ESLint flat config + boundary rules
+- [ ] Copy `ui/eslint.config.mjs` to the repo root. **Keep:** the library TS block (`hw` selector prefix, `prefer-inject` off), the library HTML block, the per-entry `no-restricted-imports` map (`ALLOWED_BELOW` — the load-bearing downward-only rule), and the `**/*.spec.ts` exemption block.
+- [ ] **Remove** the two `src/**` app blocks (App TypeScript + App templates) — no app tree here. `APP_IMPORT_PATTERNS`/`APP_IMPORT_MESSAGE` become dead; either trim them or keep them as a guard so a future showcase app can't reach into library internals.
+- [ ] Point the `honuware-ui` lint `lintFilePatterns` (and any config globs) at `projects/**/*.{ts,html}`.
+
+#### 4.1.6 Port headless test setup
+- [ ] Add a library-owned test stylesheet — `projects/honuware-ui/test-styles.scss` with a minimal `@use '@angular/material'` theme (or an empty file) — and point the `honuware-ui` test target's `styles` at it (replacing the app `src/styles.scss` from 4.1.4).
+- [ ] Add a `karma.conf.js` with a `ChromeHeadlessNoSandbox` custom launcher (`--no-sandbox --disable-gpu`) for CI containers — or invoke `ng test honuware-ui --browsers=ChromeHeadlessNoSandbox --watch=false`. (4.2's CI uses the headless launcher.)
+
+#### 4.1.7 Confirm the publishable package manifest
+- [ ] `projects/honuware-ui/package.json` is already publish-ready (Phase 3.2): `name: @honuware/ui`, `version: 0.1.0`, the 8 Angular/rxjs `peerDependencies`, `tslib` as the sole `dependency`, `sideEffects: false`. Carry it over unchanged. (If 4.1.1 forced a name change, update `name` here.)
+- [ ] Set the root workspace `package.json` `"private": true` and add scripts: `build` = `ng build honuware-ui`, `test` = `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox`, `lint` = `ng lint honuware-ui`, `pack` = `npm pack ./dist/honuware-ui`.
+
+#### 4.1.8 Add legal + governance files
+- [ ] `LICENSE` — Apache-2.0 (matches `server_components`; decided).
+- [ ] `NOTICE` — attribution per Apache-2.0.
+- [ ] Root `README.md` — repo-level dev/build/test/publish instructions. (The **published-package** README stays `projects/honuware-ui/README.md`, already written in 3.2.)
+- [ ] `CONTRIBUTING.md` — the layering rule (an entry imports only entries below it), the `hw-` selector prefix, "tests land in the same change," and how to run lint/test/build.
+- [ ] Provenance: record **"extracted from knottyyoga at commit `<SHA>`"** in the README (or a `PROVENANCE` file / the initial commit message) — capture the exact knottyyoga SHA the copy was taken from.
+- [ ] `.gitignore` — ignore `dist/`, `node_modules/`, `.angular/`, `coverage/`.
+
+#### 4.1.9 Green-gate the fresh repo
+- [ ] `npm ci` (or `npm install`) resolves with **no peer-dependency warnings**.
+- [ ] `ng lint honuware-ui` — clean; probe-verify the boundary rules still fire (an import of a higher/sibling entry or a now-absent app path should error, as validated in 2.3).
+- [ ] `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox` — all **466** specs green (count carried from the last knottyyoga gate; re-baseline here).
+- [ ] `ng build honuware-ui` (production) — all 8 entries emit partial-Ivy FESM2022 + typings into `dist/honuware-ui`.
+- [ ] `npm pack ./dist/honuware-ui` — inspect the tarball (FESM + `.d.ts` for all 8 entries + root, the `exports` map, peerDeps, README; **no source `.ts` leak**). Same rehearsal as 3.1, now in the real repo. Delete the tarball.
+
+#### 4.1.10 Initial commit & push
+- [ ] One initial commit on `main` (fresh history) → push to `github.com/honuware/web_components`.
+- [ ] Do **not** tag yet — the first `npm publish` runs via CI on tag in **4.2**.
 
 ### 4.2 CI
 - [ ] GitHub Actions: PR/push → `npm ci`, lint, headless-Chrome tests, `ng build honuware-ui`, `npm pack`, upload the tarball artifact; on tag → `npm publish` to the public registry with provenance (decided, Q2 — npm from day one, 0.x). This workflow doubles as the CI template for the friends' sites (same role the server repo's CI plays).
