@@ -454,12 +454,12 @@ git push -u origin master
 - [x] Set the root workspace `package.json` `"private": true` and add scripts: `build` = `ng build honuware-ui`, `test` = `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox`, `lint` = `ng lint honuware-ui`, `pack` = `npm pack ./dist/honuware-ui`.
 
 #### 4.1.8 Add legal + governance files
-- [ ] `LICENSE` — Apache-2.0 (matches `server_components`; decided).
-- [ ] `NOTICE` — attribution per Apache-2.0.
-- [ ] Root `README.md` — repo-level dev/build/test/publish instructions. (The **published-package** README stays `projects/honuware-ui/README.md`, already written in 3.2.)
-- [ ] `CONTRIBUTING.md` — the layering rule (an entry imports only entries below it), the `hw-` selector prefix, "tests land in the same change," and how to run lint/test/build.
-- [ ] Provenance: record **"extracted from knottyyoga at commit `<SHA>`"** in the README (or a `PROVENANCE` file / the initial commit message) — capture the exact knottyyoga SHA the copy was taken from.
-- [ ] `.gitignore` — ignore `dist/`, `node_modules/`, `.angular/`, `coverage/`.
+- [x] `LICENSE` — Apache-2.0 (matches `server_components`; decided).
+- [x] `NOTICE` — attribution per Apache-2.0.
+- [x] Root `README.md` — repo-level dev/build/test/publish instructions. (The **published-package** README stays `projects/honuware-ui/README.md`, already written in 3.2.)
+- [x] `CONTRIBUTING.md` — the layering rule (an entry imports only entries below it), the `hw-` selector prefix, "tests land in the same change," and how to run lint/test/build.
+- [x] Provenance: record **"extracted from knottyyoga at commit `da7ec9f9ff7f46c9120194805ca4bb7d68426411`"** (in the root README + NOTICE) in the README (or a `PROVENANCE` file / the initial commit message) — capture the exact knottyyoga SHA the copy was taken from.
+- [x] `.gitignore` — ignore `dist/`, `node_modules/`, `.angular/`, `coverage/`. *(Already covered by the `ng new` default — no change needed.)*
 
 #### 4.1.9 Green-gate the fresh repo
 - [x] `npm ci` (or `npm install`) resolves with **no peer-dependency warnings**.
