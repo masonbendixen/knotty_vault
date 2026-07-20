@@ -397,9 +397,36 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
     - **If (and only if) extraction happens after Phase 1.0 moves the app to 22:** bump the eight `peerDependencies` in the copied `projects/honuware-ui/package.json` from `^21.0.0` → `^22.0.0` (they were pinned against 21 in Phase 3.2 — this is the one file in the library tree that encodes the major). On 21, leave them.
     - Verify: `npx ng version` shows the same major in both repos + `ng build honuware-ui` compiles the copied source with zero edits.
 
+**End-to-end command reference (create → push).** The scaffold/gate/push commands for all of 4.1, in order — copy-paste and fill in `<SHA>`. Steps 4.1.3–4.1.9 (copy the library, wire `angular.json`/`tsconfig`/`eslint`, gate green) are the commented middle. Uses the app's current Angular major (**21** today) and **`master`** to match knottyyoga.
+
+```bash
+# ── @honuware/ui extraction: create & push the web_components repo ──
+# Prereqs (4.1.1 above): empty repo github.com/honuware/web_components created;
+# @honuware npm org created; publishing account has 2FA.
+
+# 1. Scaffold locally on the app's current Angular major (21 today), no git, no default app:
+npx @angular/cli@21 new honuware-web-components --no-create-application --package-manager npm --strict --skip-git
+cd honuware-web-components
+
+# 2. Copy the library + wire configs + gate green  ->  4.1.3-4.1.9
+#    - copy ui/projects/honuware-ui  ->  projects/honuware-ui
+#    - port angular.json (honuware-ui block), tsconfig paths, eslint.config.mjs
+#    - then gate:
+npx ng lint honuware-ui
+npx ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox
+npx ng build honuware-ui
+
+# 3. Init git on master, connect the remote, push the first commit  ->  4.1.10
+git init -b master
+git remote add origin https://github.com/honuware/web_components.git
+git add -A
+git commit -m "Initial commit - @honuware/ui extracted from knottyyoga at <SHA>"
+git push -u origin master
+```
+
 #### 4.1.2 Scaffold the empty workspace
-- [ ] Clone the empty repo locally (or `git init` a fresh tree — **fresh history, do NOT import knottyyoga's git log**; decided).
-- [ ] `ng new honuware-web-components --no-create-application --package-manager npm --strict` — a workspace with **no default app** (the library is added as a project; the showcase comes in Phase 5.1). This emits the root `angular.json`, `tsconfig.json`, `package.json`, `.gitignore`, `.editorconfig`.
+- [ ] Work in a fresh tree with **fresh history** (do NOT import knottyyoga's git log; decided). **Preferred flow:** scaffold locally, then `git init -b master` + add remote + push (the 4.1.1 command block). Cloning the empty repo first is the alternative, but `ng new` wants to create its own new subdirectory, so init-after-scaffold is cleaner.
+- [ ] `ng new honuware-web-components --no-create-application --package-manager npm --strict --skip-git` — a workspace with **no default app** (the library is added as a project; the showcase comes in Phase 5.1). `--skip-git` leaves git to you so the first commit (with the provenance `<SHA>`, per 4.1.10) is yours. This emits the root `angular.json`, `tsconfig.json`, `package.json`, `.gitignore`, `.editorconfig`.
 - [ ] Match the toolchain versions to `ui/package.json` `devDependencies`: `@angular/cli`, `@angular/build`, `@angular-devkit/build-angular`, `@angular/compiler-cli`, `ng-packagr`, `angular-eslint`, `eslint`, `typescript-eslint`, `typescript`, `karma` + `karma-chrome-launcher`/`-jasmine`/`-jasmine-html-reporter`/`-coverage`, `jasmine-core`, `@types/jasmine`. (Drop app-only `jsdom`/`vitest`/`globals` unless a ported spec needs them.)
 
 #### 4.1.3 Copy the library source verbatim
@@ -440,7 +467,7 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 - [ ] `npm pack ./dist/honuware-ui` — inspect the tarball (FESM + `.d.ts` for all 8 entries + root, the `exports` map, peerDeps, README; **no source `.ts` leak**). Same rehearsal as 3.1, now in the real repo. Delete the tarball.
 
 #### 4.1.10 Initial commit & push
-- [ ] One initial commit on `main` (fresh history) → push to `github.com/honuware/web_components`.
+- [ ] One initial commit on `master` (fresh history) → push to `github.com/honuware/web_components` (commands in the 4.1.1 block: `git init -b master` → `git remote add origin https://github.com/honuware/web_components.git` → commit → `git push -u origin master`). If GitHub still shows `main` as the default branch afterward, set it to `master` under repo **Settings → Branches**.
 - [ ] Do **not** tag yet — the first `npm publish` runs via CI on tag in **4.2**.
 
 ### 4.2 CI
