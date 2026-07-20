@@ -393,7 +393,7 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 - [x] Create the empty public repo **`github.com/honuware/web_components`** — do **not** auto-init a README/license/.gitignore (we push a clean, fresh-history tree). Mirrors `honuware/server_components`. ✅ 2026-07-20
 - [x] Verify the npm org name is free (`npm org ls honuware`, or browse `npmjs.com/org/honuware`). If free, create the **`@honuware`** org on the public registry — required before any publish (decided Q2). If taken, pick the fallback per Q1 and update the package `name` (4.1.7) before 4.2. ✅ 2026-07-20
 - [x] Decide the publishing account now (CI uses it in 4.2): enable 2FA and reserve an automation/publish token slot. ✅ 2026-07-20
-- [ ] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** — the source of truth is `@angular/core` in `ui/package.json` (today `^21.2.18` → **21**; the 21→22 hop is Phase 1.0's target, currently blocked on Node — see that item). The repo and the copied source must compile unchanged, so:
+- [x] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** — the source of truth is `@angular/core` in `ui/package.json` (today `^21.2.18` → **21**; the 21→22 hop is Phase 1.0's target, currently blocked on Node — see that item). The repo and the copied source must compile unchanged, so:
     - Scaffold with a **pinned CLI**: `npx @angular/cli@<major> new …` (don't trust a stray global `ng`; confirm `npx @angular/cli@<major> --version` first).
     - Align the new repo's framework/toolchain versions to `ui/package.json` — `@angular/*` (`^21.2.18`; cdk/material `^21.2.14`), `ng-packagr`, `angular-eslint`, `typescript`/`typescript-eslint`, `rxjs`/`zone.js`/`tslib`.
     - **If (and only if) extraction happens after Phase 1.0 moves the app to 22:** bump the eight `peerDependencies` in the copied `projects/honuware-ui/package.json` from `^21.0.0` → `^22.0.0` (they were pinned against 21 in Phase 3.2 — this is the one file in the library tree that encodes the major). On 21, leave them.
@@ -427,31 +427,31 @@ git push -u origin master
 ```
 
 #### 4.1.2 Scaffold the empty workspace
-- [ ] Work in a fresh tree with **fresh history** (do NOT import knottyyoga's git log; decided). **Preferred flow:** scaffold locally, then `git init -b master` + add remote + push (the 4.1.1 command block). Cloning the empty repo first is the alternative, but `ng new` wants to create its own new subdirectory, so init-after-scaffold is cleaner.
-- [ ] `ng new honuware-web-components --no-create-application --package-manager npm --strict --skip-git` — a workspace with **no default app** (the library is added as a project; the showcase comes in Phase 5.1). `--skip-git` leaves git to you so the first commit (with the provenance `<SHA>`, per 4.1.10) is yours. This emits the root `angular.json`, `tsconfig.json`, `package.json`, `.gitignore`, `.editorconfig`.
-- [ ] Match the toolchain versions to `ui/package.json` `devDependencies`: `@angular/cli`, `@angular/build`, `@angular-devkit/build-angular`, `@angular/compiler-cli`, `ng-packagr`, `angular-eslint`, `eslint`, `typescript-eslint`, `typescript`, `karma` + `karma-chrome-launcher`/`-jasmine`/`-jasmine-html-reporter`/`-coverage`, `jasmine-core`, `@types/jasmine`. (Drop app-only `jsdom`/`vitest`/`globals` unless a ported spec needs them.)
+- [x] Work in a fresh tree with **fresh history** (do NOT import knottyyoga's git log; decided). **Preferred flow:** scaffold locally, then `git init -b master` + add remote + push (the 4.1.1 command block). Cloning the empty repo first is the alternative, but `ng new` wants to create its own new subdirectory, so init-after-scaffold is cleaner.
+- [x] `ng new honuware-web-components --no-create-application --package-manager npm --strict --skip-git` — a workspace with **no default app** (the library is added as a project; the showcase comes in Phase 5.1). `--skip-git` leaves git to you so the first commit (with the provenance `<SHA>`, per 4.1.10) is yours. This emits the root `angular.json`, `tsconfig.json`, `package.json`, `.gitignore`, `.editorconfig`.
+- [x] Match the toolchain versions to `ui/package.json` `devDependencies`: `@angular/cli`, `@angular/build`, `@angular-devkit/build-angular`, `@angular/compiler-cli`, `ng-packagr`, `angular-eslint`, `eslint`, `typescript-eslint`, `typescript`, `karma` + `karma-chrome-launcher`/`-jasmine`/`-jasmine-html-reporter`/`-coverage`, `jasmine-core`, `@types/jasmine`. (Drop app-only `jsdom`/`vitest`/`globals` unless a ported spec needs them.)
 
 #### 4.1.3 Copy the library source verbatim
-- [ ] Copy the entire `ui/projects/honuware-ui/` tree to the same path `projects/honuware-ui/` in the new repo: all 8 entry dirs (`foundation`, `access`, `controls`, `photos`, `auth`, `crud`, `square`, `testing`) + the root `src/` (`public-api.ts`/`.spec.ts`), every per-entry `ng-package.json`, plus `ng-package.json`, `tsconfig.lib.json`, `tsconfig.lib.prod.json`, `tsconfig.spec.json`, `package.json`, `README.md`. Nothing here imports an app path (enforced since 2.3), so it moves unchanged.
-- [ ] Do **not** copy anything under `ui/src/` — that's the app.
+- [x] Copy the entire `ui/projects/honuware-ui/` tree to the same path `projects/honuware-ui/` in the new repo: all 8 entry dirs (`foundation`, `access`, `controls`, `photos`, `auth`, `crud`, `square`, `testing`) + the root `src/` (`public-api.ts`/`.spec.ts`), every per-entry `ng-package.json`, plus `ng-package.json`, `tsconfig.lib.json`, `tsconfig.lib.prod.json`, `tsconfig.spec.json`, `package.json`, `README.md`. Nothing here imports an app path (enforced since 2.3), so it moves unchanged.
+- [x] Do **not** copy anything under `ui/src/` — that's the app.
 
 #### 4.1.4 Wire the workspace config (angular.json + tsconfig + path aliases)
-- [ ] Add the `honuware-ui` project to the new `angular.json` — copy the block verbatim from `ui/angular.json` (`projectType: library`, `root`/`sourceRoot: projects/honuware-ui`, `prefix: hw`, builder `@angular/build:ng-packagr` with prod/dev tsConfigs, the `@angular-devkit/build-angular:karma` test target, the `@angular-eslint/builder:lint` target). **Preserve `sourceRoot: projects/honuware-ui`** — the 2.1 fix that lets karma discover specs inside the secondary-entry dirs. **One change:** the test target's `"styles": ["src/styles.scss"]` points at the *app's* stylesheet, which won't exist here → replace per 4.1.6.
-- [ ] In the root `tsconfig.json`, add the **9 `@honuware/ui/*` path aliases** exactly as in `ui/tsconfig.json` (`@honuware/ui` → `projects/honuware-ui/src/public-api.ts`; one per entry → `projects/honuware-ui/<entry>/src/public-api.ts`). These resolve cross-entry imports (e.g. `crud` → `@honuware/ui/auth`) and the future showcase against source. **Drop** the 7 app aliases (`@core`, `@shared`, `@pages`, `@controls`, `@crud`, `@app`, `@access`).
-- [ ] Confirm the root `compilerOptions` (target/module/lib/strict/paths base) match the app's so the copied source type-checks identically.
+- [x] Add the `honuware-ui` project to the new `angular.json` — copy the block verbatim from `ui/angular.json` (`projectType: library`, `root`/`sourceRoot: projects/honuware-ui`, `prefix: hw`, builder `@angular/build:ng-packagr` with prod/dev tsConfigs, the `@angular-devkit/build-angular:karma` test target, the `@angular-eslint/builder:lint` target). **Preserve `sourceRoot: projects/honuware-ui`** — the 2.1 fix that lets karma discover specs inside the secondary-entry dirs. **One change:** the test target's `"styles": ["src/styles.scss"]` points at the *app's* stylesheet, which won't exist here → replace per 4.1.6.
+- [x] In the root `tsconfig.json`, add the **9 `@honuware/ui/*` path aliases** exactly as in `ui/tsconfig.json` (`@honuware/ui` → `projects/honuware-ui/src/public-api.ts`; one per entry → `projects/honuware-ui/<entry>/src/public-api.ts`). These resolve cross-entry imports (e.g. `crud` → `@honuware/ui/auth`) and the future showcase against source. **Drop** the 7 app aliases (`@core`, `@shared`, `@pages`, `@controls`, `@crud`, `@app`, `@access`).
+- [x] Confirm the root `compilerOptions` (target/module/lib/strict/paths base) match the app's so the copied source type-checks identically. *(Kept the scaffold's stricter modern config rather than matching the app — see the 4.1 STATUS note; required one `export type` fix.)*
 
 #### 4.1.5 Port the ESLint flat config + boundary rules
-- [ ] Copy `ui/eslint.config.mjs` to the repo root. **Keep:** the library TS block (`hw` selector prefix, `prefer-inject` off), the library HTML block, the per-entry `no-restricted-imports` map (`ALLOWED_BELOW` — the load-bearing downward-only rule), and the `**/*.spec.ts` exemption block.
-- [ ] **Remove** the two `src/**` app blocks (App TypeScript + App templates) — no app tree here. `APP_IMPORT_PATTERNS`/`APP_IMPORT_MESSAGE` become dead; either trim them or keep them as a guard so a future showcase app can't reach into library internals.
-- [ ] Point the `honuware-ui` lint `lintFilePatterns` (and any config globs) at `projects/**/*.{ts,html}`.
+- [x] Copy `ui/eslint.config.mjs` to the repo root. **Keep:** the library TS block (`hw` selector prefix, `prefer-inject` off), the library HTML block, the per-entry `no-restricted-imports` map (`ALLOWED_BELOW` — the load-bearing downward-only rule), and the `**/*.spec.ts` exemption block.
+- [x] **Remove** the two `src/**` app blocks (App TypeScript + App templates) — no app tree here. `APP_IMPORT_PATTERNS`/`APP_IMPORT_MESSAGE` become dead; either trim them or keep them as a guard so a future showcase app can't reach into library internals.
+- [x] Point the `honuware-ui` lint `lintFilePatterns` (and any config globs) at `projects/**/*.{ts,html}`.
 
 #### 4.1.6 Port headless test setup
-- [ ] Add a library-owned test stylesheet — `projects/honuware-ui/test-styles.scss` with a minimal `@use '@angular/material'` theme (or an empty file) — and point the `honuware-ui` test target's `styles` at it (replacing the app `src/styles.scss` from 4.1.4).
-- [ ] Add a `karma.conf.js` with a `ChromeHeadlessNoSandbox` custom launcher (`--no-sandbox --disable-gpu`) for CI containers — or invoke `ng test honuware-ui --browsers=ChromeHeadlessNoSandbox --watch=false`. (4.2's CI uses the headless launcher.)
+- [x] Add a library-owned test stylesheet — `projects/honuware-ui/test-styles.scss` with a minimal `@use '@angular/material'` theme (or an empty file) — and point the `honuware-ui` test target's `styles` at it (replacing the app `src/styles.scss` from 4.1.4).
+- [x] Add a `karma.conf.js` with a `ChromeHeadlessNoSandbox` custom launcher (`--no-sandbox --disable-gpu`) for CI containers — or invoke `ng test honuware-ui --browsers=ChromeHeadlessNoSandbox --watch=false`. (4.2's CI uses the headless launcher.)
 
 #### 4.1.7 Confirm the publishable package manifest
-- [ ] `projects/honuware-ui/package.json` is already publish-ready (Phase 3.2): `name: @honuware/ui`, `version: 0.1.0`, the 8 Angular/rxjs `peerDependencies`, `tslib` as the sole `dependency`, `sideEffects: false`. Carry it over unchanged. (If 4.1.1 forced a name change, update `name` here; if extraction is on Angular 22, apply the `^21.0.0` → `^22.0.0` peer bump per 4.1.1.)
-- [ ] Set the root workspace `package.json` `"private": true` and add scripts: `build` = `ng build honuware-ui`, `test` = `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox`, `lint` = `ng lint honuware-ui`, `pack` = `npm pack ./dist/honuware-ui`.
+- [x] `projects/honuware-ui/package.json` is already publish-ready (Phase 3.2): `name: @honuware/ui`, `version: 0.1.0`, the 8 Angular/rxjs `peerDependencies`, `tslib` as the sole `dependency`, `sideEffects: false`. Carry it over unchanged. (If 4.1.1 forced a name change, update `name` here; if extraction is on Angular 22, apply the `^21.0.0` → `^22.0.0` peer bump per 4.1.1.)
+- [x] Set the root workspace `package.json` `"private": true` and add scripts: `build` = `ng build honuware-ui`, `test` = `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox`, `lint` = `ng lint honuware-ui`, `pack` = `npm pack ./dist/honuware-ui`.
 
 #### 4.1.8 Add legal + governance files
 - [ ] `LICENSE` — Apache-2.0 (matches `server_components`; decided).
@@ -462,10 +462,10 @@ git push -u origin master
 - [ ] `.gitignore` — ignore `dist/`, `node_modules/`, `.angular/`, `coverage/`.
 
 #### 4.1.9 Green-gate the fresh repo
-- [ ] `npm ci` (or `npm install`) resolves with **no peer-dependency warnings**.
-- [ ] `ng lint honuware-ui` — clean; probe-verify the boundary rules still fire (an import of a higher/sibling entry or a now-absent app path should error, as validated in 2.3).
-- [ ] `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox` — all **466** specs green (count carried from the last knottyyoga gate; re-baseline here).
-- [ ] `ng build honuware-ui` (production) — all 8 entries emit partial-Ivy FESM2022 + typings into `dist/honuware-ui`.
+- [x] `npm ci` (or `npm install`) resolves with **no peer-dependency warnings**.
+- [x] `ng lint honuware-ui` — clean; probe-verify the boundary rules still fire (an import of a higher/sibling entry or a now-absent app path should error, as validated in 2.3).
+- [x] `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox` — all **466** specs green (count carried from the last knottyyoga gate; re-baseline here).
+- [x] `ng build honuware-ui` (production) — all 8 entries emit partial-Ivy FESM2022 + typings into `dist/honuware-ui`.
 - [ ] `npm pack ./dist/honuware-ui` — inspect the tarball (FESM + `.d.ts` for all 8 entries + root, the `exports` map, peerDeps, README; **no source `.ts` leak**). Same rehearsal as 3.1, now in the real repo. Delete the tarball.
 
 #### 4.1.10 Initial commit & push
