@@ -390,7 +390,7 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 #### 4.1.1 Provision the GitHub repo and the npm org (accounts first)
 - [x] Create the empty public repo **`github.com/honuware/web_components`** — do **not** auto-init a README/license/.gitignore (we push a clean, fresh-history tree). Mirrors `honuware/server_components`. ✅ 2026-07-20
 - [x] Verify the npm org name is free (`npm org ls honuware`, or browse `npmjs.com/org/honuware`). If free, create the **`@honuware`** org on the public registry — required before any publish (decided Q2). If taken, pick the fallback per Q1 and update the package `name` (4.1.7) before 4.2. ✅ 2026-07-20
-- [ ] Decide the publishing account now (CI uses it in 4.2): enable 2FA and reserve an automation/publish token slot.
+- [x] Decide the publishing account now (CI uses it in 4.2): enable 2FA and reserve an automation/publish token slot. ✅ 2026-07-20
 - [ ] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** (Phase 1.0's target — currently the 21→22 hop is blocked on Node; see the Phase 1.0 item). The repo and the copied source must match so the tree compiles unchanged.
 
 #### 4.1.2 Scaffold the empty workspace
