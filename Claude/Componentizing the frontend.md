@@ -391,7 +391,11 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 - [x] Create the empty public repo **`github.com/honuware/web_components`** — do **not** auto-init a README/license/.gitignore (we push a clean, fresh-history tree). Mirrors `honuware/server_components`. ✅ 2026-07-20
 - [x] Verify the npm org name is free (`npm org ls honuware`, or browse `npmjs.com/org/honuware`). If free, create the **`@honuware`** org on the public registry — required before any publish (decided Q2). If taken, pick the fallback per Q1 and update the package `name` (4.1.7) before 4.2. ✅ 2026-07-20
 - [x] Decide the publishing account now (CI uses it in 4.2): enable 2FA and reserve an automation/publish token slot. ✅ 2026-07-20
-- [ ] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** (Phase 1.0's target — currently the 21→22 hop is blocked on Node; see the Phase 1.0 item). The repo and the copied source must match so the tree compiles unchanged.
+- [ ] Fix the Angular major to scaffold on = **the app's Angular major at extraction time** — the source of truth is `@angular/core` in `ui/package.json` (today `^21.2.18` → **21**; the 21→22 hop is Phase 1.0's target, currently blocked on Node — see that item). The repo and the copied source must compile unchanged, so:
+    - Scaffold with a **pinned CLI**: `npx @angular/cli@<major> new …` (don't trust a stray global `ng`; confirm `npx @angular/cli@<major> --version` first).
+    - Align the new repo's framework/toolchain versions to `ui/package.json` — `@angular/*` (`^21.2.18`; cdk/material `^21.2.14`), `ng-packagr`, `angular-eslint`, `typescript`/`typescript-eslint`, `rxjs`/`zone.js`/`tslib`.
+    - **If (and only if) extraction happens after Phase 1.0 moves the app to 22:** bump the eight `peerDependencies` in the copied `projects/honuware-ui/package.json` from `^21.0.0` → `^22.0.0` (they were pinned against 21 in Phase 3.2 — this is the one file in the library tree that encodes the major). On 21, leave them.
+    - Verify: `npx ng version` shows the same major in both repos + `ng build honuware-ui` compiles the copied source with zero edits.
 
 #### 4.1.2 Scaffold the empty workspace
 - [ ] Clone the empty repo locally (or `git init` a fresh tree — **fresh history, do NOT import knottyyoga's git log**; decided).
@@ -417,7 +421,7 @@ Landed 7/20/2026. **Phase 2 begins.** Gate: library builds/tests/lints green; **
 - [ ] Add a `karma.conf.js` with a `ChromeHeadlessNoSandbox` custom launcher (`--no-sandbox --disable-gpu`) for CI containers — or invoke `ng test honuware-ui --browsers=ChromeHeadlessNoSandbox --watch=false`. (4.2's CI uses the headless launcher.)
 
 #### 4.1.7 Confirm the publishable package manifest
-- [ ] `projects/honuware-ui/package.json` is already publish-ready (Phase 3.2): `name: @honuware/ui`, `version: 0.1.0`, the 8 Angular/rxjs `peerDependencies`, `tslib` as the sole `dependency`, `sideEffects: false`. Carry it over unchanged. (If 4.1.1 forced a name change, update `name` here.)
+- [ ] `projects/honuware-ui/package.json` is already publish-ready (Phase 3.2): `name: @honuware/ui`, `version: 0.1.0`, the 8 Angular/rxjs `peerDependencies`, `tslib` as the sole `dependency`, `sideEffects: false`. Carry it over unchanged. (If 4.1.1 forced a name change, update `name` here; if extraction is on Angular 22, apply the `^21.0.0` → `^22.0.0` peer bump per 4.1.1.)
 - [ ] Set the root workspace `package.json` `"private": true` and add scripts: `build` = `ng build honuware-ui`, `test` = `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox`, `lint` = `ng lint honuware-ui`, `pack` = `npm pack ./dist/honuware-ui`.
 
 #### 4.1.8 Add legal + governance files
