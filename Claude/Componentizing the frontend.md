@@ -466,11 +466,11 @@ git push -u origin master
 - [x] `ng lint honuware-ui` — clean; probe-verify the boundary rules still fire (an import of a higher/sibling entry or a now-absent app path should error, as validated in 2.3).
 - [x] `ng test honuware-ui --watch=false --browsers=ChromeHeadlessNoSandbox` — all **466** specs green (count carried from the last knottyyoga gate; re-baseline here).
 - [x] `ng build honuware-ui` (production) — all 8 entries emit partial-Ivy FESM2022 + typings into `dist/honuware-ui`.
-- [ ] `npm pack ./dist/honuware-ui` — inspect the tarball (FESM + `.d.ts` for all 8 entries + root, the `exports` map, peerDeps, README; **no source `.ts` leak**). Same rehearsal as 3.1, now in the real repo. Delete the tarball.
+- [x] `npm pack ./dist/honuware-ui` — inspect the tarball (FESM + `.d.ts` for all 8 entries + root, the `exports` map, peerDeps, README; **no source `.ts` leak**). Same rehearsal as 3.1, now in the real repo. Delete the tarball. *(Verified 7/20/2026: 29 files, `@honuware/ui@0.1.0`, FESM2022 + `types/*.d.ts` for all 8 entries + root, complete `exports` map, 8 `^21` peerDeps + rxjs + `tslib`, `sideEffects: false`, README; no raw `.ts`. Tarball deleted.)*
 
 #### 4.1.10 Initial commit & push
-- [ ] One initial commit on `master` (fresh history) → push to `github.com/honuware/web_components` (commands in the 4.1.1 block: `git init -b master` → `git remote add origin https://github.com/honuware/web_components.git` → commit → `git push -u origin master`). If GitHub still shows `main` as the default branch afterward, set it to `master` under repo **Settings → Branches**.
-- [ ] Do **not** tag yet — the first `npm publish` runs via CI on tag in **4.2**.
+- [x] One initial commit on `master` (fresh history) → push to `github.com/honuware/web_components` (commands in the 4.1.1 block: `git init -b master` → `git remote add origin https://github.com/honuware/web_components.git` → commit → `git push -u origin master`). If GitHub still shows `main` as the default branch afterward, set it to `master` under repo **Settings → Branches**.
+- [x] Do **not** tag yet — the first `npm publish` runs via CI on tag in **4.2**.
 
 ### 4.2 CI
 - [ ] GitHub Actions: PR/push → `npm ci`, lint, headless-Chrome tests, `ng build honuware-ui`, `npm pack`, upload the tarball artifact; on tag → `npm publish` to the public registry with provenance (decided, Q2 — npm from day one, 0.x). This workflow doubles as the CI template for the friends' sites (same role the server repo's CI plays).
