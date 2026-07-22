@@ -6,5 +6,6 @@
     "Templates/",
     "Sources/",
     "Class/"
-  ]
+  ],
+  "showLineNumber": true
 }
