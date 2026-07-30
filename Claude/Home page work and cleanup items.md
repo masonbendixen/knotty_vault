@@ -288,6 +288,8 @@ Please answer inline under each.
 - **OQ-7 — Getting Started copy.** Phase 6 ships my draft (7 steps above, written around the intro-workshop-first funnel from [[Marketing plan for studio]]). Want to red-pen the copy in this doc before I build, or edit after it's rendered?
 	- Mason- We can tweak it after. I'd like to get the structural stuff done now and we can revise text later.
 - **OQ-8 — Show membership tiers to logged-out visitors?** Your sentence scopes the tier section to users without a membership; logged-out visitors also have none, and it's strong marketing material, so Phase 5 shows tiers to them too. Confirm?
-	- Mason- Yes, that is important for marketing.
+	- Mason- Yes, that is important for marketing. They need to see the membership tiers so they can buy one.
 - **OQ-9 — `/api/schedule/week` after the redo.** Phase 2 leaves the endpoint + `getWeeklySchedule` in place but UI-unused. Fine to leave for now (I'd note it as a later removal), or should Phase 2 delete the frontend method (backend endpoint stays for any external consumers)?
+	- Mason- Can you explain this more?
 - **OQ-10 — Calendar deep-link filter.** Class-page "See on the calendar" links land on the unfiltered calendar. Want a small enhancement where `/calendar?class_id=<id>` pre-filters to that class (extra work item in Phase 3), or is the plain link fine?
+	- Mason- Let's just go straight to the calendar unfiltered. I like the idea of them looking up the calendar this way but then seeing what else there is.
