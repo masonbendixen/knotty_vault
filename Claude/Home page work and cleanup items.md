@@ -76,31 +76,33 @@ What the code does today, so the phases below are uncontroversial:
 
 > No backend work in this phase. All items are small, independent, and unblock the later phases' navigation story.
 
+> **Implemented 7/30/2026.** Angular gate green: the 7 affected spec files pass (79 specs), the full suite is **2648 SUCCESS / 0 failures**, `ng build` is clean (only the pre-existing bundle/scss budget warnings), and `npx eslint` on the touched files reports no new problems.
+
 ### 1.1 Menu restructure
-- [ ] `mockHeaderResponse.ts`: replace the "Our Classes" dropdown with a direct `InternalLink` **Our Classes** → `/schedule`; delete the per-class entries and the "All Classes" dropdown entry (the All Classes page stays routed and gets linked from the redone schedule page in Phase 2).
-- [ ] `mockHeaderResponse.ts`: replace the "Services" dropdown with a direct `InternalLink` **Services** → `/shop/services` (drops the duplicate "Upcoming Events" entry; the top-level Upcoming Events item stays — OQ-2 ✅).
-- [ ] `mockHeaderResponse.ts`: rename **Shop** → **Memberships**, target unchanged (`/shop`) — label-only rename per OQ-1 ✅.
-- [ ] `mockHeaderResponse.ts`: remove the now-redundant "Memberships" entry (→ `/shop/subscriptions`) from the account dropdown (OQ-1 follow-up ✅ — the top-level item covers the storefront; "My Subscriptions" covers what you own; the `/shop/subscriptions` route itself stays).
-- [ ] `mockHeaderResponse.ts`: remove the dead user-dropdown entries "My Goals" (`/goals`) and "My Classes" (`/myclasses`).
-- [ ] Drop the now-unneeded `classes` parameter from `mockHeaderResponse(...)`; simplify `HeaderService.refreshHeaderData` to stop fetching `/api/classes` and delete the per-identity class cache.
-- [ ] Specs: update `header.service.spec.ts` (no class fetch), `mockHeaderResponse` assertions wherever they live (header/component specs), and mobile-menu spec if it asserts menu contents. Assert: Our Classes is a direct link to `/schedule`; Services is a direct link to `/shop/services`; a top-level "Memberships" item targeting `/shop` present, "Shop" label absent; the account dropdown has no "Memberships" entry; no `/goals` / `/myclasses` entries; Upcoming Events appears exactly once.
+- [x] `mockHeaderResponse.ts`: replace the "Our Classes" dropdown with a direct `InternalLink` **Our Classes** → `/schedule`; delete the per-class entries and the "All Classes" dropdown entry (the All Classes page stays routed and gets linked from the redone schedule page in Phase 2).
+- [x] `mockHeaderResponse.ts`: replace the "Services" dropdown with a direct `InternalLink` **Services** → `/shop/services` (drops the duplicate "Upcoming Events" entry; the top-level Upcoming Events item stays — OQ-2 ✅).
+- [x] `mockHeaderResponse.ts`: rename **Shop** → **Memberships**, target unchanged (`/shop`) — label-only rename per OQ-1 ✅.
+- [x] `mockHeaderResponse.ts`: remove the now-redundant "Memberships" entry (→ `/shop/subscriptions`) from the account dropdown (OQ-1 follow-up ✅ — the top-level item covers the storefront; "My Subscriptions" covers what you own; the `/shop/subscriptions` route itself stays).
+- [x] `mockHeaderResponse.ts`: remove the dead user-dropdown entries "My Goals" (`/goals`) and "My Classes" (`/myclasses`).
+- [x] Drop the now-unneeded `classes` parameter from `mockHeaderResponse(...)`; simplify `HeaderService.refreshHeaderData` to stop fetching `/api/classes` and delete the per-identity class cache. *(The `SERVER_ACCESS_TOKEN` injection came out of `HeaderService` entirely — nothing else in the service used it.)*
+- [x] Specs: update `header.service.spec.ts` (no class fetch), `mockHeaderResponse` assertions wherever they live (header/component specs), and mobile-menu spec if it asserts menu contents. Assert: Our Classes is a direct link to `/schedule`; Services is a direct link to `/shop/services`; a top-level "Memberships" item targeting `/shop` present, "Shop" label absent; the account dropdown has no "Memberships" entry; no `/goals` / `/myclasses` entries; Upcoming Events appears exactly once. *(`header.component.spec.ts` / `header-mobile-menu.component.spec.ts` assert no menu contents — nothing to change there. `table-crud.integration.spec.ts` already called `mockHeaderResponse(authData)` with one argument and still passes.)*
 
 ### 1.2 Classes page → calendar link (and keep All Classes reachable)
-- [ ] `class-info.component.html`: add a clearly visible "View the calendar" link/button (→ `/calendar`) near the page title, styled consistently with existing page-header actions.
-- [ ] `our-schedule.component.html`: add a "Browse all classes" link (→ `/classes`) in the page header **now** — with the menu entry gone, this is the classes page's entry point until the Phase 2 redo (which keeps the link).
-- [ ] Specs: `class-info.component.spec.ts` renders the calendar link; `our-schedule.component.spec.ts` renders the browse-all-classes link.
+- [x] `class-info.component.html`: add a clearly visible "View the calendar" link/button (→ `/calendar`) near the page title, styled consistently with existing page-header actions.
+- [x] `our-schedule.component.html`: add a "Browse all classes" link (→ `/classes`) in the page header **now** — with the menu entry gone, this is the classes page's entry point until the Phase 2 redo (which keeps the link).
+- [x] Specs: `class-info.component.spec.ts` renders the calendar link; `our-schedule.component.spec.ts` renders the browse-all-classes link.
 
 ### 1.3 Calendar → schedule template link
-- [ ] `calendar-home.component.html` toolbar: add a "My weekly plan" link (→ `/my/my-schedule`), shown only when logged in (next to the My Schedule/Full Schedule mode toggle).
-- [ ] `calendar-home.component.spec.ts`: link renders when authed, absent when anonymous.
+- [x] `calendar-home.component.html` toolbar: add a "My weekly plan" link (→ `/my/my-schedule`), shown only when logged in (next to the My Schedule/Full Schedule mode toggle).
+- [x] `calendar-home.component.spec.ts`: link renders when authed, absent when anonymous.
 
 ### 1.4 Schedule template page → notification settings link
-- [ ] `my-schedule.component.html`: add a "Notification settings" link (→ `/my/notification-preferences`) in the page header area.
-- [ ] `my-schedule.component.spec.ts`: link renders.
+- [x] `my-schedule.component.html`: add a "Notification settings" link (→ `/my/notification-preferences`) in the page header area.
+- [x] `my-schedule.component.spec.ts`: link renders.
 
 ### 1.5 Gallery anchor fix
-- [ ] `home-page.component.html`: give the photo-carousel section `id="gallery"` so the existing About ▸ Gallery `/#gallery` fragment link actually lands somewhere.
-- [ ] `home-page.component.spec.ts`: anchor present.
+- [x] `home-page.component.html`: give the photo-carousel section `id="gallery"` so the existing About ▸ Gallery `/#gallery` fragment link actually lands somewhere.
+- [x] `home-page.component.spec.ts`: anchor present.
 
 ### 1.6 Live hand-testing (Phase 1)
 Fresh database via `knottyyoga_database_helper`, server + `ng serve` running, no extra data needed.
