@@ -342,6 +342,41 @@ Should be able to:
 - [x] **OQ-P5-2 (resolved — all facilities, UI filter chip).** `eligible_schedules` and `today_classes` surface ALL facilities by default; the endpoints accept an optional `facility_id` filter and the UI offers a filter chip. Single-facility today, but the model is multi-facility-ready. Mason: "I'll go with your recommendation."
 - [x] **OQ-P5-3 (resolved — keep entries, badge them).** A membership lapse does NOT delete template entries — they survive so a renewal restores the template. `GET /api/me/template` decorates each entry with `currentlyEligible` (re-evaluated against the live access gate); the UI shows a "no longer eligible" badge for entries whose permission/skill the user no longer holds. Mason: "I'll go with your recommendation."
 
+## 13. SL-11 prerequisite sequencing in the planner — **DONE (7/31/2026)**
+
+> Added after Phase 5 shipped. A slot may name a `predecessor_class_schedule_slot_id` (SL-11 same-day sequencing, authored in Phase 1) — "you may only attend Partner Acrobatics if you also attend the 6pm Knotty Yoga". Until now the planner ignored that link entirely: nothing said so, and nothing stopped a member planning half a pair.
+
+**The rule, both for the standing weekly plan and for a single occurrence:** taking on a dependent means taking on its prerequisite; dropping a prerequisite means dropping what requires it. The server refuses the one-sided change — but as a **question, not an error**: HTTP 200 with `ok:false`, an `error_code`, and the slots to name. The client confirms with the member and re-sends with `cascade: true`, which applies both sides atomically inside one transaction.
+
+### 13.1 Backend
+- [x] `TableHelpers::ClassScheduleSlots::GetSlotsByPredecessor` — the reverse edge ("what requires this slot?"), via `DbCrud::GetRowsByValuesWithOrderBy`. +2 table-helper tests.
+- [x] `AttendanceTemplateHelper`: new `PrerequisiteSlotInfo` (slot + class + day/time, enough to write the sentence), error codes `REQUIRES_PREDECESSOR` / `DEPENDENTS_PRESENT`, and private `PredecessorOf` / `DependentsOf` / `IsSlotOnTemplate` / `IsAttendingOccurrence` helpers. Occurrence attendance = a one-off exception if present, else the weekly plan.
+- [x] `AddTemplateEntry(…, cascade=false)` refuses when the prerequisite isn't planned; cascading recurses so a whole chain (A→B→C) is planned in one confirmed call, nearest prerequisite first.
+- [x] `RemoveTemplateEntry` now returns `RemoveTemplateEntryResult` (was `bool`); refuses while a dependent is still planned, cascading drops dependents transitively **before** the slot itself, so the plan never transiently holds an unsatisfied prerequisite.
+- [x] `SetException` now returns `SetExceptionResult` (was `int64_t`); the check is **scoped to that occurrence's date**, so skipping next Monday's prerequisite is fine while this Monday's dependent is still planned.
+- [x] Display fields `predecessor_class_schedule_slot_id` / `predecessor_class_name` added to `EligibleScheduleInfo`, `TemplateEntryView` and `TodayClassEntry`, so every planner surface can label the dependency **before** the member touches a control.
+- [x] KVT: the three converters carry the new fields; new `PrerequisiteSlotInfoToKeyValueTable` / `…ArrayToKeyValueTableArray` for the refusal payload.
+- [x] Endpoints `POST /api/me/template/entry`, `DELETE /api/me/template/entry/<id>?cascade=true`, `POST /api/me/template/exception` all accept `cascade` and return the structured refusal at 200.
+- [x] Tests: 17 new `attendance_template_helper_test` cases (refuse/cascade/chain/per-date scoping/label plumbing on all three feeds), 2 endpoint cases each on the three routes, 3 KVT cases, 2 table-helper cases. **Linux docker gate: 4631 tests passed** (up 30 from 4601).
+
+### 13.2 Frontend
+- [x] `template.types.ts`: `PrerequisiteSlot`, `PrerequisiteErrorCode`, the two display fields on `EligibleSchedule` / `TemplateEntry` / `TodayClassEntry`, and result types for all three mutations.
+- [x] `ServerAccess` seam (interface / network / proxy / mock) takes `cascade` and returns the structured results; the network layer normalizes the nested slot arrays. The mock mirrors the server's rules (seeded slot 103 "Partner Acrobatics" requires slot 101 "Knotty Yoga") so mock mode exercises the prompts.
+- [x] New shared `PrerequisiteDialogComponent` — four wordings across (requires | dependents) × (weekly plan | one occurrence), listing each named class with its day + time.
+- [x] **My Weekly Plan** rows and kept entries show "Requires attending X"; the checkbox toggle confirms and cascades, rolling the optimistic flip back on cancel.
+- [x] **Upcoming** rows show the same label; "I'll be there" / "I can't make it" confirm and cascade, and the paired row on that day flips with it.
+- [x] The prompt also covers the **calendar** and the redone **Our Schedule** page for free: both drive attendance through the shared `CalendarNavigationService`, which now runs the confirm-and-retry there too and broadcasts the paired slot on `attendanceChanged$`.
+- [x] Specs: new `prerequisite-dialog.component.spec.ts` (10), my-schedule (+6), upcoming-classes (+5), calendar-navigation.service (+3), `ServerAccess.mock.spec.ts` (+9). **Angular gate: 2708 SUCCESS**, `ng build` clean, `tsc --noEmit` clean, no new lint.
+
+### 13.3 Live hand-testing
+Fresh database. Via the test-helper app, give the seeded **Knotty Yoga** Monday 6:00 PM slot a second class after it (e.g. **Partner Acrobatics** Monday 7:00 PM) and set that slot's predecessor to the Knotty Yoga slot. Log in as a member who passes both classes' gates.
+1. **Account menu → Profile → My Schedule → My Weekly Plan**: the Monday 7:00 PM **Partner Acrobatics** card shows **Requires attending Knotty Yoga** under its facility line; the 6:00 PM card shows no such note.
+2. Click the **Partner Acrobatics** card: a dialog reads *"Attending Partner Acrobatics requires also attending Knotty Yoga. Add Knotty Yoga to your weekly plan too?"* with **Cancel** and **Add both**. Press **Cancel** — the checkbox stays unchecked. Click again and press **Add both** — both cards are now checked.
+3. Click the **Knotty Yoga** card to uncheck it: the dialog reads *"Partner Acrobatics requires attending Knotty Yoga. Removing Knotty Yoga from your weekly plan removes Partner Acrobatics too."* with **Cancel** and **Remove both**. **Remove both** clears both checkboxes.
+4. Re-check both, then open the **Upcoming** tab: next Monday's **Partner Acrobatics** row shows **Requires attending Knotty Yoga**. Press its **I can't make it**, enter a reason, save — only that row is struck through (dropping the dependent needs no prompt).
+5. On the same day's **Knotty Yoga** row press **I can't make it**: after the reason dialog, the prerequisite prompt reads *"…Not attending Knotty Yoga means not attending Partner Acrobatics either."* — **Don't attend both** strikes both rows for that day only; the following Monday is untouched.
+6. Open **Your Calendar**, click next Monday's **Partner Acrobatics** chip and confirm **I'll be there**: the same *"Mark yourself as also attending Knotty Yoga?"* prompt appears, and confirming flips **both** chips on that day.
+
 ## 12. Cross-References
 
 - Parent plan: [[Classes, schedules, and attendance]] — §6 Phase 5.
