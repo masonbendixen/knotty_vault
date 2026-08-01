@@ -186,22 +186,28 @@ Fresh database; use the test-helper app to add a second, membership-gated class 
 
 > Frontend only. Preserves the workshop booking surface (Design Decision 3).
 
+> **Implemented 8/1/2026.** Angular gate green: `class-detail.component.spec.ts` **46 SUCCESS** (+7 new cases), full suite **2715 SUCCESS**, `ng build` clean, `tsc --noEmit` clean, `eslint` on the page clean. No backend work, as planned.
+
 ### 3.1 Upcoming Sessions → calendar link (recurring classes)
-- [ ] `class-detail.component.html/.ts`: for `kind === 'recurring'`, replace the entire Upcoming Sessions list with a "See this class on the calendar" card/CTA → `/calendar` (plain unfiltered link — OQ-10 ✅).
-- [ ] Weekly-pattern summary (day/time slots) stays if already shown elsewhere on the page; nothing else about the recurring layout changes.
+- [x] `class-detail.component.html/.ts`: for `kind === 'recurring'`, replace the entire Upcoming Sessions list with a "See this class on the calendar" card/CTA → `/calendar` (plain unfiltered link — OQ-10 ✅). *(The whole section header goes with it: a recurring class shows a "When it runs" card explaining that recurring classes are just-show-up, so the "No upcoming sessions scheduled" empty state no longer appears for them either.)*
+- [x] Weekly-pattern summary (day/time slots) stays if already shown elsewhere on the page; nothing else about the recurring layout changes. *(There is no weekly-pattern summary on this page today — nothing to preserve.)*
 
 ### 3.2 Workshops — capped list + calendar link
-- [ ] For `kind === 'workshop'`, cap the rendered occurrence list to the next **5** (OQ-4 ✅) and add "See all dates on the calendar" → `/calendar` below it. The cap is a template slice — the bookable click-through (`materializeClassOccurrence` → `/shop/event/:sessionId`) is unchanged.
+- [x] For `kind === 'workshop'`, cap the rendered occurrence list to the next **5** (OQ-4 ✅) and add "See all dates on the calendar" → `/calendar` below it. The cap is a template slice — the bookable click-through (`materializeClassOccurrence` → `/shop/event/:sessionId`) is unchanged. *(A "Showing the next 5 dates." note appears beside the link only when the cap actually hid something.)*
 
 ### 3.3 Series — unchanged runs section + calendar link
-- [ ] Series keep the runs/buy section as-is; add the same "See this class on the calendar" link for consistency.
+- [x] Series keep the runs/buy section as-is; add the same "See this class on the calendar" link for consistency. *(A series' occurrence list is naturally bounded by its run, so it is left uncapped.)*
 
 ### 3.4 Specs
-- [ ] `class-detail.component.spec.ts`: recurring shows the calendar link and no session cards; workshop shows ≤5 session cards + the link and still books an occurrence on click; series shows runs + link.
+- [x] `class-detail.component.spec.ts`: recurring shows the calendar link and no session cards; workshop shows ≤5 session cards + the link and still books an occurrence on click; series shows runs + link. *(Plus: a workshop with fewer than 5 dates shows them all with no cap note; a class with no `kind` keeps its list and gets the generic link; a recurring class with zero occurrences still offers the calendar; and the capped list's **5th** card books the **5th** occurrence — proving the slice is display-only.)*
 
 ### 3.5 Live hand-testing (Phase 3)
-1. From **Our Classes**, open **Knotty Yoga**: the page shows **See this class on the calendar** instead of a long Upcoming Sessions list, and the link opens the calendar.
-2. Create a workshop class with several future occurrences via the test-helper app; open its class page: at most 5 dated session cards render plus **See all dates on the calendar**; clicking a session card still leads to the event booking page.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+1. From **Our Classes**, open **Knotty Yoga**: instead of a long Upcoming Sessions list the page ends with a **When it runs** card explaining the class is just-show-up, and its **See this class on the calendar** button opens the calendar.
+2. Create a workshop class with more than five future occurrences via the test-helper app; open its class page from **Our Classes** → **Browse all classes**: exactly 5 dated session cards render, followed by **See all dates on the calendar** and the note **Showing the next 5 dates.** Clicking the *fifth* card leads to the event booking page for that fifth date (not the first).
+3. Give that workshop only two future occurrences: both cards render, and the cap note is gone while the calendar link stays.
+4. Open a series class page: the **Series Runs** section is unchanged (with its Buy full series / Join prorated buttons) and **See this class on the calendar** sits below the session list.
 
 ---
 
