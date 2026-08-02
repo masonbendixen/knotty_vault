@@ -227,6 +227,12 @@ The top-level menu item said **Our Classes** but opened a page titled **Our Sche
 >
 > **Sequencing note — this depends on Phase 4.** The card's Book CTA routes to `/shop/series/:classInstanceId`, which today only works when a `SeriesRun` arrives via `history.state`. That is fixed by **4.1** (`GET /api/class_series_run/<classInstanceId>`) + **4.4** (self-loading `SeriesBookingComponent`). **Recommended order: do 4.1 and 4.4 first**, then 3B. If you'd rather ship 3B first, the card's CTA has to point at the class page instead and get re-pointed later — more work overall, so the plan assumes 4.1/4.4 land first.
 
+> **Implemented 8/2/2026.** Gates green: Linux docker C++ suite **4646 tests passed** (up 15 from 4631), Angular full suite **2750 SUCCESS**, `ng build` clean, `tsc --noEmit` clean, no new lint.
+>
+> **Phase 4.1 and 4.4 were implemented as part of this**, as the sequencing note called for. Without them the card's Book button dead-ends, which would have missed the whole point of the request — so they are done and checked off in Phase 4 below.
+>
+> **Open questions answered with the documented defaults** (say the word if you'd rather change any): **OQ-11** → series only, not workshops. **OQ-12** → expanded on Upcoming Events, collapsed on Our Classes. **OQ-13** → URLs left alone.
+
 ### 3B.1 Backend — a public "upcoming series" feed
 `ClassSeriesHelper` can only answer "runs for THIS class" (`GetSeriesRunsForClass`). Every surface below needs "runs across all classes, soonest first", and `SeriesRun` doesn't currently carry enough to render a cross-class card (no class name/photo).
 - [ ] `Scheduling::SeriesInfo` (or a new `UpcomingSeriesInfo`) gains `className`, `classHasPhoto`, and the signup-window state (`signupWindowOpen` / `signupOpensAtUs`), resolved the same way `CalendarHelper::ComputeSignupWindow` does — the card must not offer Book before sign-ups open.
