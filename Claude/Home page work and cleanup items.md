@@ -213,13 +213,25 @@ Fresh database; use the test-helper app to add a second, membership-gated class 
 The top-level menu item said **Our Classes** but opened a page titled **Our Schedule**. Renamed the page to match the menu.
 - [x] `pages/public/our-schedule/` → `pages/public/our-classes/`, files `our-schedule.component.*` → `our-classes.component.*`, class `OurScheduleComponent` → `OurClassesComponent`, selector `app-our-schedule` → `app-our-classes`, and the page `<h1>` → **Our Classes**.
 - [x] **Second collision resolved:** the full catalog at `/classes` was *also* titled "Our Classes". Its `<h1>` is now **All Classes**, which is what both links into it already say (the schedule page's "Browse all classes" button and the class-detail back-link).
-- [x] Route path **stays `/schedule`** — `/classes` is the catalog, and existing links/bookmarks keep resolving. (See OQ-13 if you'd rather reshuffle the URLs.)
+- [x] ~~Route path **stays `/schedule`**~~ — **superseded by OQ-13 (answered 8/2/2026, see 3.7).** The URLs were reshuffled so the menu item and the URL agree.
 - [x] Stale `"Our Schedule"` references in code comments across `shared/`, `pages/calendar/` and `pages/manage/` updated to the new name.
 - [x] Gate: full suite **2715 SUCCESS**, `ng build` clean, `tsc --noEmit` clean, `eslint` clean on the touched files.
 
+### 3.7 URL reshuffle so the menu item and the URL agree (OQ-13) — **DONE (8/2/2026)**
+> **Mason (OQ-13):** *"This sounds like a good change."*
+>
+> (You flagged OQ-12 and OQ-13 as "shouldn't involve any work". OQ-12 indeed needed none — the defaults were already shipped. **OQ-13 did**: it is a route change plus every link that pointed at the old paths. Done below.)
+
+After 3.6 the weekly landing page was titled **Our Classes** but lived at `/schedule`, while the catalog titled **All Classes** owned `/classes`. Now the paths match the titles.
+- [x] `pages/public/public.routes.ts`: `/classes` → `OurClassesComponent`; `/classes/all` → `ClassInfoComponent`; `/classes/:id` unchanged. **`classes/all` is declared before `classes/:id`** — the other order parses the catalog as a class id.
+- [x] `/schedule` → `redirectTo: 'classes'` (`pathMatch: 'full'`), so existing links and bookmarks still resolve.
+- [x] Menu: `mockHeaderResponse.ts` **Our Classes** now points at `/classes`.
+- [x] Every link into the catalog re-pointed at `/classes/all`: the Our Classes header's **Browse all classes** button, the class-detail **All Classes** back-link, the series-booking "Browse classes" fallback, and the attendance-history empty-state "Browse the catalog" link.
+- [x] Specs updated: `mockHeaderResponse.spec.ts` (menu target + the "no stray /classes entries" assertion, now "exactly one"), `header.service.spec.ts`, `our-classes.component.spec.ts` (browse-link href), `class-detail.component.spec.ts` (back-link href).
+
 ---
 
-## Phase 3B — Series discoverability
+## Phase 3B — Series (and workshop) discoverability
 
 > **The problem (Mason, 8/2/2026):** a series is effectively unreachable. Today you either scroll the **Our Classes** week list to a week where an instance of the series happens and click that occurrence, or you go **Our Classes → Browse all classes → the series class → Series Runs**. Nothing surfaces "these series are starting soon" anywhere a visitor or member would look.
 >
@@ -231,9 +243,9 @@ The top-level menu item said **Our Classes** but opened a page titled **Our Sche
 >
 > **Phase 4.1 and 4.4 were implemented as part of this**, as the sequencing note called for. Without them the card's Book button dead-ends, which would have missed the whole point of the request — so they are done and checked off in Phase 4 below.
 >
-> **Open questions answered with the documented defaults** (say the word if you'd rather change any): **OQ-11** → series only, not workshops. **OQ-12** → expanded on Upcoming Events, collapsed on Our Classes. **OQ-13** → URLs left alone.
+> **Open questions — Mason answered 8/2/2026.** **OQ-11** → *"Let's do workshops too."* → the feed was widened to series **+ workshops**; see **3B.8** for what changed (the endpoint, the seam method and the card were all renamed off "series"). **OQ-12** → *"These defaults are fine."* → no work; expanded on Upcoming Events, collapsed on Our Classes, as shipped. **OQ-13** → *"This sounds like a good change."* → the URLs were reshuffled; see **3.7**.
 
-### 3B.1 Backend — a public "upcoming series" feed
+### 3B.1 Backend — a public "upcoming series" feed *(became the offerings feed in 3B.8)*
 `ClassSeriesHelper` can only answer "runs for THIS class" (`GetSeriesRunsForClass`). Every surface below needs "runs across all classes, soonest first", and `SeriesRun` doesn't currently carry enough to render a cross-class card (no class name/photo).
 - [x] `Scheduling::SeriesInfo` (or a new `UpcomingSeriesInfo`) gains `className`, `classHasPhoto`, and the signup-window state (`signupWindowOpen` / `signupOpensAtUs`), resolved the same way `CalendarHelper::ComputeSignupWindow` does — the card must not offer Book before sign-ups open. *(Also `inProgress`, so the card can say "Already under way" and offer the prorated CTA. The window is measured against the run's START, mirroring how the calendar measures an occurrence's.)*
 - [x] `ClassSeriesHelper::GetUpcomingSeriesRuns(...)` — every **active** `kind='series'` class's runs that haven't ended, whether they start later or are already under way. Ordered by `valid_from_us`, then class name. Personalized pricing when `personId > 0`, public otherwise. *(Named `GetUpcomingSeriesRunsAcrossClasses` — the per-class `GetUpcomingSeriesRuns` already existed. Both, plus the new single-run read, now share one private `BuildSeriesInfo`, so pricing, occurrence counting and the annotation resolve one way.)*
@@ -244,37 +256,37 @@ The top-level menu item said **Our Classes** but opened a page titled **Our Sche
 >
 > **Worth a decision later:** buying a started run "in full" charges for sessions that already happened. That is pre-existing class-page behavior, not something 3B introduced — but if you'd rather started runs were prorated-or-nothing, the clean fix is in `BookFullSeries` (reject a started run) rather than in the feed, so the class page and the card stay consistent.
 - [x] Access-gate the list the same way the calendar does: a series the viewer can't take still appears (it's marketing) but carries the `members_only` / `needs_skill` annotation. **Anonymous viewers get real states.** *(This forced a good cleanup: the classification was private to `CalendarHelper::AnnotateAccess`. It moved to `ClassAccessHelper::Annotate` + a `ClassAccessAnnotation` struct, so the calendar and the series feed classify through one path; `kCalendarAccess*` are now aliases of the shared constants, so no call site churned.)*
-- [x] New thin endpoint `GET /api/upcoming_series_runs?to_us&limit` (public / anonymous-safe) → `{ items: [...] }`; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [x] New thin endpoint `GET /api/upcoming_series_runs?to_us&limit` (public / anonymous-safe) → `{ items: [...] }`; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`. *(Superseded by **3B.8**: renamed to `GET /api/upcoming_offerings` when workshops joined the feed; the old file was deleted.)*
 - [x] KVT converter + `scheduling_key_value_table_test.cpp` case (2 cases: populated + defaults).
-- [x] Tests: helper (`GetRunByClassInstanceId` found/missing/wrong-kind, plus ended-run and inactive-class exclusion) + endpoint `get_upcoming_series_runs_test.cpp` (empty, cross-class ordering, in-progress only when prorated is allowed, non-series ignored, gated-but-listed, limit + to_us). A shared `series_run_test_fixture.h` builds a run in one call.
+- [x] Tests: helper (`GetRunByClassInstanceId` found/missing/wrong-kind, plus ended-run and inactive-class exclusion) + endpoint `get_upcoming_series_runs_test.cpp` (empty, cross-class ordering, in-progress only when prorated is allowed, non-series ignored, gated-but-listed, limit + to_us). A shared `series_run_test_fixture.h` builds a run in one call. *(The endpoint test became `get_upcoming_offerings_test.cpp` in **3B.8**; the fixture gained a `BuildWorkshop` builder.)*
 
 ### 3B.2 Frontend — `ServerAccess` seam
-- [x] `getUpcomingSeriesRuns(toUs?, limit?)` **and** `getSeriesRunByInstance(id)` across interface / network / proxy / mock; `SeriesRun` gains `class_name`, `has_photo`, `in_progress`, `access`, `required_permission_id/name`, `missing_skill_ids`, `signup_window_open`, `signup_opens_at_us`. One `normalizeSeriesRun` in the network layer coerces the string booleans + comma-joined skill ids for all three series reads.
+- [x] `getUpcomingSeriesRuns(toUs?, limit?)` *(renamed to `getUpcomingOfferings` in **3B.8**)* **and** `getSeriesRunByInstance(id)` across interface / network / proxy / mock; `SeriesRun` gains `class_name`, `has_photo`, `in_progress`, `access`, `required_permission_id/name`, `missing_skill_ids`, `signup_window_open`, `signup_opens_at_us`. One `normalizeSeriesRun` in the network layer coerces the string booleans + comma-joined skill ids for all three series reads.
 - [x] `ServerAccess.mock.spec.ts`: 6 new cases (single-run found/404, feed ordering, under-way run dropped when prorated is forbidden, limit + to_us, gate carried). The mock is seeded with a second, gated run so local mode exercises the lock path.
 
 ### 3B.3 Frontend — the shared expandable series card
-- [x] New `shared/components/series-highlight/` — one component, three hosts. Collapsed it is a single summary row; expanded it lists each run with the class photo, class name + run name, date window, session count, per-session and total price, and the right CTA:
+- [x] New `shared/components/series-highlight/` *(renamed `offering-highlight/` in **3B.8**)* — one component, three hosts. Collapsed it is a single summary row; expanded it lists each run with the class photo, class name + run name, date window, session count, per-session and total price, and the right CTA:
   - eligible + sign-ups open → **Book the series** → `/shop/series/:classInstanceId`;
   - eligible + in progress → **Join from today — prorated**;
   - sign-ups not open yet → "Sign-ups open {date}";
   - `members_only` / `needs_skill` → the calendar's lock treatment (→ Memberships page / skill dialog).
-- [x] Inputs: `runs`, `heading`, `collapsedByDefault`. Hidden entirely when `runs` is empty. *(Once the viewer toggles it, their choice sticks — a re-fetch won't slam it shut on them.)*
+- [x] Inputs: `runs` *(now `offerings`)*, `heading`, `collapsedByDefault`. Hidden entirely when `runs` is empty. *(Once the viewer toggles it, their choice sticks — a re-fetch won't slam it shut on them.)*
 - [x] Spec: 16 cases — collapse/expand, every CTA state, hidden-when-empty, UTC window formatting, and lock-beats-closed-window precedence. *(One trap worth remembering: `MatDialogModule` provides `MatDialog` at **module** scope, so a standalone component importing `SharedModule` gets it from its own injector — the spec must spy on the component's instance, not `TestBed.inject(MatDialog)`.)*
 - [x] Deviation from the plan: **no "Remind me" button** on a not-yet-open run. That action is slot+occurrence keyed (`requestSignupReminder(slotId, occurrenceDateUs)`) and a series run has neither — it is a date window, not an occurrence. The card states the open date instead; wiring reminders for whole runs would need a new backend key and is worth its own item if you want it.
 
 ### 3B.4 Upcoming Events page — series section
-- [x] `upcoming-events.component`: fetches `getUpcomingSeriesRuns()` alongside the event list and renders `app-series-highlight` **above** the one-off events, headed "Series starting soon", expanded by default.
+- [x] `upcoming-events.component`: fetches `getUpcomingSeriesRuns()` alongside the event list and renders `app-series-highlight` **above** the one-off events, headed "Series starting soon", expanded by default. *(**3B.8**: now `getUpcomingOfferings()` → `app-offering-highlight`, headed "Series & workshops coming up", filtered through `visibleOfferings`.)*
 - [x] Spec: renders above the events list (asserted by document order), absent when empty, and the two fetches are independent in **both** directions — a series failure leaves the events list intact, and an events failure still shows the series card.
 
 ### 3B.5 Our Classes page — series card at the top
-- [x] `our-classes.component`: renders `app-series-highlight` between the page header and the week list, **collapsed by default**, headed "Series & multi-week programs".
+- [x] `our-classes.component`: renders `app-series-highlight` between the page header and the week list, **collapsed by default**, headed "Series & multi-week programs". *(**3B.8**: now `app-offering-highlight`, headed "Series & workshops".)*
 - [x] The card is week-independent — fetched once in `ngOnInit` (not in `load()`), so paging weeks never refetches it, and it is untouched by the facility filter and the eligible-only toggle.
 - [x] Spec: above the week list, expands on demand, hidden when empty, survives week navigation without a refetch, survives filters that hide every class, and the week list still renders when the series fetch fails.
 
 ### 3B.6 Home page — series card
 > Lands **with Phase 5** (the home page redesign) rather than before it, so the section is placed once rather than built and then moved.
-- [ ] Logged out: `app-series-highlight` collapsed, under the membership tiers — a series is a bigger commitment than a drop-in, so it sits below the tier pitch.
-- [ ] Logged in: collapsed, alongside "Events you could sign up for"; suppress runs the viewer has already booked (same exclusion the events strip uses).
+- [ ] Logged out: `app-offering-highlight` collapsed, under the membership tiers — a series is a bigger commitment than a drop-in, so it sits below the tier pitch.
+- [ ] Logged in: collapsed, alongside "Events you could sign up for"; suppress offerings the viewer has already booked (same exclusion the events strip uses — workshop dates can reuse the `event_session_id` key **3B.8** added).
 - [ ] Add to the Phase 5.4 / 5.5 spec + hand-test lists rather than duplicating them here.
 
 ### 3B.7 Live hand-testing (Phase 3B)
@@ -287,6 +299,44 @@ Fresh database; via the test-helper app create two series classes — one starti
 4. Open **Our Classes**: a collapsed **Series & multi-week programs** card sits under the page header; expanding it shows the same three runs. Page to **Next week** — the card is unchanged and no refetch happens. Flip **Full Schedule** / change the **Facility** filter — the card is unaffected.
 5. Log in as a member who passes the gate: the third series now shows a Book CTA instead of the membership lock.
 6. With no series in the system at all, neither page shows the card (no empty heading, no stray whitespace).
+### 3B.8 OQ-11 — widen the feed to workshops too — **DONE (8/2/2026)**
+> **Mason (OQ-11):** *"Let's do workshops too."*
+
+A recurring class is just-show-up and belongs in the weekly grid. The two kinds that need **buying** — a series run and a workshop occurrence — were equally hard to find, so the series-only feed became one **offerings** feed carrying both. Everything named "series" on this path was renamed; the series behavior is unchanged.
+
+**Backend**
+- [x] New `business_logic/scheduling/upcoming_offerings_helper.{h,cpp}` — `UpcomingOffering` + `UpcomingOfferingsHelper::GetUpcomingOfferings(txn, personId, asOfUs, toUs = 0, limit = 0)`. `kind` is `"series"` or `"workshop"` and decides which half of the struct is meaningful; **every field is emitted either way** (zeroed for the other half) so the client sees one stable shape.
+  - *Series half:* `class_instance_id`, `run_name`, `occurrence_count`, `total_cents`, `in_progress`, `prorated_signups_allowed` — mapped straight from `ClassSeriesHelper::GetUpcomingSeriesRunsAcrossClasses`, so the two feeds can never drift.
+  - *Workshop half:* `class_schedule_slot_id`, `occurrence_date_us`, `event_session_id`. Occurrences are **derived** per date from the active instance's implementation slots (`ClassScheduleHelper::GetDerivedSessionsForRange`), priced via `CatalogHelper::ResolveBestPriceForPerson` and gated via `ClassAccessHelper::Annotate`, with the sign-up window computed per occurrence from `SignupReminderHelper::ResolveBestAdvanceDaysForPerson`.
+  - Cancelled occurrences are skipped. A workshop class with no run (hence no product) is skipped.
+- [x] **`event_session_id` is the de-duplication key.** A materialized workshop occurrence is *also* an `event_sessions` row, so it already appears on Upcoming Events as a normal bookable event. The feed reports the persisted id (0 while purely derived) so a host can drop what it is already listing — and so the client can skip the materialize round-trip when booking.
+- [x] **Default 120-day horizon** (`kDefaultWorkshopHorizonDays`) when the caller gives no `to_us`: a series is bounded by its own run window, but workshop derivation is open-ended and would otherwise walk forward forever. `to_us` overrides it; series are never clipped by it.
+- [x] Derivation walks whole UTC days from `midnight(asOfUs)`, so the first day can yield an occurrence that **already started** — those are dropped (`startUs < asOfUs`), or "10am today" would still read as upcoming at 6pm.
+- [x] Endpoint renamed: `GET /api/upcoming_series_runs` → **`GET /api/upcoming_offerings?to_us&limit`** (public / anonymous-safe) → `{ items: [...] }`. `get_upcoming_series_runs.*` deleted; `web_app.cpp` anchor + `endpoints/CMakeLists.txt` re-pointed.
+- [x] KVT converters `UpcomingOfferingToKeyValueTable` / `...ToKeyValueTableArray` + 5 `scheduling_key_value_table_test.cpp` cases (series half, workshop half, access annotation, closed window, array order).
+- [x] Tests: 13 helper cases (`upcoming_offerings_helper_test.cpp` — workshop listed with pricing, recurring excluded, cancelled skipped, materialized carries its session id, no-instance skipped, members-only still listed, closed sign-up window, past-today occurrence dropped, series+workshop merge order, limit, ended run excluded, in-progress run kept, default horizon) + 5 endpoint cases (`get_upcoming_offerings_test.cpp` — both kinds for anonymous, soonest-first, limit, `to_us`, gate carried). `series_run_test_fixture.h` gained a `BuildWorkshop` builder.
+- [x] 🐞 **Fixture trap found while writing these:** `CatalogHelper` resolves every price against **one** active price schedule (lowest id wins). A test that built two priced things created two schedules, and whichever lost silently priced at **0**. Both builders now go through a shared `EnsurePriceSchedule` that reuses the existing one.
+
+**Frontend**
+- [x] New `shared/types/offering.types.ts` (`UpcomingOffering`, `OfferingKind`). `SeriesRun` is unchanged — the per-class list and the single-run read still use it.
+- [x] Seam: `getUpcomingSeriesRuns` → **`getUpcomingOfferings(toUs?, limit?)`** across interface / network / proxy / mock, with a new `normalizeOffering` in the network layer.
+- [x] `shared/components/series-highlight/` → **`shared/components/offering-highlight/`** (`app-offering-highlight`, input `offerings`). Each row now carries a **Series** / **Workshop** chip; a workshop shows its date + duration + single-occurrence price where a series shows its window + session count + run total (with the per-session breakdown).
+- [x] Workshop CTA is **"Book this date"** → materialize the slot+date into an `event_session`, then hand off to `/shop/event/:id` — the same path the class-detail page uses, so every payment option comes along. When the feed already reported an `event_session_id` the round-trip is skipped, and a signed-out visitor is sent to `/login` first. A failed materialize shows an inline message instead of navigating.
+- [x] The collapsed summary counts both kinds ("2 series, 1 workshop") and names each class **once**, so the same workshop on three dates doesn't repeat.
+- [x] **Upcoming Events** filters the card through `visibleOfferings`, dropping any offering whose `event_session_id` is already in the events list below — no date advertised twice on one page. Heading is now "Series & workshops coming up".
+- [x] **Our Classes** heading is now "Series & workshops"; still collapsed by default and still week-independent.
+- [x] Specs: 24 cases on `offering-highlight` (both kinds rendered, kind chip, count/summary dedupe, distinct rows per workshop date, every CTA state incl. the three workshop-booking paths, locks, formatting), plus updated host specs (Upcoming Events gained "lists workshop dates" and "drops an offering the events list is already showing"; Our Classes gained "lists workshop dates in the card") and 7 mock-seam cases (merge order, series mapping, workshop keys, under-way run kept, ended run dropped, past occurrence dropped, limit + `to_us`, gate carried). The mock is seeded with two dates of one workshop.
+
+**Live hand-testing (OQ-11 — workshops in the feed).** Fresh database, on top of the Phase 3B steps below.
+1. Via the test-helper app create a **workshop** class ("Handstand Intensive") with a weekly slot and a per-occurrence price, and leave every date underived (nobody has booked one).
+2. Logged out, open **Upcoming Events**: the **Series & workshops coming up** card now lists the workshop's next dates, each tagged **Workshop**, showing the date, the length in minutes and the single-date price — interleaved with the series runs by time, soonest first.
+3. Click **Book this date** while logged out: you land on the sign-in page. Sign in as a member and click it again: you land on the event booking page **for that exact date**, with the workshop's price.
+4. Go back to **Upcoming Events**: the date you just booked is now in the one-off events list below — and it is **gone** from the card, not shown twice.
+5. Open **Our Classes**: the collapsed card's count reads e.g. **"2 series, 3 workshops"** and the summary names *Handstand Intensive* **once**, not once per date. Expand it — each date is its own row.
+6. Cancel one of the workshop dates via the test-helper app: that row disappears from both cards while the other dates stay.
+7. Give the workshop product a booking window of, say, 7 days: dates further out than that show **Sign-ups open {date}** instead of a Book button.
+8. Gate the workshop behind Gold Member: every date shows **Requires a membership** and lands on the Memberships page.
+
 
 ---
 
@@ -392,15 +442,15 @@ Fresh database. Via **Manage** → **Events** → **Create Event**, create two f
 
 # Open Questions
 
-> ⏳ **Three new questions (OQ-11 – OQ-13) from the Phase 3B series-discoverability work (8/2/2026)** are at the top of the list below and need answers before 3B starts. Each has a working default so nothing is blocked if you'd rather I just proceed.
+> ✅ **OQ-11 – OQ-13 (Phase 3B series-discoverability work) — answered by Mason 8/2/2026 and implemented the same day.** OQ-11 widened the feed to workshops (**3B.8**); OQ-12 confirmed the shipped defaults (no work); OQ-13 reshuffled the URLs (**3.7**).
 >
 > ✅ **OQ-1 – OQ-10 all resolved (7/30/2026, round 2)** and folded into the plan: OQ-1 follow-up — account-dropdown "Memberships" entry removed (Phase 1.1); OQ-3 follow-up — day-grouped weekly timetable confirmed (Phase 2.4); OQ-9 — option (c), the weekly-schedule surface is deleted end to end (new Phase 2.5). The full Q&A dialog is kept below for the record.
 
-- **OQ-11 — Does the series card cover workshops too?** You asked specifically about series. Workshops have a *partial* path today (a materialized workshop occurrence shows up on Upcoming Events as a normal bookable event), but an un-materialized future workshop is just as invisible as a series. My default: **series only** for 3B, since that's what you asked for and workshops at least appear once materialized. Say the word and I'll widen the feed to "series + workshops" — it's the same endpoint with one more `kind` and roughly one extra day of work across the three surfaces.
+- **OQ-11 — Does the series card cover workshops too?** ✅ **RESOLVED — Mason: *"Let's do workshops too."*** (8/2/2026) The series-only feed became one **offerings** feed: `GET /api/upcoming_offerings` returns series runs **and** derived workshop occurrences, and the card renders both with a Series/Workshop chip. A materialized workshop date is dropped from the card on Upcoming Events (it is already in the events list below), keyed on `event_session_id`. Implemented in **3B.8**.
 	- Mason- Let's do workshops too.
-- **OQ-12 — Collapsed or expanded by default?** My default: **expanded on Upcoming Events** (that page exists to answer "what can I sign up for") and **collapsed on Our Classes and the home page** (both have other primary content, and a collapsed one-line summary still advertises "3 series starting soon"). If you'd rather it were always expanded — or always collapsed — that's a one-line input change per host.
+- **OQ-12 — Collapsed or expanded by default?** ✅ **RESOLVED — Mason: *"These defaults are fine."*** (8/2/2026) No work: **expanded on Upcoming Events**, **collapsed on Our Classes** (and the home page when Phase 5 places it), exactly as shipped.
 	- Mason- These defaults are fine.
-- **OQ-13 — Should the URLs be reshuffled now that the pages are renamed?** After Phase 3.6 the weekly landing page is titled **Our Classes** but lives at `/schedule`, and the catalog is titled **All Classes** at `/classes`. I **kept the paths as-is** (no broken links/bookmarks, and `/classes` was already taken). The tidier end state would be `/classes` → Our Classes and `/classes/all` → All Classes, with a redirect from `/schedule`. Worth doing, or leave the URLs alone?
+- **OQ-13 — Should the URLs be reshuffled now that the pages are renamed?** ✅ **RESOLVED — Mason: *"This sounds like a good change."*** (8/2/2026) `/classes` → **Our Classes**, `/classes/all` → **All Classes**, `/schedule` redirects to `/classes`; every link into the catalog re-pointed. Implemented in **3.7**. *(Note: you flagged this one as "shouldn't involve any work" — it did, since it is a route change plus the links that fed it. OQ-12 was the one that needed none.)*
 	- Mason- This sounds like a good change.
 
 - **OQ-1 — "Memberships" menu target.** I plan to point the renamed **Memberships** item at `/shop/subscriptions` (the pure tier list). The generic `/shop` catalog (one-time products + subscriptions — currently also massage/spa entry points live under Services) stays routed but loses its menu entry. OK? If you'd rather keep the full catalog reachable, I can point Memberships at `/shop` unchanged-but-renamed, or add a "Full shop" link on the Memberships page.
