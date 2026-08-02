@@ -209,6 +209,70 @@ Fresh database; use the test-helper app to add a second, membership-gated class 
 3. Give that workshop only two future occurrences: both cards render, and the cap note is gone while the calendar link stays.
 4. Open a series class page: the **Series Runs** section is unchanged (with its Buy full series / Join prorated buttons) and **See this class on the calendar** sits below the session list.
 
+### 3.6 Rename the landing page "Our Schedule" → "Our Classes" — **DONE (8/2/2026)**
+The top-level menu item said **Our Classes** but opened a page titled **Our Schedule**. Renamed the page to match the menu.
+- [x] `pages/public/our-schedule/` → `pages/public/our-classes/`, files `our-schedule.component.*` → `our-classes.component.*`, class `OurScheduleComponent` → `OurClassesComponent`, selector `app-our-schedule` → `app-our-classes`, and the page `<h1>` → **Our Classes**.
+- [x] **Second collision resolved:** the full catalog at `/classes` was *also* titled "Our Classes". Its `<h1>` is now **All Classes**, which is what both links into it already say (the schedule page's "Browse all classes" button and the class-detail back-link).
+- [x] Route path **stays `/schedule`** — `/classes` is the catalog, and existing links/bookmarks keep resolving. (See OQ-13 if you'd rather reshuffle the URLs.)
+- [x] Stale `"Our Schedule"` references in code comments across `shared/`, `pages/calendar/` and `pages/manage/` updated to the new name.
+- [x] Gate: full suite **2715 SUCCESS**, `ng build` clean, `tsc --noEmit` clean, `eslint` clean on the touched files.
+
+---
+
+## Phase 3B — Series discoverability
+
+> **The problem (Mason, 8/2/2026):** a series is effectively unreachable. Today you either scroll the **Our Classes** week list to a week where an instance of the series happens and click that occurrence, or you go **Our Classes → Browse all classes → the series class → Series Runs**. Nothing surfaces "these series are starting soon" anywhere a visitor or member would look.
+>
+> The fix is one new public feed plus one shared, expandable card reused on three surfaces: **Upcoming Events**, the top of **Our Classes**, and the **home page**.
+>
+> **Sequencing note — this depends on Phase 4.** The card's Book CTA routes to `/shop/series/:classInstanceId`, which today only works when a `SeriesRun` arrives via `history.state`. That is fixed by **4.1** (`GET /api/class_series_run/<classInstanceId>`) + **4.4** (self-loading `SeriesBookingComponent`). **Recommended order: do 4.1 and 4.4 first**, then 3B. If you'd rather ship 3B first, the card's CTA has to point at the class page instead and get re-pointed later — more work overall, so the plan assumes 4.1/4.4 land first.
+
+### 3B.1 Backend — a public "upcoming series" feed
+`ClassSeriesHelper` can only answer "runs for THIS class" (`GetSeriesRunsForClass`). Every surface below needs "runs across all classes, soonest first", and `SeriesRun` doesn't currently carry enough to render a cross-class card (no class name/photo).
+- [ ] `Scheduling::SeriesInfo` (or a new `UpcomingSeriesInfo`) gains `className`, `classHasPhoto`, and the signup-window state (`signupWindowOpen` / `signupOpensAtUs`), resolved the same way `CalendarHelper::ComputeSignupWindow` does — the card must not offer Book before sign-ups open.
+- [ ] `ClassSeriesHelper::GetUpcomingSeriesRuns(Transaction&, personId, fromUs, toUs, limit)` — every **active** `kind='series'` class's runs that either start in the window or are in progress and still joinable (`prorated_signups_allowed` + not yet ended). Ordered by `valid_from_us`, then class name. Personalized pricing when `personId > 0`, public pricing otherwise (reuse the existing resolution internals so there is one pricing path).
+- [ ] Access-gate the list the same way the calendar does: a series the viewer can't take still appears (it's marketing) but carries the `members_only` / `needs_skill` annotation so the card can show the lock instead of a Book button. **Anonymous viewers get real states** (Phase 2.1 already made that work).
+- [ ] New thin endpoint `GET /api/upcoming_series_runs?from_us&to_us&limit` (public / anonymous-safe) → `{ items: [...] }`; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [ ] KVT converter + `scheduling_key_value_table_test.cpp` case.
+- [ ] Tests: helper (in-window / in-progress-joinable / ended-excluded / inactive-class-excluded / ordering / anonymous vs member pricing / access annotation) + endpoint (`get_upcoming_series_runs_test.cpp`: 200 shape, anonymous OK, empty list, limit honored).
+
+### 3B.2 Frontend — `ServerAccess` seam
+- [ ] `getUpcomingSeriesRuns(fromUs?, toUs?, limit?)` across interface / network / proxy / mock; `SeriesRun` (or a new `UpcomingSeriesRun`) type gains `class_name`, `has_photo`, `signup_window_open`, `signup_opens_at_us`, `access`, `required_permission_name`.
+- [ ] `ServerAccess.mock.spec.ts`: new-method cases (list shape, anonymous allowed, ordering, limit).
+
+### 3B.3 Frontend — the shared expandable series card
+- [ ] New `shared/components/series-highlight/` — one component, three hosts. Collapsed it is a single summary row ("**3 series starting soon** — Fall Partner Acro, Intro to Handstands, …"); expanded it lists each run as a row with the class photo, class name + run name, date window, session count, per-session and total price, and the right CTA:
+  - eligible + sign-ups open → **Book the series** → `/shop/series/:classInstanceId` (needs 4.1/4.4);
+  - eligible + in progress + prorated allowed → **Join from today — prorated**;
+  - sign-ups not open yet → "Sign-ups open {date}" + the existing **Remind me** action (reuse `CalendarNavigationService.requestSignupReminder`);
+  - `members_only` / `needs_skill` → the same lock treatment the calendar chip uses (→ Memberships page / skill dialog).
+- [ ] Inputs: `runs`, `heading`, `collapsedByDefault`. Hidden entirely (renders nothing) when `runs` is empty, so no host needs an empty-state branch.
+- [ ] Spec: collapsed/expanded toggle, each CTA state, the hidden-when-empty case, and that the lock states route through the shared navigation service.
+
+### 3B.4 Upcoming Events page — series section
+- [ ] `upcoming-events.component`: fetch `getUpcomingSeriesRuns()` alongside the existing visible-event-session list and render `app-series-highlight` **above** the one-off events, headed "Series starting soon", expanded by default (this page is the "what can I sign up for" page — burying it would repeat the current problem).
+- [ ] Spec: series section renders above the events list; absent when there are no upcoming runs; a failed series fetch leaves the events list intact.
+
+### 3B.5 Our Classes page — series card at the top
+- [ ] `our-classes.component`: fetch the same feed and render `app-series-highlight` between the page header and the week list, **collapsed by default** (the week grid is the page's primary content), headed "Series & multi-week programs".
+- [ ] The card is week-independent — it does **not** re-fetch on week navigation, and it is not affected by the facility filter or the eligible-only toggle (a series you can't take yet is exactly what the upsell is for).
+- [ ] Spec: renders above the week list; survives week navigation without refetching; hidden when the feed is empty.
+
+### 3B.6 Home page — series card
+> Lands **with Phase 5** (the home page redesign) rather than before it, so the section is placed once rather than built and then moved.
+- [ ] Logged out: `app-series-highlight` collapsed, under the membership tiers — a series is a bigger commitment than a drop-in, so it sits below the tier pitch.
+- [ ] Logged in: collapsed, alongside "Events you could sign up for"; suppress runs the viewer has already booked (same exclusion the events strip uses).
+- [ ] Add to the Phase 5.4 / 5.5 spec + hand-test lists rather than duplicating them here.
+
+### 3B.7 Live hand-testing (Phase 3B)
+Fresh database; via the test-helper app create two series classes — one starting next month, one already in progress with `prorated_signups_allowed` — plus a third gated behind the Gold Member permission.
+1. Logged out, open **Upcoming Events**: a **Series starting soon** section sits above the one-off events, expanded, listing both open series with their date windows, session counts and prices; the gated one shows **Requires a membership** and lands on the Memberships page.
+2. Click **Book the series** on the future one: it goes straight to the series booking page with the run's dates and price — *without* having visited the class page first.
+3. The in-progress one offers **Join from today — prorated**; that CTA opens the same page in prorated mode.
+4. Open **Our Classes**: a collapsed **Series & multi-week programs** card sits under the page header; expanding it shows the same three runs. Page to **Next week** — the card is unchanged and no refetch happens. Flip **Full Schedule** / change the **Facility** filter — the card is unaffected.
+5. Log in as a member who passes the gate: the third series now shows a Book CTA instead of the membership lock.
+6. With no series in the system at all, neither page shows the card (no empty heading, no stray whitespace).
+
 ---
 
 ## Phase 4 — Series & workshop sign-up discoverability
@@ -311,7 +375,13 @@ Fresh database. Via **Manage** → **Events** → **Create Event**, create two f
 
 # Open Questions
 
-> ✅ **All open questions resolved (7/30/2026, round 2)** and folded into the plan: OQ-1 follow-up — account-dropdown "Memberships" entry removed (Phase 1.1); OQ-3 follow-up — day-grouped weekly timetable confirmed (Phase 2.4); OQ-9 — option (c), the weekly-schedule surface is deleted end to end (new Phase 2.5). The full Q&A dialog is kept below for the record.
+> ⏳ **Three new questions (OQ-11 – OQ-13) from the Phase 3B series-discoverability work (8/2/2026)** are at the top of the list below and need answers before 3B starts. Each has a working default so nothing is blocked if you'd rather I just proceed.
+>
+> ✅ **OQ-1 – OQ-10 all resolved (7/30/2026, round 2)** and folded into the plan: OQ-1 follow-up — account-dropdown "Memberships" entry removed (Phase 1.1); OQ-3 follow-up — day-grouped weekly timetable confirmed (Phase 2.4); OQ-9 — option (c), the weekly-schedule surface is deleted end to end (new Phase 2.5). The full Q&A dialog is kept below for the record.
+
+- **OQ-11 — Does the series card cover workshops too?** You asked specifically about series. Workshops have a *partial* path today (a materialized workshop occurrence shows up on Upcoming Events as a normal bookable event), but an un-materialized future workshop is just as invisible as a series. My default: **series only** for 3B, since that's what you asked for and workshops at least appear once materialized. Say the word and I'll widen the feed to "series + workshops" — it's the same endpoint with one more `kind` and roughly one extra day of work across the three surfaces.
+- **OQ-12 — Collapsed or expanded by default?** My default: **expanded on Upcoming Events** (that page exists to answer "what can I sign up for") and **collapsed on Our Classes and the home page** (both have other primary content, and a collapsed one-line summary still advertises "3 series starting soon"). If you'd rather it were always expanded — or always collapsed — that's a one-line input change per host.
+- **OQ-13 — Should the URLs be reshuffled now that the pages are renamed?** After Phase 3.6 the weekly landing page is titled **Our Classes** but lives at `/schedule`, and the catalog is titled **All Classes** at `/classes`. I **kept the paths as-is** (no broken links/bookmarks, and `/classes` was already taken). The tidier end state would be `/classes` → Our Classes and `/classes/all` → All Classes, with a redirect from `/schedule`. Worth doing, or leave the URLs alone?
 
 - **OQ-1 — "Memberships" menu target.** I plan to point the renamed **Memberships** item at `/shop/subscriptions` (the pure tier list). The generic `/shop` catalog (one-time products + subscriptions — currently also massage/spa entry points live under Services) stays routed but loses its menu entry. OK? If you'd rather keep the full catalog reachable, I can point Memberships at `/shop` unchanged-but-renamed, or add a "Full shop" link on the Memberships page.
 	- Mason- We currently have Services, Upcoming Events, and Shop. Services is currently a drop down that has Browse Services and Upcoming Events. Given that Upcoming Events also has a separate menu item, it seems like making Services not a dropdown and just going straight to the current Browse Services item would make the most sense. There isn't anything under Shop besides memberships so it would make more sense to just change that label to memberships.
