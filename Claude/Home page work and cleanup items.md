@@ -348,6 +348,10 @@ A recurring class is just-show-up and belongs in the weekly grid. The two kinds 
 
 > Backend first: make a series run addressable by `class_instance_id`; then wire Book CTAs everywhere the Overview asks for (profile tab, calendar, class page — the class page already books).
 
+> **Phase 4 complete 8/2/2026** (4.1 and 4.4 landed earlier with Phase 3B). Gates green: Linux docker C++ suite **4668 tests passed** (up 4 — the endpoint test file that had never been compiled, see the 4.2 bug note), Angular full suite **2786 SUCCESS** (up 21), `ng build` clean, `tsc --noEmit` clean on both configs, `ng lint` unchanged from its pre-existing baseline (263 problems before and after; the one finding in a file touched here is a pre-existing `as any` that only shifted line number).
+>
+> **The one deviation from the plan:** 4.5 said to "reuse the shared `CalendarNavigationService` flow" for the workshop CTA, but that service had no such flow — the materialize-then-navigate logic was inline in the 3B offering card. With three surfaces needing it, it was extracted into a new `shared/services/offering-booking.service.ts` and all three now call it. Details in 4.5.
+
 ### 4.1 Backend — `GET /api/class_series_run/<int:classInstanceId>` (public) — **DONE (8/2/2026, with Phase 3B)**
 - [x] `business_logic/scheduling/`: `ClassSeriesHelper` gains `GetRunByClassInstanceId(Transaction&, classInstanceId, personId, asOfUs)` returning the same run shape as the per-class reader (both now share the private `BuildSeriesInfo`, so pricing and the access annotation resolve one way).
 - [x] New thin endpoint `endpoints/get_class_series_run.{h,cpp}` → `{ run: {...} }`, 404 when the instance doesn't exist or isn't a series run; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
