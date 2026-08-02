@@ -235,34 +235,35 @@ The top-level menu item said **Our Classes** but opened a page titled **Our Sche
 
 ### 3B.1 Backend — a public "upcoming series" feed
 `ClassSeriesHelper` can only answer "runs for THIS class" (`GetSeriesRunsForClass`). Every surface below needs "runs across all classes, soonest first", and `SeriesRun` doesn't currently carry enough to render a cross-class card (no class name/photo).
-- [ ] `Scheduling::SeriesInfo` (or a new `UpcomingSeriesInfo`) gains `className`, `classHasPhoto`, and the signup-window state (`signupWindowOpen` / `signupOpensAtUs`), resolved the same way `CalendarHelper::ComputeSignupWindow` does — the card must not offer Book before sign-ups open.
-- [ ] `ClassSeriesHelper::GetUpcomingSeriesRuns(Transaction&, personId, fromUs, toUs, limit)` — every **active** `kind='series'` class's runs that either start in the window or are in progress and still joinable (`prorated_signups_allowed` + not yet ended). Ordered by `valid_from_us`, then class name. Personalized pricing when `personId > 0`, public pricing otherwise (reuse the existing resolution internals so there is one pricing path).
-- [ ] Access-gate the list the same way the calendar does: a series the viewer can't take still appears (it's marketing) but carries the `members_only` / `needs_skill` annotation so the card can show the lock instead of a Book button. **Anonymous viewers get real states** (Phase 2.1 already made that work).
-- [ ] New thin endpoint `GET /api/upcoming_series_runs?from_us&to_us&limit` (public / anonymous-safe) → `{ items: [...] }`; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
-- [ ] KVT converter + `scheduling_key_value_table_test.cpp` case.
-- [ ] Tests: helper (in-window / in-progress-joinable / ended-excluded / inactive-class-excluded / ordering / anonymous vs member pricing / access annotation) + endpoint (`get_upcoming_series_runs_test.cpp`: 200 shape, anonymous OK, empty list, limit honored).
+- [x] `Scheduling::SeriesInfo` (or a new `UpcomingSeriesInfo`) gains `className`, `classHasPhoto`, and the signup-window state (`signupWindowOpen` / `signupOpensAtUs`), resolved the same way `CalendarHelper::ComputeSignupWindow` does — the card must not offer Book before sign-ups open. *(Also `inProgress`, so the card can say "Already under way" and offer the prorated CTA. The window is measured against the run's START, mirroring how the calendar measures an occurrence's.)*
+- [x] `ClassSeriesHelper::GetUpcomingSeriesRuns(...)` — every **active** `kind='series'` class's runs that either start in the window or are in progress and still joinable. Ordered by `valid_from_us`, then class name. Personalized pricing when `personId > 0`, public otherwise. *(Named `GetUpcomingSeriesRunsAcrossClasses` — the per-class `GetUpcomingSeriesRuns` already existed. Both, plus the new single-run read, now share one private `BuildSeriesInfo`, so pricing, occurrence counting and the annotation resolve one way.)*
+- [x] Access-gate the list the same way the calendar does: a series the viewer can't take still appears (it's marketing) but carries the `members_only` / `needs_skill` annotation. **Anonymous viewers get real states.** *(This forced a good cleanup: the classification was private to `CalendarHelper::AnnotateAccess`. It moved to `ClassAccessHelper::Annotate` + a `ClassAccessAnnotation` struct, so the calendar and the series feed classify through one path; `kCalendarAccess*` are now aliases of the shared constants, so no call site churned.)*
+- [x] New thin endpoint `GET /api/upcoming_series_runs?to_us&limit` (public / anonymous-safe) → `{ items: [...] }`; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [x] KVT converter + `scheduling_key_value_table_test.cpp` case (2 cases: populated + defaults).
+- [x] Tests: helper (`GetRunByClassInstanceId` found/missing/wrong-kind, plus ended-run and inactive-class exclusion) + endpoint `get_upcoming_series_runs_test.cpp` (empty, cross-class ordering, in-progress only when prorated is allowed, non-series ignored, gated-but-listed, limit + to_us). A shared `series_run_test_fixture.h` builds a run in one call.
 
 ### 3B.2 Frontend — `ServerAccess` seam
-- [ ] `getUpcomingSeriesRuns(fromUs?, toUs?, limit?)` across interface / network / proxy / mock; `SeriesRun` (or a new `UpcomingSeriesRun`) type gains `class_name`, `has_photo`, `signup_window_open`, `signup_opens_at_us`, `access`, `required_permission_name`.
-- [ ] `ServerAccess.mock.spec.ts`: new-method cases (list shape, anonymous allowed, ordering, limit).
+- [x] `getUpcomingSeriesRuns(toUs?, limit?)` **and** `getSeriesRunByInstance(id)` across interface / network / proxy / mock; `SeriesRun` gains `class_name`, `has_photo`, `in_progress`, `access`, `required_permission_id/name`, `missing_skill_ids`, `signup_window_open`, `signup_opens_at_us`. One `normalizeSeriesRun` in the network layer coerces the string booleans + comma-joined skill ids for all three series reads.
+- [x] `ServerAccess.mock.spec.ts`: 6 new cases (single-run found/404, feed ordering, under-way run dropped when prorated is forbidden, limit + to_us, gate carried). The mock is seeded with a second, gated run so local mode exercises the lock path.
 
 ### 3B.3 Frontend — the shared expandable series card
-- [ ] New `shared/components/series-highlight/` — one component, three hosts. Collapsed it is a single summary row ("**3 series starting soon** — Fall Partner Acro, Intro to Handstands, …"); expanded it lists each run as a row with the class photo, class name + run name, date window, session count, per-session and total price, and the right CTA:
-  - eligible + sign-ups open → **Book the series** → `/shop/series/:classInstanceId` (needs 4.1/4.4);
-  - eligible + in progress + prorated allowed → **Join from today — prorated**;
-  - sign-ups not open yet → "Sign-ups open {date}" + the existing **Remind me** action (reuse `CalendarNavigationService.requestSignupReminder`);
-  - `members_only` / `needs_skill` → the same lock treatment the calendar chip uses (→ Memberships page / skill dialog).
-- [ ] Inputs: `runs`, `heading`, `collapsedByDefault`. Hidden entirely (renders nothing) when `runs` is empty, so no host needs an empty-state branch.
-- [ ] Spec: collapsed/expanded toggle, each CTA state, the hidden-when-empty case, and that the lock states route through the shared navigation service.
+- [x] New `shared/components/series-highlight/` — one component, three hosts. Collapsed it is a single summary row; expanded it lists each run with the class photo, class name + run name, date window, session count, per-session and total price, and the right CTA:
+  - eligible + sign-ups open → **Book the series** → `/shop/series/:classInstanceId`;
+  - eligible + in progress → **Join from today — prorated**;
+  - sign-ups not open yet → "Sign-ups open {date}";
+  - `members_only` / `needs_skill` → the calendar's lock treatment (→ Memberships page / skill dialog).
+- [x] Inputs: `runs`, `heading`, `collapsedByDefault`. Hidden entirely when `runs` is empty. *(Once the viewer toggles it, their choice sticks — a re-fetch won't slam it shut on them.)*
+- [x] Spec: 16 cases — collapse/expand, every CTA state, hidden-when-empty, UTC window formatting, and lock-beats-closed-window precedence. *(One trap worth remembering: `MatDialogModule` provides `MatDialog` at **module** scope, so a standalone component importing `SharedModule` gets it from its own injector — the spec must spy on the component's instance, not `TestBed.inject(MatDialog)`.)*
+- [x] Deviation from the plan: **no "Remind me" button** on a not-yet-open run. That action is slot+occurrence keyed (`requestSignupReminder(slotId, occurrenceDateUs)`) and a series run has neither — it is a date window, not an occurrence. The card states the open date instead; wiring reminders for whole runs would need a new backend key and is worth its own item if you want it.
 
 ### 3B.4 Upcoming Events page — series section
-- [ ] `upcoming-events.component`: fetch `getUpcomingSeriesRuns()` alongside the existing visible-event-session list and render `app-series-highlight` **above** the one-off events, headed "Series starting soon", expanded by default (this page is the "what can I sign up for" page — burying it would repeat the current problem).
-- [ ] Spec: series section renders above the events list; absent when there are no upcoming runs; a failed series fetch leaves the events list intact.
+- [x] `upcoming-events.component`: fetches `getUpcomingSeriesRuns()` alongside the event list and renders `app-series-highlight` **above** the one-off events, headed "Series starting soon", expanded by default.
+- [x] Spec: renders above the events list (asserted by document order), absent when empty, and the two fetches are independent in **both** directions — a series failure leaves the events list intact, and an events failure still shows the series card.
 
 ### 3B.5 Our Classes page — series card at the top
-- [ ] `our-classes.component`: fetch the same feed and render `app-series-highlight` between the page header and the week list, **collapsed by default** (the week grid is the page's primary content), headed "Series & multi-week programs".
-- [ ] The card is week-independent — it does **not** re-fetch on week navigation, and it is not affected by the facility filter or the eligible-only toggle (a series you can't take yet is exactly what the upsell is for).
-- [ ] Spec: renders above the week list; survives week navigation without refetching; hidden when the feed is empty.
+- [x] `our-classes.component`: renders `app-series-highlight` between the page header and the week list, **collapsed by default**, headed "Series & multi-week programs".
+- [x] The card is week-independent — fetched once in `ngOnInit` (not in `load()`), so paging weeks never refetches it, and it is untouched by the facility filter and the eligible-only toggle.
+- [x] Spec: above the week list, expands on demand, hidden when empty, survives week navigation without a refetch, survives filters that hide every class, and the week list still renders when the series fetch fails.
 
 ### 3B.6 Home page — series card
 > Lands **with Phase 5** (the home page redesign) rather than before it, so the section is placed once rather than built and then moved.
@@ -271,6 +272,8 @@ The top-level menu item said **Our Classes** but opened a page titled **Our Sche
 - [ ] Add to the Phase 5.4 / 5.5 spec + hand-test lists rather than duplicating them here.
 
 ### 3B.7 Live hand-testing (Phase 3B)
+- [x] Steps written (below) — awaiting your run against a live server.
+
 Fresh database; via the test-helper app create two series classes — one starting next month, one already in progress with `prorated_signups_allowed` — plus a third gated behind the Gold Member permission.
 1. Logged out, open **Upcoming Events**: a **Series starting soon** section sits above the one-off events, expanded, listing both open series with their date windows, session counts and prices; the gated one shows **Requires a membership** and lands on the Memberships page.
 2. Click **Book the series** on the future one: it goes straight to the series booking page with the run's dates and price — *without* having visited the class page first.
@@ -285,10 +288,10 @@ Fresh database; via the test-helper app create two series classes — one starti
 
 > Backend first: make a series run addressable by `class_instance_id`; then wire Book CTAs everywhere the Overview asks for (profile tab, calendar, class page — the class page already books).
 
-### 4.1 Backend — `GET /api/class_series_run/<int:classInstanceId>` (public)
-- [ ] `business_logic/scheduling/`: `ClassSeriesHelper` gains `GetRunByClassInstanceId(Transaction&, classInstanceId, personId)` returning the same run shape as `GetSeriesRunsForClass` (reuse the existing resolution/pricing internals; personalized pricing when logged in, public otherwise).
-- [ ] New thin endpoint `endpoints/get_class_series_run.{h,cpp}` → `{ run: {...} }`, 404 when the instance doesn't exist or isn't a series run; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
-- [ ] Tests: helper test (found / wrong-kind / missing) + endpoint test (`get_class_series_run_test.cpp`: 200 shape, 404, anonymous OK).
+### 4.1 Backend — `GET /api/class_series_run/<int:classInstanceId>` (public) — **DONE (8/2/2026, with Phase 3B)**
+- [x] `business_logic/scheduling/`: `ClassSeriesHelper` gains `GetRunByClassInstanceId(Transaction&, classInstanceId, personId, asOfUs)` returning the same run shape as the per-class reader (both now share the private `BuildSeriesInfo`, so pricing and the access annotation resolve one way).
+- [x] New thin endpoint `endpoints/get_class_series_run.{h,cpp}` → `{ run: {...} }`, 404 when the instance doesn't exist or isn't a series run; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
+- [x] Tests: helper test (found / wrong-kind / missing) + endpoint test (`get_class_series_run_test.cpp`: 200 shape for anonymous, 404 unknown, 404 non-series instance, membership gate carried).
 
 ### 4.2 Backend — `class_instance_id` on `UpcomingSignupOffering`
 - [ ] `SignupReminderHelper::GetUpcomingSignupOfferings` (Phase 11 code): resolve and carry `class_instance_id` for each offering (series and workshop rows both have an owning instance).
@@ -298,9 +301,11 @@ Fresh database; via the test-helper app create two series classes — one starti
 - [ ] `getSeriesRunByInstance(classInstanceId)` → `GET /api/class_series_run/:classInstanceId` across interface / network / proxy / mock; `UpcomingSignupOffering` type gains `class_instance_id` (+ network numeric normalization).
 - [ ] `ServerAccess.mock.spec.ts`: new-method cases (found/404/logged-out allowed) + offering field coverage.
 
-### 4.4 Frontend — self-sufficient `SeriesBookingComponent`
-- [ ] When `history.state.run` is absent, fetch via `getSeriesRunByInstance(classInstanceId)` instead of dead-ending in `'missing'` (keep the error state for a real 404).
-- [ ] `series-booking.component.spec.ts`: state-provided path unchanged; state-missing path fetches and renders; 404 shows the error state.
+### 4.4 Frontend — self-sufficient `SeriesBookingComponent` — **DONE (8/2/2026, with Phase 3B)**
+- [x] When `history.state.run` is absent, fetch via `getSeriesRunByInstance(classInstanceId)` instead of dead-ending in `'missing'` (keep the error state for a real 404). The `prorated` flag still comes from router state when present, so the card's prorated CTA survives the self-load.
+- [x] `series-booking.component.spec.ts`: state-provided path unchanged (and asserted **not** to refetch); state-missing path fetches from the route id and renders; 404 shows the missing state; neither state nor route id still shows missing.
+
+> **4.3 note:** the `getSeriesRunByInstance` half of 4.3 shipped with 3B (seam + mock + mock-spec cases). What's left of 4.3 is the `class_instance_id` field on `UpcomingSignupOffering`, which belongs with 4.2.
 
 ### 4.5 Frontend — Book CTAs on the Workshops & Series tab
 - [ ] `upcoming-offerings.component`: when `window_open`, replace the inert "Sign-ups are open" text with a **Book** button — `kind === 'workshop'` → `materializeClassOccurrence(slot, occurrence)` then `/shop/event/:sessionId` (reuse the shared `CalendarNavigationService` flow); `kind === 'series'` → `/shop/series/:classInstanceId`.
