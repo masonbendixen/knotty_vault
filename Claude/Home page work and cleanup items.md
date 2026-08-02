@@ -353,13 +353,20 @@ A recurring class is just-show-up and belongs in the weekly grid. The two kinds 
 - [x] New thin endpoint `endpoints/get_class_series_run.{h,cpp}` → `{ run: {...} }`, 404 when the instance doesn't exist or isn't a series run; registered in `web_app.cpp` + `endpoints/CMakeLists.txt`.
 - [x] Tests: helper test (found / wrong-kind / missing) + endpoint test (`get_class_series_run_test.cpp`: 200 shape for anonymous, 404 unknown, 404 non-series instance, membership gate carried).
 
-### 4.2 Backend — `class_instance_id` on `UpcomingSignupOffering`
-- [ ] `SignupReminderHelper::GetUpcomingSignupOfferings` (Phase 11 code): resolve and carry `class_instance_id` for each offering (series and workshop rows both have an owning instance).
-- [ ] KVT converter + `scheduling_key_value_table_test.cpp` (or the Phase 11 KVT test file) updated; `get_my_upcoming_signup_offerings_test.cpp` asserts the field.
+### 4.2 Backend — `class_instance_id` on `UpcomingSignupOffering` — **DONE (8/2/2026)**
+- [x] `SignupReminderHelper`: the private `OccurrenceContext` already walked slot → impl → **instance** → product but threw the instance id away; it now keeps it, and `GetUpcomingSignupOfferingsForPerson` copies it onto every `SignupOffering`. Populated for workshops too, not just series — they have an owning run even though they book per occurrence.
+- [x] KVT converter emits `class_instance_id`; `scheduling_key_value_table_test.cpp` asserts it on the populated case and `"0"` on the defaults case.
+- [x] Helper tests assert it on both shapes (`GetUpcomingOfferingsAnnotatesWorkshopWindow`, `GetUpcomingOfferingsEmitsOneOfferingPerSeriesRun`).
+- [x] `endpoints/template_test_fixture.h`: `SlotFixture` now exposes `classInstanceId` (it was a local in `CreateRecurringSlot`), so endpoint tests can assert against the real run id.
+- [x] New endpoint case `SeriesRowCarriesItsRunId` — an open series run comes back as **one** row carrying its `class_instance_id` and `window_open: true`.
 
-### 4.3 Frontend — `ServerAccess` additions
-- [ ] `getSeriesRunByInstance(classInstanceId)` → `GET /api/class_series_run/:classInstanceId` across interface / network / proxy / mock; `UpcomingSignupOffering` type gains `class_instance_id` (+ network numeric normalization).
-- [ ] `ServerAccess.mock.spec.ts`: new-method cases (found/404/logged-out allowed) + offering field coverage.
+> 🐞 **Pre-existing bug found and fixed here.** `get_my_upcoming_signup_offerings_test.cpp` was **never registered in `endpoints/CMakeLists.txt`** — the only endpoint test file in the directory that wasn't. It has not compiled or run since it was written in Phase 11, so its three cases (401-when-anonymous, bad-range 400s, workshop window state) were silently absent from every green run. Registered; all four cases (three old + the new one) now build and pass. Worth a `for f in *_test.cpp; do grep -q $f CMakeLists.txt` sweep if this pattern shows up again.
+
+### 4.3 Frontend — `ServerAccess` additions — **DONE (8/2/2026)**
+- [x] `getSeriesRunByInstance(classInstanceId)` shipped with 3B (see the note below).
+- [x] `UpcomingSignupOffering` gains `class_instance_id`, normalized to a number in `normalizeSignupOffering`.
+- [x] The mock now seeds **three** offerings instead of two — an open workshop, an **open series**, and a closed one — so local mode exercises both Book paths (materialize-then-event, and the series deep-link) as well as the remind-me path.
+- [x] `ServerAccess.mock.spec.ts`: asserts every offering carries a run id and that both open kinds are represented.
 
 ### 4.4 Frontend — self-sufficient `SeriesBookingComponent` — **DONE (8/2/2026, with Phase 3B)**
 - [x] When `history.state.run` is absent, fetch via `getSeriesRunByInstance(classInstanceId)` instead of dead-ending in `'missing'` (keep the error state for a real 404). The `prorated` flag still comes from router state when present, so the card's prorated CTA survives the self-load.
@@ -367,19 +374,35 @@ A recurring class is just-show-up and belongs in the weekly grid. The two kinds 
 
 > **4.3 note:** the `getSeriesRunByInstance` half of 4.3 shipped with 3B (seam + mock + mock-spec cases). What's left of 4.3 is the `class_instance_id` field on `UpcomingSignupOffering`, which belongs with 4.2.
 
-### 4.5 Frontend — Book CTAs on the Workshops & Series tab
-- [ ] `upcoming-offerings.component`: when `window_open`, replace the inert "Sign-ups are open" text with a **Book** button — `kind === 'workshop'` → `materializeClassOccurrence(slot, occurrence)` then `/shop/event/:sessionId` (reuse the shared `CalendarNavigationService` flow); `kind === 'series'` → `/shop/series/:classInstanceId`.
-- [ ] `upcoming-offerings.component.spec.ts`: workshop CTA materializes + navigates; series CTA navigates with the instance id; closed-window rows still show the reminder button.
+### 4.5 Frontend — Book CTAs on the Workshops & Series tab — **DONE (8/2/2026)**
+- [x] **New shared `shared/services/offering-booking.service.ts`.** The plan said "reuse the shared `CalendarNavigationService` flow", but that service didn't have one — the materialize-then-navigate logic lived inline in the 3B offering card. Three surfaces need it (the card, this tab, calendar clicks), so it was extracted rather than copied a third time. It answers with an `OfferingBookingOutcome` (`'navigated' | 'signin-required' | 'failed'`) so callers show an error **only** for a real failure — a sign-in redirect is routine, not an error.
+- [x] `upcoming-offerings.component`: an open window now renders a **Book** button (`Book the series` / `Book this date`) instead of the inert "Sign-ups are open" line. In-flight state is keyed per row so one pending materialize doesn't grey out the whole list; a failure shows an inline message.
+- [x] `offering-highlight` (3B) refactored onto the same service — its inline `bookWorkshop` is gone.
+- [x] Specs: 8 new cases on the service itself (`offering-booking.service.spec.ts` — series deep-link, prorated flag, refuses a 0 run id, works logged out; workshop materialize, skip when already materialized, sign-in redirect, failure, refuses a 0 slot) + 4 on the tab (workshop CTA materializes + navigates, series CTA deep-links without materializing, failure message, closed-window row keeps the reminder button).
 
-### 4.6 Frontend — calendar click routing books open offerings
-- [ ] Shared `CalendarNavigationService`: an `eligible` + `signup_window_open` **series** occurrence → `/shop/series/:classInstanceId` (was: class page); an `eligible` + open **workshop** occurrence → materialize + `/shop/event/:sessionId`; all other cases keep today's routing (class page / lock handling / reminder).
-- [ ] `calendar-navigation.service.spec.ts`: the two new routes + unchanged fallbacks (members-only, needs-skill, not-open, anonymous).
+### 4.6 Frontend — calendar click routing books open offerings — **DONE (8/2/2026)**
+- [x] `CalendarNavigationService` gained a private `canBookNow(event)` = eligible (or unannotated) **and** the advance window has opened. `signupWindowOpen === undefined` reads as open, preserving pre-Phase-11 behavior on feeds that don't annotate it.
+- [x] **Series**: bookable → `/shop/series/:classInstanceId` via the shared service. The old comment explaining the class-page detour ("the booking page needs the whole `SeriesRun` via router state") is gone — 4.1/4.4 made the page self-loading, so the detour was obsolete.
+- [x] **Workshop**: bookable → materialize + `/shop/event/:id`, reusing `event.sessionId` when the occurrence is already materialized. A **failed** materialize falls back to the class page rather than leaving the click dead.
+- [x] Everything else is untouched: a booked occurrence still goes to My Bookings, a locked one to the membership upsell / skill dialog, and a not-yet-open one to the class page.
+- [x] Spec: 4 new booking routes + 5 explicit fallback cases (series not-open, series members-only, workshop members-only, workshop skill-gated, workshop not-open) so the new branch can't quietly swallow the lock handling.
 
 ### 4.7 Live hand-testing (Phase 4)
-Seed a series run and a workshop occurrence with open sign-ups via the test-helper app (series with a future run window; workshop with a dated occurrence).
-1. Logged in, open the account dashboard card **Workshops & Series**: the open-window series row shows **Book**; clicking it lands directly on the series booking page with the run's dates and price (no prior visit to the class page needed), and payment with the Square sandbox card completes.
-2. The open-window workshop row's **Book** lands on the event booking page for that date; booking completes and the item appears under **My Bookings**.
-3. On **Your Calendar**, click the same series occurrence: it goes straight to the series booking page; click the workshop occurrence: it goes straight to its event booking page.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+**Setup (blank database + the real `create_database.cpp` seed data).** Via the **knottyyoga test-helper app**, create:
+- a `series` class **Aerial Series** with a run starting next month and a per-instance price, **no booking window** (so sign-ups are open);
+- a `workshop` class **Handstand Intensive** with a dated occurrence next week and a standard price, **no booking window**;
+- a second workshop **Gold Handstand** gated behind the **Gold Member** permission, and a third **Early Bird Workshop** with a **7-day** booking window and an occurrence 30 days out.
+
+Sign in as a member who does **not** hold Gold Member.
+
+1. Top menu **My Account** → dashboard card **Workshops & Series**. The page lists all four offerings. The **Aerial Series** row shows a **Book the series** button; the **Handstand Intensive** row shows **Book this date**. **Early Bird Workshop** shows **Sign-ups open {date}** with a **Remind me** button — no Book button.
+2. Click **Book the series** on **Aerial Series**: you land on the series booking page showing that run's date window, session count and total price — without having opened the class page first. Complete payment with the Square sandbox card; the purchase appears under **My Account → Purchases**.
+3. Back on **Workshops & Series**, click **Book this date** on **Handstand Intensive**: you land on the event booking page for **that specific date**. Complete the booking; it appears under **My Account → My Bookings**.
+4. Top menu **Calendar**. Click the **Aerial Series** occurrence: it goes straight to the series booking page (not the class page). Click a **Handstand Intensive** occurrence: it goes straight to that date's event booking page.
+5. On the calendar, click the **Gold Handstand** occurrence: it does **not** book — it opens the **Memberships** page with the Gold Member tier highlighted. Click the **Early Bird Workshop** occurrence: it opens the **class page** (sign-ups aren't open yet), not checkout.
+6. Sign out and open **Calendar** again: clicking **Handstand Intensive** sends you to **Sign in** first, and after signing in the booking flow still works.
 
 ---
 
