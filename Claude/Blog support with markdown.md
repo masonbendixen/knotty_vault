@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/3/2026
-Version: 0.3
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -20,6 +20,11 @@ There should be a New Post button that brings up a blog authoring screen. There 
 There should be a new top level menu entry that required no permissions called Blog. Clicking this should bring the latest Blog posts up that shows the five most recent blog posts with next and previous posts buttons at the bottom. At the top of the page, there should be buttons for navigating year / month / day with all three only having entries for items for which there are blog posts as well as an option for All Years / All Months / All Days. Selecting All Years automatically chooses All Months / All Days. Choosing All Months automatically chooses All Days. Blog posts should be rendered with the Name as a title, then the author, the date modified last, and then the body converted to HTML to be displayed. If the current user has the author_blog permission, we should also show a button Edit Post / Delete Post. Delete Post should prompt for confirmation.
 
 # Blog Feature with Markdown Support — Implementation Plan
+
+> **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: **55 blog tests pass** in the Linux docker client (15 table-helper, 13 business-logic, 7 KVT, 20 endpoint), plus the honuware photo-write change with its own framework tests. Three things worth knowing, detailed inline:
+> 1. 🐞 **Postgres type-inference bug caught by the tests.** A bare `$1 = 0` guard types the parameter as **int4**, so a real microsecond timestamp overflows at bind time. It only fires once a caller passes a non-zero bound — the unbounded feed tests passed while every filtered one threw. Every parameter is now cast explicitly (`$1::bigint`). See 2.1.
+> 2. **`table_item_photos.table_name` is a FOREIGN KEY into `photo_support_tables`**, so nothing can be attached to a table that isn't registered for photo support. Real databases get the row from `create_database.cpp`; test databases have the tables but not the seed rows, so photo tests must register it themselves. See 3.1.
+> 3. **The plan named the wrong file for table registration.** `MakeBlogPostsTable` goes in `make_app_tables.cpp` (the app half), not `make_database_info.cpp` (which just stacks framework + app). See 1.2.
 
 > **v0.3 (8/3/2026):** Mason answered open questions 1–7 (all confirmed as planned, recorded inline) and added a requirement: **per-post photos with CRUD, displayed above each post** — captured as decision 11 and threaded through 3.1 / new 4.2 / 4.1 / 5.x / 6.1 / 7.2, the sequence, the gates, and the hand-testing steps. The photo-write investigation surfaced a real framework gap: the generic `upload_photo`/`delete_photo` endpoints hardcode **admin-only**, so a non-admin `author_blog` holder couldn't manage blog photos — fixed by a small honuware change (Phase 4.2), with a warning that `IsTableAllowed` is NOT the right check to reuse there.
 
@@ -87,11 +92,11 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 ## Section 1: Backend — Database Schema & Registration
 
-### Phase 1.1: Blog Posts Table Definition
+### Phase 1.1: Blog Posts Table Definition — **DONE (8/3/2026)**
 
-- [ ] Create `server/knottyyoga_server/src/db_schema/blog_posts.h`
-- [ ] Create `server/knottyyoga_server/src/db_schema/blog_posts.cpp`
-- [ ] Add both to `db_schema/CMakeLists.txt` (`target_sources(knotty_yoga_core PRIVATE ...)`, header before cpp)
+- [x] Create `server/knottyyoga_server/src/db_schema/blog_posts.h`
+- [x] Create `server/knottyyoga_server/src/db_schema/blog_posts.cpp`
+- [x] Add both to `db_schema/CMakeLists.txt` (`target_sources(knotty_yoga_core PRIVATE ...)`, header before cpp)
 
 **blog_posts.h** — constants (pattern: `db_schema/home_page_photos.h`):
 - `kBlogPostsTable = "blog_posts"`
@@ -107,19 +112,21 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 - `AddColumnNotNullableWithDefault(..., DB_TYPE_BIGINT, kDatabaseInfoDefaultNow)` — created_at_us, modified_at_us
 - `AddColumnNullable(..., DB_TYPE_BIGINT)` — post_at_us (NULL = not scheduled)
 
-### Phase 1.2: Registration in create_database.cpp
+### Phase 1.2: Registration in create_database.cpp — **DONE (8/3/2026)**
+
+> **Plan correction:** the table builder goes in **`db_schema/make_app_tables.cpp`**, not `make_database_info.cpp`. The latter is just the composition root that stacks `MakeFrameworkTables` then `MakeAppTables`; the app's per-table calls all live in the app builder.
 
 All in `server/knottyyoga_server/src/database_helper/create_database.cpp` unless noted. **Permissions and roles are referenced BY NAME** (`PermissionIdByName` / `RoleIdByName`) — ids renumber per tenant, never hardcode one.
 
-- [ ] `db_schema/make_database_info.cpp`: `#include "blog_posts.h"` + `MakeBlogPostsTable(databaseInfo);` (no FK dependencies — order is flexible; put it under a `// Blog tables` comment)
-- [ ] `create_database.cpp` includes: `#include "db_schema/blog_posts.h"`
-- [ ] `CreateTables()`: `CreateTable(DbSchema::kBlogPostsTable);`
-- [ ] `PopulatePhotoSupportTables()`: `AddRow(DbSchema::kBlogPostsTable);` — this is what "photo support" means; the generic photo endpoints (`upload_photo` / `get_photo` / `get_scaled_photo` / `has_photo`) then accept `blog_posts` rows
-- [ ] `PopulatePermissions()`: `AddRow(DbSchema::kPermissionAuthorBlog, "Permission to author and manage blog posts.");` — NOT pricing-eligible (omit the third arg)
-- [ ] `PopulateRolePermissions()`: `Grant(DbSchema::kRoleNameAdmin, DbSchema::kPermissionAuthorBlog);` — admins can author. (Studio Manager: leave out; grant later if wanted.)
-- [ ] `PopulateAdminTopLevelTables()`: `AddRow(DbSchema::kBlogPostsTable);` — required or the generic CRUD/photo endpoints reject the table ("Table is not an allowed table")
-- [ ] `PopulateAdminTablePermissions()`: `AddRow(DbSchema::kBlogPostsTable, std::stoi(PermissionIdByName(transaction, DbSchema::kPermissionAuthorBlog)));` — follows the `kManageProductsPermissionId` lookup pattern already in that function. **This row does double duty:** it grants non-admin `author_blog` holders the generic CRUD surface for the table AND (after Phase 4.2) photo upload/delete against `blog_posts` rows.
-- [ ] `PopulateAdminColumnDataInfo()` — signature is `(table, column, label, hint, htmlInputType, required, hidden="", readonly_="")`:
+- [x] `db_schema/make_app_tables.cpp` *(not `make_database_info.cpp` — see above)*: `#include "blog_posts.h"` + `MakeBlogPostsTable(databaseInfo);` under a `// Blog tables` comment. No FK dependencies, so it sits last.
+- [x] `create_database.cpp` includes: `#include "db_schema/blog_posts.h"`
+- [x] `CreateTables()`: `CreateTable(DbSchema::kBlogPostsTable);`
+- [x] `PopulatePhotoSupportTables()`: `AddRow(DbSchema::kBlogPostsTable);` — this is what "photo support" means; the generic photo endpoints (`upload_photo` / `get_photo` / `get_scaled_photo` / `has_photo`) then accept `blog_posts` rows
+- [x] `PopulatePermissions()`: `AddRow(DbSchema::kPermissionAuthorBlog, "Permission to author and manage blog posts.");` — NOT pricing-eligible (omit the third arg)
+- [x] `PopulateRolePermissions()`: `Grant(DbSchema::kRoleNameAdmin, DbSchema::kPermissionAuthorBlog);` — admins can author. (Studio Manager: leave out; grant later if wanted.)
+- [x] `PopulateAdminTopLevelTables()`: `AddRow(DbSchema::kBlogPostsTable);` — required or the generic CRUD/photo endpoints reject the table ("Table is not an allowed table")
+- [x] `PopulateAdminTablePermissions()`: `AddRow(DbSchema::kBlogPostsTable, std::stoi(PermissionIdByName(transaction, DbSchema::kPermissionAuthorBlog)));` — follows the `kManageProductsPermissionId` lookup pattern already in that function. **This row does double duty:** it grants non-admin `author_blog` holders the generic CRUD surface for the table AND (after Phase 4.2) photo upload/delete against `blog_posts` rows.
+- [x] `PopulateAdminColumnDataInfo()` — signature is `(table, column, label, hint, htmlInputType, required, hidden="", readonly_="")`:
   - name → "Title", "Blog post title", "text", "true"
   - author → "Author", "Post author name", "text", "true"
   - body → "Body", "Blog post content (Markdown)", "text", "true"
@@ -127,21 +134,25 @@ All in `server/knottyyoga_server/src/database_helper/create_database.cpp` unless
   - created_at_us → "Created", "When created", "date", "false", "", "true" (readonly)
   - modified_at_us → "Modified", "When last modified", "date", "false", "", "true" (readonly)
   - post_at_us → "Post Date", "When the post goes public", "date", "false"
-- [ ] `PopulateAdminColumnFriendlyNames()` — *(missing from v0.1)* grid headers: Title, Author, Draft, Created, Modified, Post Date
-- [ ] `PopulateAdminTableFriendlyNames()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "Blog Posts", "Blog posts authored via the Blog Posts admin page. Debug view; author via the blog editor.");`
-- [ ] `PopulateAdminTableDisplayTemplates()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "{name}");`
-- [ ] **No migration.** `business_logic/migration/` exists but both streams are deliberately empty pre-deploy (`all_migrations.cpp`: "Both are empty pre-deploy"). New table = create_database + recreate the dev DB with `knottyyoga_database_helper --recreate_database` (needs `HONUWARE_ALLOW_DESTRUCTIVE=1`).
-- [ ] No blog seed data — the blog starts empty.
+- [x] `PopulateAdminColumnFriendlyNames()` — *(missing from v0.1)* grid headers: Title, Author, Draft, Created, Modified, Post Date
+- [x] `PopulateAdminTableFriendlyNames()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "Blog Posts", "Blog posts authored via the Blog Posts admin page. Debug view; author via the blog editor.");`
+- [x] `PopulateAdminTableDisplayTemplates()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "{name}");`
+- [x] **No migration.** `business_logic/migration/` exists but both streams are deliberately empty pre-deploy (`all_migrations.cpp`: "Both are empty pre-deploy"). New table = create_database + recreate the dev DB with `knottyyoga_database_helper --recreate_database` (needs `HONUWARE_ALLOW_DESTRUCTIVE=1`).
+- [x] No blog seed data — the blog starts empty.
 
 ---
 
 ## Section 2: Backend — Table Helper
 
-### Phase 2.1: Blog Posts Table Helper + Tests
+### Phase 2.1: Blog Posts Table Helper + Tests — **DONE (8/3/2026, 15 tests)**
 
-- [ ] Create `sql_util/table_helpers/blog_posts.h` / `.cpp` — class `TableHelpers::BlogPosts`
-- [ ] Create `sql_util/table_helpers/blog_posts_test.cpp` — suite `BlogPostsTest`
-- [ ] Add all three to `sql_util/table_helpers/CMakeLists.txt` (h+cpp to core, test to tests)
+- [x] Create `sql_util/table_helpers/blog_posts.h` / `.cpp` — class `TableHelpers::BlogPosts`
+- [x] Create `sql_util/table_helpers/blog_posts_test.cpp` — suite `BlogPostsTest`
+- [x] Add all three to `sql_util/table_helpers/CMakeLists.txt` (h+cpp to core, test to tests)
+
+> 🐞 **Postgres typed the range parameters as int4 and every filtered query threw.** The window guard was written `($1 = 0 OR post_at_us >= $1)`; Postgres infers a parameter's type from its **first** use, so the literal `0` typed `$1` as **int4** and a real microsecond timestamp (~1.8e15) overflowed at bind time. The failure is invisible until a caller passes a non-zero bound — the three unbounded tests passed while all three filtered ones threw. Fixed by casting **every** parameter explicitly (`$1::bigint`, `LIMIT NULLIF($3::bigint, 0) OFFSET $4::bigint`). Worth remembering for any future `param = 0` sentinel against a BIGINT column.
+>
+> **Also:** `UpdateBlogPost` writes `now_us()` and `NULL` as raw SQL, which needs `DbCrud::UpdateRow`'s `allowedSqlKeywords` set (`{ "now_us()", "NULL" }`) — without it they bind as the literal strings and clearing a post date silently fails. A test pins that (`UpdateWithZeroPostAtClearsTheDate`).
 
 **Methods:**
 ```
@@ -162,20 +173,23 @@ int64_t GetAllPostCount(tx, startUs, endUs)
 KeyValueTableArray GetAvailableDates(tx, bool forAdmin)
 ```
 
-- [ ] Standard CRUD through `DbCrud::*` (`AddRowToTableFetchInt64PrimaryKey`, `GetRow`, `UpdateRow`, `DeleteRow`); the published/admin/date queries are custom SQL — follow the `kSql...` constant + `$1/$2` parameter pattern in `sql_util/table_helpers/price_schedules.cpp` (incl. the `COUNT(*) OVER()`/`LIMIT NULLIF($n, 0)` idioms if convenient)
-- [ ] Available-dates SQL sketch: `SELECT DISTINCT EXTRACT(YEAR FROM to_timestamp(post_at_us / 1000000.0) AT TIME ZONE 'UTC')::int AS year, EXTRACT(MONTH FROM ...)::int AS month FROM blog_posts WHERE <published> ORDER BY 1 DESC, 2 DESC` (UTC per decision 10)
-- [ ] Tests (`TestDatabaseUtil` + `RunInTransaction`, tables pre-created, no fixtures): add/get/update (incl. modified_at_us advancing)/delete; draft excluded from published; NULL and future `post_at_us` excluded from published; range filtering on both feeds; pagination + counts; date pairs newest-first and draft-blind for admin; find-by-id in assertions, never by array index
+- [x] Standard CRUD through `DbCrud::*` (`AddRowToTableFetchInt64PrimaryKey`, `GetRow`, `UpdateRow`, `DeleteRow`); the published/admin/date queries are custom SQL — follow the `kSql...` constant + `$1/$2` parameter pattern in `sql_util/table_helpers/price_schedules.cpp` (incl. the `COUNT(*) OVER()`/`LIMIT NULLIF($n, 0)` idioms if convenient)
+- [x] Available-dates SQL: `SELECT DISTINCT EXTRACT(YEAR FROM to_timestamp(post_at_us / 1000000.0) AT TIME ZONE 'UTC')::int AS year, EXTRACT(MONTH FROM ...)::int AS month FROM blog_posts WHERE <published> ORDER BY 1 DESC, 2 DESC` (UTC per decision 10)
+- [x] Tests — 15 cases: add/get round-trip, NULL post date, missing id, update rewrite + modified advancing, clearing the date unpublishes, delete, the three-condition published rule, newest-first order, pagination without overlap, page-size 0, half-open range, unbounded zero bounds, admin range on created_at_us, distinct date pairs, public dates ignoring unpublished. *(Bool columns come back as `"t"`/`"f"` from Postgres, not `"true"`/`"false"` — the tests use a tolerant `BoolField` helper rather than pinning the driver's spelling.)*
 
 ---
 
 ## Section 3: Backend — Business Logic Layer
 
-### Phase 3.1: Blog Helper + Key Value Table + Tests
+### Phase 3.1: Blog Helper + Key Value Table + Tests — **DONE (8/3/2026, 13 + 7 tests)**
 
-- [ ] Create directory `business_logic/blog/` with `CMakeLists.txt` (mirror `business_logic/skills/CMakeLists.txt`: `target_sources` on `knotty_yoga_core` / `knotty_yoga_tests`)
-- [ ] `business_logic/CMakeLists.txt`: `add_subdirectory(blog)`
-- [ ] Create `blog_helper.h` / `.cpp` + `blog_helper_test.cpp` (suite `BlogHelperTest`)
-- [ ] Create `blog_key_value_table.h` / `.cpp` + `blog_key_value_table_test.cpp` (suite `BlogKeyValueTableTest`)
+- [x] Create directory `business_logic/blog/` with `CMakeLists.txt`
+- [x] `business_logic/CMakeLists.txt`: `add_subdirectory(blog)`
+- [x] Create `blog_helper.h` / `.cpp` + `blog_helper_test.cpp` (suite `BlogHelperTest`)
+- [x] Create `blog_key_value_table.h` / `.cpp` + `blog_key_value_table_test.cpp` (suite `BlogKeyValueTableTest`)
+- [x] **Added beyond the plan:** a free `Blog::IsPublished(post, nowUs)` stating the three-condition rule in domain terms, so the single-post endpoint can gate an unpublished post without re-deriving it. `SaveBlogPostRequest` (create and update take the same shape) so the two endpoints share one parse. `DeletePost` also drops the post's `table_item_photos` row — an orphan would otherwise be handed to whatever post later reuses the id.
+
+> ⚠️ **`table_item_photos.table_name` is a FOREIGN KEY into `photo_support_tables`.** Nothing can be attached to a table that isn't registered for photo support. Real databases get the row from `PopulatePhotoSupportTables`; a **test** database has the tables but not the seed rows, so the two photo tests call `TableHelpers::PhotoSupportTables::AddPhotoSupportTable(tx, "blog_posts")` first. Both failed with an opaque `unknown file: Failure` until that was added — worth knowing before writing any other photo test.
 
 **Domain structs** (in `blog_helper.h`, `namespace Blog`):
 ```cpp
@@ -198,7 +212,7 @@ struct AvailableDate { int year = 0; int month = 0; };
 - `KeyValueTableArray BlogPostsToKeyValueTableArray(const std::vector<BlogPostInfo>&)`
 - `KeyValueTable AvailableDateToKeyValueTable(const AvailableDate&)`
 - `KeyValueTableArray AvailableDatesToKeyValueTableArray(const std::vector<AvailableDate>&)`
-- [ ] KVT tests: populated + default rows, array order preserved, the `""`-for-unscheduled rule
+- [x] KVT tests — 7 cases: every field, booleans as strings, the `""`-for-unscheduled rule, defaults, post-array order, available-date conversion + order
 
 ---
 
