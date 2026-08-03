@@ -464,22 +464,33 @@ Sign in as a member who does **not** hold Gold Member.
 
 ## Phase 6 — Getting Started page
 
-### 6.1 Frontend — page + route
-- [ ] New `pages/public/getting-started/getting-started.component.*` (separate template/styles per convention); `public.routes.ts`: `start` → `GettingStartedComponent` (menu already points there).
-- [ ] Content — numbered step cards with CTA buttons (draft copy ships now; text gets revised together after it renders — OQ-7 ✅):
-  1. **Try an intro workshop** — what to expect at your first visit; CTA → Upcoming Events.
-  2. **Create your account** — CTA → Register (hidden when logged in).
-  3. **Pick your membership** — what each tier includes; CTA → Memberships.
-  4. **Plan your weekly schedule** — explains the attendance template ("tell us which classes you normally attend — it's a plan, not a booking"); CTA → My Schedule (login-aware).
-  5. **Show up and check in** — membership classes need no advance booking; staff checks you in at the door.
-  6. **Workshops & series** — where to find and book them (calendar, class pages, your Workshops & Series tab).
-  7. **Stay in the loop** — weekly digest, sign-up reminders, and the iCal feed under Notification Preferences.
-- [ ] Auth-aware rendering (step 2 hidden when logged in; step 4/7 CTAs go to login first when logged out — standard guard behavior).
-- [ ] `getting-started.component.spec.ts`: steps render; register step hidden when authed; CTAs navigate.
+> **Phase 6 complete 8/2/2026.** Frontend only. Gates green: Angular full suite **2828 SUCCESS** (up 9), `ng build` clean, `tsc --noEmit` clean on both configs, `ng lint` **262 problems — unchanged**, no finding in any new file.
+>
+> **The menu item was dead until now.** `/start` has been in the top menu since Phase 1.1, but the route rendered `HomePageComponent` — so clicking **Get Started** re-rendered the home page and looked like nothing happened. Same for the "New here? Get started" button added to Our Classes in Phase 2.4 and the Get Started banner added to the home page in Phase 5.2. All three now land on a real page.
+
+### 6.1 Frontend — page + route — **DONE (8/2/2026)**
+- [x] New `pages/public/getting-started/getting-started.component.{ts,html,scss,spec.ts}` (separate template/styles per convention); `public.routes.ts`: `start` → `GettingStartedComponent`.
+- [x] Content — seven numbered step cards, each with an icon, a short body and exactly one CTA. Draft copy per OQ-7; it ships now and gets revised once it can be read on screen.
+  1. **Try an intro workshop** → `/events`
+  2. **Create your account** → `/register` *(hidden when logged in)*
+  3. **Pick your membership** → `/shop`
+  4. **Plan your weekly schedule** → `/my/my-schedule` — leads with "It is a plan, not a booking"
+  5. **Show up and check in** → `/classes`
+  6. **Workshops and series** → `/my/upcoming-offerings`
+  7. **Stay in the loop** → `/my/notification-preferences`
+- [x] Closes with a footer CTA back to `/events` for anyone still undecided.
+- [x] The steps live in a typed `allSteps` array on the component rather than inline in the template, so the spec can assert the set and the ordering without scraping the DOM.
+- [x] Auth-aware: step 2 is dropped once you have an account, and the numbering **closes up** rather than skipping a 2. The guarded CTAs (4, 6, 7) stay visible to a visitor — the `AuthGuard` already routes them through sign-in and back, which is how every other guarded link in the app behaves. State comes from `authData$`, so a sign-in updates the page without a reload.
+- [x] Spec: 9 cases — every step renders with a CTA, the seven titles in order, each CTA's target route, numbering from 1, the create-account step dropped when authed, numbering closes up, a live sign-in flip, guarded CTAs kept for visitors, footer CTA.
 
 ### 6.2 Live hand-testing (Phase 6)
-1. Logged out, open **Get Started** from the menu: the step list renders with working CTAs — **Try an intro workshop** opens Upcoming Events, **Create your account** opens registration, **Pick your membership** opens the Memberships page.
-2. Log in and reopen **Get Started**: the create-account step is gone; **Plan your weekly schedule** opens My Schedule directly.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+1. **Logged out**, click **Get Started** in the top menu. A page headed **Get Started** renders with **seven** numbered cards: Try an intro workshop, Create your account, Pick your membership, Plan your weekly schedule, Show up and check in, Workshops and series, Stay in the loop.
+2. Check the CTAs that need no sign-in: **See upcoming workshops** → Upcoming Events; **Create an account** → the registration form; **Compare memberships** → the Memberships page; **See the class schedule** → Our Classes. The footer's **See upcoming workshops** also opens Upcoming Events.
+3. Click **Plan my week** while still logged out: you are sent to **Sign in** first, and after signing in you land on **My Schedule** (not back on Get Started). Same for **Notification settings** and **Browse workshops and series**.
+4. Now signed in, reopen **Get Started** from the menu: the **Create your account** card is **gone** and the remaining cards are numbered **1–6** with no gap. **Plan my week** now opens My Schedule directly.
+5. From the **home page**, click **Show me how** in the Get Started panel, and from **Our Classes** click **New here? Get started** — both land on this same page. (Before Phase 6 all three of these silently re-rendered the home page.)
 
 ---
 
