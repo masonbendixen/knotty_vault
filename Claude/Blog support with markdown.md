@@ -47,12 +47,16 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 ### Resolved
 
 1. **Generic CRUD vs custom endpoints?** — **Custom endpoints for everything user-facing.** The public blog needs pagination with date filtering, draft exclusion, and a "get available dates" query that generic CRUD cannot handle; the admin list needs a *range* filter on `created_at_us`, which `getFilteredTableRows`' equality-only `FilterPair[]` cannot express either (v0.1 got this wrong). One list endpoint serves both via a `view=admin` flag. The generic CRUD registration still happens (1.2) so the Manage Data debug editor and the photo endpoints work against the table.
+	- Mason- I want custom end points / UI.
 
 2. **Admin route location?** — **New top-level route `/blog-admin`** with `[AuthGuard, AuthorBlogGuard]`. The `/manage` route requires `ManageProductsGuard` which is a different permission — blog authors shouldn't need `manage_products`.
+	- Mason- Add a new permission.
 
 3. **Author field type?** — **Free-text string.** The spec defines `author` as a string. Authors may want pen names. Default to logged-in user's name in the editor.
+	- Mason- This sounds fine.
 
 4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. No PrismJS — blog posts don't need code block syntax highlighting. ngx-markdown's HTML sanitization stays **on** (the default); author_blog holders are trusted staff, but there's no reason to disable it.
+	- Mason- This sounds fine.
 
 5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in the admin list. **Also unpublished-by-omission:** a post whose `post_at_us` is NULL (never scheduled) or in the future is likewise excluded from public queries — "published" = `draft = false AND post_at_us IS NOT NULL AND post_at_us <= now_us()`.
 
