@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 3/16/2026
-Version: 0.1
+Last Updated: 8/3/2026
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -21,9 +21,24 @@ There should be a new top level menu entry that required no permissions called B
 
 # Blog Feature with Markdown Support — Implementation Plan
 
+> **Re-grounded against the live codebase 8/3/2026 (v0.2).** The v0.1 plan was written in March and had drifted. Material corrections in this revision — details inline in each phase:
+> 1. **Angular is 21, not 19** → `ngx-markdown@^21`, not `^19` (5.1).
+> 2. **Permissions are seeded and referenced by NAME, not literal id** (`PermissionIdByName` / the `Grant(role, permission)` lambda) — the v0.1 "becomes permission ID 6" hardcoding would be wrong (1.2).
+> 3. **The v0.1 `web_app.cpp` anchor pattern (`auto g_X = &Endpoints::X;`) is the documented BROKEN pattern** — file-scope anchors get dead-stripped at `-O2` and every route 404s in Release. Anchors go inside `RegisterAllEndpoints()` through the `volatile` store (4.1).
+> 4. **Three registration functions were missing** from 1.2: `PopulateAdminColumnFriendlyNames`, `PopulateAdminTableFriendlyNames`, `PopulateAdminTableDisplayTemplates`.
+> 5. **Guards and auth types moved into `@honuware/ui/auth`** — `core/guards/auth-guards.ts` and `core/services/auth.types.ts` are re-export shims now. `AuthorBlogGuard`/`hasAuthorBlog` are app-side additions to those shim files, not library changes (5.3).
+> 6. **The admin list can't use `getFilteredTableRows`** — its `FilterPair[]` is equality-only, and the year/month filter is a *range* on `created_at_us`. The admin list uses the custom list endpoint with an admin view instead (4.1, 7.1).
+> 7. **A KVT can't carry an array** — `BlogPostListResultToKeyValueTable` as specced is unrepresentable. Converters produce `KeyValueTableArray`; the endpoint composes `{items, total_count}` JSON at the edge (3.1).
+> 8. **The endpoint permission check is `endpointAuthHelper.RequirePermission(transaction, name, resp)`** (401 anonymous / 403 missing), not `session.ActiveUserHasPermission` (4.1).
+> 9. **Spec files were missing throughout** — every new component, the mock seam, and the header menu specs now have explicit test items (house rule: tests ship in the same session as the change).
+> 10. **The verification plan built C++ on Windows** — forbidden; the gate is the Linux docker client (Gates section).
+> 11. **A migration system now exists** (`business_logic/migration/`) but both streams are deliberately empty pre-deploy — a new table needs **no migration**, just `create_database.cpp` + a DB recreate. Noted in 1.2 so nobody adds one out of caution.
+
 ## Context
 
 Adding a blog to the Knotty Yoga website. Blog posts are authored by users with the `author_blog` permission via a markdown editor with live preview. Published posts are viewable by anyone on a public `/blog` page with year/month/day filtering and pagination. The blog requires a new database table, custom API endpoints, a new permission, and both admin and public Angular pages.
+
+**Tenancy note:** `blog_posts` is tenant data — it goes through the normal `make_database_info` / `create_database.cpp` path, so every tenant DB gets it automatically (`--recreate_database` / `--create_tenant` both run this code).
 
 ---
 
@@ -31,25 +46,27 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 ### Resolved
 
-1. **Generic CRUD vs custom endpoints?** — **Custom endpoints.** The public blog needs pagination with date filtering, draft exclusion, and a "get available dates" query that generic CRUD cannot handle. The admin list can use `getFilteredTableRows` for the table view, but create/update/delete should use custom endpoints.
+1. **Generic CRUD vs custom endpoints?** — **Custom endpoints for everything user-facing.** The public blog needs pagination with date filtering, draft exclusion, and a "get available dates" query that generic CRUD cannot handle; the admin list needs a *range* filter on `created_at_us`, which `getFilteredTableRows`' equality-only `FilterPair[]` cannot express either (v0.1 got this wrong). One list endpoint serves both via a `view=admin` flag. The generic CRUD registration still happens (1.2) so the Manage Data debug editor and the photo endpoints work against the table.
 
 2. **Admin route location?** — **New top-level route `/blog-admin`** with `[AuthGuard, AuthorBlogGuard]`. The `/manage` route requires `ManageProductsGuard` which is a different permission — blog authors shouldn't need `manage_products`.
 
 3. **Author field type?** — **Free-text string.** The spec defines `author` as a string. Authors may want pen names. Default to logged-in user's name in the editor.
 
-4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. No PrismJS — blog posts don't need code block syntax highlighting.
+4. **Markdown editor approach?** — **Plain `<textarea>` on left, `<markdown>` preview on right using ngx-markdown.** No heavyweight CodeMirror/Monaco. No PrismJS — blog posts don't need code block syntax highlighting. ngx-markdown's HTML sanitization stays **on** (the default); author_blog holders are trusted staff, but there's no reason to disable it.
 
-5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in admin list.
+5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in the admin list. **Also unpublished-by-omission:** a post whose `post_at_us` is NULL (never scheduled) or in the future is likewise excluded from public queries — "published" = `draft = false AND post_at_us IS NOT NULL AND post_at_us <= now_us()`.
 
-6. **"Post Now" behavior?** — Sets `post_at_us = now` AND `draft = false`. Convenience shortcut for "publish immediately."
+6. **"Post Now" behavior?** — Sets `post_at_us = now` AND `draft = false`, then saves. Convenience shortcut for "publish immediately."
 
 7. **Column name typo?** — Spec says "modifed_at_us" — use correct spelling `modified_at_us`.
 
 ### Resolved (User-Confirmed)
 
-8. **Day-level filtering on public blog:** — **Client-side computation.** Derive available days from the posts loaded for the selected year/month. The `GetAvailableDates` endpoint returns year/month pairs only. Day options are extracted from `post_at_us` of currently loaded posts.
+8. **Day-level filtering on public blog:** — **Client-side computation.** Derive available days from the posts loaded for the selected year/month. The dates endpoint returns year/month pairs only. Day options are extracted from `post_at_us` of currently loaded posts. *(Known limit, accepted: with more than one page in a month, the day dropdown only offers days present on the loaded page.)*
 
-9. **ngx-markdown Angular 19 compatibility:** — **Confirmed compatible.** Use `ngx-markdown@^19.0.0` (latest v19.1.1) with `marked@^15.0.0`. The library's major version aligns with Angular's major version. Uses `provideMarkdown()` for standalone app setup. No fallback needed.
+9. **ngx-markdown compatibility:** — **The app is Angular 21.2 today** (v0.1 said 19 — stale). ngx-markdown's major tracks Angular's major: install `ngx-markdown@^21.0.0` plus whatever `marked` major its peerDependencies declare (npm reports it at install). Uses `provideMarkdown()` for standalone app setup. If the pending Angular 22 upgrade lands before this plan executes, use `^22` instead.
+
+10. **Timezone for year/month bucketing:** — **UTC on both sides.** The server extracts year/month from `post_at_us` in UTC; the client derives day options and computes filter ranges with the `Date` UTC accessors. (Posts are stamped with real instants — `Date.now()*1000` — so a post published late evening Pacific can bucket into the next UTC day/month. Accepted: consistency matters more than the edge, and the alternative drags studio-timezone plumbing into a blog.)
 
 ---
 
@@ -57,53 +74,49 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 ### Phase 1.1: Blog Posts Table Definition
 
-**Create:**
-- `server/knottyyoga_server/src/db_schema/blog_posts.h`
-- `server/knottyyoga_server/src/db_schema/blog_posts.cpp`
+- [ ] Create `server/knottyyoga_server/src/db_schema/blog_posts.h`
+- [ ] Create `server/knottyyoga_server/src/db_schema/blog_posts.cpp`
+- [ ] Add both to `db_schema/CMakeLists.txt` (`target_sources(knotty_yoga_core PRIVATE ...)`, header before cpp)
 
-**blog_posts.h** — Constants:
+**blog_posts.h** — constants (pattern: `db_schema/home_page_photos.h`):
 - `kBlogPostsTable = "blog_posts"`
-- `kBlogPostsId = "id"` (BIGSERIAL PK)
-- `kBlogPostsName = "name"` (STRING, not null)
-- `kBlogPostsAuthor = "author"` (STRING, not null)
-- `kBlogPostsBody = "body"` (STRING, not null — maps to PG TEXT)
-- `kBlogPostsDraft = "draft"` (BOOL, default TRUE)
-- `kBlogPostsCreatedAtUs = "created_at_us"` (BIGINT, default `kDatabaseInfoDefaultNow`)
-- `kBlogPostsModifiedAtUs = "modified_at_us"` (BIGINT, default `kDatabaseInfoDefaultNow`)
-- `kBlogPostsPostAtUs = "post_at_us"` (BIGINT, nullable — null = not scheduled)
+- `kBlogPostsId = "id"`, `kBlogPostsName = "name"`, `kBlogPostsAuthor = "author"`, `kBlogPostsBody = "body"`, `kBlogPostsDraft = "draft"`, `kBlogPostsCreatedAtUs = "created_at_us"`, `kBlogPostsModifiedAtUs = "modified_at_us"`, `kBlogPostsPostAtUs = "post_at_us"`
+- `kPermissionAuthorBlog = "author_blog"` — app-side permission name constant. (The framework permission constants live in honuware's `components/platform/db_schema/permissions.h`; `author_blog` is app-specific, so its constant lives here with the table it gates rather than requiring a honuware pin bump.)
 - Declare `void MakeBlogPostsTable(DatabaseInfo databaseInfo);`
 
-**blog_posts.cpp** — Use `AddColumnPrimaryKey`, `AddColumnSimple` (name, author, body), `AddColumnNotNullableWithDefault` (draft → `kDatabaseInfoDefaultFalse`... actually wait, default TRUE), `AddColumnNotNullableWithDefault` (created_at_us, modified_at_us → `kDatabaseInfoDefaultNow`), `AddColumnNullable` (post_at_us).
+**blog_posts.cpp** — verified against `database_info.h`:
+- `AddTable(kBlogPostsTable)`
+- `AddColumnPrimaryKey(..., DB_TYPE_BIGSERIAL)` — id
+- `AddColumnSimple(..., DB_TYPE_STRING)` — name, author, body (not-null; STRING maps to PG TEXT, fine for the body)
+- `AddColumnNotNullableWithDefault(..., DB_TYPE_BOOL, kDatabaseInfoDefaultTrue)` — draft (new posts default to draft)
+- `AddColumnNotNullableWithDefault(..., DB_TYPE_BIGINT, kDatabaseInfoDefaultNow)` — created_at_us, modified_at_us
+- `AddColumnNullable(..., DB_TYPE_BIGINT)` — post_at_us (NULL = not scheduled)
 
-**Pattern reference:** `db_schema/home_page_photos.h/.cpp`
+### Phase 1.2: Registration in create_database.cpp
 
-### Phase 1.2: Three-Place Registration + Seed Data
+All in `server/knottyyoga_server/src/database_helper/create_database.cpp` unless noted. **Permissions and roles are referenced BY NAME** (`PermissionIdByName` / `RoleIdByName`) — ids renumber per tenant, never hardcode one.
 
-**Modify:** `server/knottyyoga_server/src/db_schema/make_database_info.cpp`
-- Add `#include "blog_posts.h"`
-- Add `MakeBlogPostsTable(databaseInfo);` in `MakeDatabaseInfo()` (after gift permissions, under `// Blog tables` comment)
-
-**Modify:** `server/knottyyoga_server/src/database_helper/create_database.cpp`
-1. Add `#include "db_schema/blog_posts.h"` to includes
-2. `CreateTables()`: Add `CreateTable(DbSchema::kBlogPostsTable);` under `// Blog tables`
-3. `PopulatePhotoSupportTables()`: Add `AddRow(DbSchema::kBlogPostsTable);`
-4. `PopulatePermissions()`: Add `AddRow("author_blog", "Permission to author and manage blog posts.");` — becomes permission ID 6
-5. `PopulateRolePermissions()`: Add `const int kAuthorBlogPermissionId = 6;` and `AddRow(kAdminRoleId, kAuthorBlogPermissionId);` so admins get blog access
-6. `PopulateAdminTopLevelTables()`: Add `AddRow(DbSchema::kBlogPostsTable);`
-7. `PopulateAdminTablePermissions()`: Add `AddRow(DbSchema::kBlogPostsTable, 6);` (author_blog permission ID)
-8. `PopulateAdminColumnDataInfo()`: Add entries for all blog_posts columns:
-   - `name` → label "Title", hint "Blog post title", type "text", required "true"
-   - `author` → label "Author", hint "Post author name", type "text", required "true"
-   - `body` → label "Body", hint "Blog post content (Markdown)", type "long-text", required "true"
-   - `draft` → label "Draft", hint "Whether this is a draft", type "checkbox", required "false"
-   - `created_at_us` → label "Created", hint "When created", type "date", required "false", readonly "true"
-   - `modified_at_us` → label "Modified", hint "When last modified", type "date", required "false", readonly "true"
-   - `post_at_us` → label "Post Date", hint "When published", type "date", required "false"
-
-**Modify:** `server/knottyyoga_server/src/db_schema/CMakeLists.txt`
-- Add `blog_posts.h` and `blog_posts.cpp` to `target_sources(knotty_yoga_core PRIVATE ...)`
-
-**No blog seed data needed** — blog starts empty.
+- [ ] `db_schema/make_database_info.cpp`: `#include "blog_posts.h"` + `MakeBlogPostsTable(databaseInfo);` (no FK dependencies — order is flexible; put it under a `// Blog tables` comment)
+- [ ] `create_database.cpp` includes: `#include "db_schema/blog_posts.h"`
+- [ ] `CreateTables()`: `CreateTable(DbSchema::kBlogPostsTable);`
+- [ ] `PopulatePhotoSupportTables()`: `AddRow(DbSchema::kBlogPostsTable);` — this is what "photo support" means; the generic photo endpoints (`upload_photo` / `get_photo` / `get_scaled_photo` / `has_photo`) then accept `blog_posts` rows
+- [ ] `PopulatePermissions()`: `AddRow(DbSchema::kPermissionAuthorBlog, "Permission to author and manage blog posts.");` — NOT pricing-eligible (omit the third arg)
+- [ ] `PopulateRolePermissions()`: `Grant(DbSchema::kRoleNameAdmin, DbSchema::kPermissionAuthorBlog);` — admins can author. (Studio Manager: leave out; grant later if wanted.)
+- [ ] `PopulateAdminTopLevelTables()`: `AddRow(DbSchema::kBlogPostsTable);` — required or the generic CRUD/photo endpoints reject the table ("Table is not an allowed table")
+- [ ] `PopulateAdminTablePermissions()`: `AddRow(DbSchema::kBlogPostsTable, std::stoi(PermissionIdByName(transaction, DbSchema::kPermissionAuthorBlog)));` — follows the `kManageProductsPermissionId` lookup pattern already in that function
+- [ ] `PopulateAdminColumnDataInfo()` — signature is `(table, column, label, hint, htmlInputType, required, hidden="", readonly_="")`:
+  - name → "Title", "Blog post title", "text", "true"
+  - author → "Author", "Post author name", "text", "true"
+  - body → "Body", "Blog post content (Markdown)", "text", "true"
+  - draft → "Draft", "Hidden from the public blog while checked", "checkbox", "false"
+  - created_at_us → "Created", "When created", "date", "false", "", "true" (readonly)
+  - modified_at_us → "Modified", "When last modified", "date", "false", "", "true" (readonly)
+  - post_at_us → "Post Date", "When the post goes public", "date", "false"
+- [ ] `PopulateAdminColumnFriendlyNames()` — *(missing from v0.1)* grid headers: Title, Author, Draft, Created, Modified, Post Date
+- [ ] `PopulateAdminTableFriendlyNames()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "Blog Posts", "Blog posts authored via the Blog Posts admin page. Debug view; author via the blog editor.");`
+- [ ] `PopulateAdminTableDisplayTemplates()` — *(missing from v0.1)* `AddRow(DbSchema::kBlogPostsTable, "{name}");`
+- [ ] **No migration.** `business_logic/migration/` exists but both streams are deliberately empty pre-deploy (`all_migrations.cpp`: "Both are empty pre-deploy"). New table = create_database + recreate the dev DB with `knottyyoga_database_helper --recreate_database` (needs `HONUWARE_ALLOW_DESTRUCTIVE=1`).
+- [ ] No blog seed data — the blog starts empty.
 
 ---
 
@@ -111,38 +124,32 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 
 ### Phase 2.1: Blog Posts Table Helper + Tests
 
-**Create:**
-- `server/knottyyoga_server/src/sql_util/table_helpers/blog_posts.h`
-- `server/knottyyoga_server/src/sql_util/table_helpers/blog_posts.cpp`
-- `server/knottyyoga_server/src/sql_util/table_helpers/blog_posts_test.cpp`
-
-**Class:** `TableHelpers::BlogPosts`
+- [ ] Create `sql_util/table_helpers/blog_posts.h` / `.cpp` — class `TableHelpers::BlogPosts`
+- [ ] Create `sql_util/table_helpers/blog_posts_test.cpp` — suite `BlogPostsTest`
+- [ ] Add all three to `sql_util/table_helpers/CMakeLists.txt` (h+cpp to core, test to tests)
 
 **Methods:**
 ```
 BlogPosts(DatabaseHelper databaseHelper)
-int64_t AddBlogPost(transaction, name, author, body, draft, postAtUs)
-KeyValueTable GetBlogPost(transaction, id)
-void UpdateBlogPost(transaction, id, name, author, body, draft, modifiedAtUs, postAtUs)
-void DeleteBlogPost(transaction, id)
-KeyValueTableArray GetPublishedPosts(transaction, pageSize, page)
-int64_t GetPublishedPostCount(transaction)
-KeyValueTableArray GetPublishedPostsByDateRange(transaction, startUs, endUs, pageSize, page)
-int64_t GetPublishedPostCountByDateRange(transaction, startUs, endUs)
-KeyValueTableArray GetAvailableDates(transaction)
+int64_t AddBlogPost(tx, name, author, body, draft, postAtUs)        // postAtUs 0 → NULL
+KeyValueTable GetBlogPost(tx, id)
+void UpdateBlogPost(tx, id, name, author, body, draft, postAtUs)    // also stamps modified_at_us = now_us()
+void DeleteBlogPost(tx, id)
+// Public feed — published = draft=false AND post_at_us IS NOT NULL AND post_at_us <= now_us();
+// ORDER BY post_at_us DESC. startUs/endUs of 0 = unbounded.
+KeyValueTableArray GetPublishedPosts(tx, startUs, endUs, pageSize, page)
+int64_t GetPublishedPostCount(tx, startUs, endUs)
+// Admin list — every post incl. drafts; range + sort on created_at_us DESC.
+KeyValueTableArray GetAllPosts(tx, startUs, endUs, pageSize, page)
+int64_t GetAllPostCount(tx, startUs, endUs)
+// Distinct UTC (year, month) pairs, newest first. forAdmin=false → published posts
+// bucketed on post_at_us; forAdmin=true → all posts bucketed on created_at_us.
+KeyValueTableArray GetAvailableDates(tx, bool forAdmin)
 ```
 
-**Key SQL patterns:**
-- Published = `draft = false AND post_at_us <= now_us()`
-- Pagination = `ORDER BY post_at_us DESC LIMIT $1 OFFSET $2`
-- Available dates = `SELECT DISTINCT EXTRACT(YEAR FROM to_timestamp(post_at_us / 1000000.0))::int, EXTRACT(MONTH FROM to_timestamp(post_at_us / 1000000.0))::int FROM blog_posts WHERE draft = false AND post_at_us <= now_us() ORDER BY year DESC, month DESC`
-
-**Use:** `DbCrud::AddRowToTableFetchInt64PrimaryKey`, `DbCrud::GetRow`, `DbCrud::UpdateRow`, `DbCrud::DeleteRow` for standard CRUD. Custom SQL via `transaction.Execute()` for the published/date queries.
-
-**Tests:** Use `TestDatabaseUtil` + `RunInTransaction`. No table creation needed. Test all methods.
-
-**Modify:** `server/knottyyoga_server/src/sql_util/table_helpers/CMakeLists.txt`
-- Add `blog_posts.h`, `blog_posts.cpp` to core, `blog_posts_test.cpp` to tests
+- [ ] Standard CRUD through `DbCrud::*` (`AddRowToTableFetchInt64PrimaryKey`, `GetRow`, `UpdateRow`, `DeleteRow`); the published/admin/date queries are custom SQL — follow the `kSql...` constant + `$1/$2` parameter pattern in `sql_util/table_helpers/price_schedules.cpp` (incl. the `COUNT(*) OVER()`/`LIMIT NULLIF($n, 0)` idioms if convenient)
+- [ ] Available-dates SQL sketch: `SELECT DISTINCT EXTRACT(YEAR FROM to_timestamp(post_at_us / 1000000.0) AT TIME ZONE 'UTC')::int AS year, EXTRACT(MONTH FROM ...)::int AS month FROM blog_posts WHERE <published> ORDER BY 1 DESC, 2 DESC` (UTC per decision 10)
+- [ ] Tests (`TestDatabaseUtil` + `RunInTransaction`, tables pre-created, no fixtures): add/get/update (incl. modified_at_us advancing)/delete; draft excluded from published; NULL and future `post_at_us` excluded from published; range filtering on both feeds; pagination + counts; date pairs newest-first and draft-blind for admin; find-by-id in assertions, never by array index
 
 ---
 
@@ -150,51 +157,32 @@ KeyValueTableArray GetAvailableDates(transaction)
 
 ### Phase 3.1: Blog Helper + Key Value Table + Tests
 
-**Create directory:** `server/knottyyoga_server/src/business_logic/blog/`
+- [ ] Create directory `business_logic/blog/` with `CMakeLists.txt` (mirror `business_logic/skills/CMakeLists.txt`: `target_sources` on `knotty_yoga_core` / `knotty_yoga_tests`)
+- [ ] `business_logic/CMakeLists.txt`: `add_subdirectory(blog)`
+- [ ] Create `blog_helper.h` / `.cpp` + `blog_helper_test.cpp` (suite `BlogHelperTest`)
+- [ ] Create `blog_key_value_table.h` / `.cpp` + `blog_key_value_table_test.cpp` (suite `BlogKeyValueTableTest`)
 
-**Create files:**
-- `business_logic/blog/CMakeLists.txt`
-- `business_logic/blog/blog_helper.h` and `.cpp`
-- `business_logic/blog/blog_helper_test.cpp`
-- `business_logic/blog/blog_key_value_table.h` and `.cpp`
-- `business_logic/blog/blog_key_value_table_test.cpp`
-
-**Domain structs** (in `blog_helper.h`):
+**Domain structs** (in `blog_helper.h`, `namespace Blog`):
 ```cpp
-namespace Blog {
-    struct BlogPostInfo {
-        int64_t id;
-        std::string name;
-        std::string author;
-        std::string body;
-        bool draft;
-        int64_t createdAtUs;
-        int64_t modifiedAtUs;
-        int64_t postAtUs;  // 0 if not scheduled
-    };
-
-    struct BlogPostListResult {
-        std::vector<BlogPostInfo> posts;
-        int64_t totalCount;
-    };
-
-    struct AvailableDate {
-        int year;
-        int month;
-    };
-}
+struct BlogPostInfo {
+    int64_t id = 0;
+    std::string name, author, body;
+    bool draft = true;
+    int64_t createdAtUs = 0, modifiedAtUs = 0;
+    int64_t postAtUs = 0;   // 0 = not scheduled (NULL in the DB)
+};
+struct BlogPostListResult { std::vector<BlogPostInfo> posts; int64_t totalCount = 0; };
+struct AvailableDate { int year = 0; int month = 0; };
 ```
 
-**BlogHelper class:** Wraps `TableHelpers::BlogPosts`, converts `KeyValueTable` → `BlogPostInfo` structs. Methods mirror table helper but return domain structs.
+**BlogHelper** wraps `TableHelpers::BlogPosts`, converts rows → structs. Methods mirror the table helper (`GetPublishedPosts` / `GetAllPosts` returning `BlogPostListResult`, `GetAvailableDates(forAdmin)`, CRUD returning `BlogPostInfo`).
 
-**blog_key_value_table.h:** Conversion functions:
-- `BlogPostInfoToKeyValueTable(const BlogPostInfo&) → KeyValueTable`
-- `BlogPostListResultToKeyValueTable(const BlogPostListResult&) → KeyValueTable` (includes `items` array + `total_count`)
-- `AvailableDateToKeyValueTable(const AvailableDate&) → KeyValueTable`
-- `AvailableDatesToKeyValueTable(const std::vector<AvailableDate>&) → KeyValueTable` (wraps in `dates` array)
-
-**Modify:** `server/knottyyoga_server/src/business_logic/CMakeLists.txt`
-- Add `add_subdirectory(blog)`
+**blog_key_value_table** — *(v0.1 correction: a KVT is a flat string map and cannot hold an array; list responses are composed at the endpoint edge like every other list in the codebase)*:
+- `KeyValueTable BlogPostInfoToKeyValueTable(const BlogPostInfo&)` — emits every column; `draft` as `"true"/"false"`, `post_at_us` as `""` when 0
+- `KeyValueTableArray BlogPostsToKeyValueTableArray(const std::vector<BlogPostInfo>&)`
+- `KeyValueTable AvailableDateToKeyValueTable(const AvailableDate&)`
+- `KeyValueTableArray AvailableDatesToKeyValueTableArray(const std::vector<AvailableDate>&)`
+- [ ] KVT tests: populated + default rows, array order preserved, the `""`-for-unscheduled rule
 
 ---
 
@@ -202,37 +190,27 @@ namespace Blog {
 
 ### Phase 4.1: Blog Endpoints + Tests
 
-**Create:**
-- `server/knottyyoga_server/src/endpoints/blog_posts.h`
-- `server/knottyyoga_server/src/endpoints/blog_posts.cpp`
-- `server/knottyyoga_server/src/endpoints/blog_posts_test.cpp`
+- [ ] Create `endpoints/blog_posts.h` / `.cpp` — one file, multiple routes in one `SetupRouting::AddRoute` (pattern: `endpoints/admin_coupons.cpp`, which registers 4 routes)
+- [ ] Create `endpoints/blog_posts_test.cpp` — suite `BlogPostsEndpointTest`
+- [ ] Add h/cpp to core + test to tests in `endpoints/CMakeLists.txt` — **then prove the test suite actually runs**: `--gtest_filter=BlogPostsEndpointTest.*` must report a non-zero count (`0 tests` still exits 0 — this repo has already shipped a never-registered endpoint test once)
 
-**Routes to register:**
+**Routes:**
 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| GET | `/api/blog_posts` | None | Published posts with pagination. Query params: `page`, `page_size`, `start_us`, `end_us` |
-| GET | `/api/blog_posts/dates` | None | Available year/month pairs for published posts |
-| GET | `/api/blog_posts/<int>` | Optional | Single post. Public: non-draft only. With `author_blog`: all posts |
-| POST | `/api/blog_posts` | `author_blog` | Create blog post |
-| PUT | `/api/blog_posts/<int>` | `author_blog` | Update blog post (also updates `modified_at_us`) |
-| DELETE | `/api/blog_posts/<int>` | `author_blog` | Delete blog post |
+| GET | `/api/blog_posts` | none / `author_blog` for `view=admin` | List. Params: `page`, `page_size` (cap ≤ 50), `start_us`, `end_us`, `view=admin`. Public: published only, `post_at_us` DESC, range on `post_at_us`. Admin: drafts included, `created_at_us` DESC, range on `created_at_us`. |
+| GET | `/api/blog_posts/dates` | none / `author_blog` for `view=admin` | Distinct year/month pairs (`{dates: [...]}`). Public buckets published `post_at_us`; admin buckets all `created_at_us`. |
+| GET | `/api/blog_posts/<int>` | none for published | Single post. If the row is a draft (or unscheduled/future), gate with `RequirePermission` — published rows are public. Crow matches `dates` vs `<int>` by type, so the literal route doesn't collide. |
+| POST | `/api/blog_posts` | `author_blog` | Create; returns the created post. |
+| PUT | `/api/blog_posts/<int>` | `author_blog` | Update (stamps `modified_at_us`); returns the updated post. |
+| DELETE | `/api/blog_posts/<int>` | `author_blog` | Delete. |
 
-**Endpoint structure:** Follow `admin_duplicate_product.cpp` pattern:
-- `HandleGet`/`HandlePost`/`HandlePut`/`HandleDelete` HTTP handlers
-- `SetupRouting` class with `RoutingBase`
-- Exported functions: `GetBlogPosts`, `GetBlogPostDates`, `GetBlogPost`, `PostBlogPost`, `PutBlogPost`, `DeleteBlogPost`
-- Permission check: `session.ActiveUserHasPermission(transaction, "author_blog")`
-- Response: `SqlUtil::KeyValueTableToJson(Blog::BlogPostInfoToKeyValueTable(result))`
-- Query param parsing: `req.url_params.get("page")` etc.
-
-**Modify:** `server/knottyyoga_server/src/endpoints/web_app.cpp`
-- Add `#include "blog_posts.h"`
-- Add `auto g_GetBlogPosts = &Endpoints::GetBlogPosts;` (and similar for each exported function)
-
-**Modify:** `server/knottyyoga_server/src/endpoints/CMakeLists.txt`
-- Add `blog_posts.h`, `blog_posts.cpp` to core target
-- Add `blog_posts_test.cpp` to tests target
+**Structure** (per `endpoints/CLAUDE.md` — handlers + `SetupRouting` + exported functions only, no helpers in the endpoint file):
+- Exported: `GetBlogPosts`, `GetBlogPostDates`, `GetBlogPost`, `PostBlogPost`, `PutBlogPost`, `DeleteBlogPost`
+- Permission check: `endpointAuthHelper.RequirePermission(transaction, DbSchema::kPermissionAuthorBlog, resp)` — 401 anonymous / 403 missing, writes resp itself *(v0.1's `session.ActiveUserHasPermission` doesn't exist)*
+- List composition at the edge (pattern: `admin_attendance_templates.cpp` / the payments example): `Json::JsonObject{{"items", SqlUtil::KeyValueTableArrayToJson(Blog::BlogPostsToKeyValueTableArray(r.posts))}, {"total_count", ...}}`
+- [ ] `endpoints/web_app.cpp`: `#include "blog_posts.h"` + **anchors INSIDE `RegisterAllEndpoints()`**: `anchor = reinterpret_cast<AnchorFunc>(&Endpoints::GetBlogPosts);` (one per exported function, following the file's convention). *(v0.1's file-scope `auto g_X = &...;` is the exact pattern the codebase banned: dead-stripped at `-O2`, every route 404s in Release.)*
+- [ ] Endpoint tests (drive over HTTP via `EndpointTestHelper` + `handle_full`; query params via `req.url_params = crow::query_string(...)`, never `req.url`): public list excludes drafts/unscheduled/future + paginates + range-filters; admin view 401 anonymous, 403 without the permission, includes drafts for a holder (grant via the permissions table helper, as `admin_attendance_templates_test.cpp` does); dates both views; single GET public-vs-draft gating; POST/PUT/DELETE happy paths + 401/403; PUT advances `modified_at_us`
 
 ---
 
@@ -240,17 +218,10 @@ namespace Blog {
 
 ### Phase 5.1: Install ngx-markdown + Blog Types
 
-**Run:** `cd ui && npm install ngx-markdown@^19.0.0 marked@^15.0.0 --save`
-- ngx-markdown v19.x is confirmed compatible with Angular 19 (major versions align)
-- `marked@^15.0.0` is the required peer dependency for ngx-markdown v19
-- No PrismJS — blog posts don't require code block syntax highlighting
+- [ ] From `ui/`: `npm install ngx-markdown@^21.0.0 marked --save` — **Angular is 21.2 in package.json** *(v0.1 said 19 — stale)*; ngx-markdown's major must match. Take the `marked` major ngx-markdown's peerDependencies ask for (npm surfaces it). If the Angular 22 upgrade has landed by execution time, use `^22`.
+- [ ] `ui/src/app/app.config.ts`: `import { provideMarkdown } from 'ngx-markdown';` + `provideMarkdown()` in the `providers` array (no loader config — we never fetch remote `.md` files)
+- [ ] Create `ui/src/app/shared/types/blog.types.ts`:
 
-**Modify:** `ui/src/app/app.config.ts`
-- Import: `import { provideMarkdown } from 'ngx-markdown';`
-- Add `provideMarkdown()` to `providers` array
-  - Note: If remote `.md` file loading via `[src]` is needed later, pass `{ loader: HttpClient }` and ensure `provideHttpClient()` is also present
-
-**Create:** `ui/src/app/shared/types/blog.types.ts`
 ```typescript
 export interface BlogPost {
   id: number;
@@ -260,27 +231,12 @@ export interface BlogPost {
   draft: boolean;
   created_at_us: number;
   modified_at_us: number;
-  post_at_us: number | null;
+  post_at_us: number | null;   // null = not scheduled
 }
-export interface BlogPostListResponse {
-  items: BlogPost[];
-  total_count: number;
-}
-export interface AvailableDate {
-  year: number;
-  month: number;
-}
-export interface BlogDatesResponse {
-  dates: AvailableDate[];
-}
-export interface CreateBlogPostRequest {
-  name: string;
-  author: string;
-  body: string;
-  draft: boolean;
-  post_at_us: number | null;
-}
-export interface UpdateBlogPostRequest {
+export interface BlogPostListResponse { items: BlogPost[]; total_count: number; }
+export interface AvailableDate { year: number; month: number; }
+export interface BlogDatesResponse { dates: AvailableDate[]; }
+export interface SaveBlogPostRequest {   // create + update take the same shape
   name: string;
   author: string;
   body: string;
@@ -291,40 +247,32 @@ export interface UpdateBlogPostRequest {
 
 ### Phase 5.2: Server Access Interface + All Implementations
 
-**Modify:** `ui/src/app/shared/types/ServerAccess.ts`
-- Import blog types
-- Add 6 blog methods to `ServerAccess` interface:
-  - `getBlogPosts(page, pageSize, startUs?, endUs?): Observable<BlogPostListResponse>`
+The seam is **five** files, not four — the mock's spec is part of the seam *(missing from v0.1)*.
+
+- [ ] `shared/types/ServerAccess.ts` — import blog types, add 6 methods:
+  - `getBlogPosts(page, pageSize, opts?: {startUs?, endUs?, adminView?}): Observable<BlogPostListResponse>`
   - `getBlogPost(id): Observable<BlogPost>`
-  - `getBlogDates(): Observable<BlogDatesResponse>`
-  - `createBlogPost(request): Observable<BlogPost>`
-  - `updateBlogPost(id, request): Observable<BlogPost>`
+  - `getBlogDates(adminView?: boolean): Observable<BlogDatesResponse>`
+  - `createBlogPost(request: SaveBlogPostRequest): Observable<BlogPost>`
+  - `updateBlogPost(id, request: SaveBlogPostRequest): Observable<BlogPost>`
   - `deleteBlogPost(id): Observable<void>`
-- Add re-exports for blog types
-
-**Modify:** `ui/src/app/shared/services/network/ServerAccessNetwork.ts`
-- Implement all 6 methods with HTTP calls to `/api/blog_posts*`
-
-**Modify:** `ui/src/app/shared/services/network/ServerAccess.mock.ts`
-- Add `blogPosts: BlogPost[]` array with 3-5 sample posts
-- Implement all 6 methods with in-memory operations
-
-**Modify:** `ui/src/app/shared/services/network/ServerAccess.ts` (Proxy)
-- Add all 6 methods using `this.serialize(() => this.impl.method(...))`
+- [ ] `shared/services/network/ServerAccessNetwork.ts` — implement against `/api/blog_posts*` with a private `normalizeBlogPost`: KVT→JSON serializes booleans as the strings `"true"/"false"` and the unscheduled `post_at_us` as `""` — coerce `draft` via the existing `coerceBool` and `"" → null` for `post_at_us`, `Number(...)` the timestamps (same pattern as `normalizeSignupOffering`)
+- [ ] `shared/services/network/ServerAccess.mock.ts` — `blogPosts: BlogPost[]` seeded with 3–5 posts **including one draft and one future-dated post** so local mode exercises the public-exclusion rules; in-memory implementations of all 6 (mock honors published-vs-admin filtering, sorting, pagination)
+- [ ] `shared/services/network/ServerAccess.ts` (proxy) — 6 `this.serialize(() => this.impl.method(...))` passthroughs
+- [ ] `ServerAccess.mock.spec.ts` — cases: public list excludes the draft + the future post and sorts `post_at_us` DESC; admin view includes drafts sorted `created_at_us` DESC; pagination + `total_count`; date pairs; single get found/404; create/update/delete round-trip; update stamps `modified_at_us`
 
 ### Phase 5.3: Auth Types & Guard
 
-**Modify:** `ui/src/app/core/services/auth.types.ts`
-- Add:
+*(v0.1 correction: `core/services/auth.types.ts` and `core/guards/auth-guards.ts` are now one-line re-export shims over `@honuware/ui/auth`, where `hasPermission`, `hasManageProducts`, and all guards live. `author_blog` is app-specific, so its helper + guard are **app-side additions to the shim files** — no honuware release needed.)*
+
+- [ ] `core/services/auth.types.ts`: add (alongside the re-export)
   ```typescript
   export function hasAuthorBlog(authData: AuthData): boolean {
     return (authData.isAuth && authData.isAdmin) || hasPermission(authData, 'author_blog');
   }
   ```
-
-**Modify:** `ui/src/app/core/guards/auth-guards.ts`
-- Import `hasAuthorBlog`
-- Add `AuthorBlogGuard` following `ManageProductsGuard` pattern
+- [ ] `core/guards/auth-guards.ts`: add a functional `AuthorBlogGuard` (`CanActivateFn`) that injects `AuthService`, checks `hasAuthorBlog`, and redirects to `/` on failure — mirror the library's `ManageProductsGuard` behavior
+- [ ] Spec coverage for both (a small `auth-guards.spec.ts` if none exists app-side): admin passes, `author_blog` holder passes, plain user redirected, anonymous redirected
 
 ---
 
@@ -332,45 +280,24 @@ export interface UpdateBlogPostRequest {
 
 ### Phase 6.1: Public Blog List Page
 
-**Create:**
-- `ui/src/app/pages/public/blog/blog-list/blog-list.component.ts`
-- `ui/src/app/pages/public/blog/blog-list/blog-list.component.html`
-- `ui/src/app/pages/public/blog/blog-list/blog-list.component.scss`
-
-**Features:**
-- Standalone component importing `SharedModule`, `MarkdownModule` (from `ngx-markdown`)
-- Injects `SERVER_ACCESS_TOKEN` for API calls, `AuthService` for permission checks
-- On init: calls `getBlogDates()` and `getBlogPosts(0, 5)`
-- **Date navigation** at top:
-  - Year dropdown: from `dates` response + "All Years"
-  - Month dropdown: filtered by selected year + "All Months"
-  - Day dropdown: derived from loaded posts + "All Days"
-  - Selecting "All Years" auto-selects "All Months" / "All Days"
-  - Date selection computes `startUs`/`endUs` and reloads posts
-- **Post rendering:** For each post:
-  - `<h2>{{ post.name }}</h2>` (title)
-  - `<p>By {{ post.author }} | {{ formatDate(post.modified_at_us) }}</p>`
-  - `<markdown [data]="post.body"></markdown>` (rendered body)
-  - If `hasAuthorBlog(authData)`: Edit Post button (links to `/blog-admin/edit/:id`) and Delete Post button (confirmation dialog)
-- **Pagination:** "Previous" / "Next" buttons, page tracking, disable at bounds
-- Styling: SCSS with `mat-card` borders, consistent with project conventions
+- [ ] Create `pages/public/blog/blog-list/blog-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [ ] Standalone component; imports `SharedModule` + ngx-markdown's standalone `MarkdownComponent`; injects `SERVER_ACCESS_TOKEN`, `AuthService`, `MatDialog`, `Router`
+- [ ] On init: `getBlogDates()` + `getBlogPosts(0, 5)`; page size 5 per the Overview
+- [ ] **Date navigation** at top:
+  - Year dropdown from the dates response + "All Years"; Month dropdown limited to months present for the chosen year + "All Months"; Day dropdown derived client-side from loaded posts + "All Days"
+  - "All Years" forces "All Months" + "All Days"; "All Months" forces "All Days"
+  - Selection computes a UTC `[startUs, endUs)` range (decision 10) and reloads page 0
+- [ ] **Post rendering** per post: name as title; "By {author} | {modified date}"; `<markdown [data]="post.body">` (sanitization on — default)
+- [ ] **Author controls:** when `hasAuthorBlog(authData)` — Edit Post → `/blog-admin/edit/:id`; Delete Post → `ConfirmDialogComponent` from **`@honuware/ui/foundation`** *(v0.1 path `shared/components/confirm-dialog` no longer exists)* → `deleteBlogPost` → reload
+- [ ] **Pagination:** Previous/Next from `total_count`, disabled at the bounds
+- [ ] Styling: card borders `1px solid #d1d5db` per house rule
+- [ ] Spec: renders posts as markdown (assert rendered HTML, e.g. `**bold**` → `<strong>`); date dropdown cascade rules; range passed to the fetch; pagination bounds; Edit/Delete only for `hasAuthorBlog`; delete confirms then reloads; empty state
 
 ### Phase 6.2: Blog Routes & Menu
 
-**Modify:** `ui/src/app/pages/public/public.routes.ts`
-- Import `BlogListComponent`
-- Add: `{ path: 'blog', component: BlogListComponent }`
-
-**Modify:** `ui/src/app/shared/services/header/mockHeaderResponse.ts`
-- Add `blogButton` definition:
-  ```typescript
-  const blogButton: HeaderButton = {
-    title: 'Blog',
-    kind: HeaderButtonKind.InternalLink,
-    goTo: '/blog',
-  };
-  ```
-- Insert into `headerData.menu` array (between `eventsButton` and `shopButton`, around line 179)
+- [ ] `pages/public/public.routes.ts`: `{ path: 'blog', component: BlogListComponent }`
+- [ ] `shared/services/header/mockHeaderResponse.ts`: add a `blogButton` (`title: 'Blog'`, InternalLink, `goTo: '/blog'`) to the top-level menu between `eventsButton` and `membershipsButton` *(v0.1's "shopButton, around line 179" is stale — the Phase 1 menu rework renamed and reordered everything)*
+- [ ] Update `mockHeaderResponse.spec.ts` + `header.service.spec.ts` — both assert menu contents and will need the new entry *(missing from v0.1)*
 
 ---
 
@@ -378,188 +305,124 @@ export interface UpdateBlogPostRequest {
 
 ### Phase 7.1: Admin Blog List Page
 
-**Create:**
-- `ui/src/app/pages/blog-admin/blog-list/blog-admin-list.component.ts`
-- `ui/src/app/pages/blog-admin/blog-list/blog-admin-list.component.html`
-- `ui/src/app/pages/blog-admin/blog-list/blog-admin-list.component.scss`
-
-**Features:**
-- Standalone component with `SharedModule` imports
-- Uses `getFilteredTableRows('blog_posts', 'created_at_us', false, pageSize, page, filterPairs)` for paginated list
-- Year/Month filter dropdowns with "All Years" / "All Months"
-- Material table (`mat-table`) with columns: Name, Author, Draft (chip/badge), Created Date
-- Edit icon per row → navigates to `/blog-admin/edit/:id`
-- Delete icon per row → confirmation dialog → `deleteBlogPost(id)` → reload
-- "New Post" button → navigates to `/blog-admin/new`
-- Pagination controls (page size, page number, total count)
+- [ ] Create `pages/blog-admin/blog-list/blog-admin-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [ ] Data source: **`getBlogPosts(page, pageSize, {startUs, endUs, adminView: true})` + `getBlogDates(true)`** — *not* `getFilteredTableRows` as v0.1 planned: its `FilterPair[]` is equality-only and the year/month filter is a range on `created_at_us`; the custom endpoint also keeps drafts and the right sort
+- [ ] Year/Month dropdowns with "All Years" / "All Months" ("All Years" forces "All Months"), computing a UTC `created_at_us` range
+- [ ] `mat-table`: Title, Author, Draft (chip), Created, Post Date; edit icon → `/blog-admin/edit/:id`; delete icon → `ConfirmDialogComponent` → `deleteBlogPost` → reload
+- [ ] "New Post" button → `/blog-admin/new`; paginator wired to `total_count`
+- [ ] Spec: lists rows incl. drafts; filter range passed through; edit/delete/new navigation; delete confirm; pagination
 
 ### Phase 7.2: Blog Editor Page
 
-**Create:**
-- `ui/src/app/pages/blog-admin/blog-editor/blog-editor.component.ts`
-- `ui/src/app/pages/blog-admin/blog-editor/blog-editor.component.html`
-- `ui/src/app/pages/blog-admin/blog-editor/blog-editor.component.scss`
-
-**Features:**
-- Standalone component with `SharedModule`, `MarkdownModule` (from `ngx-markdown`), `ReactiveFormsModule`
-- **Reactive form fields:**
-  - `name` (mat-form-field, text input, required)
-  - `author` (mat-form-field, text input, required, defaults to user's `firstName + " " + lastName`)
-  - `draft` (mat-checkbox, defaults to true)
-  - `postAtUs` (Material datepicker + timepicker combo, converts to/from microseconds)
-  - `body` (textarea, required)
-- **Buttons:**
-  - "Post Now" → sets `draft=false`, `post_at_us=Date.now()*1000`, then saves
-  - "Save Post" → saves with current form values
-  - "Cancel" → navigates to `/blog-admin`
-- **Split-pane layout:**
-  - Left: `<textarea formControlName="body" class="markdown-editor">` (full height)
-  - Right: `<markdown [data]="form.get('body').value">` (live preview, scrollable)
-  - CSS: `display: flex; gap: 1rem;` with each pane at `flex: 1`
-- **Edit mode:** When route has `:id` param, load via `getBlogPost(id)`, populate form
-- **Create mode:** When route is `new`, form starts empty except author default
-- **On save:** `createBlogPost()` or `updateBlogPost()` → navigate to `/blog-admin`
+- [ ] Create `pages/blog-admin/blog-editor/blog-editor.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [ ] Standalone; `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`
+- [ ] Form fields: Name (required), Author (required, defaults to `firstName + ' ' + lastName` from `authData` in create mode), Draft checkbox (defaults checked), Post At = **Material datepicker + `<input matInput type="time">`** — the established pair from `manage/events/event-create` *(house rule: dates use date pickers, times use hour pickers — no free-text)*; converts to/from microseconds, empty → `post_at_us: null`
+- [ ] Buttons: **Post Now** (sets Draft unchecked + Post At = now, then saves), **Save Post**, **Cancel** (→ `/blog-admin`, no save)
+- [ ] Split pane: left `<textarea formControlName="body">`, right `<markdown [data]="...">` live preview; `display: flex; gap: 1rem;` panes `flex: 1`; preview scrolls independently
+- [ ] Edit mode (`:id` param): load via `getBlogPost(id)`, populate; create mode (`new`): empty except author default
+- [ ] Save → `createBlogPost` / `updateBlogPost` → navigate to `/blog-admin`
+- [ ] Spec: create defaults (draft checked, author prefilled); edit populates from the fetch; Post Now flips draft + stamps now + saves; save maps date+time → microseconds and empty → null; cancel navigates without saving; preview renders the textarea content
 
 ### Phase 7.3: Admin Blog Routes & Menu
 
-**Create:** `ui/src/app/pages/blog-admin/blog-admin.routes.ts`
-```typescript
-const routes: Routes = [
-  { path: '', component: BlogAdminListComponent },
-  { path: 'new', component: BlogEditorComponent },
-  { path: 'edit/:id', component: BlogEditorComponent },
-];
-```
-
-**Modify:** `ui/src/app/app.routes.ts`
-- Import `AuthorBlogGuard`
-- Add route block after `manage`:
+- [ ] Create `pages/blog-admin/blog-admin.routes.ts`:
   ```typescript
-  {
-    path: 'blog-admin',
-    loadChildren: () => import('@pages/blog-admin/blog-admin.routes'),
-    canActivate: [AuthGuard, AuthorBlogGuard],
-  },
+  const routes: Routes = [
+    { path: '', component: BlogAdminListComponent },
+    { path: 'new', component: BlogEditorComponent },
+    { path: 'edit/:id', component: BlogEditorComponent },
+  ];
+  export default routes;
   ```
-
-**Modify:** `ui/src/app/shared/services/header/mockHeaderResponse.ts`
-- Import `hasAuthorBlog` from `auth.types`
-- Update admin dropdown visibility condition (line ~200):
+- [ ] `app.routes.ts`: after the `manage` block —
   ```typescript
-  if (authData.isAuth && (authData.isAdmin || hasManageProducts(authData) || hasAuthorBlog(authData))) {
+  { path: 'blog-admin', loadChildren: () => import('@pages/blog-admin/blog-admin.routes'), canActivate: [AuthGuard, AuthorBlogGuard] },
   ```
-- Add "Blog Posts" to `adminMenu` conditionally:
-  ```typescript
-  if (hasAuthorBlog(authData)) {
-    adminMenu.push({
-      title: 'Blog Posts',
-      kind: HeaderButtonKind.InternalLink,
-      goTo: '/blog-admin',
-    });
-  }
-  ```
+- [ ] `mockHeaderResponse.ts`: import `hasAuthorBlog`; widen the Admin dropdown condition to `authData.isAuth && (authData.isAdmin || hasManageProducts(authData) || hasAuthorBlog(authData))`; push a "Blog Posts" item (`goTo: '/blog-admin'`) into `adminMenu` when `hasAuthorBlog(authData)` — note this makes the Admin dropdown appear for a user whose ONLY elevated permission is `author_blog`, containing just Blog Posts (intended)
+- [ ] Update `mockHeaderResponse.spec.ts`: Blog Posts present for admin and for an `author_blog`-only user, absent otherwise; Admin dropdown appears for the `author_blog`-only user
 
 ---
 
 ## Implementation Sequence
 
-Execute phases in this order (dependency-aware):
+Phase-level checklist (dependency order; mark off with the granular boxes above):
 
-| Step | Phase | Description | Depends On |
-|------|-------|-------------|------------|
-| 1 | 1.1 | Blog posts table schema | — |
-| 2 | 1.2 | Three-place registration + seed data | 1.1 |
-| 3 | 2.1 | Table helper + tests | 1.1, 1.2 |
-| 4 | 3.1 | Business logic helper + KVT + tests | 2.1 |
-| 5 | 4.1 | Blog endpoints + tests | 3.1 |
-| 6 | 5.1 | Install ngx-markdown + blog types | — |
-| 7 | 5.2 | Server access interface + implementations | 5.1 |
-| 8 | 5.3 | Auth types & guard | — |
-| 9 | 6.1 | Public blog list page | 5.1, 5.2 |
-| 10 | 6.2 | Public blog routes & menu | 6.1 |
-| 11 | 7.1 | Admin blog list page | 5.2 |
-| 12 | 7.2 | Blog editor page | 5.1, 5.2 |
-| 13 | 7.3 | Admin blog routes & menu | 5.3, 7.1, 7.2 |
+- [ ] **1.1** Blog posts table schema
+- [ ] **1.2** create_database registration (needs 1.1)
+- [ ] **2.1** Table helper + tests (needs 1.2)
+- [ ] **3.1** Business logic + KVT + tests (needs 2.1)
+- [ ] **4.1** Endpoints + tests + web_app anchors (needs 3.1)
+- [ ] **5.1** ngx-markdown + blog types
+- [ ] **5.2** ServerAccess seam ×5 files (needs 5.1)
+- [ ] **5.3** hasAuthorBlog + AuthorBlogGuard
+- [ ] **6.1** Public blog list page (needs 5.2)
+- [ ] **6.2** Public route + Blog menu item (needs 6.1)
+- [ ] **7.1** Admin blog list page (needs 5.2)
+- [ ] **7.2** Blog editor page (needs 5.2)
+- [ ] **7.3** Admin routes + Admin-dropdown menu item (needs 5.3, 7.1, 7.2)
 
-Backend (steps 1-5) can be completed fully before frontend. Frontend steps 6-8 can be started as soon as types are defined.
+Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 
 ---
 
 ## Critical File Reference
 
-### Files to CREATE (Backend)
-- `server/knottyyoga_server/src/db_schema/blog_posts.h` + `.cpp`
-- `server/knottyyoga_server/src/sql_util/table_helpers/blog_posts.h` + `.cpp` + `_test.cpp`
-- `server/knottyyoga_server/src/business_logic/blog/CMakeLists.txt`
-- `server/knottyyoga_server/src/business_logic/blog/blog_helper.h` + `.cpp` + `_test.cpp`
-- `server/knottyyoga_server/src/business_logic/blog/blog_key_value_table.h` + `.cpp` + `_test.cpp`
-- `server/knottyyoga_server/src/endpoints/blog_posts.h` + `.cpp` + `_test.cpp`
+### CREATE (Backend)
+- `db_schema/blog_posts.h` + `.cpp`
+- `sql_util/table_helpers/blog_posts.h` + `.cpp` + `_test.cpp`
+- `business_logic/blog/CMakeLists.txt`, `blog_helper.h/.cpp/_test.cpp`, `blog_key_value_table.h/.cpp/_test.cpp`
+- `endpoints/blog_posts.h` + `.cpp` + `_test.cpp`
 
-### Files to CREATE (Frontend)
-- `ui/src/app/shared/types/blog.types.ts`
-- `ui/src/app/pages/public/blog/blog-list/blog-list.component.ts` + `.html` + `.scss`
-- `ui/src/app/pages/blog-admin/blog-admin.routes.ts`
-- `ui/src/app/pages/blog-admin/blog-list/blog-admin-list.component.ts` + `.html` + `.scss`
-- `ui/src/app/pages/blog-admin/blog-editor/blog-editor.component.ts` + `.html` + `.scss`
+### CREATE (Frontend)
+- `shared/types/blog.types.ts`
+- `pages/public/blog/blog-list/blog-list.component.{ts,html,scss,spec.ts}`
+- `pages/blog-admin/blog-admin.routes.ts`
+- `pages/blog-admin/blog-list/blog-admin-list.component.{ts,html,scss,spec.ts}`
+- `pages/blog-admin/blog-editor/blog-editor.component.{ts,html,scss,spec.ts}`
 
-### Files to MODIFY (Backend)
-- `server/.../db_schema/make_database_info.cpp` — add `MakeBlogPostsTable`
-- `server/.../database_helper/create_database.cpp` — 8 functions to modify (CreateTables, PopulatePhotoSupport, PopulatePermissions, PopulateRolePermissions, PopulateAdminTopLevelTables, PopulateAdminTablePermissions, PopulateAdminColumnDataInfo)
-- `server/.../db_schema/CMakeLists.txt` — add blog_posts files
-- `server/.../sql_util/table_helpers/CMakeLists.txt` — add blog_posts files
-- `server/.../business_logic/CMakeLists.txt` — add blog subdirectory
-- `server/.../endpoints/CMakeLists.txt` — add blog_posts files
-- `server/.../endpoints/web_app.cpp` — register blog endpoint references
+### MODIFY (Backend)
+- `db_schema/make_database_info.cpp`, `db_schema/CMakeLists.txt`
+- `database_helper/create_database.cpp` — the 11 registration points in Phase 1.2
+- `sql_util/table_helpers/CMakeLists.txt`, `business_logic/CMakeLists.txt`, `endpoints/CMakeLists.txt`
+- `endpoints/web_app.cpp` — include + `RegisterAllEndpoints()` anchors
 
-### Files to MODIFY (Frontend)
-- `ui/src/app/shared/types/ServerAccess.ts` — add 6 blog methods + re-exports
-- `ui/src/app/shared/services/network/ServerAccessNetwork.ts` — implement blog HTTP calls
-- `ui/src/app/shared/services/network/ServerAccess.mock.ts` — implement blog mock
-- `ui/src/app/shared/services/network/ServerAccess.ts` — proxy blog methods
-- `ui/src/app/core/services/auth.types.ts` — add `hasAuthorBlog()`
-- `ui/src/app/core/guards/auth-guards.ts` — add `AuthorBlogGuard`
-- `ui/src/app/shared/services/header/mockHeaderResponse.ts` — add Blog menu + Blog Posts admin
-- `ui/src/app/app.routes.ts` — add blog-admin route
-- `ui/src/app/pages/public/public.routes.ts` — add /blog route
-- `ui/angular.json` — no changes needed (PrismJS removed)
-- `ui/src/app/app.config.ts` — add markdown provider
+### MODIFY (Frontend)
+- `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccessNetwork.ts`, `ServerAccess.mock.ts`, `ServerAccess.mock.spec.ts`, `ServerAccess.ts` (proxy)
+- `core/services/auth.types.ts` (+ `hasAuthorBlog`), `core/guards/auth-guards.ts` (+ `AuthorBlogGuard`)
+- `shared/services/header/mockHeaderResponse.ts` + `mockHeaderResponse.spec.ts` + `header.service.spec.ts`
+- `app.routes.ts`, `pages/public/public.routes.ts`, `app.config.ts` (`provideMarkdown()`)
+- `package.json` (ngx-markdown + marked); `angular.json` untouched
 
-### Key Existing Functions to Reuse
-- `DbCrud::AddRowToTableFetchInt64PrimaryKey` — `sql_util/database_access/database_crud_helpers.h`
-- `SqlUtil::KeyValueTableToJson` — `sql_util/json/key_value_table_json.h`
-- `ErrorResponse::NotAuthenticated/NotAuthorized/BadRequest` — `util/error_response.h`
-- `session.ActiveUserHasPermission(transaction, "author_blog")` — `business_logic/auth/session.h`
-- `microsToDate` / `dateToMicros` — `ui/src/app/shared/utils/DateFormatting.ts`
-- `hasPermission(authData, permission)` — `ui/src/app/core/services/auth.types.ts`
-- `ConfirmDialogComponent` — `ui/src/app/shared/components/confirm-dialog/`
+### Key existing pieces to reuse (verified 8/3/2026)
+- `endpointAuthHelper.RequirePermission(transaction, name, resp)` — honuware `endpoint_auth_helper.h`
+- `DbCrud::*` — `sql_util/database_access/database_crud_helpers.h`
+- `SqlUtil::KeyValueTableToJson` / `KeyValueTableArrayToJson` — `sql_util/json/key_value_table_json.h`
+- `PermissionIdByName` / `Grant` lambdas — already in `create_database.cpp`
+- `hasPermission(authData, name)` — `@honuware/ui/auth` (via the `core/services/auth.types.ts` shim)
+- `ConfirmDialogComponent` — `@honuware/ui/foundation`
+- `coerceBool` — private helper already in `ServerAccessNetwork.ts`
+- Date + time inputs — `pages/manage/events/event-create` (Material datepicker + `matInput type="time"`)
 
 ---
 
-## Verification Plan
+## Gates & Verification
 
-### Backend
-1. **Build:** `cd server/knottyyoga_server/build && cmake .. && make` — verify clean compilation
-2. **Unit tests:** `bin/knottyyoga_tests --gtest_filter=BlogPosts*` — all table helper tests pass
-3. **Unit tests:** `bin/knottyyoga_tests --gtest_filter=BlogHelper*` — all business logic tests pass
-4. **Unit tests:** `bin/knottyyoga_tests --gtest_filter=BlogKeyValueTable*` — all KVT tests pass
-5. **Unit tests:** `bin/knottyyoga_tests --gtest_filter=BlogEndpoint*` — all endpoint tests pass
-6. **Database reset:** Run `knottyyoga_database_helper` to verify table creation with new `blog_posts` table, `author_blog` permission, and photo support registration
+### Automated gates
+- [ ] **C++ (the only build/test path — never build on Windows):** full Linux docker suite green —
+  `MSYS_NO_PATHCONV=1 docker run --rm --network knotty-net -v "C:/Users/mason/source/repos/knottyyoga/server:/src" -v "C:/Users/mason/source/repos/server_components:/honuware" -v honuware-conan2:/root/.conan2 -v knottyyoga-linux-build:/build -e HONUWARE_SRC_DIR=/honuware -e HONUWARE_DB_SSLMODE=disable -w /src knottyyoga_build:latest bash docker_project/build_and_test.sh`
+  During development, filter with `"--gtest_filter=BlogPostsTest.*:BlogHelperTest.*:BlogKeyValueTableTest.*:BlogPostsEndpointTest.*"` — and confirm the filtered run reports a **non-zero** test count (a test file missing from CMakeLists still exits 0).
+- [ ] **Angular** (bare commands from the `ui/` working directory): `npx tsc --noEmit -p tsconfig.app.json` + `-p tsconfig.spec.json` clean; `npx ng test --watch=false --browsers=ChromeHeadless` full suite green; `npx ng build` clean; `npx ng lint` no new findings vs baseline
+- [ ] Database recreate succeeds: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
 
-### Frontend
-7. **Build:** `cd ui && ng build` — verify clean compilation
-8. **Unit tests:** `ng test` — all tests pass
-9. **Dev server:** `ng serve` — verify:
-   - `/blog` route loads public blog page (empty initially)
-   - "Blog" menu item appears in header
-   - Admin dropdown shows "Blog Posts" when logged in as admin
-   - `/blog-admin` route loads admin list
-   - `/blog-admin/new` loads editor with split-pane markdown
-   - Creating a post and viewing it on `/blog` works end-to-end
-
-### Integration (requires backend running)
-10. Create a blog post via admin, verify it appears on public blog
-11. Test draft filtering — draft posts hidden from public view
-12. Test date filtering — year/month navigation works
-13. Test pagination — next/prev buttons work with >5 posts
-14. Test photo upload via admin data viewer (photo support registered)
-15. Test permission enforcement — non-admin without `author_blog` cannot access `/blog-admin`
+### Live hand-testing (blank DB + real create_database seed data, via the web UI)
+1. Sign in as the admin. The **Admin** dropdown now contains **Blog Posts**. The top-level menu shows **Blog** between **Upcoming Events** and **Memberships** — visible signed out too.
+2. **Admin → Blog Posts** → **New Post**. Fill **Name** "Welcome to Knotty Yoga", leave **Author** prefilled with your name, leave **Draft** checked, no post date. Type markdown with a heading, bold, and a list in the left pane — the right pane renders it live. **Save Post** → back on the list, the row shows a **Draft** chip.
+3. Open **Blog** (top menu): the page is empty — drafts don't show.
+4. Edit the post: uncheck **Draft**, click **Post Now**, save. **Blog** now shows the post — title, "By {author}", the modified date, and the body rendered as HTML (heading/bold/list, not raw markdown).
+5. Create a second post with **Draft** unchecked and a **Post At** date one month in the future. It appears in the admin list but **not** on **Blog** (scheduled, not yet published).
+6. Create six more published posts (Post Now). **Blog** shows the **5** most recent with **Previous/Next** at the bottom; **Next** shows the older ones; **Previous** returns.
+7. On **Blog**, pick a **Year** and **Month** from the dropdowns — only year/months that actually have posts are offered; the list filters. Pick a **Day** — the day list only offers days from the loaded posts. Choose **All Years** — Month and Day snap back to **All Months** / **All Days** and everything returns.
+8. In the admin list, use **Year/Month** to filter by creation date; **All Years** forces **All Months**.
+9. Signed in as admin on **Blog**, each post shows **Edit Post** / **Delete Post**. **Delete Post** prompts for confirmation; confirming removes it. Sign out — the buttons are gone.
+10. Via the test-helper app (or Manage Data), create a second user **without** `author_blog`: no **Blog Posts** menu item, `/blog-admin` redirects away, no Edit/Delete on **Blog**. Grant them `author_blog` (no other elevated permission): the **Admin** dropdown appears containing just **Blog Posts**, and authoring works.
+11. **Manage Data → Blog Posts** (debug editor): the row opens, and a photo can be uploaded against it (photo support registered).
