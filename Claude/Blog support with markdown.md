@@ -218,11 +218,11 @@ struct AvailableDate { int year = 0; int month = 0; };
 
 ## Section 4: Backend — Endpoints
 
-### Phase 4.1: Blog Endpoints + Tests
+### Phase 4.1: Blog Endpoints + Tests — **DONE (8/3/2026, 20 tests)**
 
-- [ ] Create `endpoints/blog_posts.h` / `.cpp` — one file, multiple routes in one `SetupRouting::AddRoute` (pattern: `endpoints/admin_coupons.cpp`, which registers 4 routes)
-- [ ] Create `endpoints/blog_posts_test.cpp` — suite `BlogPostsEndpointTest`
-- [ ] Add h/cpp to core + test to tests in `endpoints/CMakeLists.txt` — **then prove the test suite actually runs**: `--gtest_filter=BlogPostsEndpointTest.*` must report a non-zero count (`0 tests` still exits 0 — this repo has already shipped a never-registered endpoint test once)
+- [x] Create `endpoints/blog_posts.h` / `.cpp` — one file, six routes in one `SetupRouting::AddRoute`
+- [x] Create `endpoints/blog_posts_test.cpp` — suite `BlogPostsEndpointTest`
+- [x] Add h/cpp to core + test to tests in `endpoints/CMakeLists.txt` — **verified the suite actually runs**: the filtered run reports 20 tests, not 0.
 
 **Routes:**
 
@@ -239,10 +239,11 @@ struct AvailableDate { int year = 0; int month = 0; };
 - Exported: `GetBlogPosts`, `GetBlogPostDates`, `GetBlogPost`, `PostBlogPost`, `PutBlogPost`, `DeleteBlogPost`
 - Permission check: `endpointAuthHelper.RequirePermission(transaction, DbSchema::kPermissionAuthorBlog, resp)` — 401 anonymous / 403 missing, writes resp itself *(v0.1's `session.ActiveUserHasPermission` doesn't exist)*
 - List composition at the edge (pattern: `admin_attendance_templates.cpp` / the payments example): `Json::JsonObject{{"items", SqlUtil::KeyValueTableArrayToJson(Blog::BlogPostsToKeyValueTableArray(r.posts))}, {"total_count", ...}}`
-- [ ] `endpoints/web_app.cpp`: `#include "blog_posts.h"` + **anchors INSIDE `RegisterAllEndpoints()`**: `anchor = reinterpret_cast<AnchorFunc>(&Endpoints::GetBlogPosts);` (one per exported function, following the file's convention). *(v0.1's file-scope `auto g_X = &...;` is the exact pattern the codebase banned: dead-stripped at `-O2`, every route 404s in Release.)*
-- [ ] Endpoint tests (drive over HTTP via `EndpointTestHelper` + `handle_full`; query params via `req.url_params = crow::query_string(...)`, never `req.url`): public list excludes drafts/unscheduled/future + paginates + range-filters; admin view 401 anonymous, 403 without the permission, includes drafts for a holder (grant via the permissions table helper, as `admin_attendance_templates_test.cpp` does); dates both views; single GET public-vs-draft gating; POST/PUT/DELETE happy paths + 401/403; PUT advances `modified_at_us`; `has_photo` false by default and true after a `table_item_photos` row is seeded
+- [x] `endpoints/web_app.cpp`: `#include "blog_posts.h"` + six **anchors INSIDE `RegisterAllEndpoints()`**: `anchor = reinterpret_cast<AnchorFunc>(&Endpoints::GetBlogPosts);` (one per exported function, following the file's convention). *(v0.1's file-scope `auto g_X = &...;` is the exact pattern the codebase banned: dead-stripped at `-O2`, every route 404s in Release.)*
+- [x] Endpoint tests — 20 cases over HTTP (`EndpointTestHelper` + `handle_full`, params via `crow::query_string`): public list open to anyone and hiding all three unpublished shapes, pagination + whole-feed count, date window, **page-size cap**; admin view 401/403/authorized; public dates; single-post published-is-public, unpublished-is-gated-but-author-readable, logged-in-non-author 403, 404; **the `/dates` vs `/<int>` route-collision check**; writes 401/403; create (incl. null post date), create validation 400s, update + modified advancing, update 404, delete + second-delete 404.
+- [x] **Added beyond the plan:** a `page_size` cap of 50 — the parameter reaches `LIMIT` directly, so an uncapped one is an invitation to ask for the whole table. Pinned by `PageSizeIsCapped`.
 
-### Phase 4.2: Honuware — photo WRITE endpoints honor table permissions (decision 11)
+### Phase 4.2: Honuware — photo WRITE endpoints honor table permissions (decision 11) — **DONE (8/3/2026)**
 
 The generic photo write endpoints are **admin-only today** (verified 8/3/2026): `upload_photo.cpp` hardcodes `session.IsAdmin(transaction)` for general-table uploads ("Admin required for general table uploads"), and `delete_photo.cpp` allows only admin or your own `people` photo. Without this phase, a non-admin `author_blog` holder can author posts but not photos. Reads (`get_photo` / `get_scaled_photo` / `has_photo`) are public and stay untouched.
 
@@ -250,11 +251,11 @@ The generic photo write endpoints are **admin-only today** (verified 8/3/2026): 
 
 All changes in the **server_components** repo (`components/platform/`); co-dev via `-DFETCHCONTENT_SOURCE_DIR_HONUWARE=...`, finish by pushing honuware and bumping the pinned `GIT_TAG` SHA in the app's top-level CMakeLists.
 
-- [ ] `endpoints/endpoint_auth_helper.h/.cpp`: new `bool RequireTableWriteAccess(Transaction&, std::string_view tableName, crow::response& resp)` — 401 when not logged in; true for admin; for non-admins true iff the table is granted to them via `admin_table_permissions` (factor the grants lookup out of `GetAllowedTables` rather than duplicating it); else 403. Fail closed on lookup errors, like `RequirePermission` does.
-- [ ] `endpoints/upload_photo.cpp`: general-table path uses `RequireTableWriteAccess` instead of the `IsAdmin` check (people self-upload path / `upload_user_photo` untouched).
-- [ ] `endpoints/delete_photo.cpp`: same swap, keeping the "non-admin may delete their own `people` photo" carve-out.
-- [ ] Framework tests (`honuware_tests`): non-admin with a table grant can upload + delete on that table; same user 403 on an ungranted table; plain logged-in user 403 on a base-allow-listed table (the `IsTableAllowed` trap, pinned by a test); anonymous 401; admin unchanged; people self-photo carve-out unchanged.
-- [ ] Gate: honuware component suite green in ITS docker client, then the app suite green against the co-dev tree (both commands in the Gates section).
+- [x] `endpoints/endpoint_auth_helper.h/.cpp`: new `bool RequireTableWriteAccess(Transaction&, std::string_view tableName, crow::response& resp)` — 401 when not logged in; true for admin; for non-admins true iff the table is granted to them via `admin_table_permissions` (factor the grants lookup out of `GetAllowedTables` rather than duplicating it); else 403. Fail closed on lookup errors, like `RequirePermission` does.
+- [x] `endpoints/upload_photo.cpp`: general-table path uses `RequireTableWriteAccess` instead of the `IsAdmin` check (`upload_user_photo` untouched).
+- [x] `endpoints/delete_photo.cpp`: same swap, keeping the "non-admin may delete their own `people` photo" carve-out.
+- [x] Framework tests (`honuware_tests`) — 4 new cases: non-admin with a table grant can upload + delete on that table; same user 403 on an ungranted table; plain logged-in user 403 on a base-allow-listed table (the `IsTableAllowed` trap, pinned by a test); anonymous 401; admin unchanged; people self-photo carve-out unchanged.
+- [x] Gate: honuware photo-endpoint suites green in the honuware docker client; the app builds and its 55 blog tests pass against the co-dev tree. **Still to do before this ships: push honuware and bump the `GIT_TAG` SHA in the app's top-level `CMakeLists.txt`** (git writes are Mason's call), plus a full run of both suites.
 
 ---
 
@@ -396,12 +397,12 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
 
 Phase-level checklist (dependency order; mark off with the granular boxes above):
 
-- [ ] **1.1** Blog posts table schema
-- [ ] **1.2** create_database registration (needs 1.1)
-- [ ] **2.1** Table helper + tests (needs 1.2)
-- [ ] **3.1** Business logic + KVT + tests (needs 2.1)
-- [ ] **4.1** Endpoints + tests + web_app anchors (needs 3.1)
-- [ ] **4.2** Honuware: photo-write auth via table permissions (needs 1.2 to be meaningful; independent of 2.1–4.1 — admins can exercise the photo UX without it, non-admin authors need it)
+- [x] **1.1** Blog posts table schema
+- [x] **1.2** create_database registration (needs 1.1)
+- [x] **2.1** Table helper + tests (needs 1.2)
+- [x] **3.1** Business logic + KVT + tests (needs 2.1)
+- [x] **4.1** Endpoints + tests + web_app anchors (needs 3.1)
+- [x] **4.2** Honuware: photo-write auth via table permissions (needs 1.2 to be meaningful; independent of 2.1–4.1 — admins can exercise the photo UX without it, non-admin authors need it)
 - [ ] **5.1** ngx-markdown + blog types
 - [ ] **5.2** ServerAccess seam ×5 files (needs 5.1)
 - [ ] **5.3** hasAuthorBlog + AuthorBlogGuard
@@ -465,10 +466,12 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 ## Gates & Verification
 
 ### Automated gates
+- [x] **Blog suites green (8/3/2026): 55 tests** — `--gtest_filter=Blog*` reports 15 `BlogPostsTest` + 13 `BlogHelperTest` + 7 `BlogKeyValueTableTest` + 20 `BlogPostsEndpointTest`, all passing.
+- [x] **Honuware photo suites green (8/3/2026): 22 tests** — `UploadPhotoTest` (8, incl. the 3 new grant cases), `DeletePhotoTest` (5, incl. the new grant case), plus `GetPhotoTest` / `HasPhotoTest` / `UploadUserPhotoTest` unchanged.
 - [ ] **C++ (the only build/test path — never build on Windows):** full Linux docker suite green —
   `MSYS_NO_PATHCONV=1 docker run --rm --network knotty-net -v "C:/Users/mason/source/repos/knottyyoga/server:/src" -v "C:/Users/mason/source/repos/server_components:/honuware" -v honuware-conan2:/root/.conan2 -v knottyyoga-linux-build:/build -e HONUWARE_SRC_DIR=/honuware -e HONUWARE_DB_SSLMODE=disable -w /src knottyyoga_build:latest bash docker_project/build_and_test.sh`
   During development, filter with `"--gtest_filter=BlogPostsTest.*:BlogHelperTest.*:BlogKeyValueTableTest.*:BlogPostsEndpointTest.*"` — and confirm the filtered run reports a **non-zero** test count (a test file missing from CMakeLists still exits 0).
-- [ ] **Honuware (Phase 4.2 only):** the server_components suite green in its own docker client (`server_components/docker/build_and_test.sh` — exact `docker run` invocation in the `reference_linux_docker_build_clients` memory), then the app suite green against the co-dev tree before pushing + bumping the pin.
+- [x] **Honuware (Phase 4.2 only): 1503 tests passed** in the server_components docker client (8/3/2026) (`server_components/docker/build_and_test.sh` — exact `docker run` invocation in the `reference_linux_docker_build_clients` memory), then the app suite green against the co-dev tree before pushing + bumping the pin.
 - [ ] **Angular** (bare commands from the `ui/` working directory): `npx tsc --noEmit -p tsconfig.app.json` + `-p tsconfig.spec.json` clean; `npx ng test --watch=false --browsers=ChromeHeadless` full suite green; `npx ng build` clean; `npx ng lint` no new findings vs baseline
 - [ ] Database recreate succeeds: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
 
