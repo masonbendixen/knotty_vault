@@ -59,10 +59,15 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 	- Mason- This sounds fine.
 
 5. **Draft handling?** — Filter `draft=true` posts out of all public queries via SQL. Drafts visible only in the admin list. **Also unpublished-by-omission:** a post whose `post_at_us` is NULL (never scheduled) or in the future is likewise excluded from public queries — "published" = `draft = false AND post_at_us IS NOT NULL AND post_at_us <= now_us()`.
+	- Mason- This sounds like a good idea.
 
 6. **"Post Now" behavior?** — Sets `post_at_us = now` AND `draft = false`, then saves. Convenience shortcut for "publish immediately."
+	- Mason- This sounds reasonable.
 
 7. **Column name typo?** — Spec says "modifed_at_us" — use correct spelling `modified_at_us`.
+	- Mason- Yes, please correct this typo.
+
+Mason- Please update the design to add being able to upload a photo for each blog post (have CRUD functionality for the photos) and then display the photo above each blog post.
 
 ### Resolved (User-Confirmed)
 
