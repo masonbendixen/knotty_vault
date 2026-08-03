@@ -285,11 +285,12 @@ After 3.6 the weekly landing page was titled **Our Classes** but lived at `/sche
 - [x] The card is week-independent — fetched once in `ngOnInit` (not in `load()`), so paging weeks never refetches it, and it is untouched by the facility filter and the eligible-only toggle.
 - [x] Spec: above the week list, expands on demand, hidden when empty, survives week navigation without a refetch, survives filters that hide every class, and the week list still renders when the series fetch fails.
 
-### 3B.6 Home page — series card
-> Lands **with Phase 5** (the home page redesign) rather than before it, so the section is placed once rather than built and then moved.
-- [ ] Logged out: `app-offering-highlight` collapsed, under the membership tiers — a series is a bigger commitment than a drop-in, so it sits below the tier pitch.
-- [ ] Logged in: collapsed, alongside "Events you could sign up for"; suppress offerings the viewer has already booked (same exclusion the events strip uses — workshop dates can reuse the `event_session_id` key **3B.8** added).
-- [ ] Add to the Phase 5.4 / 5.5 spec + hand-test lists rather than duplicating them here.
+### 3B.6 Home page — series card — **DONE (8/2/2026, with Phase 5)**
+- [x] `app-offering-highlight` renders collapsed in **both** auth states, between the event sections and the membership tiers. (Placed *above* the tiers rather than below: on the logged-in page the tiers are often absent entirely, which would have left the card orphaned at the bottom under the class planner.)
+- [x] Logged in, offerings the viewer has already booked are suppressed via `visibleOfferings`, keyed on `event_session_id` — the same key the could-sign-up strip uses.
+- [x] Specs live in `home-page.component.spec.ts` (card present collapsed in both states, hidden when empty, booked workshop date dropped, visitor keeps everything).
+
+> ⚠️ **Partial: a booked *series run* is still advertised.** The suppression only reaches offerings with an `event_session_id`, i.e. **materialized workshop dates**. A series run's bookings are per-occurrence and the run offering carries no "you're enrolled" signal, so a run you already own still appears on the card. Fixing it properly needs a backend flag on `UpcomingOffering` (e.g. `viewer_enrolled`, resolved from `event_sessions.series_purchase_id` for the viewer). Small and self-contained — worth its own item if it bothers you in practice; it is called out here rather than silently left.
 
 ### 3B.7 Live hand-testing (Phase 3B)
 - [x] Steps written (below) — awaiting your run against a live server.
@@ -414,33 +415,48 @@ Sign in as a member who does **not** hold Gold Member.
 
 > No backend changes expected — every section rides existing endpoints. Frontend: shared tier-card extraction first, then the page.
 
-### 5.1 Frontend — shared membership tier cards
-- [ ] Extract the inline tier-card markup from `subscription-catalog.component.html` into `shared/components/membership-tier-cards/` (input: `CatalogProduct[]`; output/behavior: Subscribe → `/shop/subscribe/:productId`). `SubscriptionCatalogComponent` consumes it.
-- [ ] Specs: new `membership-tier-cards.component.spec.ts` (renders tiers, monthly price format, subscribe navigation) + updated `subscription-catalog.component.spec.ts`.
+> **Phase 5 complete 8/2/2026 — no backend changes were needed, as predicted.** Gates green: Angular full suite **2818 SUCCESS** (up 32), `ng build` clean (initial bundle unchanged at 1.39 MB — the public pages are lazy-loaded, so embedding the class planner cost ~20 bytes), `tsc --noEmit` clean on both configs, `ng lint` **262 problems, one fewer than the 263 baseline** (rewriting the home-page spec removed an `as any`; no new findings).
+>
+> **Phase 3B.6 (the home-page offerings card) landed with this**, as that section said it would.
 
-### 5.2 Frontend — home page sections (both auth states)
-- [ ] Keep the photo carousel (with the Phase 1 `id="gallery"`) and the hero marketing block.
-- [ ] **Getting Started CTA banner** → `/start` (both states; copy differs slightly when logged in).
+### 5.1 Frontend — shared membership tier cards — **DONE (8/2/2026)**
+- [x] New `shared/components/membership-tier-cards/` — input `products: CatalogProduct[]`, Subscribe → `/shop/subscribe/:productId`. Purely presentational: the host fetches and filters (both hosts want `kind === 'subscription'`). Renders **nothing** when the list is empty, so neither host needs an empty-state branch around it.
+- [x] `SubscriptionCatalogComponent` consumes it; its `formatPrice`/`onSubscribe` and its `Router` injection are gone (they moved into the card), and its own SCSS keeps only `.page-container`.
+- [x] Subscribe needs no auth awareness — `/shop/subscribe/:id` is already auth-guarded, so a visitor is sent to sign in and lands back on the flow.
+- [x] Specs: new `membership-tier-cards.component.spec.ts` (4 cases — renders each tier with name/description/monthly price, renders nothing when empty, Subscribe routes with the product id, currency respected). **`subscription-catalog.component.spec.ts` did not exist** despite the plan saying "updated" — written from scratch (4 cases: filters to subscriptions, renders through the shared card, empty state, error state).
 
-### 5.3 Frontend — logged-out sections
-- [ ] **Featured events strip**: up to 4 cards from `getVisibleEventSessions('home_page')` (name, time, facility, price, Book Now → `/shop/event/:id`) + "View All Events" → `/events`; empty state unchanged. Logged-in visitors get the personalized event sections below instead — the curated `home_page` placement stays a visitor-marketing surface.
-- [ ] **Membership tiers section**: `getCatalogProducts()` filtered to `kind === 'subscription'` rendered via the shared tier cards (OQ-8 ✅), headed with short marketing copy; Subscribe click follows the existing auth-guarded flow (redirects to login).
+### 5.2 Frontend — home page sections (both auth states) — **DONE (8/2/2026)**
+- [x] Photo carousel (with the Phase 1 `id="gallery"` anchor) and the hero block are untouched.
+- [x] **Get Started banner** → `/start`, under the hero in both states; the copy differs ("New here? …" vs "Not sure what to do next? …") via a `gettingStartedCopy` getter.
+- [x] The old "Next Upcoming Event" single-card block is gone — 5.3's featured strip replaces it.
 
-### 5.4 Frontend — logged-in sections
-- [ ] **Your upcoming events**: `getMyBookings('upcoming')`, first 3 cards (event name, date, facility, status incl. waitlisted) + "All my bookings" → `/my/events`; section hidden when empty.
-- [ ] **Events you could sign up for** (OQ-5 ✅): `getVisibleEventSessions('upcoming')` — the same list the Upcoming Events page shows (ad-hoc events plus materialized workshop/series occurrences) — minus sessions already in the user's upcoming bookings, capped at the **4 soonest**; cards Book Now → `/shop/event/:id`; section hidden when empty.
-- [ ] **Next 4 days at the studio**: embed `app-upcoming-classes` with a new `@Input() daysAhead = 28` set to 4 and `[embedded]="true"` (attend / can't-make-it toggles come with the component); headline links "Plan your weekly schedule" → `/my/my-schedule`.
-- [ ] `upcoming-classes.component`: add the `daysAhead` input (window = now → now + daysAhead days) + spec case.
-- [ ] **Membership tiers when no membership**: on `getSubscriptions()` returning no active subscription and no shared entitlement (the profile-hub rule — OQ-6 ✅), show the same tier section with "Become a member" copy; hidden for members.
-- [ ] Auth branching on `AuthService.authData$` (subscribe/refresh on auth change, like the header does).
-- [ ] Specs: `home-page.component.spec.ts` rewritten — logged-out: hero + featured strip + tiers + no personalized sections; logged-in with membership: bookings/could-sign-up/4-day feed present, tiers + featured strip absent; logged-in without membership: tiers present; could-sign-up caps at the 4 soonest and excludes booked sessions. Mock `SquarePaymentService` is not needed (no embedded payment control), but keep the rule in mind if a card control ever lands here.
+### 5.3 Frontend — logged-out sections — **DONE (8/2/2026)**
+- [x] **Featured events strip**: up to 4 cards from `getVisibleEventSessions('home_page')` (name, time, facility, price, Book Now → `/shop/event/:id`) + "View All Events" → `/events`; the "No upcoming events at this time." empty state is preserved. Asserted that a signed-in viewer never fetches the `home_page` placement and a visitor never fetches `upcoming` — the curated placement stays a visitor-marketing surface.
+- [x] **Membership tiers section**: `getCatalogProducts()` filtered to `kind === 'subscription'`, rendered through the shared tier cards, headed "Memberships" with short marketing copy and a "See all memberships" link.
+
+### 5.4 Frontend — logged-in sections — **DONE (8/2/2026)**
+- [x] **Your upcoming events**: `getMyBookings('upcoming')` (cancelled and undated rows dropped, sorted soonest-first), first 3 cards with name, date, facility and a **Waitlisted** chip + "All my bookings" → `/my/events`; hidden when empty.
+- [x] **Events you could sign up for**: `getVisibleEventSessions('upcoming')` minus anything whose `event_session_id` is in the viewer's bookings, sorted soonest-first, capped at 4; Book Now → `/shop/event/:id` (omitted when `can_book` is false); hidden when empty. The two sections resolve **in sequence**, not in parallel — the exclusion needs the bookings first.
+- [x] **Next 4 days at the studio**: embeds `app-upcoming-classes` with `[embedded]="true" [daysAhead]="4"`; headline links "Plan your weekly schedule" → `/my/my-schedule`.
+- [x] `upcoming-classes.component`: `@Input() daysAhead = 28` replaces the private `weeksAhead = 4` (same default window, now overridable). Its subtitle said "for the next few weeks", which is wrong at 4 days — a `windowLabel` getter now follows the input ("the next few weeks" / "the next 4 days" / "today").
+- [x] **Membership tiers when no membership**: `getSubscriptions()` → an active subscription **or** any shared entitlement counts as a member (the profile hub's exact rule). Non-members get the same tier grid headed "Become a member"; members get nothing. `hasMembership` starts `undefined` so the section can't flash on during the round-trip.
+- [x] Auth branching on `AuthService.authData$` like the header. A `reload$` subject cancels the previous state's in-flight fetches, so a slow logged-out response can't land after sign-in and repopulate a section that should be gone.
+- [x] Every fetch is independently `catchError`-ed to an empty section — one dead endpoint can't blank the page (asserted).
+- [x] Specs: `home-page.component.spec.ts` rewritten — 20 cases covering both auth states, the caps (4 featured / 3 bookings / 4 could-sign-up), the booked-session exclusion, both membership rules, the offerings card, all-fetches-fail isolation, and a live sign-in flip that swaps the page. No `SquarePaymentService` mock needed (no embedded card control) — kept in mind per the standing rule.
 
 ### 5.5 Live hand-testing (Phase 5)
-Fresh database. Via **Manage** → **Events** → **Create Event**, create two future **Intro Workshop** sessions, both visible on the upcoming list and at least one flagged for the home page placement (fields per the create-event form labels) — or use the test-helper app equivalents.
-1. Logged out, open the home page: carousel + hero render; the **featured events** strip shows the Intro Workshop card(s) with **Book Now**; the **membership tiers** section shows the three Gold memberships with **Subscribe** buttons; a **Get Started** banner is present. Clicking **Subscribe** routes through **Sign In**.
-2. Log in as a fresh account (no membership): the curated featured strip is replaced by **Events you could sign up for** listing both Intro Workshop sessions (soonest first); **Next 4 days at the studio** appears (empty-state text until you're eligible for a class); the tier section stays visible.
-3. Buy **Knotty Yoga Gold Membership** (Square sandbox card). Back on the home page: the tier section is gone; the **Next 4 days** feed lists Monday/Wednesday **Knotty Yoga** rows with **I'll be there / I can't make it** controls that flip state; **Plan your weekly schedule** opens My Schedule.
-4. Book one Intro Workshop session; the home page now shows it under **Your upcoming events**, and it disappears from **Events you could sign up for**.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+**Setup (blank database + the real `create_database.cpp` seed data).** Via **Manage** → **Events** → **Create Event**, create two future **Intro Workshop** sessions. On the create form set **Show on upcoming** = yes for both, and **Show on home page** = yes for one only. (Or the test-helper app equivalents.)
+
+1. **Logged out**, open the home page (top menu **Home**). In order down the page: the photo carousel, the hero ("Knotty Yoga Is An Inclusive…"), a **Get Started** panel whose copy starts "New here?" with a **Show me how** button, an **Upcoming events** strip showing only the home-page-flagged Intro Workshop with **Book Now** and a **View All Events** link, a collapsed **Series & workshops coming up** card, and a **Memberships** section with the Gold tiers and **Subscribe** buttons.
+2. Click **Show me how** → the Get Started page. Back on Home, click **Subscribe** on a tier → you are sent to **Sign in** first.
+3. **Register a fresh account** (no membership) and return to Home. The **Upcoming events** strip is **gone**; in its place **Events you could sign up for** lists **both** Intro Workshop sessions, soonest first. The Get Started copy now starts "Not sure what to do next?". The **Memberships** section is still there but headed **Become a member**. **Next 4 days at the studio** appears at the bottom (with its empty-state text until you're eligible for a class).
+4. Buy **Knotty Yoga Gold Membership** with the Square sandbox card, then return to Home. The membership section is **gone**. **Next 4 days at the studio** now lists **Knotty Yoga** rows with **I'll be there** / **I can't make it** controls; toggling one flips its state and it stays flipped after a reload. **Plan your weekly schedule** opens My Schedule.
+5. Book one Intro Workshop session (**Book Now** on its card). Back on Home it appears under **Your upcoming events** with its date and facility, and it is **gone** from **Events you could sign up for**.
+6. Have an admin waitlist you onto a full session (or fill one to capacity and book it): its card under **Your upcoming events** shows a **Waitlisted** chip.
+7. Book four more sessions so you have five: **Your upcoming events** shows only the **3 soonest**, with **All my bookings** opening the full list. Likewise create five future sessions and confirm **Events you could sign up for** shows only **4**.
+8. Expand the **Series & workshops coming up** card: it lists the series runs and workshop dates from Phase 3B/4. Book a workshop date from it, then reload Home — that date is gone from the card. *(Known gap: booking a whole **series run** does not remove it from the card — see the note in 3B.6.)*
 
 ---
 
