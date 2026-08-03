@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/3/2026
-Version: 0.2
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -20,6 +20,8 @@ There should be a New Post button that brings up a blog authoring screen. There 
 There should be a new top level menu entry that required no permissions called Blog. Clicking this should bring the latest Blog posts up that shows the five most recent blog posts with next and previous posts buttons at the bottom. At the top of the page, there should be buttons for navigating year / month / day with all three only having entries for items for which there are blog posts as well as an option for All Years / All Months / All Days. Selecting All Years automatically chooses All Months / All Days. Choosing All Months automatically chooses All Days. Blog posts should be rendered with the Name as a title, then the author, the date modified last, and then the body converted to HTML to be displayed. If the current user has the author_blog permission, we should also show a button Edit Post / Delete Post. Delete Post should prompt for confirmation.
 
 # Blog Feature with Markdown Support — Implementation Plan
+
+> **v0.3 (8/3/2026):** Mason answered open questions 1–7 (all confirmed as planned, recorded inline) and added a requirement: **per-post photos with CRUD, displayed above each post** — captured as decision 11 and threaded through 3.1 / new 4.2 / 4.1 / 5.x / 6.1 / 7.2, the sequence, the gates, and the hand-testing steps. The photo-write investigation surfaced a real framework gap: the generic `upload_photo`/`delete_photo` endpoints hardcode **admin-only**, so a non-admin `author_blog` holder couldn't manage blog photos — fixed by a small honuware change (Phase 4.2), with a warning that `IsTableAllowed` is NOT the right check to reuse there.
 
 > **Re-grounded against the live codebase 8/3/2026 (v0.2).** The v0.1 plan was written in March and had drifted. Material corrections in this revision — details inline in each phase:
 > 1. **Angular is 21, not 19** → `ngx-markdown@^21`, not `^19` (5.1).
@@ -67,8 +69,6 @@ Adding a blog to the Knotty Yoga website. Blog posts are authored by users with 
 7. **Column name typo?** — Spec says "modifed_at_us" — use correct spelling `modified_at_us`.
 	- Mason- Yes, please correct this typo.
 
-Mason- Please update the design to add being able to upload a photo for each blog post (have CRUD functionality for the photos) and then display the photo above each blog post.
-
 ### Resolved (User-Confirmed)
 
 8. **Day-level filtering on public blog:** — **Client-side computation.** Derive available days from the posts loaded for the selected year/month. The dates endpoint returns year/month pairs only. Day options are extracted from `post_at_us` of currently loaded posts. *(Known limit, accepted: with more than one page in a month, the day dropdown only offers days present on the loaded page.)*
@@ -76,6 +76,12 @@ Mason- Please update the design to add being able to upload a photo for each blo
 9. **ngx-markdown compatibility:** — **The app is Angular 21.2 today** (v0.1 said 19 — stale). ngx-markdown's major tracks Angular's major: install `ngx-markdown@^21.0.0` plus whatever `marked` major its peerDependencies declare (npm reports it at install). Uses `provideMarkdown()` for standalone app setup. If the pending Angular 22 upgrade lands before this plan executes, use `^22` instead.
 
 10. **Timezone for year/month bucketing:** — **UTC on both sides.** The server extracts year/month from `post_at_us` in UTC; the client derives day options and computes filter ranges with the `Date` UTC accessors. (Posts are stamped with real instants — `Date.now()*1000` — so a post published late evening Pacific can bucket into the next UTC day/month. Accepted: consistency matters more than the edge, and the alternative drags studio-timezone plumbing into a blog.)
+
+11. **Blog post photos (Mason, 8/3/2026):** — *"Please update the design to add being able to upload a photo for each blog post (have CRUD functionality for the photos) and then display the photo above each blog post."* — **Design: one photo per post through the existing generic photo system** (`table_item_photos` keyed by `(blog_posts, id)`), which the table's photo-support registration (1.2) already plugs into. No new storage, no new tables.
+    - **Create/Update (replace):** the editor hosts the library `hw-photo-upload` control (`@honuware/ui/photos`) — live against the post id in edit mode; in create mode with `[deferUpload]="true"`, flushing via `uploadPendingPhoto('blog_posts', id)` after the row is created (the exact pattern `manage/instructors` already uses).
+    - **Delete:** the control has no remove affordance (verified in its d.ts), so the editor adds a **Remove photo** button → confirm → `deletePhoto('blog_posts', id)`.
+    - **Read/display:** `BlogPostInfo` carries `has_photo` (resolved via `TableHelpers::TableItemPhotos::HasPhoto`, the `SeriesInfo.classHasPhoto` precedent); the public page renders `/api/get_scaled_photo/blog_posts/{id}/...` above the post when set. Photo **reads** are already public (public pages use `get_scaled_photo` in `<img>` tags today).
+    - **The catch — photo WRITES are admin-only today:** honuware's `upload_photo.cpp` hardcodes `session.IsAdmin` for general-table uploads and `delete_photo.cpp` allows only admin (or your own `people` photo). A non-admin `author_blog` holder couldn't manage blog photos. Fixed in **Phase 4.2** (small honuware change aligning photo-write auth with the `admin_table_permissions` model the CRUD endpoints use).
 
 ---
 
@@ -112,7 +118,7 @@ All in `server/knottyyoga_server/src/database_helper/create_database.cpp` unless
 - [ ] `PopulatePermissions()`: `AddRow(DbSchema::kPermissionAuthorBlog, "Permission to author and manage blog posts.");` — NOT pricing-eligible (omit the third arg)
 - [ ] `PopulateRolePermissions()`: `Grant(DbSchema::kRoleNameAdmin, DbSchema::kPermissionAuthorBlog);` — admins can author. (Studio Manager: leave out; grant later if wanted.)
 - [ ] `PopulateAdminTopLevelTables()`: `AddRow(DbSchema::kBlogPostsTable);` — required or the generic CRUD/photo endpoints reject the table ("Table is not an allowed table")
-- [ ] `PopulateAdminTablePermissions()`: `AddRow(DbSchema::kBlogPostsTable, std::stoi(PermissionIdByName(transaction, DbSchema::kPermissionAuthorBlog)));` — follows the `kManageProductsPermissionId` lookup pattern already in that function
+- [ ] `PopulateAdminTablePermissions()`: `AddRow(DbSchema::kBlogPostsTable, std::stoi(PermissionIdByName(transaction, DbSchema::kPermissionAuthorBlog)));` — follows the `kManageProductsPermissionId` lookup pattern already in that function. **This row does double duty:** it grants non-admin `author_blog` holders the generic CRUD surface for the table AND (after Phase 4.2) photo upload/delete against `blog_posts` rows.
 - [ ] `PopulateAdminColumnDataInfo()` — signature is `(table, column, label, hint, htmlInputType, required, hidden="", readonly_="")`:
   - name → "Title", "Blog post title", "text", "true"
   - author → "Author", "Post author name", "text", "true"
@@ -177,6 +183,7 @@ struct BlogPostInfo {
     int64_t id = 0;
     std::string name, author, body;
     bool draft = true;
+    bool hasPhoto = false;  // decision 11 — resolved from table_item_photos
     int64_t createdAtUs = 0, modifiedAtUs = 0;
     int64_t postAtUs = 0;   // 0 = not scheduled (NULL in the DB)
 };
@@ -184,10 +191,10 @@ struct BlogPostListResult { std::vector<BlogPostInfo> posts; int64_t totalCount 
 struct AvailableDate { int year = 0; int month = 0; };
 ```
 
-**BlogHelper** wraps `TableHelpers::BlogPosts`, converts rows → structs. Methods mirror the table helper (`GetPublishedPosts` / `GetAllPosts` returning `BlogPostListResult`, `GetAvailableDates(forAdmin)`, CRUD returning `BlogPostInfo`).
+**BlogHelper** wraps `TableHelpers::BlogPosts`, converts rows → structs. Methods mirror the table helper (`GetPublishedPosts` / `GetAllPosts` returning `BlogPostListResult`, `GetAvailableDates(forAdmin)`, CRUD returning `BlogPostInfo`). Resolves `hasPhoto` per post via `TableHelpers::TableItemPhotos::HasPhoto(tx, kBlogPostsTable, id)` — the `SeriesInfo.classHasPhoto` precedent (`class_series_helper.cpp`); helper test covers with/without a photo row.
 
 **blog_key_value_table** — *(v0.1 correction: a KVT is a flat string map and cannot hold an array; list responses are composed at the endpoint edge like every other list in the codebase)*:
-- `KeyValueTable BlogPostInfoToKeyValueTable(const BlogPostInfo&)` — emits every column; `draft` as `"true"/"false"`, `post_at_us` as `""` when 0
+- `KeyValueTable BlogPostInfoToKeyValueTable(const BlogPostInfo&)` — emits every column plus `has_photo`; booleans as `"true"/"false"`, `post_at_us` as `""` when 0
 - `KeyValueTableArray BlogPostsToKeyValueTableArray(const std::vector<BlogPostInfo>&)`
 - `KeyValueTable AvailableDateToKeyValueTable(const AvailableDate&)`
 - `KeyValueTableArray AvailableDatesToKeyValueTableArray(const std::vector<AvailableDate>&)`
@@ -219,7 +226,21 @@ struct AvailableDate { int year = 0; int month = 0; };
 - Permission check: `endpointAuthHelper.RequirePermission(transaction, DbSchema::kPermissionAuthorBlog, resp)` — 401 anonymous / 403 missing, writes resp itself *(v0.1's `session.ActiveUserHasPermission` doesn't exist)*
 - List composition at the edge (pattern: `admin_attendance_templates.cpp` / the payments example): `Json::JsonObject{{"items", SqlUtil::KeyValueTableArrayToJson(Blog::BlogPostsToKeyValueTableArray(r.posts))}, {"total_count", ...}}`
 - [ ] `endpoints/web_app.cpp`: `#include "blog_posts.h"` + **anchors INSIDE `RegisterAllEndpoints()`**: `anchor = reinterpret_cast<AnchorFunc>(&Endpoints::GetBlogPosts);` (one per exported function, following the file's convention). *(v0.1's file-scope `auto g_X = &...;` is the exact pattern the codebase banned: dead-stripped at `-O2`, every route 404s in Release.)*
-- [ ] Endpoint tests (drive over HTTP via `EndpointTestHelper` + `handle_full`; query params via `req.url_params = crow::query_string(...)`, never `req.url`): public list excludes drafts/unscheduled/future + paginates + range-filters; admin view 401 anonymous, 403 without the permission, includes drafts for a holder (grant via the permissions table helper, as `admin_attendance_templates_test.cpp` does); dates both views; single GET public-vs-draft gating; POST/PUT/DELETE happy paths + 401/403; PUT advances `modified_at_us`
+- [ ] Endpoint tests (drive over HTTP via `EndpointTestHelper` + `handle_full`; query params via `req.url_params = crow::query_string(...)`, never `req.url`): public list excludes drafts/unscheduled/future + paginates + range-filters; admin view 401 anonymous, 403 without the permission, includes drafts for a holder (grant via the permissions table helper, as `admin_attendance_templates_test.cpp` does); dates both views; single GET public-vs-draft gating; POST/PUT/DELETE happy paths + 401/403; PUT advances `modified_at_us`; `has_photo` false by default and true after a `table_item_photos` row is seeded
+
+### Phase 4.2: Honuware — photo WRITE endpoints honor table permissions (decision 11)
+
+The generic photo write endpoints are **admin-only today** (verified 8/3/2026): `upload_photo.cpp` hardcodes `session.IsAdmin(transaction)` for general-table uploads ("Admin required for general table uploads"), and `delete_photo.cpp` allows only admin or your own `people` photo. Without this phase, a non-admin `author_blog` holder can author posts but not photos. Reads (`get_photo` / `get_scaled_photo` / `has_photo`) are public and stay untouched.
+
+> ⚠️ **Do NOT "fix" this by swapping `IsAdmin` for `IsTableAllowed`.** `GetAllowedTables` (which backs `IsTableAllowed`) is the union of the app's **base public allow-list** and the per-permission grants — reusing it for writes would let ANY logged-in user upload photos to every base-allowed public table. The write check must be the *grants half only*.
+
+All changes in the **server_components** repo (`components/platform/`); co-dev via `-DFETCHCONTENT_SOURCE_DIR_HONUWARE=...`, finish by pushing honuware and bumping the pinned `GIT_TAG` SHA in the app's top-level CMakeLists.
+
+- [ ] `endpoints/endpoint_auth_helper.h/.cpp`: new `bool RequireTableWriteAccess(Transaction&, std::string_view tableName, crow::response& resp)` — 401 when not logged in; true for admin; for non-admins true iff the table is granted to them via `admin_table_permissions` (factor the grants lookup out of `GetAllowedTables` rather than duplicating it); else 403. Fail closed on lookup errors, like `RequirePermission` does.
+- [ ] `endpoints/upload_photo.cpp`: general-table path uses `RequireTableWriteAccess` instead of the `IsAdmin` check (people self-upload path / `upload_user_photo` untouched).
+- [ ] `endpoints/delete_photo.cpp`: same swap, keeping the "non-admin may delete their own `people` photo" carve-out.
+- [ ] Framework tests (`honuware_tests`): non-admin with a table grant can upload + delete on that table; same user 403 on an ungranted table; plain logged-in user 403 on a base-allow-listed table (the `IsTableAllowed` trap, pinned by a test); anonymous 401; admin unchanged; people self-photo carve-out unchanged.
+- [ ] Gate: honuware component suite green in ITS docker client, then the app suite green against the co-dev tree (both commands in the Gates section).
 
 ---
 
@@ -238,6 +259,7 @@ export interface BlogPost {
   author: string;
   body: string;
   draft: boolean;
+  has_photo: boolean;          // decision 11 — drives the photo above the post
   created_at_us: number;
   modified_at_us: number;
   post_at_us: number | null;   // null = not scheduled
@@ -265,10 +287,10 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
   - `createBlogPost(request: SaveBlogPostRequest): Observable<BlogPost>`
   - `updateBlogPost(id, request: SaveBlogPostRequest): Observable<BlogPost>`
   - `deleteBlogPost(id): Observable<void>`
-- [ ] `shared/services/network/ServerAccessNetwork.ts` — implement against `/api/blog_posts*` with a private `normalizeBlogPost`: KVT→JSON serializes booleans as the strings `"true"/"false"` and the unscheduled `post_at_us` as `""` — coerce `draft` via the existing `coerceBool` and `"" → null` for `post_at_us`, `Number(...)` the timestamps (same pattern as `normalizeSignupOffering`)
-- [ ] `shared/services/network/ServerAccess.mock.ts` — `blogPosts: BlogPost[]` seeded with 3–5 posts **including one draft and one future-dated post** so local mode exercises the public-exclusion rules; in-memory implementations of all 6 (mock honors published-vs-admin filtering, sorting, pagination)
+- [ ] `shared/services/network/ServerAccessNetwork.ts` — implement against `/api/blog_posts*` with a private `normalizeBlogPost`: KVT→JSON serializes booleans as the strings `"true"/"false"` and the unscheduled `post_at_us` as `""` — coerce `draft` + `has_photo` via the existing `coerceBool`, `"" → null` for `post_at_us`, `Number(...)` the timestamps (same pattern as `normalizeSignupOffering`)
+- [ ] `shared/services/network/ServerAccess.mock.ts` — `blogPosts: BlogPost[]` seeded with 3–5 posts **including one draft, one future-dated post, and one with `has_photo: true`** so local mode exercises the exclusion rules and the photo banner; in-memory implementations of all 6 (mock honors published-vs-admin filtering, sorting, pagination). The mock's existing `PhotoAccess` methods (`uploadPhoto`/`deletePhoto`/`hasPhoto`) should flip the matching post's `has_photo` when called with `blog_posts`, so the editor's photo flow works in local mode
 - [ ] `shared/services/network/ServerAccess.ts` (proxy) — 6 `this.serialize(() => this.impl.method(...))` passthroughs
-- [ ] `ServerAccess.mock.spec.ts` — cases: public list excludes the draft + the future post and sorts `post_at_us` DESC; admin view includes drafts sorted `created_at_us` DESC; pagination + `total_count`; date pairs; single get found/404; create/update/delete round-trip; update stamps `modified_at_us`
+- [ ] `ServerAccess.mock.spec.ts` — cases: public list excludes the draft + the future post and sorts `post_at_us` DESC; admin view includes drafts sorted `created_at_us` DESC; pagination + `total_count`; date pairs; single get found/404; create/update/delete round-trip; update stamps `modified_at_us`; `has_photo` flips through the photo methods
 
 ### Phase 5.3: Auth Types & Guard
 
@@ -296,11 +318,11 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
   - Year dropdown from the dates response + "All Years"; Month dropdown limited to months present for the chosen year + "All Months"; Day dropdown derived client-side from loaded posts + "All Days"
   - "All Years" forces "All Months" + "All Days"; "All Months" forces "All Days"
   - Selection computes a UTC `[startUs, endUs)` range (decision 10) and reloads page 0
-- [ ] **Post rendering** per post: name as title; "By {author} | {modified date}"; `<markdown [data]="post.body">` (sanitization on — default)
+- [ ] **Post rendering** per post: **the photo above everything when `has_photo`** — `<img src="/api/get_scaled_photo/blog_posts/{{post.id}}/1200/675">`, full content width, `max-width: 100%` (decision 11; reads are public, no auth needed); then name as title; "By {author} | {modified date}"; `<markdown [data]="post.body">` (sanitization on — default)
 - [ ] **Author controls:** when `hasAuthorBlog(authData)` — Edit Post → `/blog-admin/edit/:id`; Delete Post → `ConfirmDialogComponent` from **`@honuware/ui/foundation`** *(v0.1 path `shared/components/confirm-dialog` no longer exists)* → `deleteBlogPost` → reload
 - [ ] **Pagination:** Previous/Next from `total_count`, disabled at the bounds
 - [ ] Styling: card borders `1px solid #d1d5db` per house rule
-- [ ] Spec: renders posts as markdown (assert rendered HTML, e.g. `**bold**` → `<strong>`); date dropdown cascade rules; range passed to the fetch; pagination bounds; Edit/Delete only for `hasAuthorBlog`; delete confirms then reloads; empty state
+- [ ] Spec: renders posts as markdown (assert rendered HTML, e.g. `**bold**` → `<strong>`); photo `<img>` present with the scaled URL only when `has_photo`; date dropdown cascade rules; range passed to the fetch; pagination bounds; Edit/Delete only for `hasAuthorBlog`; delete confirms then reloads; empty state
 
 ### Phase 6.2: Blog Routes & Menu
 
@@ -324,13 +346,17 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
 ### Phase 7.2: Blog Editor Page
 
 - [ ] Create `pages/blog-admin/blog-editor/blog-editor.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
-- [ ] Standalone; `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`
+- [ ] Standalone; `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`, `PhotoUploadComponent` (`@honuware/ui/photos`)
 - [ ] Form fields: Name (required), Author (required, defaults to `firstName + ' ' + lastName` from `authData` in create mode), Draft checkbox (defaults checked), Post At = **Material datepicker + `<input matInput type="time">`** — the established pair from `manage/events/event-create` *(house rule: dates use date pickers, times use hour pickers — no free-text)*; converts to/from microseconds, empty → `post_at_us: null`
+- [ ] **Photo section (decision 11)** — `hw-photo-upload` with `[tableName]="'blog_posts'"`:
+  - Edit mode: `[tableItemId]="postId"` — upload/replace live against the row.
+  - Create mode: `[tableItemId]="0" [deferUpload]="true"`; after `createBlogPost` returns the id, flush via `@ViewChild(PhotoUploadComponent)` → `if (photoUpload?.hasPendingFile) photoUpload.uploadPendingPhoto('blog_posts', id)` before navigating — the exact `manage/instructors` create-flow pattern (`instructors-admin.component.ts`).
+  - **Remove photo** button (edit mode, shown when the post has a photo) → `ConfirmDialogComponent` → `deletePhoto('blog_posts', postId)` — the control has no built-in remove (verified in the photos d.ts).
 - [ ] Buttons: **Post Now** (sets Draft unchecked + Post At = now, then saves), **Save Post**, **Cancel** (→ `/blog-admin`, no save)
 - [ ] Split pane: left `<textarea formControlName="body">`, right `<markdown [data]="...">` live preview; `display: flex; gap: 1rem;` panes `flex: 1`; preview scrolls independently
 - [ ] Edit mode (`:id` param): load via `getBlogPost(id)`, populate; create mode (`new`): empty except author default
 - [ ] Save → `createBlogPost` / `updateBlogPost` → navigate to `/blog-admin`
-- [ ] Spec: create defaults (draft checked, author prefilled); edit populates from the fetch; Post Now flips draft + stamps now + saves; save maps date+time → microseconds and empty → null; cancel navigates without saving; preview renders the textarea content
+- [ ] Spec: create defaults (draft checked, author prefilled); edit populates from the fetch; Post Now flips draft + stamps now + saves; save maps date+time → microseconds and empty → null; cancel navigates without saving; preview renders the textarea content; create-with-pending-photo flushes `uploadPendingPhoto` with the new id; Remove photo confirms then calls `deletePhoto`. *(Mock `hasPhoto` in the spec's ServerAccess stub — `PhotoUploadComponent` calls it on init, as the instructors-admin spec notes.)*
 
 ### Phase 7.3: Admin Blog Routes & Menu
 
@@ -361,13 +387,14 @@ Phase-level checklist (dependency order; mark off with the granular boxes above)
 - [ ] **2.1** Table helper + tests (needs 1.2)
 - [ ] **3.1** Business logic + KVT + tests (needs 2.1)
 - [ ] **4.1** Endpoints + tests + web_app anchors (needs 3.1)
+- [ ] **4.2** Honuware: photo-write auth via table permissions (needs 1.2 to be meaningful; independent of 2.1–4.1 — admins can exercise the photo UX without it, non-admin authors need it)
 - [ ] **5.1** ngx-markdown + blog types
 - [ ] **5.2** ServerAccess seam ×5 files (needs 5.1)
 - [ ] **5.3** hasAuthorBlog + AuthorBlogGuard
 - [ ] **6.1** Public blog list page (needs 5.2)
 - [ ] **6.2** Public route + Blog menu item (needs 6.1)
 - [ ] **7.1** Admin blog list page (needs 5.2)
-- [ ] **7.2** Blog editor page (needs 5.2)
+- [ ] **7.2** Blog editor page incl. the photo section (needs 5.2; non-admin photo writes need 4.2)
 - [ ] **7.3** Admin routes + Admin-dropdown menu item (needs 5.3, 7.1, 7.2)
 
 Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
@@ -395,6 +422,11 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 - `sql_util/table_helpers/CMakeLists.txt`, `business_logic/CMakeLists.txt`, `endpoints/CMakeLists.txt`
 - `endpoints/web_app.cpp` — include + `RegisterAllEndpoints()` anchors
 
+### MODIFY (Honuware — server_components repo, Phase 4.2)
+- `components/platform/endpoints/endpoint_auth_helper.h/.cpp` — new `RequireTableWriteAccess`
+- `components/platform/endpoints/upload_photo.cpp` + `delete_photo.cpp` — auth swap (+ their `_test.cpp` files)
+- App top-level `CMakeLists.txt` — honuware `GIT_TAG` pin bump once pushed
+
 ### MODIFY (Frontend)
 - `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccessNetwork.ts`, `ServerAccess.mock.ts`, `ServerAccess.mock.spec.ts`, `ServerAccess.ts` (proxy)
 - `core/services/auth.types.ts` (+ `hasAuthorBlog`), `core/guards/auth-guards.ts` (+ `AuthorBlogGuard`)
@@ -411,6 +443,8 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 - `ConfirmDialogComponent` — `@honuware/ui/foundation`
 - `coerceBool` — private helper already in `ServerAccessNetwork.ts`
 - Date + time inputs — `pages/manage/events/event-create` (Material datepicker + `matInput type="time"`)
+- `PhotoUploadComponent` (`hw-photo-upload`) — `@honuware/ui/photos`; defer-then-flush create pattern in `pages/manage/instructors/instructors-admin.component.ts`
+- `TableHelpers::TableItemPhotos::HasPhoto` — the `has_photo` resolution (see `class_series_helper.cpp`)
 
 ---
 
@@ -420,6 +454,7 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 - [ ] **C++ (the only build/test path — never build on Windows):** full Linux docker suite green —
   `MSYS_NO_PATHCONV=1 docker run --rm --network knotty-net -v "C:/Users/mason/source/repos/knottyyoga/server:/src" -v "C:/Users/mason/source/repos/server_components:/honuware" -v honuware-conan2:/root/.conan2 -v knottyyoga-linux-build:/build -e HONUWARE_SRC_DIR=/honuware -e HONUWARE_DB_SSLMODE=disable -w /src knottyyoga_build:latest bash docker_project/build_and_test.sh`
   During development, filter with `"--gtest_filter=BlogPostsTest.*:BlogHelperTest.*:BlogKeyValueTableTest.*:BlogPostsEndpointTest.*"` — and confirm the filtered run reports a **non-zero** test count (a test file missing from CMakeLists still exits 0).
+- [ ] **Honuware (Phase 4.2 only):** the server_components suite green in its own docker client (`server_components/docker/build_and_test.sh` — exact `docker run` invocation in the `reference_linux_docker_build_clients` memory), then the app suite green against the co-dev tree before pushing + bumping the pin.
 - [ ] **Angular** (bare commands from the `ui/` working directory): `npx tsc --noEmit -p tsconfig.app.json` + `-p tsconfig.spec.json` clean; `npx ng test --watch=false --browsers=ChromeHeadless` full suite green; `npx ng build` clean; `npx ng lint` no new findings vs baseline
 - [ ] Database recreate succeeds: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
 
@@ -433,5 +468,7 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 7. On **Blog**, pick a **Year** and **Month** from the dropdowns — only year/months that actually have posts are offered; the list filters. Pick a **Day** — the day list only offers days from the loaded posts. Choose **All Years** — Month and Day snap back to **All Months** / **All Days** and everything returns.
 8. In the admin list, use **Year/Month** to filter by creation date; **All Years** forces **All Months**.
 9. Signed in as admin on **Blog**, each post shows **Edit Post** / **Delete Post**. **Delete Post** prompts for confirmation; confirming removes it. Sign out — the buttons are gone.
-10. Via the test-helper app (or Manage Data), create a second user **without** `author_blog`: no **Blog Posts** menu item, `/blog-admin` redirects away, no Edit/Delete on **Blog**. Grant them `author_blog` (no other elevated permission): the **Admin** dropdown appears containing just **Blog Posts**, and authoring works.
-11. **Manage Data → Blog Posts** (debug editor): the row opens, and a photo can be uploaded against it (photo support registered).
+10. **Photos (decision 11).** **Admin → Blog Posts → New Post**: fill in Name/body, choose a photo in the **Photo** control, **Post Now**, save — the photo uploads as part of the save (deferred until the row exists). Open **Blog**: the photo renders **above** that post's title, scaled to the content width. Posts without a photo show no image and no gap.
+11. **Edit** the same post: the Photo control shows the current photo. Choose a different file — the photo is replaced (confirm on **Blog** after a reload). Click **Remove photo**, confirm — the control empties and the post on **Blog** renders with no image.
+12. Via the test-helper app (or Manage Data), create a second user **without** `author_blog`: no **Blog Posts** menu item, `/blog-admin` redirects away, no Edit/Delete on **Blog**. Grant them `author_blog` (no other elevated permission): the **Admin** dropdown appears containing just **Blog Posts**, and authoring works — **including uploading and removing a blog photo while NOT an admin** (this is the Phase 4.2 change; before it, non-admin photo writes 403).
+13. **Manage Data → Blog Posts** (debug editor): the row opens, and a photo can be uploaded against it (photo support registered).
