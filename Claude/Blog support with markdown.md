@@ -21,7 +21,7 @@ There should be a new top level menu entry that required no permissions called B
 
 # Blog Feature with Markdown Support — Implementation Plan
 
-> **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: **55 blog tests pass** in the Linux docker client (15 table-helper, 13 business-logic, 7 KVT, 20 endpoint), plus the honuware photo-write change with its own framework tests. Three things worth knowing, detailed inline:
+> **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: full app suite **4727 passed** (up 59: 55 new blog tests + 4 honuware photo tests) and the full honuware suite **1503 passed**. **Remaining before this ships: push honuware and bump the pinned `GIT_TAG` SHA** in the app's top-level `CMakeLists.txt` — the app currently reaches Phase 4.2 only through the co-dev mount. Three things worth knowing, detailed inline:
 > 1. 🐞 **Postgres type-inference bug caught by the tests.** A bare `$1 = 0` guard types the parameter as **int4**, so a real microsecond timestamp overflows at bind time. It only fires once a caller passes a non-zero bound — the unbounded feed tests passed while every filtered one threw. Every parameter is now cast explicitly (`$1::bigint`). See 2.1.
 > 2. **`table_item_photos.table_name` is a FOREIGN KEY into `photo_support_tables`**, so nothing can be attached to a table that isn't registered for photo support. Real databases get the row from `create_database.cpp`; test databases have the tables but not the seed rows, so photo tests must register it themselves. See 3.1.
 > 3. **The plan named the wrong file for table registration.** `MakeBlogPostsTable` goes in `make_app_tables.cpp` (the app half), not `make_database_info.cpp` (which just stacks framework + app). See 1.2.
@@ -468,12 +468,12 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 ### Automated gates
 - [x] **Blog suites green (8/3/2026): 55 tests** — `--gtest_filter=Blog*` reports 15 `BlogPostsTest` + 13 `BlogHelperTest` + 7 `BlogKeyValueTableTest` + 20 `BlogPostsEndpointTest`, all passing.
 - [x] **Honuware photo suites green (8/3/2026): 22 tests** — `UploadPhotoTest` (8, incl. the 3 new grant cases), `DeletePhotoTest` (5, incl. the new grant case), plus `GetPhotoTest` / `HasPhotoTest` / `UploadUserPhotoTest` unchanged.
-- [ ] **C++ (the only build/test path — never build on Windows):** full Linux docker suite green —
+- [x] **Full app suite green (8/3/2026): 4727 tests passed** (up 59 from 4668 — 55 blog + 4 honuware photo), built against the co-dev honuware tree. Command —
   `MSYS_NO_PATHCONV=1 docker run --rm --network knotty-net -v "C:/Users/mason/source/repos/knottyyoga/server:/src" -v "C:/Users/mason/source/repos/server_components:/honuware" -v honuware-conan2:/root/.conan2 -v knottyyoga-linux-build:/build -e HONUWARE_SRC_DIR=/honuware -e HONUWARE_DB_SSLMODE=disable -w /src knottyyoga_build:latest bash docker_project/build_and_test.sh`
   During development, filter with `"--gtest_filter=BlogPostsTest.*:BlogHelperTest.*:BlogKeyValueTableTest.*:BlogPostsEndpointTest.*"` — and confirm the filtered run reports a **non-zero** test count (a test file missing from CMakeLists still exits 0).
 - [x] **Honuware (Phase 4.2 only): 1503 tests passed** in the server_components docker client (8/3/2026) (`server_components/docker/build_and_test.sh` — exact `docker run` invocation in the `reference_linux_docker_build_clients` memory), then the app suite green against the co-dev tree before pushing + bumping the pin.
 - [ ] **Angular** (bare commands from the `ui/` working directory): `npx tsc --noEmit -p tsconfig.app.json` + `-p tsconfig.spec.json` clean; `npx ng test --watch=false --browsers=ChromeHeadless` full suite green; `npx ng build` clean; `npx ng lint` no new findings vs baseline
-- [ ] Database recreate succeeds: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
+- [ ] Database recreate succeeds *(not yet run — needs `HONUWARE_ALLOW_DESTRUCTIVE=1` against the live dev DB)*: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
 
 ### Live hand-testing (blank DB + real create_database seed data, via the web UI)
 1. Sign in as the admin. The **Admin** dropdown now contains **Blog Posts**. The top-level menu shows **Blog** between **Upcoming Events** and **Memberships** — visible signed out too.
