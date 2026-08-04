@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/4/2026
-Version: 0.1
+Version: 0.2
 tags: 
 ---
 
@@ -18,9 +18,11 @@ This doc **fuses and supersedes** the theming sketches scattered across three ot
 
 - **[[Website Makeover]] Phase 5** ("Database-driven per-tenant theming") — superseded by this doc. The makeover keeps Phases 1–4 (Ryan's tokens → CSS variables → component sweep) and 6; when its Phase 5 comes up in sequence, execute *this* doc instead.
 - **[[Converting the server to a multi tenant Saas architecture]] Phase 7** — shipped 7/23/2026; its as-built hooks (`/api/site_info`, `SiteConfigService`) are this doc's foundation, and its 7.4 note ("align `site_info` so it can carry or coexist with theme tokens rather than duplicating them") is honored by decision D2 below.
-- **[[Componentizing the frontend]]** styling rules — the `@honuware/ui` library is CSS-framework-agnostic, bans hardcoded colors, and never ships a brand; nothing here touches the library.
+- **[[Componentizing the frontend]]** styling rules — the `@honuware/ui` library is CSS-framework-agnostic, bans hardcoded colors, and never ships a brand. *(v0.1 said "nothing here touches the library" — revised in v0.2: CommunityFinder will consume runtime branding, so the frontend machinery reaches the library on its clock. See D11 and OQ-T7.)*
 
 The designer-facing view of this work (the 🎨 markers, the five design rules, the fake-second-studio proof frame) lives in [[Component Inventory for Designer]]; this doc is the engineering side. Planning here is iterative — answer open questions inline, keep the Overview intact, and tick checkboxes as phases land.
+
+> **v0.2 (8/4/2026):** Mason answered OQ-T1/T3/T4/T5 (OQ-T2 pending Ryan) and dropped the plan's biggest assumption: **CommunityFinder will be a branded, multi-site consumer** (`gay.seattle.beyondthefreeze.com`, then `lesbian.seattle.…`, `gay.portland.…`). Consequences threaded through: theming machinery is **framework surface** (new D11), the Getting Started steps became **database rows with an editor** instead of copy keys (D6 rewritten, new Phase 3), phases renumbered 1–8 with `[hw] / [hw-lib] / [app]` placement tags, and two new honuware questions opened (OQ-T6 site granularity, OQ-T7 frontend-lift timing).
 
 ---
 
@@ -32,8 +34,8 @@ The designer-facing view of this work (the 🎨 markers, the five design rules, 
 - **Per-tenant layout or feature differences.** Every tenant gets the same pages, routes, components, and features. A studio that wants a different *shape* of site is a different app, not a theme.
 - **Per-tenant custom pages / arbitrary HTML injection.** Content slots are typed and enumerated; there is no "paste your own page" escape hatch (XSS surface, support burden).
 - **A theme marketplace / multiple switchable themes per tenant.** One theme per tenant, editable.
-- **`@honuware/ui` changes.** The library stays brand-free and token-consuming; per the componentization plan's Q12, the `HONUWARE_BRANDING` token is created only if a library surface ever needs it (none does today).
-- **CommunityFinder.** It runs static compile-time branding and never calls `/api/site_info` — unaffected by anything here.
+- **Speculative `@honuware/ui` surface growth.** The library stays brand-free and token-consuming. CommunityFinder *will* consume runtime branding (v0.2 revision — see D11), so the frontend theming machinery does eventually reach the library — but on the second-consumer clock (Phase 8, OQ-T7), never ahead of a consumer.
+- **CommunityFinder's own adoption plan.** Its bootstrap doc (other vault) owns when and how it consumes this machinery — this doc only guarantees the honuware surface it needs, and hands over the OQ-T6 granularity decision when that project resumes.
 
 ---
 
@@ -84,7 +86,8 @@ Locked as working decisions; each has an open question below only where a real a
 - **D3 — Application: the existing APP_INITIALIZER applies tokens to `:root` before first render.** `SiteConfigService.load()` already runs pre-render; it gains "write `theme` entries as CSS custom properties on `document.documentElement`, set `document.title`". No FOUC beyond today's (defaults render if the fetch is slow/failed — same graceful-fallback contract as now).
 - **D4 — Fonts: a curated, self-hosted set; role-based selection.** Tenants pick `display` / `heading` / `body` families from a short list the app ships (D-DIN + a few open-licensed families, self-hosted — no external font CDNs). Arbitrary font upload is out (licensing, loading, CSP). D-DIN is Knotty Yoga's *value*, not the system. The `.din*` classes become thin wrappers over `--font-display` / `--font-heading` / `--font-body` so existing templates keep working unchanged.
 - **D5 — Long copy is markdown.** `about` (and any future long slot) is a markdown string rendered with the blog's ngx-markdown pipeline and prose styles — sanitization on, one rendering path, one set of text styles. The About page becomes the second consumer of the blog's prose system.
-- **D6 — Structured copy keeps its structure.** Getting Started stays seven app-defined steps with fixed CTAs/routes; tenants edit each step's title + body text (and the page intro). No per-tenant step add/remove — the flow *is* the product.
+- **D6 — Structured content is data, not copy keys** *(rewritten 8/4/2026 per Mason's OQ-T3 answer)*. The Getting Started steps become **per-tenant database rows**, not fourteen `config_secrets` keys: a `getting_started_steps` table (ordinal, Material icon name, title, body, link route + label, `hidden_when_logged_in`) with a dedicated editor page and a **curated icon picker**. v0.1's "no add/remove — the flow is the product" stance dissolves with the move to rows: an ordered list of rows has no fixed arity, so tenants can reword, reorder, add, and remove. The page's behaviors survive as data: numbering renders from *position* (so it still closes up when a row is hidden), the signed-in "Create your account" drop becomes the `hidden_when_logged_in` flag (seeded true on that row). Same precedent as `home_page_photos`: **structured per-tenant content = a table; prose = a slot.** Full design in Phase 3.
+- **D11 — Framework-first placement** *(new 8/4/2026 — driven by Mason's CommunityFinder note in Sequencing)*. CommunityFinder will be a *branded, multi-site* consumer, so the theming machinery is framework surface, not app convenience: the secret keys, validation, the extended `/api/site_info`, and the Site Theme read/write endpoints all land in **honuware** (per OQ-T5 ✅), with each app contributing its slot *defaults* exactly as `app_secret_values.cpp` does today — the same split the secrets system already uses. The **frontend** half lifts into `@honuware/ui` on CommunityFinder's clock (Phase 8, OQ-T7). This supersedes the componentization plan's Q12 deferral ("no library surface needs branding") and the static-branding assumption in the tenancy plan's §1.9/§1.10 — update those docs' CF notes next time they're touched.
 - **D7 — Imagery v1 is URL + existing photo plumbing, no new upload surface.** `site_logo_url` already exists; add `site_hero_image_url` and `site_favicon_url` the same way. Carousel photos already upload through `home_page_photos`. A dedicated `site_assets` upload flow is a later nicety, not v1 (no-premature-code).
 - **D8 — Dark mode: structure now, pairs later.** Tokens are defined so a `-dark` variant *can* exist per key, but v1 ships a single (light) value set. The makeover's dark-mode phase consumes the token structure when it lands.
 - **D9 — Material bridge via system variables.** Where Material components must follow tenant color, override Material's CSS custom properties (`--mat-*` system tokens) from the same boot application rather than compiling per-tenant SCSS themes. The full Material-theme realignment stays Makeover 2.3; this doc only wires the bridge for the tenant-variable values.
@@ -116,7 +119,7 @@ The starting contract between Ryan's Figma Variables (Makeover 1.1.A / 4.1) and 
 
 Config-secret key per token: `site_theme_<role>` (e.g. `site_theme_primary`, `site_theme_font_body`, `site_theme_radius_card`). The `theme` object in `/api/site_info` maps CSS-variable name → value, so the frontend applies it without a lookup table.
 
-The exact status-tone hex values in use get pinned during Phase 3 grounding (they're scattered across badge SCSS today; the makeover's badge consolidation is where they become one set).
+The exact status-tone hex values in use get pinned during Phase 4 grounding (they're scattered across badge SCSS today; the makeover's badge consolidation is where they become one set).
 
 ---
 
@@ -140,7 +143,7 @@ Engineering twin of the designer table in [[Component Inventory for Designer]]. 
 | Contact email | `site_contact_email` | line | footer mailto | `info@knottyyoga.com` |
 | About | `site_about_markdown` | md | `/about` (rendered as prose) | current `aboutMe` blurb |
 | Getting Started intro | `site_start_intro` | line | `/start` header | current intro line |
-| Getting Started steps 1–7 | `site_start_step_<n>_title` / `_body` | line / line | `/start` step cards (CTAs/routes stay app-fixed) | the seven shipped steps |
+| ~~Getting Started steps 1–7~~ | *moved to **data** — the `getting_started_steps` table (D6, Phase 3), not slots* | rows | `/start` step cards | the seven shipped steps become seed rows |
 | Membership blurb | `site_membership_blurb` | line | home Memberships section | "Unlimited classes, priority sign-ups, and the whole community — pick the tier that fits how you train." |
 | Social links | `site_social_links` | lines (`label|url`) | footer icon row | current links |
 
@@ -150,14 +153,14 @@ Not slots (already per-tenant data, no work): carousel photos (`home_page_photos
 
 # Phased Implementation Plan
 
-Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before frontend inside every phase; every item lands with its tests in the same session; Linux docker is the C++ gate, `ng test`/`ng build`/`ng lint` the Angular gate; live hand-testing steps close each phase. Phases 1–2 have no dependency on Ryan or the makeover and can start immediately; Phase 3 defines the CSS variables itself if Makeover 2.1 hasn't landed first (they're the same variables — first mover creates, second consumes).
+Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before frontend inside every phase; every item lands with its tests in the same session; Linux docker is the C++ gate, `ng test`/`ng build`/`ng lint` the Angular gate; live hand-testing steps close each phase. Placement tags per D11: **[hw]** = honuware server components (needs a pin bump), **[hw-lib]** = `@honuware/ui`, **[app]** = knottyyoga. Phases 1–3 have no dependency on Ryan or the makeover and can start immediately; Phase 4 defines the CSS variables itself if Makeover 2.1 hasn't landed first (they're the same variables — first mover creates, second consumes); Phase 8 waits for CommunityFinder.
 
 ## Phase 1 — Content slots, server side
 
 - [ ] Register the new content-slot secret keys (brand-free *names*) in honuware's `secret_keys.h` + `FillInSecretsStringView`, with empty/neutral framework defaults — mirroring how `kSiteLogoUrl` landed. *(hw — needs a pin bump)*
 - [ ] Register Knotty Yoga default *values* app-side in `business_logic/app_secret_values.cpp` (the table above's right-hand column). *(app)*
-- [ ] Extend `GET /api/site_info` with the `content` object (slot key → resolved value, defaults filled) and the `theme` object (empty until Phase 3 — present so the payload shape is stable). Keep the endpoint public + cacheable; keep the pure builder split. *(hw)*
-- [ ] Server-side validation helpers per D10 (hex color, URL shape, size caps) — shared by site_info's read path (defensive normalize) and Phase 5's write path. *(hw)*
+- [ ] Extend `GET /api/site_info` with the `content` object (slot key → resolved value, defaults filled) and the `theme` object (empty until Phase 4 — present so the payload shape is stable). Keep the endpoint public + cacheable; keep the pure builder split. *(hw)*
+- [ ] Server-side validation helpers per D10 (hex color, URL shape, size caps) — shared by site_info's read path (defensive normalize) and Phase 6's write path. *(hw)*
 - [ ] Tests: builder field-mapping for `content`/`theme`; defaults fill when unset; validation accepts/rejects the documented shapes; app suite green proving the new defaults seed on a fresh DB.
 
 ## Phase 2 — Content slots, frontend
@@ -167,7 +170,19 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 - [ ] `/about` renders `site_about_markdown` through ngx-markdown with the blog's prose styles (route-scoped `provideMarkdown()`, same as `/blog`).
 - [ ] Specs per consumer (the standing component-spec rule) + `SiteConfigService` merge cases + `ServerAccess.mock` returns the dev content block (+ mock spec).
 
-## Phase 3 — Token pipeline
+## Phase 3 — Getting Started steps as data (D6)
+
+Backend first, then the page rewire, then the editor.
+
+- [ ] `db_schema/getting_started_steps.{h,cpp}` — **app-side** table, the `home_page_photos` precedent: `id`, `ordinal`, `mat_icon`, `title`, `body`, `link_route`, `link_label`, `hidden_when_logged_in`, timestamps. Registered through the full new-table checklist (`make_app_tables.cpp` + create_database's 11 registration points — admin registration included, so the generic editor doubles as the debug view). App-side because knottyyoga is the only app with a Getting Started page today; the table is a leaf and promotes to honuware cheaply if CommunityFinder ever builds one. *(app)*
+- [ ] Curated **icon allow-list** constant (Material icon names) — one source of truth serving both server-side `mat_icon` validation and the editor's picker grid. *(app)*
+- [ ] Table helper + `GET /api/getting_started_steps` (anonymous, ordered by `ordinal`) — the public page's feed. Writes ride the generic CRUD endpoints via the admin table registration (admin permission). Route values validated to be root-relative (`/...`). *(app)*
+- [ ] Seed the seven shipped steps in `create_database.cpp` — the "Create your account" row seeded `hidden_when_logged_in = true`. *(app)*
+- [ ] Frontend: `/start` renders from the endpoint — numbering from array position (the signed-in close-up behavior falls out for free), icon/title/body/CTA from the row. `ServerAccess` seam ×5 files per the standing rule. Component + mock specs.
+- [ ] Frontend: dedicated **Manage → Getting Started** editor page (per the "Manage Data is a debug hack" rule — this is the business workflow surface): ordered row list with reorder, add/remove, the icon-picker grid over the curated set, title/body/route/label fields, the hidden-when-signed-in toggle. Specs.
+- [ ] Tests: table helper CRUD + ordering; endpoint anonymity + order; icon + route validation; seed presence on a fresh DB.
+
+## Phase 4 — Token pipeline
 
 - [ ] Server: accept + serve `site_theme_*` keys in the `theme` object (CSS-var name → validated value). *(hw)*
 - [ ] Frontend: boot application — write each `theme` entry onto `document.documentElement`; alias the legacy `--red`/`--orange`/`--gray` to the new `--theme-*` so existing Tailwind mappings restyle immediately.
@@ -176,36 +191,45 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 - [ ] Reconcile token names with Ryan's Foundations file when it lands (his names win; update the catalog above).
 - [ ] Tests: application function unit-tested (writes vars, skips invalid), spec that a themed boot restyles a `theme-red` consumer, font-class regression spec.
 
-## Phase 4 — Imagery v1 (URL-based)
+## Phase 5 — Imagery v1 (URL-based)
 
 - [ ] Wire `site_hero_image_url` + `site_favicon_url` consumers (Phase 2 stubs them behind defaults; this phase completes fallback behavior + error handling — a 404'd image falls back to the bundled asset, never a broken-image icon).
 - [ ] Document the constraint set for each slot (logo: light-on-dark, height-bounded; hero image: aspect guidance) in the onboarding runbook — these match Ryan's slot-constraint rules in the inventory doc.
 - [ ] *(Deferred, recorded not planned: a `site_assets` upload flow so tenants don't need externally hosted URLs — revisit after the first real second tenant.)*
 
-## Phase 5 — Admin "Site Theme" page
+## Phase 6 — Admin "Site Theme" page
 
-- [ ] Backend: curated endpoints `GET /api/manage/site_theme` (full editable set, unset-vs-default distinguished) + `PUT /api/manage/site_theme` (validated writes to the tenant's `config_secrets`). Admin-only via the existing permission machinery. **Never** the generic CRUD surface — `config_secrets` stays excluded. *(hw or app — decide at grounding by where the slot registry ends up)*
-- [ ] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** (name, title, logo/favicon URLs, contact, address, socials) / **Copy** (hero, tagline, blurbs, Getting Started steps) / **About** (markdown textarea + live prose preview, reusing the blog editor's split-pane pattern) / **Colors & fonts** (color pickers per token role, font dropdowns) — with per-field "reset to default".
+- [ ] Backend: curated endpoints `GET /api/manage/site_theme` (full editable set, unset-vs-default distinguished) + `PUT /api/manage/site_theme` (validated writes to the tenant's `config_secrets`). Admin-only via the existing permission machinery. **Never** the generic CRUD surface — `config_secrets` stays excluded. *(hw — resolved by OQ-T5/D11; the app contributes its slot list the same way it contributes defaults)*
+- [ ] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** (name, title, logo/favicon URLs, contact, address, socials) / **Copy** (hero, tagline, blurbs — the Getting Started steps have their own editor, Phase 3) / **About** (markdown textarea + live prose preview, reusing the blog editor's split-pane pattern) / **Colors & fonts** (color pickers per token role, font dropdowns) — with per-field "reset to default". *(app for now; lift candidate in Phase 8)*
 - [ ] "Changes appear within ~5 minutes" note (the site_info cache) + a save-confirmation.
 - [ ] Tests: endpoint auth/validation/round-trip; component specs per section.
 
-## Phase 6 — Provisioning, runbook, and the fake-studio proof
+## Phase 7 — Provisioning, runbook, and the fake-studio proof
 
-- [ ] `--create_tenant` verification: a fresh tenant boots with every slot on defaults (this mostly falls out of the defaults machinery — the test proves it).
-- [ ] Onboarding runbook: the checklist a new studio walks (Site Theme form top to bottom, photo uploads, DNS/CloudFront per the tenancy plan's Phase 8).
+- [ ] `--create_tenant` verification: a fresh tenant boots with every slot on defaults (this mostly falls out of the defaults machinery — the test proves it) and the seven seeded Getting Started rows present.
+- [ ] Onboarding runbook: the checklist a new studio walks (Site Theme form top to bottom, Getting Started editor, photo uploads, DNS/CloudFront per the tenancy plan's Phase 8).
 - [ ] **The fake-studio smoke test** — engineering twin of Ryan's OQ-D3 proof frame: a second local tenant with an invented brand (different palette, wide logo, two-line name, different hero copy); walk Home / Our Classes / Blog / Getting Started / About / an email; nothing Knotty-branded may leak. This list = the regression checklist for every future theming change.
 - [ ] Live hand-testing steps for the whole feature (blank DB, two tenants, exact form fields + values, per the precise-instructions rule).
+- [ ] Hand-off: copy the OQ-T6 granularity decision + the honuware surface list into CommunityFinder's bootstrap doc (other vault) when that project resumes.
+
+## Phase 8 — `@honuware/ui` lift (on CommunityFinder's clock — OQ-T7)
+
+> Deliberately last and deliberately gated: the lift happens when CommunityFinder's frontend actually bootstraps, not speculatively. Until then knottyyoga's app-side implementation is the reference implementation.
+
+- [ ] Lift the site-config surface into `@honuware/ui`: a `SiteAccess` seam beside `CrudAccess`/`AuthAccess`/`PhotoAccess` (`getSiteInfo()`), the config service (merge + fallback contract), and the token boot-applier. This *is* the branding surface the componentization plan's Q12 reserved `HONUWARE_BRANDING` for — the service supersedes the token idea. knottyyoga's `SiteConfigService` becomes the app-side provider/consumer; its specs move with it; brand-free library assertions stay. *(hw-lib)*
+- [ ] Evaluate lifting the Site Theme manage page + the Getting Started steps table/editor once CommunityFinder has the surfaces to mount them — recorded, not planned (no-premature-code). *(hw-lib, speculative)*
 
 ---
 
 # Sequencing with the other plans
 
-- **Independent now:** Phases 1–2 (content slots) touch nothing Ryan or the makeover owns.
-- **Coordinates with Makeover Phase 2:** Phase 3 shares the CSS-variable layer. Either lands first; whoever is second consumes the other's variables. Ryan's Figma token *names* (Makeover 1.1.A/4.1) get reconciled into the catalog when they exist — they gate nothing.
+- **Independent now:** Phases 1–3 (content slots + the steps table) touch nothing Ryan or the makeover owns.
+- **Coordinates with Makeover Phase 2:** Phase 4 shares the CSS-variable layer. Either lands first; whoever is second consumes the other's variables. Ryan's Figma token *names* (Makeover 1.1.A/4.1) get reconciled into the catalog when they exist — they gate nothing.
 - **Supersedes Makeover Phase 5** (noted there when the makeover doc next gets touched; the makeover's dark-mode phase later consumes D8's structure).
-- **Tenancy Phase 8 (CloudFront/DNS per tenant)** remains the ops half of onboarding — unchanged by this doc.
-- **CommunityFinder:** unaffected (static branding, no `/api/site_info`).
+- **Tenancy Phase 8 (CloudFront/DNS per tenant)** remains the ops half of onboarding — unchanged by this doc, and it is exactly the wiring each `beyondthefreeze.com` subdomain will reuse.
+- **CommunityFinder:** ~~unaffected (static branding, no `/api/site_info`)~~ — **revised 8/4/2026: a driving consumer.**
 	- Mason- I very much want community finder to be branded. I intend to start with gay.seattle.beyondthefreeze.com but branch out to lesbian.seattle.beyondthefreeze.com and gay.portland.beyondthefreeze.com.
+	- Claude- ✅ Plan updated throughout. What this changes: (1) the server-side theming surface is **framework** (new D11 — keys, validation, extended `site_info`, manage endpoints all in honuware), so CommunityFinder gets the whole stack by consuming honuware: per-subdomain CloudFront distribution → `X-Honuware-Site` header → tenant resolution → that site's theme, exactly the tenancy plan's Phase 8 wiring; (2) the frontend machinery lifts into `@honuware/ui` when CommunityFinder's frontend bootstraps (new Phase 8 here, OQ-T7); (3) this supersedes the static-branding notes in the tenancy plan (§1.9 #2/#3, §1.10, its 7.4 note) and the componentization plan's Q12 deferral — those docs get their CF lines updated next time they're touched, and CommunityFinder's own bootstrap doc inherits the OQ-T6 decision (Phase 7 hand-off item). One architecture question falls out of the subdomain list — **OQ-T6 below**: whether each subdomain is its own tenant (own database) or several subdomains share one community's data and differ only in skin. The stack as shipped is strictly one site key → one tenant DB, so the answer decides whether honuware needs a new mode.
 
 ---
 
