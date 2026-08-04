@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/4/2026
-Version: 0.3
+Version: 0.4
 tags: 
 ---
 
@@ -369,7 +369,7 @@ Three waves landed since 7/19:
 
 Mason is turning the platform into a product other studios can run. The server side is already multi-tenant, and the frontend already boots by asking the server "who am I?" — the studio's display name, website URL, and logo arrive from an API at load, and the footer's address / contact email / copyright name plus the About text are already centralized behind a config service with Knotty Yoga's values as fallbacks. Next in line: the hero copy, the Getting Started copy, colors, and fonts.
 
-**Decision (Mason, 8/4/2026): full theme support becomes its own companion document** — a third doc alongside the makeover plan and this inventory. It will fuse Website Makeover Phase 5 (DB-driven theme tokens + a `/api/site_theme` bootstrap endpoint + an admin "Site Theme" page — already sketched there) with the tenancy plan's shipped branding hooks, and it will own the token catalog and the full content-slot inventory. **This document stays the component/screen inventory** and just marks what must flex with 🎨.
+**Decision (Mason, 8/4/2026): full theme support is its own companion document — [[Tenant Theming and Branding]]** (drafted 8/4/2026, per OQ-D2). It fuses Website Makeover Phase 5 (DB-driven theme tokens + bootstrap endpoint + an admin "Site Theme" page — sketched there, now superseded by the theming doc) with the tenancy plan's shipped branding hooks, and it owns the token catalog and the full content-slot inventory. **This document stays the component/screen inventory** and just marks what must flex with 🎨 — the slot table below is the designer-facing summary; the theming doc holds the engineering version with storage keys and defaults.
 
 What it changes about how you design — five rules:
 
@@ -442,7 +442,7 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 
 ## 🚫 Not your problem (new since 7/19)
 
-- **Blog authoring** — the Blog Posts admin list (status chips Draft / Scheduled / Published / No date, year–month filters, table) and the **editor** (title/author/draft/post-date form, photo upload, split-pane markdown editor with live preview, Post Now / Save / Cancel). Back office; composes from your blocks. *(Optional exception, same spirit as Staff Check-In: the editor is the one back-office screen a blog author lives in — a pass on the split-pane editor would be welcome if you have spare time, but nothing blocks on it.)*
+- **Blog authoring** — the Blog Posts admin list (status chips Draft / Scheduled / Published / No date, year–month filters, table) and the **editor** (title/author/draft/post-date form, photo upload, split-pane markdown editor with live preview, Post Now / Save / Cancel). Back office; composes from your blocks. *(Confirmed strictly out of scope — OQ-D1, 8/4/2026.)*
 - **Admin data-editor cleanups** (read-only field handling, date formatting, enum dropdowns) — invisible restyle targets.
 - **Everything multi-tenant on the server** — tenancy is invisible in the UI beyond the 🎨 slots above.
 
@@ -455,11 +455,8 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 5. **Public / Getting Started** — seven cards, quick to compose from Button/Card/Icon.
 6. **The 🎨 pass** — variable-ize the brand slots in your Foundations file and produce the one fake-studio proof frame. This is the piece the future theming doc builds on, so it's the highest-leverage hour after the screens.
 
-## Open questions (Mason — answer inline)
+## Open questions — ✅ all resolved (Mason, 8/4/2026)
 
-- **OQ-D1 — Blog editor:** keep it strictly 🚫, or take the optional-exception design pass? *(Recommendation: leave it 🚫 — it composes fine from the blocks.)*
-	- Mason- I'll go with your recommendation.
-- **OQ-D2 — The theming document:** ready for me to draft `Tenant Theming and Branding.md` (token catalog + content-slot inventory + the admin "Site Theme" page, fusing Website Makeover Phase 5 with the shipped tenancy branding hooks)? *(Recommendation: yes — nothing in Ryan's current batch depends on it, so it can start any time.)*
-	- Mason- Sure, that sounds great.
-- **OQ-D3 — Fake second studio frame:** worth ~an hour of Ryan's time as the theme-proof (rule 4 above)? *(Recommendation: yes — one Home + header frame is enough.)*
-	- Mason- Sure, I'll go with your recommendation.
+- **OQ-D1 — Blog editor:** ✅ **RESOLVED — strictly 🚫.** *(Mason: "I'll go with your recommendation.")* The blog editor stays out of scope entirely; the optional-exception note has been removed from the 🚫 section above so no time gets spent there.
+- **OQ-D2 — The theming document:** ✅ **RESOLVED — yes.** *(Mason: "Sure, that sounds great.")* Drafted: **[[Tenant Theming and Branding]]** — the token catalog, the content-slot inventory, the storage/endpoint design, and the admin "Site Theme" page now live there. This doc keeps only the 🎨 markers and the five design rules; when the theming doc's token catalog and Ryan's Figma Variables disagree on a name, reconcile there, not here.
+- **OQ-D3 — Fake second studio frame:** ✅ **RESOLVED — yes, one Home + header frame.** *(Mason: "Sure, I'll go with your recommendation.")* Kept as rule 4 + Quick Win #6. The theming doc's final phase includes the engineering twin of this proof — a second local tenant with an invented brand — so Ryan's frame and the running site can be compared side by side.
