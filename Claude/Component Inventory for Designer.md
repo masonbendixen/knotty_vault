@@ -343,3 +343,11 @@ If your time is limited, the single biggest visual upgrade comes from getting th
 5. **🆕 The July additions with real customer traffic** — **Public / Our Schedule** and the **Calendar Event Chip / Card** (all three densities + the status matrix), then **Tag Chip** + **Filter Chip Row**. These now carry as much visitor traffic as anything in item 3 — see the "What changed since your first pass" section at the top for the full delta.
 
 Everything else can come later.
+
+# Mason - Updates to the document 8/4/2026
+- Ryan, the graphics designer has done the Figma for the document and app as things stood before. Since then, I have made the following changes:
+	- [[Blog support with markdown]]
+	- [[Converting the server to a multi tenant Saas architecture]]
+	- [[Componentizing the frontend]]
+	- [[Home page work and cleanup items]]
+	- Classes Phase XXX (1-16)
