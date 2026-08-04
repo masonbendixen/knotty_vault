@@ -205,6 +205,7 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 - **Supersedes Makeover Phase 5** (noted there when the makeover doc next gets touched; the makeover's dark-mode phase later consumes D8's structure).
 - **Tenancy Phase 8 (CloudFront/DNS per tenant)** remains the ops half of onboarding — unchanged by this doc.
 - **CommunityFinder:** unaffected (static branding, no `/api/site_info`).
+	- Mason- I very much want community finder to be branded. I intend to start with gay.seattle.beyondthefreeze.com but branch out to lesbian.seattle.beyondthefreeze.com and gay.portland.beyondthefreeze.com.
 
 ---
 
@@ -215,6 +216,8 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 - **OQ-T2 — Curated font list contents.** Which open-licensed families ship beside D-DIN? *(Recommendation: 3–4 with distinct personalities — e.g. Inter, Source Serif, Montserrat, Oswald — self-hosted; final pick with Ryan since he'll preview them in Figma.)*
 	- Mason- I need to ask Ryan.
 - **OQ-T3 — Getting Started step copy: per-step keys or accept the shipped copy as universal?** The seven steps read fairly studio-neutral already ("Try an intro workshop", "Pick your membership"…). Per-step keys are 14 slots of admin-form surface for copy most tenants may never touch. *(Recommendation: ship the keys anyway — the defaults machinery makes them free until someone edits, and "intro workshop" is exactly the phrase a pure-yoga studio would want to change.)*
-	- Mason- Those all seems to have an icon, headline text, a longer text description, and a link. It feels like these could be rows in a database and we could have a page to edit this (with an ordinal number). The only issue is the icon but we could probably have an icon picker
+	- Mason- Those all seems to have an icon, headline text, a longer text description, and a link. It feels like these could be rows in a database and we could have a page to edit this (with an ordinal number). The only issue is the icon but we could probably have an icon picker and a group of standard icons. What do you think?
 - **OQ-T4 — Social links: typed per-network fields or the freeform `label|url` lines?** *(Recommendation: freeform lines v1; the footer maps known labels to icons and falls back to a link — no schema churn when a studio wants TikTok.)*
+	- Mason- I'll go with your recommendation.
 - **OQ-T5 — Where does the slot registry live, honuware or app?** The key *names* and validation are framework-ready (any consumer app wants them), but the slot *set* references app pages (Getting Started steps). *(Recommendation: keys + validation + site_info/manage endpoints in honuware; the app contributes its slot defaults exactly as `app_secret_values.cpp` does today — same split the secrets system already uses.)*
+	- Mason- Given that I want this in community finder (so above Mason- note about that), I think that this needs to be in honuware.
