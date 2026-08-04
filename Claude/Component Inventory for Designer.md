@@ -458,5 +458,8 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 ## Open questions (Mason — answer inline)
 
 - **OQ-D1 — Blog editor:** keep it strictly 🚫, or take the optional-exception design pass? *(Recommendation: leave it 🚫 — it composes fine from the blocks.)*
+	- Mason- I'll go with your recommendation.
 - **OQ-D2 — The theming document:** ready for me to draft `Tenant Theming and Branding.md` (token catalog + content-slot inventory + the admin "Site Theme" page, fusing Website Makeover Phase 5 with the shipped tenancy branding hooks)? *(Recommendation: yes — nothing in Ryan's current batch depends on it, so it can start any time.)*
+	- Mason- Sure, that sounds great.
 - **OQ-D3 — Fake second studio frame:** worth ~an hour of Ryan's time as the theme-proof (rule 4 above)? *(Recommendation: yes — one Home + header frame is enough.)*
+	- Mason- Sure, I'll go with your recommendation.
