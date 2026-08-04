@@ -21,6 +21,8 @@ There should be a new top level menu entry that required no permissions called B
 
 # Blog Feature with Markdown Support — Implementation Plan
 
+> **Follow-up (Section 8) 8/3/2026 — month filter + photo sizing.** Month is now an independent filter rather than a sub-choice of year: both dropdowns are always on screen defaulting to All, and picking a month with no year means *that month in every year* — which is not a contiguous range, so it needed its own server parameter rather than another `[startUs, endUs)` window. Separately, the post photo was `width: 100%`, which **upscaled** anything the aspect-preserving scaler returned smaller than the bounding box; both axes are now capped instead. Gates: app **4736**, Angular **2915**.
+
 > **Sections 5–7 (all frontend work) implemented 8/3/2026.** Angular gates green: full suite **2905 passed** (up 77), `ng build` clean, `ng lint` with no new findings (all 262 are pre-existing `no-explicit-any`/`no-unused-vars` in untouched files). Three things worth knowing, detailed inline:
 > 1. **`provideMarkdown()` is route-scoped, not app-wide.** Putting it in `app.config.ts` as planned pulls `marked` into the initial bundle (1.39 → 1.45 MB measured); providing it on the two markdown-rendering route trees keeps it at 1.38 MB. See 5.1.
 > 2. **`MatDialog` comes from the component's own injector.** `MatDialogModule` provides it at module scope, so `spyOn(TestBed.inject(MatDialog), 'open')` silently misses every call from a standalone component that imports `SharedModule`. Spy on `fixture.componentInstance`'s own instance instead. See 6.1.
@@ -408,6 +410,40 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
 
 ---
 
+## Section 8: Follow-up — independent month filter + photo sizing — **DONE (8/3/2026)**
+
+Two pieces of feedback after the first pass, both fixed together.
+
+### Phase 8.1: Month becomes a filter in its own right
+
+**The complaint:** "instead of just being able to filter by year… can we also do months, but default to all years and all months?" The feature was there but invisible — the Month dropdown only appeared *after* a year was picked, so the filter read as year-only on arrival.
+
+Making the dropdown permanently visible forces a design question the original plan ducked: what does "March" mean with **All Years** selected? It means March in every year — and that is **not a contiguous range**, so it cannot be expressed as `[startUs, endUs)`. The window could never say it. So the month became its own filter, independent of the window, ANDed with it.
+
+- [x] `sql_util/table_helpers/blog_posts.cpp` — all four list/count statements take `$3::int` month (0 = any), matched against `EXTRACT(MONTH FROM to_timestamp(<col> / 1000000.0) AT TIME ZONE 'UTC')::int`. UTC to match `GetAvailableDates`, or a late-evening post would filter under a different month than the navigator filed it under. Parameters renumbered so `$n` order matches the C++ argument order (`start, end, month, pageSize, offset`).
+- [x] `blog_posts.h` / `blog_helper.h` / `blog_helper.cpp` — `month` threaded through `GetPublishedPosts`, `GetPublishedPostCount`, `GetAllPosts`, `GetAllPostCount`. **The count takes the month too** — otherwise the client's Next button pages past the end of a month-filtered feed.
+- [x] `endpoints/blog_posts.cpp` — `month` query parameter. Out of range (`0`, `13`, `-1`, junk) falls back to "every month" rather than matching nothing: a bad value should not silently blank the feed.
+- [x] Backend tests — **9 new**: 5 `BlogPostsTest` (spans every year; month 0 = every month; combines with the year window; the admin feed's month reads `created_at_us` not `post_at_us`; the month filter still honors the published rules so a draft cannot slip through), 1 `BlogHelperTest` (month narrows the feed AND the count), 3 `BlogPostsEndpointTest` (public month across years, month + window together, out-of-range ignored, admin view honors it).
+- [x] `blog.types.ts` `BlogListOptions.month?: number`; `ServerAccessNetwork` sends `&month=`; the mock filters on the UTC month of the same stamp it sorts by.
+- [x] Both list pages: the Month dropdown is **always rendered**, defaulting to All Months, and offers the **union of months across years** while All Years is selected (deduplicated, calendar order rather than newest-first, since it is now permanently on screen).
+- [x] Cascade rules rewritten. The old rule reset the month whenever the year changed; now the month **survives** a year change when the new year also has it (March 2026 → 2025 lands on March 2025) and only resets when keeping it would show an empty list. The **day** still needs both a year and a month — "the 15th of March in any year" is not a date — so the Day dropdown is gated on both and clears on either change.
+- [x] Frontend tests — **10 new/rewritten**: 2 mock (month across years, month ANDed with a window), 5 public list (both filters visible by default, union of months, month survives a compatible year change, month drops on an incompatible one, day gated on both, and the filters actually sent), 3 admin list (same shape, minus the day).
+
+### Phase 8.2: Blog photo sizing
+
+**The complaint:** "what width are you defaulting to for blog post photos? The photo being used currently is enormous."
+
+**The bug:** the CSS was `width: 100%` on a 52rem content column — about 780px. But `/api/get_scaled_photo/.../1200/675` scales to **fit a bounding box, preserving aspect** (`ImageHelper::EnforceMaxDimensions` → `BoundingRect::GetClippedRect`), so a portrait or square source comes back well *under* 1200×675 — and `width: 100%` then **upscaled it back**, producing an image over 1100px tall for a portrait photo.
+
+- [x] `blog-list.component.scss` — bound both axes instead of stretching one: `max-width: 100%; max-height: 22rem; width: auto; height: auto; margin: 0 auto 1rem;`. The image now renders at its natural scaled size, centred, never wider than the column and never taller than ~350px. Nothing is cropped and nothing is upscaled.
+- [x] The `1200/675` request is unchanged — it is roughly 2× the display cap, which is what a high-DPI screen wants.
+
+### Gates (8/3/2026)
+- [x] **Full app suite: 4736 passed** (up 9 from 4727), Linux docker client, co-dev honuware tree.
+- [x] **Angular: 2915 passed** (up 10 from 2905); `ng build` clean at 1.40 MB initial; `ng lint` still 262 pre-existing findings, none in blog files.
+
+---
+
 ## Implementation Sequence
 
 Phase-level checklist (dependency order; mark off with the granular boxes above):
@@ -426,6 +462,8 @@ Phase-level checklist (dependency order; mark off with the granular boxes above)
 - [x] **7.1** Admin blog list page (needs 5.2)
 - [x] **7.2** Blog editor page incl. the photo section (needs 5.2; non-admin photo writes need 4.2)
 - [x] **7.3** Admin routes + Admin-dropdown menu item (needs 5.3, 7.1, 7.2)
+- [x] **8.1** Month as an independent filter, server → seam → both list pages (follow-up)
+- [x] **8.2** Blog photo sizing fix (follow-up)
 
 Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 
