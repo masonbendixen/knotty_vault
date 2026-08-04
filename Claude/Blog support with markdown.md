@@ -21,6 +21,13 @@ There should be a new top level menu entry that required no permissions called B
 
 # Blog Feature with Markdown Support — Implementation Plan
 
+> **Sections 5–7 (all frontend work) implemented 8/3/2026.** Angular gates green: full suite **2905 passed** (up 77), `ng build` clean, `ng lint` with no new findings (all 262 are pre-existing `no-explicit-any`/`no-unused-vars` in untouched files). Three things worth knowing, detailed inline:
+> 1. **`provideMarkdown()` is route-scoped, not app-wide.** Putting it in `app.config.ts` as planned pulls `marked` into the initial bundle (1.39 → 1.45 MB measured); providing it on the two markdown-rendering route trees keeps it at 1.38 MB. See 5.1.
+> 2. **`MatDialog` comes from the component's own injector.** `MatDialogModule` provides it at module scope, so `spyOn(TestBed.inject(MatDialog), 'open')` silently misses every call from a standalone component that imports `SharedModule`. Spy on `fixture.componentInstance`'s own instance instead. See 6.1.
+> 3. **The mock derives `has_photo` rather than storing it** — computed from the existing `photos` Map, so `uploadPhoto`/`deletePhoto` can't drift from a duplicate field and the editor's photo flow works in local mode. See 5.2.
+>
+> **Remaining:** the DB recreate and the live hand-testing pass (both need a running dev database).
+
 > **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: full app suite **4727 passed** (up 59: 55 new blog tests + 4 honuware photo tests) and the full honuware suite **1503 passed**. Honuware was pushed (CI green) and the app's pinned `GIT_TAG` bumped to `c258a8c` the same day, verified by a **pinned-SHA build**: **4727 tests passed** with no co-dev mount, from a clean `knottyyoga-linux-build-pinned` volume, log confirming `honuware : pinned SHA (FetchContent will clone it)` — identical count to the co-dev run, so the pushed commit and the working tree agree. Three things worth knowing, detailed inline:
 > 1. 🐞 **Postgres type-inference bug caught by the tests.** A bare `$1 = 0` guard types the parameter as **int4**, so a real microsecond timestamp overflows at bind time. It only fires once a caller passes a non-zero bound — the unbounded feed tests passed while every filtered one threw. Every parameter is now cast explicitly (`$1::bigint`). See 2.1.
 > 2. **`table_item_photos.table_name` is a FOREIGN KEY into `photo_support_tables`**, so nothing can be attached to a table that isn't registered for photo support. Real databases get the row from `create_database.cpp`; test databases have the tables but not the seed rows, so photo tests must register it themselves. See 3.1.
@@ -262,11 +269,13 @@ All changes in the **server_components** repo (`components/platform/`); co-dev v
 
 ## Section 5: Frontend — Dependencies & Types
 
-### Phase 5.1: Install ngx-markdown + Blog Types
+### Phase 5.1: Install ngx-markdown + Blog Types — **DONE (8/3/2026)**
 
-- [ ] From `ui/`: `npm install ngx-markdown@^21.0.0 marked --save` — **Angular is 21.2 in package.json** *(v0.1 said 19 — stale)*; ngx-markdown's major must match. Take the `marked` major ngx-markdown's peerDependencies ask for (npm surfaces it). If the Angular 22 upgrade has landed by execution time, use `^22`.
-- [ ] `ui/src/app/app.config.ts`: `import { provideMarkdown } from 'ngx-markdown';` + `provideMarkdown()` in the `providers` array (no loader config — we never fetch remote `.md` files)
-- [ ] Create `ui/src/app/shared/types/blog.types.ts`:
+- [x] From `ui/`: `npm install ngx-markdown@^21.0.0 marked --save` — **Angular is 21.2 in package.json** *(v0.1 said 19 — stale)*; ngx-markdown's major must match. Take the `marked` major ngx-markdown's peerDependencies ask for (npm surfaces it). If the Angular 22 upgrade has landed by execution time, use `^22`.
+- [x] `ui/src/app/app.config.ts`: `import { provideMarkdown } from 'ngx-markdown';` + `provideMarkdown()` in the `providers` array (no loader config — we never fetch remote `.md` files)
+- [x] **Deviation — `provideMarkdown()` is route-scoped, not app-wide.** The plan put it in `app.config.ts`; that pulls `marked` into the initial bundle (measured 1.39 → 1.45 MB). It is instead provided on the two route trees that render markdown (`public.routes.ts` blog entry and `blog-admin.routes.ts`), which keeps the initial bundle at 1.38 MB — under the pre-existing 1.00 MB budget overrun, not adding to it.
+- [x] Installed `ngx-markdown@^21.3.0` + `marked@^18.0.8`. Only `marked` is a **required** peer; katex / mermaid / prismjs / clipboard / emoji-toolkit are all `optional: true`, so none were installed.
+- [x] Create `ui/src/app/shared/types/blog.types.ts`:
 
 ```typescript
 export interface BlogPost {
@@ -292,91 +301,96 @@ export interface SaveBlogPostRequest {   // create + update take the same shape
 }
 ```
 
-### Phase 5.2: Server Access Interface + All Implementations
+### Phase 5.2: Server Access Interface + All Implementations — **DONE (8/3/2026, 13 mock spec cases)**
 
 The seam is **five** files, not four — the mock's spec is part of the seam *(missing from v0.1)*.
 
-- [ ] `shared/types/ServerAccess.ts` — import blog types, add 6 methods:
+- [x] `shared/types/ServerAccess.ts` — import blog types, add 6 methods:
   - `getBlogPosts(page, pageSize, opts?: {startUs?, endUs?, adminView?}): Observable<BlogPostListResponse>`
   - `getBlogPost(id): Observable<BlogPost>`
   - `getBlogDates(adminView?: boolean): Observable<BlogDatesResponse>`
   - `createBlogPost(request: SaveBlogPostRequest): Observable<BlogPost>`
   - `updateBlogPost(id, request: SaveBlogPostRequest): Observable<BlogPost>`
   - `deleteBlogPost(id): Observable<void>`
-- [ ] `shared/services/network/ServerAccessNetwork.ts` — implement against `/api/blog_posts*` with a private `normalizeBlogPost`: KVT→JSON serializes booleans as the strings `"true"/"false"` and the unscheduled `post_at_us` as `""` — coerce `draft` + `has_photo` via the existing `coerceBool`, `"" → null` for `post_at_us`, `Number(...)` the timestamps (same pattern as `normalizeSignupOffering`)
-- [ ] `shared/services/network/ServerAccess.mock.ts` — `blogPosts: BlogPost[]` seeded with 3–5 posts **including one draft, one future-dated post, and one with `has_photo: true`** so local mode exercises the exclusion rules and the photo banner; in-memory implementations of all 6 (mock honors published-vs-admin filtering, sorting, pagination). The mock's existing `PhotoAccess` methods (`uploadPhoto`/`deletePhoto`/`hasPhoto`) should flip the matching post's `has_photo` when called with `blog_posts`, so the editor's photo flow works in local mode
-- [ ] `shared/services/network/ServerAccess.ts` (proxy) — 6 `this.serialize(() => this.impl.method(...))` passthroughs
-- [ ] `ServerAccess.mock.spec.ts` — cases: public list excludes the draft + the future post and sorts `post_at_us` DESC; admin view includes drafts sorted `created_at_us` DESC; pagination + `total_count`; date pairs; single get found/404; create/update/delete round-trip; update stamps `modified_at_us`; `has_photo` flips through the photo methods
+- [x] `shared/services/network/ServerAccessNetwork.ts` — implement against `/api/blog_posts*` with a private `normalizeBlogPost`: KVT→JSON serializes booleans as the strings `"true"/"false"` and the unscheduled `post_at_us` as `""` — coerce `draft` + `has_photo` via the existing `coerceBool`, `"" → null` for `post_at_us`, `Number(...)` the timestamps (same pattern as `normalizeSignupOffering`)
+- [x] `shared/services/network/ServerAccess.mock.ts` — `blogPosts: BlogPost[]` seeded with 3–5 posts **including one draft, one future-dated post, and one with `has_photo: true`** so local mode exercises the exclusion rules and the photo banner; in-memory implementations of all 6 (mock honors published-vs-admin filtering, sorting, pagination). The mock's existing `PhotoAccess` methods (`uploadPhoto`/`deletePhoto`/`hasPhoto`) should flip the matching post's `has_photo` when called with `blog_posts`, so the editor's photo flow works in local mode
+- [x] **Deviation — the mock derives `has_photo`, it does not store it.** `blogPosts` is typed `Omit<BlogPost, 'has_photo'>[]` and `has_photo` is computed from the mock's existing `photos` Map (`blog_posts:${id}`) on the way out. Storing it as a field would have created a second source of truth that `uploadPhoto`/`deletePhoto` could drift from; deriving it makes the editor's photo flow work in local mode for free. Seeded with 4 posts: two published (ids 1 and 2, one with a photo), id 3 a draft, id 4 future-dated.
+- [x] `isBlogPostPublished()` in the mock mirrors the server's three-condition rule, so local mode and the real endpoint agree on what the public list hides.
+- [x] `shared/services/network/ServerAccess.ts` (proxy) — 6 `this.serialize(() => this.impl.method(...))` passthroughs
+- [x] `ServerAccess.mock.spec.ts` — cases: public list excludes the draft + the future post and sorts `post_at_us` DESC; admin view includes drafts sorted `created_at_us` DESC; pagination + `total_count`; date pairs; single get found/404; create/update/delete round-trip; update stamps `modified_at_us`; `has_photo` flips through the photo methods
 
-### Phase 5.3: Auth Types & Guard
+### Phase 5.3: Auth Types & Guard — **DONE (8/3/2026, 8 tests)**
 
 *(v0.1 correction: `core/services/auth.types.ts` and `core/guards/auth-guards.ts` are now one-line re-export shims over `@honuware/ui/auth`, where `hasPermission`, `hasManageProducts`, and all guards live. `author_blog` is app-specific, so its helper + guard are **app-side additions to the shim files** — no honuware release needed.)*
 
-- [ ] `core/services/auth.types.ts`: add (alongside the re-export)
+- [x] `core/services/auth.types.ts`: add (alongside the re-export)
   ```typescript
   export function hasAuthorBlog(authData: AuthData): boolean {
     return (authData.isAuth && authData.isAdmin) || hasPermission(authData, 'author_blog');
   }
   ```
-- [ ] `core/guards/auth-guards.ts`: add a functional `AuthorBlogGuard` (`CanActivateFn`) that injects `AuthService`, checks `hasAuthorBlog`, and redirects to `/` on failure — mirror the library's `ManageProductsGuard` behavior
-- [ ] Spec coverage for both (a small `auth-guards.spec.ts` if none exists app-side): admin passes, `author_blog` holder passes, plain user redirected, anonymous redirected
+- [x] `core/guards/auth-guards.ts`: add a functional `AuthorBlogGuard` (`CanActivateFn`) that injects `AuthService`, checks `hasAuthorBlog`, and redirects to `/` on failure — mirror the library's `ManageProductsGuard` behavior
+- [x] Spec coverage for both (a small `auth-guards.spec.ts` if none exists app-side): admin passes, `author_blog` holder passes, plain user redirected, anonymous redirected
 
 ---
 
 ## Section 6: Frontend — Public Blog View
 
-### Phase 6.1: Public Blog List Page
+### Phase 6.1: Public Blog List Page — **DONE (8/3/2026, 18 tests)**
 
-- [ ] Create `pages/public/blog/blog-list/blog-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
-- [ ] Standalone component; imports `SharedModule` + ngx-markdown's standalone `MarkdownComponent`; injects `SERVER_ACCESS_TOKEN`, `AuthService`, `MatDialog`, `Router`
-- [ ] On init: `getBlogDates()` + `getBlogPosts(0, 5)`; page size 5 per the Overview
-- [ ] **Date navigation** at top:
+- [x] Create `pages/public/blog/blog-list/blog-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [x] Standalone component; imports `SharedModule` + ngx-markdown's standalone `MarkdownComponent`; injects `SERVER_ACCESS_TOKEN`, `AuthService`, `MatDialog`, `Router`
+- [x] On init: `getBlogDates()` + `getBlogPosts(0, 5)`; page size 5 per the Overview
+- [x] **Date navigation** at top:
   - Year dropdown from the dates response + "All Years"; Month dropdown limited to months present for the chosen year + "All Months"; Day dropdown derived client-side from loaded posts + "All Days"
   - "All Years" forces "All Months" + "All Days"; "All Months" forces "All Days"
   - Selection computes a UTC `[startUs, endUs)` range (decision 10) and reloads page 0
-- [ ] **Post rendering** per post: **the photo above everything when `has_photo`** — `<img src="/api/get_scaled_photo/blog_posts/{{post.id}}/1200/675">`, full content width, `max-width: 100%` (decision 11; reads are public, no auth needed); then name as title; "By {author} | {modified date}"; `<markdown [data]="post.body">` (sanitization on — default)
-- [ ] **Author controls:** when `hasAuthorBlog(authData)` — Edit Post → `/blog-admin/edit/:id`; Delete Post → `ConfirmDialogComponent` from **`@honuware/ui/foundation`** *(v0.1 path `shared/components/confirm-dialog` no longer exists)* → `deleteBlogPost` → reload
-- [ ] **Pagination:** Previous/Next from `total_count`, disabled at the bounds
-- [ ] Styling: card borders `1px solid #d1d5db` per house rule
-- [ ] Spec: renders posts as markdown (assert rendered HTML, e.g. `**bold**` → `<strong>`); photo `<img>` present with the scaled URL only when `has_photo`; date dropdown cascade rules; range passed to the fetch; pagination bounds; Edit/Delete only for `hasAuthorBlog`; delete confirms then reloads; empty state
+- [x] **Post rendering** per post: **the photo above everything when `has_photo`** — `<img src="/api/get_scaled_photo/blog_posts/{{post.id}}/1200/675">`, full content width, `max-width: 100%` (decision 11; reads are public, no auth needed); then name as title; "By {author} | {modified date}"; `<markdown [data]="post.body">` (sanitization on — default)
+- [x] **Author controls:** when `hasAuthorBlog(authData)` — Edit Post → `/blog-admin/edit/:id`; Delete Post → `ConfirmDialogComponent` from **`@honuware/ui/foundation`** *(v0.1 path `shared/components/confirm-dialog` no longer exists)* → `deleteBlogPost` → reload
+- [x] **Pagination:** Previous/Next from `total_count`, disabled at the bounds
+- [x] Styling: card borders `1px solid #d1d5db` per house rule
+- [x] **Spec trap — `MatDialog` resolves from the component's OWN injector.** `MatDialogModule` provides it at module scope, so a standalone component importing `SharedModule` does not get TestBed's root instance: `spyOn(TestBed.inject(MatDialog), 'open')` silently misses every call. All three blog specs create the fixture first, then `spyOn((fixture.componentInstance as { dialog: MatDialog }).dialog, 'open')`.
+- [x] **Spec trap — `<markdown>` renders asynchronously.** The two tests that assert on rendered HTML (`**bold**` → `<strong>`) are `async` and `await fixture.whenStable()` + `detectChanges()` before querying; read synchronously the body is still empty.
+- [x] Spec: renders posts as markdown (assert rendered HTML, e.g. `**bold**` → `<strong>`); photo `<img>` present with the scaled URL only when `has_photo`; date dropdown cascade rules; range passed to the fetch; pagination bounds; Edit/Delete only for `hasAuthorBlog`; delete confirms then reloads; empty state
 
-### Phase 6.2: Blog Routes & Menu
+### Phase 6.2: Blog Routes & Menu — **DONE (8/3/2026, 4 tests)**
 
-- [ ] `pages/public/public.routes.ts`: `{ path: 'blog', component: BlogListComponent }`
-- [ ] `shared/services/header/mockHeaderResponse.ts`: add a `blogButton` (`title: 'Blog'`, InternalLink, `goTo: '/blog'`) to the top-level menu between `eventsButton` and `membershipsButton` *(v0.1's "shopButton, around line 179" is stale — the Phase 1 menu rework renamed and reordered everything)*
-- [ ] Update `mockHeaderResponse.spec.ts` + `header.service.spec.ts` — both assert menu contents and will need the new entry *(missing from v0.1)*
+- [x] `pages/public/public.routes.ts`: `{ path: 'blog', component: BlogListComponent }`
+- [x] `shared/services/header/mockHeaderResponse.ts`: add a `blogButton` (`title: 'Blog'`, InternalLink, `goTo: '/blog'`) to the top-level menu between `eventsButton` and `membershipsButton` *(v0.1's "shopButton, around line 179" is stale — the Phase 1 menu rework renamed and reordered everything)*
+- [x] Update `mockHeaderResponse.spec.ts` + `header.service.spec.ts` — both assert menu contents and will need the new entry *(missing from v0.1)*
 
 ---
 
 ## Section 7: Frontend — Admin Blog Management
 
-### Phase 7.1: Admin Blog List Page
+### Phase 7.1: Admin Blog List Page — **DONE (8/3/2026, 15 tests)**
 
-- [ ] Create `pages/blog-admin/blog-list/blog-admin-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
-- [ ] Data source: **`getBlogPosts(page, pageSize, {startUs, endUs, adminView: true})` + `getBlogDates(true)`** — *not* `getFilteredTableRows` as v0.1 planned: its `FilterPair[]` is equality-only and the year/month filter is a range on `created_at_us`; the custom endpoint also keeps drafts and the right sort
-- [ ] Year/Month dropdowns with "All Years" / "All Months" ("All Years" forces "All Months"), computing a UTC `created_at_us` range
-- [ ] `mat-table`: Title, Author, Draft (chip), Created, Post Date; edit icon → `/blog-admin/edit/:id`; delete icon → `ConfirmDialogComponent` → `deleteBlogPost` → reload
-- [ ] "New Post" button → `/blog-admin/new`; paginator wired to `total_count`
-- [ ] Spec: lists rows incl. drafts; filter range passed through; edit/delete/new navigation; delete confirm; pagination
+- [x] Create `pages/blog-admin/blog-list/blog-admin-list.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [x] Data source: **`getBlogPosts(page, pageSize, {startUs, endUs, adminView: true})` + `getBlogDates(true)`** — *not* `getFilteredTableRows` as v0.1 planned: its `FilterPair[]` is equality-only and the year/month filter is a range on `created_at_us`; the custom endpoint also keeps drafts and the right sort
+- [x] Year/Month dropdowns with "All Years" / "All Months" ("All Years" forces "All Months"), computing a UTC `created_at_us` range
+- [x] `mat-table`: Title, Author, Draft (chip), Created, Post Date; edit icon → `/blog-admin/edit/:id`; delete icon → `ConfirmDialogComponent` → `deleteBlogPost` → reload
+- [x] "New Post" button → `/blog-admin/new`; paginator wired to `total_count`
+- [x] **Deviation —** `MatTableModule` and `MatPaginatorModule` are imported directly by the component; they are not part of the shared `MatImports` barrel.
+- [x] Spec: lists rows incl. drafts; filter range passed through; edit/delete/new navigation; delete confirm; pagination
 
-### Phase 7.2: Blog Editor Page
+### Phase 7.2: Blog Editor Page — **DONE (8/3/2026, 19 tests)**
 
-- [ ] Create `pages/blog-admin/blog-editor/blog-editor.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
-- [ ] Standalone; `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`, `PhotoUploadComponent` (`@honuware/ui/photos`)
-- [ ] Form fields: Name (required), Author (required, defaults to `firstName + ' ' + lastName` from `authData` in create mode), Draft checkbox (defaults checked), Post At = **Material datepicker + `<input matInput type="time">`** — the established pair from `manage/events/event-create` *(house rule: dates use date pickers, times use hour pickers — no free-text)*; converts to/from microseconds, empty → `post_at_us: null`
-- [ ] **Photo section (decision 11)** — `hw-photo-upload` with `[tableName]="'blog_posts'"`:
+- [x] Create `pages/blog-admin/blog-editor/blog-editor.component.ts` / `.html` / `.scss` / `.spec.ts` *(spec was missing from v0.1)*
+- [x] Standalone; `SharedModule`, `MarkdownComponent`, `ReactiveFormsModule`, `PhotoUploadComponent` (`@honuware/ui/photos`)
+- [x] Form fields: Name (required), Author (required, defaults to `firstName + ' ' + lastName` from `authData` in create mode), Draft checkbox (defaults checked), Post At = **Material datepicker + `<input matInput type="time">`** — the established pair from `manage/events/event-create` *(house rule: dates use date pickers, times use hour pickers — no free-text)*; converts to/from microseconds, empty → `post_at_us: null`
+- [x] **Photo section (decision 11)** — `hw-photo-upload` with `[tableName]="'blog_posts'"`:
   - Edit mode: `[tableItemId]="postId"` — upload/replace live against the row.
   - Create mode: `[tableItemId]="0" [deferUpload]="true"`; after `createBlogPost` returns the id, flush via `@ViewChild(PhotoUploadComponent)` → `if (photoUpload?.hasPendingFile) photoUpload.uploadPendingPhoto('blog_posts', id)` before navigating — the exact `manage/instructors` create-flow pattern (`instructors-admin.component.ts`).
   - **Remove photo** button (edit mode, shown when the post has a photo) → `ConfirmDialogComponent` → `deletePhoto('blog_posts', postId)` — the control has no built-in remove (verified in the photos d.ts).
-- [ ] Buttons: **Post Now** (sets Draft unchecked + Post At = now, then saves), **Save Post**, **Cancel** (→ `/blog-admin`, no save)
-- [ ] Split pane: left `<textarea formControlName="body">`, right `<markdown [data]="...">` live preview; `display: flex; gap: 1rem;` panes `flex: 1`; preview scrolls independently
-- [ ] Edit mode (`:id` param): load via `getBlogPost(id)`, populate; create mode (`new`): empty except author default
-- [ ] Save → `createBlogPost` / `updateBlogPost` → navigate to `/blog-admin`
-- [ ] Spec: create defaults (draft checked, author prefilled); edit populates from the fetch; Post Now flips draft + stamps now + saves; save maps date+time → microseconds and empty → null; cancel navigates without saving; preview renders the textarea content; create-with-pending-photo flushes `uploadPendingPhoto` with the new id; Remove photo confirms then calls `deletePhoto`. *(Mock `hasPhoto` in the spec's ServerAccess stub — `PhotoUploadComponent` calls it on init, as the instructors-admin spec notes.)*
+- [x] Buttons: **Post Now** (sets Draft unchecked + Post At = now, then saves), **Save Post**, **Cancel** (→ `/blog-admin`, no save)
+- [x] Split pane: left `<textarea formControlName="body">`, right `<markdown [data]="...">` live preview; `display: flex; gap: 1rem;` panes `flex: 1`; preview scrolls independently
+- [x] Edit mode (`:id` param): load via `getBlogPost(id)`, populate; create mode (`new`): empty except author default
+- [x] Save → `createBlogPost` / `updateBlogPost` → navigate to `/blog-admin`
+- [x] Spec: create defaults (draft checked, author prefilled); edit populates from the fetch; Post Now flips draft + stamps now + saves; save maps date+time → microseconds and empty → null; cancel navigates without saving; preview renders the textarea content; create-with-pending-photo flushes `uploadPendingPhoto` with the new id; Remove photo confirms then calls `deletePhoto`. *(Mock `hasPhoto` in the spec's ServerAccess stub — `PhotoUploadComponent` calls it on init, as the instructors-admin spec notes.)*
 
-### Phase 7.3: Admin Blog Routes & Menu
+### Phase 7.3: Admin Blog Routes & Menu — **DONE (8/3/2026)**
 
-- [ ] Create `pages/blog-admin/blog-admin.routes.ts`:
+- [x] Create `pages/blog-admin/blog-admin.routes.ts`:
   ```typescript
   const routes: Routes = [
     { path: '', component: BlogAdminListComponent },
@@ -385,12 +399,12 @@ The seam is **five** files, not four — the mock's spec is part of the seam *(m
   ];
   export default routes;
   ```
-- [ ] `app.routes.ts`: after the `manage` block —
+- [x] `app.routes.ts`: after the `manage` block —
   ```typescript
   { path: 'blog-admin', loadChildren: () => import('@pages/blog-admin/blog-admin.routes'), canActivate: [AuthGuard, AuthorBlogGuard] },
   ```
-- [ ] `mockHeaderResponse.ts`: import `hasAuthorBlog`; widen the Admin dropdown condition to `authData.isAuth && (authData.isAdmin || hasManageProducts(authData) || hasAuthorBlog(authData))`; push a "Blog Posts" item (`goTo: '/blog-admin'`) into `adminMenu` when `hasAuthorBlog(authData)` — note this makes the Admin dropdown appear for a user whose ONLY elevated permission is `author_blog`, containing just Blog Posts (intended)
-- [ ] Update `mockHeaderResponse.spec.ts`: Blog Posts present for admin and for an `author_blog`-only user, absent otherwise; Admin dropdown appears for the `author_blog`-only user
+- [x] `mockHeaderResponse.ts`: import `hasAuthorBlog`; widen the Admin dropdown condition to `authData.isAuth && (authData.isAdmin || hasManageProducts(authData) || hasAuthorBlog(authData))`; push a "Blog Posts" item (`goTo: '/blog-admin'`) into `adminMenu` when `hasAuthorBlog(authData)` — note this makes the Admin dropdown appear for a user whose ONLY elevated permission is `author_blog`, containing just Blog Posts (intended)
+- [x] Update `mockHeaderResponse.spec.ts`: Blog Posts present for admin and for an `author_blog`-only user, absent otherwise; Admin dropdown appears for the `author_blog`-only user
 
 ---
 
@@ -404,14 +418,14 @@ Phase-level checklist (dependency order; mark off with the granular boxes above)
 - [x] **3.1** Business logic + KVT + tests (needs 2.1)
 - [x] **4.1** Endpoints + tests + web_app anchors (needs 3.1)
 - [x] **4.2** Honuware: photo-write auth via table permissions (needs 1.2 to be meaningful; independent of 2.1–4.1 — admins can exercise the photo UX without it, non-admin authors need it)
-- [ ] **5.1** ngx-markdown + blog types
-- [ ] **5.2** ServerAccess seam ×5 files (needs 5.1)
-- [ ] **5.3** hasAuthorBlog + AuthorBlogGuard
-- [ ] **6.1** Public blog list page (needs 5.2)
-- [ ] **6.2** Public route + Blog menu item (needs 6.1)
-- [ ] **7.1** Admin blog list page (needs 5.2)
-- [ ] **7.2** Blog editor page incl. the photo section (needs 5.2; non-admin photo writes need 4.2)
-- [ ] **7.3** Admin routes + Admin-dropdown menu item (needs 5.3, 7.1, 7.2)
+- [x] **5.1** ngx-markdown + blog types
+- [x] **5.2** ServerAccess seam ×5 files (needs 5.1)
+- [x] **5.3** hasAuthorBlog + AuthorBlogGuard
+- [x] **6.1** Public blog list page (needs 5.2)
+- [x] **6.2** Public route + Blog menu item (needs 6.1)
+- [x] **7.1** Admin blog list page (needs 5.2)
+- [x] **7.2** Blog editor page incl. the photo section (needs 5.2; non-admin photo writes need 4.2)
+- [x] **7.3** Admin routes + Admin-dropdown menu item (needs 5.3, 7.1, 7.2)
 
 Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 
@@ -431,9 +445,10 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 - `pages/blog-admin/blog-admin.routes.ts`
 - `pages/blog-admin/blog-list/blog-admin-list.component.{ts,html,scss,spec.ts}`
 - `pages/blog-admin/blog-editor/blog-editor.component.{ts,html,scss,spec.ts}`
+- `core/guards/auth-guards.spec.ts` — new file; there was no app-side guard spec before
 
 ### MODIFY (Backend)
-- `db_schema/make_database_info.cpp`, `db_schema/CMakeLists.txt`
+- `db_schema/make_app_tables.cpp` *(not `make_database_info.cpp` — see 1.2)*, `db_schema/CMakeLists.txt`
 - `database_helper/create_database.cpp` — the 11 registration points in Phase 1.2
 - `sql_util/table_helpers/CMakeLists.txt`, `business_logic/CMakeLists.txt`, `endpoints/CMakeLists.txt`
 - `endpoints/web_app.cpp` — include + `RegisterAllEndpoints()` anchors
@@ -446,8 +461,8 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 ### MODIFY (Frontend)
 - `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccessNetwork.ts`, `ServerAccess.mock.ts`, `ServerAccess.mock.spec.ts`, `ServerAccess.ts` (proxy)
 - `core/services/auth.types.ts` (+ `hasAuthorBlog`), `core/guards/auth-guards.ts` (+ `AuthorBlogGuard`)
-- `shared/services/header/mockHeaderResponse.ts` + `mockHeaderResponse.spec.ts` + `header.service.spec.ts`
-- `app.routes.ts`, `pages/public/public.routes.ts`, `app.config.ts` (`provideMarkdown()`)
+- `shared/services/header/mockHeaderResponse.ts` + `mockHeaderResponse.spec.ts` — `header.service.spec.ts` needed **no** change; it does not pin the menu contents
+- `app.routes.ts`, `pages/public/public.routes.ts` — `provideMarkdown()` lives on these route trees, **not** `app.config.ts`, which was left untouched (see 5.1)
 - `package.json` (ngx-markdown + marked); `angular.json` untouched
 
 ### Key existing pieces to reuse (verified 8/3/2026)
@@ -473,7 +488,7 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
   `MSYS_NO_PATHCONV=1 docker run --rm --network knotty-net -v "C:/Users/mason/source/repos/knottyyoga/server:/src" -v "C:/Users/mason/source/repos/server_components:/honuware" -v honuware-conan2:/root/.conan2 -v knottyyoga-linux-build:/build -e HONUWARE_SRC_DIR=/honuware -e HONUWARE_DB_SSLMODE=disable -w /src knottyyoga_build:latest bash docker_project/build_and_test.sh`
   During development, filter with `"--gtest_filter=BlogPostsTest.*:BlogHelperTest.*:BlogKeyValueTableTest.*:BlogPostsEndpointTest.*"` — and confirm the filtered run reports a **non-zero** test count (a test file missing from CMakeLists still exits 0).
 - [x] **Honuware (Phase 4.2 only): 1503 tests passed** in the server_components docker client (8/3/2026) (`server_components/docker/build_and_test.sh` — exact `docker run` invocation in the `reference_linux_docker_build_clients` memory), then the app suite green against the co-dev tree before pushing + bumping the pin.
-- [ ] **Angular** (bare commands from the `ui/` working directory): `npx tsc --noEmit -p tsconfig.app.json` + `-p tsconfig.spec.json` clean; `npx ng test --watch=false --browsers=ChromeHeadless` full suite green; `npx ng build` clean; `npx ng lint` no new findings vs baseline
+- [x] **Angular green (8/3/2026): 2905 tests passed** (up 77 from 2828 — 13 mock spec + 8 guard + 18 public list + 15 admin list + 19 editor + 4 header). Bare commands from the `ui/` working directory: `npx ng test --watch=false --browsers=ChromeHeadless` → `TOTAL: 2905 SUCCESS`; `npx ng build` clean; `npx ng lint` **262 problems, all pre-existing** — every finding is `no-explicit-any` / `no-unused-vars` in files this feature never touched, and the four new blog files plus `auth-guards.spec.ts` produce none. The five `ServerAccess*` files do appear in the report, but every reported line predates the blog block (mock.ts max 6518 < the blog methods; mock.spec.ts max 7169 < 7619; ServerAccessNetwork max 2153 < 2267).
 - [ ] Database recreate succeeds *(not yet run — needs `HONUWARE_ALLOW_DESTRUCTIVE=1` against the live dev DB)*: `knottyyoga_database_helper --recreate_database` (with `HONUWARE_ALLOW_DESTRUCTIVE=1`) — blog_posts created, author_blog present, photo support registered
 
 ### Live hand-testing (blank DB + real create_database seed data, via the web UI)
