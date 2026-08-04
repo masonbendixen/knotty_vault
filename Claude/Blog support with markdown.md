@@ -21,7 +21,7 @@ There should be a new top level menu entry that required no permissions called B
 
 # Blog Feature with Markdown Support — Implementation Plan
 
-> **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: full app suite **4727 passed** (up 59: 55 new blog tests + 4 honuware photo tests) and the full honuware suite **1503 passed**. **Remaining before this ships: push honuware and bump the pinned `GIT_TAG` SHA** in the app's top-level `CMakeLists.txt` — the app currently reaches Phase 4.2 only through the co-dev mount. Three things worth knowing, detailed inline:
+> **Sections 1–4 (all server work) implemented 8/3/2026.** Gates green: full app suite **4727 passed** (up 59: 55 new blog tests + 4 honuware photo tests) and the full honuware suite **1503 passed**. Honuware was pushed (CI green) and the app's pinned `GIT_TAG` bumped to `c258a8c` the same day, verified by a **pinned-SHA build** (no co-dev mount, dedicated `knottyyoga-linux-build-pinned` volume; log confirms `honuware : pinned SHA (FetchContent will clone it)`). Three things worth knowing, detailed inline:
 > 1. 🐞 **Postgres type-inference bug caught by the tests.** A bare `$1 = 0` guard types the parameter as **int4**, so a real microsecond timestamp overflows at bind time. It only fires once a caller passes a non-zero bound — the unbounded feed tests passed while every filtered one threw. Every parameter is now cast explicitly (`$1::bigint`). See 2.1.
 > 2. **`table_item_photos.table_name` is a FOREIGN KEY into `photo_support_tables`**, so nothing can be attached to a table that isn't registered for photo support. Real databases get the row from `create_database.cpp`; test databases have the tables but not the seed rows, so photo tests must register it themselves. See 3.1.
 > 3. **The plan named the wrong file for table registration.** `MakeBlogPostsTable` goes in `make_app_tables.cpp` (the app half), not `make_database_info.cpp` (which just stacks framework + app). See 1.2.
@@ -255,7 +255,8 @@ All changes in the **server_components** repo (`components/platform/`); co-dev v
 - [x] `endpoints/upload_photo.cpp`: general-table path uses `RequireTableWriteAccess` instead of the `IsAdmin` check (`upload_user_photo` untouched).
 - [x] `endpoints/delete_photo.cpp`: same swap, keeping the "non-admin may delete their own `people` photo" carve-out.
 - [x] Framework tests (`honuware_tests`) — 4 new cases: non-admin with a table grant can upload + delete on that table; same user 403 on an ungranted table; plain logged-in user 403 on a base-allow-listed table (the `IsTableAllowed` trap, pinned by a test); anonymous 401; admin unchanged; people self-photo carve-out unchanged.
-- [x] Gate: honuware photo-endpoint suites green in the honuware docker client; the app builds and its 55 blog tests pass against the co-dev tree. **Still to do before this ships: push honuware and bump the `GIT_TAG` SHA in the app's top-level `CMakeLists.txt`** (git writes are Mason's call), plus a full run of both suites.
+- [x] Gate: honuware photo-endpoint suites green in the honuware docker client; full honuware suite **1503 passed**; full app suite **4727 passed** against the co-dev tree.
+- [x] **Pin bumped 8/3/2026** — Mason pushed honuware (CI green) at `c258a8c1776e32932ff0c89a0d0c4d3253891c75` ("Blog support server side"); the app's top-level `CMakeLists.txt` `GIT_TAG` moved from `3b1c3dc` to that SHA, verified against `origin/HEAD` via `ls-remote` before editing.
 
 ---
 
@@ -438,9 +439,9 @@ Backend (1.1–4.1) completes before frontend; 5.1/5.3 can start any time.
 - `endpoints/web_app.cpp` — include + `RegisterAllEndpoints()` anchors
 
 ### MODIFY (Honuware — server_components repo, Phase 4.2)
-- `components/platform/endpoints/endpoint_auth_helper.h/.cpp` — new `RequireTableWriteAccess`
+- `components/platform/endpoints/endpoint_auth_helper.h/.cpp` — new `RequireTableWriteAccess` + the extracted `GetPermissionGrantedTables`
 - `components/platform/endpoints/upload_photo.cpp` + `delete_photo.cpp` — auth swap (+ their `_test.cpp` files)
-- App top-level `CMakeLists.txt` — honuware `GIT_TAG` pin bump once pushed
+- App top-level `CMakeLists.txt` — honuware `GIT_TAG` bumped to `c258a8c` ✅
 
 ### MODIFY (Frontend)
 - `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccessNetwork.ts`, `ServerAccess.mock.ts`, `ServerAccess.mock.spec.ts`, `ServerAccess.ts` (proxy)
