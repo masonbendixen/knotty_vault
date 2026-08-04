@@ -3,8 +3,8 @@ fileClass: Reference
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 7/19/2026
-Version: 0.2
+Last Updated: 8/4/2026
+Version: 0.3
 tags: 
 ---
 
@@ -352,3 +352,111 @@ Everything else can come later.
 	- [[Home page work and cleanup items]]
 	- Classes Phase XXX (1-16)
 - I don't want you to update the stuff that already exists since he has already based his work on that, but I'd like you to add sections below this one for work for these new sections. The changes to the home page, the menu structure, blog support, getting started guide. classes / series / workshops, the calendar, and general cleanup need some new changes. A bigger change is that I want the frontend to support multiple users so it would be nice to abstract the home page images, color scheme, fonts, and a lot of the text for Knotty Yoga, the about page, and getting started so that new users can use the site as is but support a "theme." The more I think about it, it might be better to tackle the theme support as a separate document entirely (but be theme aware in this document). Can you start a plan below this section based on these updates?
+
+---
+
+# ⚡ Delta punch list #2 — what changed while you were in Figma (8/4/2026)
+
+*(Claude, responding to Mason's section above.)* Everything **above** Mason's section is frozen — it's the doc your current Figma pass was built against, so none of it has been rewritten. This section is the complete delta since 7/19, in the same style: **🆕** new, **✏️** existed but changed enough to revisit, **🚫** explicitly not designed. One **new marker: 🎨 = theme-flexible** — the item contains brand content (name, logo, colors, photos, copy) that will differ per studio; the "multi-studio" section right below explains what that means for how you design.
+
+Three waves landed since 7/19:
+
+1. **Navigation & home rework** — the menu flattened to direct links, two public pages traded names and URLs, the home page was recomposed for both auth states, and "Get Started" finally opens a real page.
+2. **A blog** — a public reading page with markdown posts and per-post photos (plus back-office authoring, which you skip).
+3. **Multi-studio / whitelabel** — the deep one. The same app will soon serve other studios, each with its own branding. It changes *how* you design more than *what* you design.
+
+## The big one first: the site is going multi-studio 🎨
+
+Mason is turning the platform into a product other studios can run. The server side is already multi-tenant, and the frontend already boots by asking the server "who am I?" — the studio's display name, website URL, and logo arrive from an API at load, and the footer's address / contact email / copyright name plus the About text are already centralized behind a config service with Knotty Yoga's values as fallbacks. Next in line: the hero copy, the Getting Started copy, colors, and fonts.
+
+**Decision (Mason, 8/4/2026): full theme support becomes its own companion document** — a third doc alongside the makeover plan and this inventory. It will fuse Website Makeover Phase 5 (DB-driven theme tokens + a `/api/site_theme` bootstrap endpoint + an admin "Site Theme" page — already sketched there) with the tenancy plan's shipped branding hooks, and it will own the token catalog and the full content-slot inventory. **This document stays the component/screen inventory** and just marks what must flex with 🎨.
+
+What it changes about how you design — five rules:
+
+1. **The tokens are the brand.** The Figma Variables layer (makeover Phase 1.1.A) stops being a nicety and becomes the product: another studio is *another set of token values plus different images and text, with zero layout changes*. Build every component off the variables; never hard-code a brand color into a component.
+2. **Brand content is a slot, not a fixture.** Treat the logo, studio name, hero headline, tagline, photos, and marketing copy as **content slots with size constraints** (max logo box, name length, headline line count) — Knotty Yoga's actual values are just the sample content filling them.
+3. **Type styles by role, not by font name.** D-DIN is a Knotty Yoga token *value*, not part of the system. Name text styles `display / heading / body / caption` so another studio can swap the font family without touching a single frame.
+4. **Prove it once with a fake second studio.** One Home frame + header rendered with an invented brand (different palette, different logo shape, longer studio name, different photos) is the cheapest possible proof the layouts don't secretly depend on Knotty Yoga's assets. Worst-case content matters: a wide logo, a two-line studio name, a missing photo.
+5. **No brand baked into artwork.** Nothing Knotty-specific lettered into imagery, icons, or decorative elements — those must survive a studio swap untouched.
+
+**Content-slot inventory** (what varies per studio — today's values are the sample content):
+
+| 🎨 Slot | Where it shows | Knotty Yoga sample value |
+|---|---|---|
+| Studio display name | Header logo alt, footer copyright, page copy, emails | "Knotty Yoga" |
+| Logo | Header (light-on-dark SVG today) | `KnottyYoga_logo_white.svg` |
+| Secondary hero image | Home hero, right side | The safe-space logo |
+| Hero headline + subline | Home | "Knotty Yoga Is An Inclusive, High-Level Acrobatic Fitness Studio." / "Get into the best shape of your life, the right way." |
+| Tagline | Footer | "That which doesn't kill you / makes you hotter. 💪🤸" |
+| Address + contact email | Footer | Redmond address / info@knottyyoga.com |
+| Social links | Footer | Current icon row |
+| About page copy | `/about` (and the About ▾ menu label "About Knotty Yoga") | Current blurb |
+| Getting Started copy | `/start` | The seven steps' text |
+| Gallery / carousel photos | Home | Already DB-driven (`/api/home_page_photos`) |
+| Membership tier names + marketing copy | Home, Memberships | "Knotty Yoga Gold …" tiers, "Unlimited classes, priority sign-ups…" |
+| Colors, fonts, radius | Everywhere | The token values (the red, D-DIN, …) |
+
+## Menu — flattened (✏️ Header + ✏️ Mobile Menu Drawer)
+
+The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is obsolete — the per-class dropdowns are gone entirely. The live model, one refresh pass across your header/drawer frames:
+
+- **Signed out:** `Get Started · About ▾ · Our Classes · Services · Upcoming Events · 🆕 Blog · Memberships · Sign In`
+  - **About ▾** = About Knotty Yoga 🎨 (the label carries the studio name) · Instructors · Gallery. The only surviving dropdown for visitors.
+  - **Our Classes** and **Services** are now *direct links* — no dropdowns, no per-class entries, no "All Classes" entry (that page is reached from the schedule page instead).
+  - **Memberships** replaced the "Shop" label (same target — the shop sells only memberships today).
+- **Signed in appends:** `Your Calendar · Staff (staff only) · Admin ▾ · {first name}`
+  - **Admin ▾** = Manage Data (admins) · Manage Products (admins + product managers) · **🆕 Blog Posts** (admins + blog authors). For a user whose only elevated permission is blog authoring, the dropdown holds *just* Blog Posts — intended.
+  - **Account dropdown** = Profile · My Purchases · My Bookings · My Subscriptions · Sign Out. The dead "My Goals" / "My Classes" are gone, the redundant "Memberships" entry is gone, and the trigger now shows the user's **profile photo as the avatar**.
+- The 7/19 ask still stands: give mobile a cart affordance (the badge is desktop-only in code).
+
+## Two pages traded names — fix the frames before anything else
+
+| Your 7/19 frame | What happened | New Figma name | What to do |
+|---|---|---|---|
+| **Public / Our Schedule** (`/schedule`) | Renamed **"Our Classes"**, moved to `/classes` (`/schedule` redirects), and **rebuilt** — no longer read-only | **Public / Our Classes** | Rename the frame, then apply the ✏️ redesign below |
+| **Public / Classes** (`/classes`) | Renamed **"All Classes"**, moved to `/classes/all`; reached from the schedule page's "Browse all classes" button, not the menu | **Public / All Classes** | Rename only — content as you designed it, plus a "View the calendar" header action |
+
+## New and rebuilt screens
+
+| Figma frame name | URL | What it shows |
+|---|---|---|
+| 🆕 **Public / Blog** 🎨 | `/blog` | Public blog, a single ~830px column. Top: a **date navigator** — Year and Month dropdowns *always visible*, defaulting to "All Years" / "All Months" (Month works without a year: "March" = March in *every* year), plus a Day dropdown that appears only once both are chosen. Then post cards, 5 per page: optional **photo banner** above everything (rendered at natural size, centred, capped ~350px tall — never stretched), title, byline "By {author} • {date}", and the body **rendered from markdown** — headings, bold, lists, links, blockquotes, code blocks. Signed-in blog authors additionally see an Edit Post / Delete Post row per card (delete confirms first). Previous/Next pager at the bottom; empty state ("No posts here yet — check back soon.") and an error state. Posts are tenant content — design the card, not the words. |
+| 🆕 **Public / Getting Started** 🎨 | `/start` | The "Get Started" menu item finally opens a real page: **seven numbered step cards**, each an icon + title + a couple of sentences + exactly one CTA — 1 Try an intro workshop → Events · 2 Create your account → Register · 3 Pick your membership → Memberships · 4 Plan your weekly schedule ("a plan, not a booking") · 5 Show up and check in → Our Classes · 6 Workshops and series · 7 Stay in the loop → Notification Preferences. Signed in, step 2 disappears and the numbering **closes up** (1–6, no gap). Footer CTA back to Events for the undecided. All copy is 🎨 sample content. |
+| ✏️ **Public / Home** 🎨 | `/` | **Recomposed top to bottom — treat as a new design.** Order: photo carousel (now the Gallery anchor) → hero (headline + subline + secondary brand image — all 🎨 slots) → **Get Started banner** (copy varies: "New here? …" vs "Not sure what to do next? …" + a "Show me how" button) → *then it branches.* **Visitors:** "Upcoming events" — up to 4 curated featured-event cards (name, when, facility, price, Book Now; View All Events link; empty state). **Members:** "Your upcoming events" (their 3 soonest bookings, Waitlisted chip, "All my bookings" link — hidden when empty) then "Events you could sign up for" (4 soonest not-yet-booked, Book Now — hidden when empty). → *Both:* the **Series & workshops coming up** panel, **expanded by default** (new building block below). → **Membership tiers** (shared tier cards + "See all memberships"): visitors always; members **only when they hold no membership**, headed "Become a member". → Members only: **"Upcoming classes"** — the embedded next-few-days class planner with per-row "I'll be there" / "I can't make it" toggles and a "Plan your weekly schedule" link. Copy rule from Mason: the window length (4 days) is *never* stated in any heading or copy. The old single "Next Upcoming Event" card is gone. |
+| ✏️ **Public / Our Classes** | `/classes` | The rebuilt schedule page — **no longer read-only**. Header row: title + actions ("Browse all classes"; signed-in: "Plan your weekly schedule"; signed-out: "New here? Get started" + "Sign in"). Then a **collapsed** Series & workshops panel. Then a toolbar: week navigator (Previous / This week / Next week + a week label), a **My Schedule / Full Schedule** segmented toggle (signed-in only — signed-in defaults to *eligible classes only*; visitors always see everything), and a facility dropdown (only when >1). Body: Sun–Sat day sections of horizontal class cards — photo, name (→ class detail), time · duration, facility, instructor "with {name}" (+ substitute note), "Requires attending: {class}" prerequisite line — **plus a calendar-style status chip on the right** of every row: the attend toggle ("I'll be there" ⇄ plan), Booked / Waitlisted, Sold out, "Sign-ups open {date}" + Remind me, Cancelled, or a lock. Same chip vocabulary as Part 1's Calendar Event Chip, in a new compact in-row context. Still no prices on this page. Empty states: per-day "No classes", whole-week empty, and the filtered-empty "Your current filters hide everything." + a Show-full-schedule reset. |
+| ✏️ **Public / Class Detail** | `/classes/:id` | The Upcoming Sessions section changed per class kind: **recurring** classes lost the (previously unbounded) session list entirely — replaced by a "When it runs" card ("just show up") + a **"See this class on the calendar"** CTA; **workshops** keep a bookable list but capped at the next **5**, with "See all dates on the calendar" below (+ a "Showing the next 5 dates." note when the cap hides some); **series** keep the runs/buy section unchanged, + the calendar link. |
+| ✏️ **Account / Workshops & Series** | `/my/upcoming-offerings` | The inert "Sign-ups are open" text became **real Book buttons** — open offerings book straight into the series-booking / event-booking flow. Same signup-window vocabulary otherwise. |
+| ✏️ **Calendar / Home** | `/calendar` | Two behavior notes, no visual rework: the toolbar gains a **"My weekly plan"** link (signed-in only, next to the mode toggle), and clicking an eligible open-window series/workshop now routes **straight into the booking flow** rather than to the class page. |
+
+## New building blocks (Part 1 additions)
+
+- **🆕 ★ Offering Highlight Panel** — the expandable "Series & workshops" panel used on **three** pages: Home ("Series & workshops coming up", expanded), Our Classes (collapsed), Upcoming Events (expanded). Collapsed: a single row — chevron, heading, "(N)" count, and a truncating names summary. Expanded: one row per offering — square class photo (icon fallback), class name (→ class detail), a **Series/Workshop kind chip**, optional subtitle, a when-line (date range + "N sessions" for series; date · time for workshops; an "Already under way" tag for prorated mid-run joins), a price line ("$X" + "($Y per session)"), and a right-side action that is exactly one of: **Book** button · "Sign-ups open {date}" text · a **locked** button (lock icon, e.g. members-only). *Code name: `offering-highlight`.*
+- **🆕 ★ Blog Post Card** 🎨 — photo banner slot (natural size, centred, max-height capped — never upscaled), title, byline, prose body, optional author-controls row (Edit / Delete). *Code: the post card in `blog-list`.*
+- **🆕 ★ Prose / long-form text styles** 🎨 — the blog renders arbitrary markdown, the site's first true long-form surface: define styles for h1–h3, paragraph, bold/italic, links, ul/ol, blockquote, inline code, and code block *inside a post body*. Make them Figma text styles tied to the token layer, so another studio's font swaps through them.
+- **🆕 Date Navigator (Year / Month / Day)** — three dropdowns defaulting to All-everything; only periods that actually contain posts are offered; **Month is independent of Year** ("March in any year"); Day appears only when both are set. Public blog (+ the blog admin list, which is 🚫).
+- **🆕 Membership Tier Card** 🎨 — extracted and now shared between the Memberships catalog and the home page: tier name, description, monthly price, Subscribe CTA. Tier names/copy are tenant content. *Code name: `membership-tier-cards`.*
+- **🆕 Getting Started Step Card** 🎨 — numbered card: number, icon, title, 1–2 sentences, exactly one CTA button. Numbering must close up when a step is hidden.
+- **🆕 Get Started Banner** 🎨 — the home-page CTA panel: short copy (two auth variants) + one button.
+- **🆕 Home Summary Card** — the small card the home page repeats for bookings / featured events / could-sign-up events: name, when, facility, optional price + Book Now, optional Waitlisted chip. Worth one clean component with those option slots; today it's three near-identical bespoke blocks.
+- **✏️ Calendar Event Chip** — no new states, but one new *context*: the compact chip now sits at the right edge of a photo class-row on Our Classes. Check your chip reads well inside a row layout, not just inside calendar cells.
+
+## 🚫 Not your problem (new since 7/19)
+
+- **Blog authoring** — the Blog Posts admin list (status chips Draft / Scheduled / Published / No date, year–month filters, table) and the **editor** (title/author/draft/post-date form, photo upload, split-pane markdown editor with live preview, Post Now / Save / Cancel). Back office; composes from your blocks. *(Optional exception, same spirit as Staff Check-In: the editor is the one back-office screen a blog author lives in — a pass on the split-pane editor would be welcome if you have spare time, but nothing blocks on it.)*
+- **Admin data-editor cleanups** (read-only field handling, date formatting, enum dropdowns) — invisible restyle targets.
+- **Everything multi-tenant on the server** — tenancy is invisible in the UI beyond the 🎨 slots above.
+
+## Quick wins #2 (priority order for this batch)
+
+1. **Header + Mobile Menu Drawer refresh** — the flat menu shows on every page; cheapest site-wide win.
+2. **Public / Home** — the recomposition touches the highest-traffic frame you have.
+3. **Public / Our Classes** — top-traffic page and the new chip-in-row interaction column.
+4. **Public / Blog + the prose text styles** — the prose styles outlive the blog (any future long-form content reuses them).
+5. **Public / Getting Started** — seven cards, quick to compose from Button/Card/Icon.
+6. **The 🎨 pass** — variable-ize the brand slots in your Foundations file and produce the one fake-studio proof frame. This is the piece the future theming doc builds on, so it's the highest-leverage hour after the screens.
+
+## Open questions (Mason — answer inline)
+
+- **OQ-D1 — Blog editor:** keep it strictly 🚫, or take the optional-exception design pass? *(Recommendation: leave it 🚫 — it composes fine from the blocks.)*
+- **OQ-D2 — The theming document:** ready for me to draft `Tenant Theming and Branding.md` (token catalog + content-slot inventory + the admin "Site Theme" page, fusing Website Makeover Phase 5 with the shipped tenancy branding hooks)? *(Recommendation: yes — nothing in Ryan's current batch depends on it, so it can start any time.)*
+- **OQ-D3 — Fake second studio frame:** worth ~an hour of Ryan's time as the theme-proof (rule 4 above)? *(Recommendation: yes — one Home + header frame is enough.)*
