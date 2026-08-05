@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/4/2026
-Version: 0.5
+Version: 0.6
 tags: 
 ---
 
@@ -471,18 +471,23 @@ His → doc name: Event session card → **Event Session Card** · Section heade
 - **Trailing spaces break exact-name mapping:** "Tertiary button ", "Upcoming events ", "Account > User information ", "Service calendar > Massage ".
 - **Anonymous top-level frames** in Foundations (Frame 23/47/49/68/125/198…) — name or fold them.
 
-### ❓ Four things only Ryan can answer (map or rename)
+### ❓ Four things only Ryan can answer (map or rename) — ✅ all settled 8/4/2026
 
 - **Fill in the blank** — which doc block is this?
 	- Mason- Ryan and I are unsure what you mean by this. Can you elaborate?
+	- Claude- It's the literal name of a component **in Ryan's Foundations page** — I didn't coin it. It sits at roughly x 498, y −1052 (left side, above the color palette): a 27px circle with three variants — plain grey circle, and one with a white ring + a 17px **red dot** (`#ED1C26`) inside. That anatomy is a **Radio Button** (the "fill in the blank" is the dot). Rename it **Radio Button** — and since the doc's Part 1 never listed a radio atom (it only appears implicitly inside Payment Method / Card Picker), consider **Radio Button** officially added to the Foundational form controls as of this audit. Variants should be `State=Unselected / Selected / Disabled`.
 - **Week calendar** — is it the **Date Strip / Week Navigator** (service booking) or a calendar view piece?
 	- Mason- This is the date strip for service booking.
+	- Claude- ✅ Rename it **Date Strip / Week Navigator**.
 - **Calendar / Calendar select / Calendar button** — is this trio the **Date Picker**?
 	- Mason- Yes
+	- Claude- ✅ Fold the three into one **Date Picker** component (Calendar select / Calendar button become its variants or internals), and the `Date Picker*` entry comes off the missing-components list.
 - **TV - 1** (1106×623 frame on Screens) — what is it?
 	- Mason- We are unsure what you are talking about.
+	- Claude- It's a frame on the **Screens page, far right of the grid** — at roughly x 2642, y 2658, sized 1106×623 (≈16:9) — containing nothing but a white **play-arrow icon**. It reads as a video-player placeholder, probably pasted and forgotten. If it's meant for something (a studio-TV display? an embedded video block?), name it for what it is; otherwise delete it.
 - (Extras that are fine but unmapped: Card_product, Card_account, Card_split — if they stay, the underscore naming should at least become `Card / Product` style. KnottyYoga_Logo + SafeSpace_icon are 🎨 slots — name them **Logo** and **Hero Secondary Image** so the theming work lands on slots, not brand names.)
 	- Mason- So just rename these to be Card / Thing?
+	- Claude- ✅ Yes, slash style to match `Card / Surface`: **Card / Product**, **Card / Account**, **Card / Split** — with one exception: `Card_membership` should become **Membership Tier Card**, because that exact name already exists in this doc (Delta #2) and the code has the matching shared component. And the two brand assets rename to **Logo** and **Hero Secondary Image** as above.
 
 ### ✏️ Screens — rename map (his → doc)
 
@@ -504,10 +509,43 @@ His → doc name: Event session card → **Event Session Card** · Section heade
 ### ❌ Not in the file yet (the honest gap list)
 
 - **Mobile: zero 375 frames — every screen is 1440-wide desktop only.** This is the single biggest gap vs the locked scope (375 + 1280, mobile first). Also note desktop is 1440 vs the doc's 1280 — fine either way, but pick one and it becomes the standard (updating the doc to 1440 is a one-line change if that's his canvas).
-- **Screens (29 of 44 in scope):** all Auth (Login/Register/Verify), Shop Catalog / Product Detail / Cart / Checkout / Subscription Signup / Series Booking, Public Class Detail / **Our Classes** (rebuilt schedule — top traffic) / Blog / Getting Started / Provider Bio, **Calendar / Home**, and the Account wave (Profile Edit, Change Password, Purchase History + Detail, My Events, Saved Cards, My Subscriptions + Detail, Gift Permissions, My Vouchers, My Skills, My Schedule, Today's Classes, Workshops & Series, Notification Preferences, Attendance History, Favorite Instructors).
-- **Components:** the July-wave blocks (Tag Chip, Filter Chip Row, **Calendar Event Chip/Card**, Kind Badge, Favorite Toggle, Skill Chip + Prerequisite Banner, Attendance/Booking Status Chips, Signup-Window Indicator, Segmented Toggle, Week Navigator, Eligible-Slot Checkbox Card, Attendance Plan Row, Series Run/Summary/Rollup, Coupon & Voucher Panel, Guest Booking Fieldset, Skill Badge Card, Skill Requirement Dialog, Inline Cancel Flow) + the base set still open (Date Picker*, Alert Card, **Empty State**, Spinner, Data Table / List, **Mobile Menu Drawer**, Sticky Bottom Action Bar, Bottom Sheet, Native Payment Buttons) + the Delta #2 additions (Offering Highlight Panel, Blog Post Card, Prose text styles, Date Navigator, Getting Started Step Card, Get Started Banner, Home Summary Card). *\*possibly covered by his Calendar/Week calendar components — see the ❓ list.*
+- **Screens (32 of 44 in scope):** all Auth (Login/Register/Verify), Shop Catalog / Product Detail / Cart / Checkout / Subscription Signup / Series Booking, Public Class Detail / **Our Classes** (rebuilt schedule — top traffic) / Blog / Getting Started / Provider Bio, **Calendar / Home**, and the Account wave (Profile Edit, Change Password, Purchase History + Detail, My Events, Saved Cards, My Subscriptions + Detail, Gift Permissions, My Vouchers, My Skills, My Schedule, Today's Classes, Workshops & Series, Notification Preferences, Attendance History, Favorite Instructors). *(12 of 44 are covered by his existing desktop frames — the mapping table above.)*
+- **Components:** the July-wave blocks (Tag Chip, Filter Chip Row, **Calendar Event Chip/Card**, Kind Badge, Favorite Toggle, Skill Chip + Prerequisite Banner, Attendance/Booking Status Chips, Signup-Window Indicator, Segmented Toggle, Week Navigator, Eligible-Slot Checkbox Card, Attendance Plan Row, Series Run/Summary/Rollup, Coupon & Voucher Panel, Guest Booking Fieldset, Skill Badge Card, Skill Requirement Dialog, Inline Cancel Flow) + the base set still open (Alert Card, **Empty State**, Spinner, Data Table / List, **Mobile Menu Drawer**, Sticky Bottom Action Bar, Bottom Sheet, Native Payment Buttons) + the Delta #2 additions (Offering Highlight Panel, Blog Post Card, Prose text styles, Date Navigator, Getting Started Step Card, Get Started Banner, Home Summary Card). *(Date Picker and Date Strip / Week Navigator came off this list — the ❓ answers confirmed his Calendar trio and Week calendar are exactly those, pending rename.)*
 
 Mason- Let's put together a plan. What do we need to do to start to integrate his work into my project? I'm guessing there is cleanup and standardization work I could do with you to get all the components CSS and so forth to move from a bunch of bespoke individual, separate CSS files into a standard file so that we can better integrate his stuff? Can we pull some of the work he's done over now to get the site looking more like his design? Can we create a list of things to get where we want to eventually?
+
+Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the bespoke-CSS → standard-file consolidation is real, already scoped as [[Website Makeover]] Phase 2, and can start **immediately with zero Ryan dependency**; **(2)** yes, some of his work ports over *now* — his palette is already mined from the file (details in Track A), and once the shared classes exist, restyling the atoms he's finished restyles every page at once; **(3)** Track D is the eventually-list. The heavy engineering detail stays in [[Website Makeover]] (its Phases 2–4 are exactly this work — note its "Current State" is a 5/19 snapshot, so each phase gets re-grounded at execution); this section is the sequencing against today's reality.
+
+### 🧩 Integration plan — getting Ryan's design into the product
+
+**Track A — Lock the design tokens (with Ryan, ~one session).** The bridge between his Figma and the code is the CSS-variable token layer — the same layer [[Tenant Theming and Branding]] Phase 4 later serves per-tenant and [[Website Makeover]] 2.1 specs. Build it once; every other track consumes it.
+
+- [x] Mine his palette from the live file *(done 8/4 via the API)*: **primary `#ED1C26`** — note this is NOT the code's current red (`#F50C22`); his is presumably the intended brand value — plus ink `#000000`, surface `#FFFFFF`, surface-tint `#F3F3F3`.
+- [ ] Ryan fills the palette gaps: accent (does the code's orange survive?), neutral text grey, and the four status tones (his **Badge** component's Success/Warning/Danger/Info fills are probably already them — confirm and promote to the palette), plus radius + type scale as Figma Variables (the 1.1.A deliverable), using the theming doc's Token Catalog names or his own (reconcile there — his win).
+- [ ] Us: write the token stylesheet — `--theme-*`, `--font-*`, `--radius-*` with his values as the defaults, legacy `--red`/`--orange` aliased onto it so every existing `theme-red` Tailwind usage restyles instantly.
+
+**Track B — CSS consolidation (us, no Ryan dependency — the "bespoke → standard" work).** [[Website Makeover]] Phase 2, executed with today's facts (the `@honuware/ui` library is already de-Tailwinded and bans hardcoded colors, so it restyles through the variables for free):
+
+- [ ] One shared **surface-card** class replacing the `border: 1px solid #d1d5db` duplicated across **56+ component SCSS files** (the single worst offender).
+- [ ] Shared **badge/status** classes replacing the ~10 bespoke `.status-badge` / `.role-badge` / `.applied-badge` implementations, mapped onto the five Badge tones.
+- [ ] Shared **page-header/back-nav**, **empty-state**, and **form-layout** patterns (each currently re-implemented per page).
+- [ ] **Material theme realigned to the tokens** (makeover 2.3) — buttons, toggles, spinners pick up brand color from `--theme-primary` instead of the stock indigo.
+- [ ] A **style-guide page** rendering every token + shared class — the safety net for the sweep, and later the theming doc's preview surface.
+- [ ] Then the mechanical sweep replacing bespoke SCSS with the shared classes, **one layer at a time with test gates between layers**: controls/shared → public → shop → account; the back office inherits.
+
+**Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
+
+- [ ] Atoms first, biggest leverage: Button (his three kinds), Text/Long Text inputs, Checkbox + Radio, Dropdown, Card, Badge, Avatar, Toast/Tooltip/Modal, Pagination — because they restyle through the shared layer, every page shifts at once.
+- [ ] **Header + Footer** to his design — the largest single visual change on every page (both are 🎨 slots, so his layout + token values, no hardcoded brand).
+- [ ] Per-screen layout polish for the **12 screens he has designed** (desktop): Home, About, Instructors + Detail, All Classes, Upcoming Events, Service Catalog + Booking flow, Subscription Catalog, Event Booking, Profile, Account Home. Mobile keeps today's responsive behavior until his 375 frames exist — no guessing at layouts he hasn't drawn.
+
+**Track D — The "eventually" list (standing backlog, in order).**
+
+- Ryan: the ✏️ rename pass → mobile frames for what exists (Home + Header/Drawer first) → the missing 32 screens + July/Delta components, per the two Quick-wins lists → Figma Variables + the fake-studio proof frame.
+- Us: makeover Phase 3's mobile additions (Sticky Bottom Action Bar, Bottom Sheet, native Apple/Google Pay buttons), dark mode (makeover Phase 6, consuming theming D8's structure), optional visual-regression CI — and then [[Tenant Theming and Branding]] Phases 1–8 turn the whole token/content layer per-tenant.
+- Dependency note: Track A's variable file is shared ground between makeover 2.1 and theming Phase 4 — whichever lands first creates it, the other consumes.
+
+**Sequencing:** A needs Ryan (start while he's around); B can start tomorrow and runs parallel to anything; C follows A+B; D is the backlog. First visible payoff = A + the Material realignment + Header/Footer — the site reads as "his design" site-wide before a single screen is individually polished.
 
 ### Suggested order (fits the quick-wins lists)
 
