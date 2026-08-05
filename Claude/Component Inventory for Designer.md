@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/4/2026
-Version: 0.6
+Version: 0.7
 tags: 
 ---
 
@@ -453,8 +453,12 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 3. **Public / Our Classes** — top-traffic page and the new chip-in-row interaction column.
 4. **Public / Blog + the prose text styles** — the prose styles outlive the blog (any future long-form content reuses them).
 5. **Public / Getting Started** — seven cards, quick to compose from Button/Card/Icon.
-6. **The 🎨 pass** — variable-ize the brand slots in your Foundations file and produce the one fake-studio proof frame. This is the piece the future theming doc builds on, so it's the highest-leverage hour after the screens.
+6. **Make the brand swappable** — three concrete Figma tasks:
+	1. **Create Figma Variables** for the colors, font families, and corner radii, then **rewire the components to reference the variables** instead of raw values — so `#ED1C26` lives in exactly one place and every button/chip/link points at it. (Same for the fonts: text styles reference a "display/heading/body" variable, not "D-DIN" directly.)
+	2. **Mark the brand content as swappable**, not baked in: the logo, studio name, hero headline/subline, tagline, and photos should be their own layers/components that can be swapped per studio — never flattened into artwork. (The slot table in the multi-studio section above is the exact list.)
+	3. **Build one proof frame**: duplicate Home + the header, then swap in an invented studio — different palette values, a different-shaped logo, a longer studio name, a different font, different photos. If the layout survives that swap untouched, the design is genuinely multi-studio; wherever it breaks is a fix.
 	- Mason- Ryan is unsure what you mean when you say "The \<icon\>pass". The icon is cute but can you use a word here? What exactly do you want him to do here?
+	- Claude- ✅ Fair — rewritten above as "Make the brand swappable" with the three concrete tasks. (The 🎨 marker elsewhere in the doc still just means "this item contains per-studio content".)
 
 ## 🔍 Figma name audit — live file vs this doc (run 8/4/2026, via the Figma API)
 
@@ -522,9 +526,10 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 **Track A — Lock the design tokens (with Ryan, ~one session).** The bridge between his Figma and the code is the CSS-variable token layer — the same layer [[Tenant Theming and Branding]] Phase 4 later serves per-tenant and [[Website Makeover]] 2.1 specs. Build it once; every other track consumes it.
 
 - [x] Mine his palette from the live file *(done 8/4 via the API)*: **primary `#ED1C26`** — note this is NOT the code's current red (`#F50C22`); his is presumably the intended brand value — plus ink `#000000`, surface `#FFFFFF`, surface-tint `#F3F3F3`.
-- [ ] Ryan fills the palette gaps: accent (does the code's orange survive?), neutral text grey, and the four status tones (his **Badge** component's Success/Warning/Danger/Info fills are probably already them — confirm and promote to the palette), plus radius + type scale as Figma Variables (the 1.1.A deliverable), using the theming doc's Token Catalog names or his own (reconcile there — his win).
+- [x] ~~Ryan fills the palette gaps: accent + status tones~~ — **resolved 8/4**, see below.
 	- Mason- The orange does not survive. Yes to the badge components. Let me know if he needs to change anything for you to map this over.
-- [ ] Us: write the token stylesheet — `--theme-*`, `--font-*`, `--radius-*` with his values as the defaults, legacy `--red`/`--orange` aliased onto it so every existing `theme-red` Tailwind usage restyles instantly.
+	- Claude- ✅ **Nothing needs to change — the mapping is already done.** I mined his Badge variants from the file; each tone is a background + text pair, which is exactly what the code's badge classes need: **Success** `#BAF7CD` on-tone `#000000` · **Warning** `#FFE4E5` / `#B4191D` · **Danger** `#ED1C26` / `#FFFFFF` (his danger *is* the brand red — consistent with the theming doc's OQ-T1: split roles, same-ish values for KY) · **Info** `#7B7B7B` / `#FFFFFF` · **Neutral** `#F3F3F3` / `#000000`. Two *nice-to-haves*, neither blocking: add these five pairs as swatches to his Color palette frame so the palette documents itself, and register them as Figma Variables in priority #2 below. **Orange retirement is trivial:** the entire codebase uses it in exactly one place — the footer background (`bg-theme-orange`) — which gets restyled to his Footer design in Track C anyway. The only *remaining* Ryan inputs for the token layer: the neutral text grey, corner radii, and the type scale — all part of the Variables pass (priority #2 in his list below).
+- [ ] Us: write the token stylesheet — `--theme-*`, `--font-*`, `--radius-*` with his values as the defaults (primary `#ED1C26`, the five tone pairs above), legacy `--red`/`--orange` aliased onto it so every existing `theme-red` Tailwind usage restyles instantly.
 
 **Track B — CSS consolidation (us, no Ryan dependency — the "bespoke → standard" work).** [[Website Makeover]] Phase 2, executed with today's facts (the `@honuware/ui` library is already de-Tailwinded and bans hardcoded colors, so it restyles through the variables for free):
 
@@ -539,6 +544,7 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 - [ ] Atoms first, biggest leverage: Button (his three kinds), Text/Long Text inputs, Checkbox + Radio, Dropdown, Card, Badge, Avatar, Toast/Tooltip/Modal, Pagination — because they restyle through the shared layer, every page shifts at once.
 	- Mason- Did you see all of these in Ryan's design? Please let me know here if there is anything that is missing.
+	- Claude- ✅ **Yes — every atom on this list exists in his Foundations page.** Button (as three components, merging to one per the rename list), Text Input + Long Text Input, Checkbox, Radio ("Fill in the blank"), Dropdown ("Drop down menu"), Card ("Card / surface"), Badge (with the five tones), Avatar, Toast, Tooltip, Modal, Pagination — all present, which is why this track can start as soon as A + B land. Two caveats, not blockers: his Button set is missing the **Focus** and **Loading** states, and several components have junk variant names (both covered in the rename & cleanup list below). The atoms he *hasn't* drawn are deliberately not in this track — the nearest gaps worth adding to it when he draws them are **Empty State**, **Spinner**, and **Alert Card** (small, high-frequency); the rest live in his prioritized list.
 - [ ] **Header + Footer** to his design — the largest single visual change on every page (both are 🎨 slots, so his layout + token values, no hardcoded brand).
 - [ ] Per-screen layout polish for the **12 screens he has designed** (desktop): Home, About, Instructors + Detail, All Classes, Upcoming Events, Service Catalog + Booking flow, Subscription Catalog, Event Booking, Profile, Account Home. Mobile keeps today's responsive behavior until his 375 frames exist — no guessing at layouts he hasn't drawn.
 
@@ -546,21 +552,134 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 - Ryan: the ✏️ rename pass → mobile frames for what exists (Home + Header/Drawer first) → the missing 32 screens + July/Delta components, per the two Quick-wins lists → Figma Variables + the fake-studio proof frame.
 	- Mason- Can you create buckets of screens that you would like to see with the buckets organized from most useful to least useful. I'm sure that there are quite a few that will be totally fine as is with the global style defaults.
+	- Claude- ✅ Done — three buckets, most-useful → least, inside "The prioritized list for Ryan" at the bottom of the doc. Your guess is right: **twelve** of the missing screens land in Bucket 3 ("skip — global styles cover them").
 - Us: makeover Phase 3's mobile additions (Sticky Bottom Action Bar, Bottom Sheet, native Apple/Google Pay buttons), dark mode (makeover Phase 6, consuming theming D8's structure), optional visual-regression CI — and then [[Tenant Theming and Branding]] Phases 1–8 turn the whole token/content layer per-tenant.
 - Dependency note: Track A's variable file is shared ground between makeover 2.1 and theming Phase 4 — whichever lands first creates it, the other consumes.
 
 **Sequencing:** A needs Ryan (start while he's around); B can start tomorrow and runs parallel to anything; C follows A+B; D is the backlog. First visible payoff = A + the Material realignment + Header/Footer — the site reads as "his design" site-wide before a single screen is individually polished.
 
-### Suggested order (fits the quick-wins lists)
+### 📋 The exact rename & cleanup list (paste-ready)
 
-1. The ✏️ rename pass + duplicate deletions (~30 min, purely mechanical, makes everything else trackable).
-	- Mason- Can you give detailed instructions with a list of exactly what needs to be renamed and what the current value is and a guess of what you think the rename should look like? Please make this easy for us.
-2. The ❓ four answers, written inline above.
-3. Mobile frames for what exists — Home + Header/Drawer first (mobile is the primary canvas).
-4. Then the missing-work priorities already ranked in "Quick wins" and "Quick wins #2".
+- Mason- Can you give detailed instructions with a list of exactly what needs to be renamed and what the current value is and a guess of what you think the rename should look like? Please make this easy for us.
+- Claude- ✅ Here it is — four tables, worked top to bottom. Every "current" value is exactly as it reads in the file today (␣ marks a trailing space to delete). Where a variant rename is a guess, it's marked *(check by eye)* — the guess says which state I *think* each unnamed variant is; reassign if I guessed the order wrong.
+
+**Table 1 — Component renames (Foundations page).** Select the component, rename, done.
+
+| Current name | Rename to |
+|---|---|
+| `Event session card` | `Event Session Card` |
+| `Section header` | `Section Header` |
+| `Page header / Back nav` | `Page Header / Back Nav` |
+| `Card / surface` | `Card / Surface` |
+| `Modal` | `Modal / Dialog` |
+| `Pagination` | `Pagination Controls` |
+| `Photo carousel` | `Photo Carousel` |
+| `Photo upload control` | `Photo Upload Control` |
+| `Foreign key picker` | `Foreign-Key Picker` |
+| `Seat assignment widget` | `Seat Assignment Widget` |
+| `Room occupancy badge` | `Room Occupancy Badge` |
+| `Book for selector` | `Book-For Selector` |
+| `Payment method` | `Payment Method / Card Picker` |
+| `Text input` | `Text Input` |
+| `Long Text input` | `Long Text Input` |
+| `Drop down menu` | `Dropdown / Select` |
+| `Top navigation` | `Header / Top Nav Bar` |
+| `404 error illustration` | `404 / Page Not Found` |
+| `Badge` | `Badge / Pill` |
+| `Card_membership` | `Membership Tier Card` |
+| `Card_product` | `Card / Product` |
+| `Card_account` | `Card / Account` |
+| `Card_split` | `Card / Split` |
+| `KnottyYoga_Logo 1` | `Logo` |
+| `SafeSpace_icon 1` | `Hero Secondary Image` |
+| `Fill in the blank` | `Radio Button` |
+| `Week calendar` | `Date Strip / Week Navigator` |
+| `Calendar` | `Date Picker` |
+
+Already correct, no action: `Footer`, `Checkbox`, `Tooltip`, `Avatar`, `Photo carousel`'s siblings not listed here, and the Material-icon frames.
+
+**Table 2 — Merges & deletions.**
+
+| # | Action |
+|---|---|
+| M1 | `Primary button` + `Secondary button` + `Tertiary button␣` → **one** `Button` component set with a `Kind` property (Primary / Secondary / Tertiary). Kills the trailing space too. |
+| M2 | `Badge pill` → merge anything unique into `Badge / Pill`, then **delete** `Badge pill`. |
+| M3 | `Toast` + `Snackbar` → one `Toast / Snackbar` — keep whichever looks better, delete the other. |
+| M4 | `` `simple-text` `` → its State variants (Default/Focus/Disabled/Error) are the *correct* state set — move them into `Text Input`, then **delete** `simple-text`. |
+| M5 | `Calendar select` + `Calendar button` → fold into `Date Picker` (variants or internals). |
+| M6 | `Drop down select` (a frame, not a component) → fold into `Dropdown / Select` or delete. |
+| M7 | `Button holder`, `Nav button_2`, `Large book now button` → fold into `Button` as variants, or rename to what they actually are. |
+| D1 | Delete the duplicate `Memberships` frame (two identical copies on Screens). |
+| D2 | Keep `Staff / Caleb` (rename per Table 4); **delete** `Staff / Mason`. |
+| D3 | Keep one `Event details page > Intro workshop`; delete the other two — or if they're intentional states, suffix them (`… / Guest added`, etc.). |
+| D4 | Delete `TV - 1` (the stray play-button frame, far right of Screens) — or name it if it's real. |
+| D5 | Foundations frames `Frame 23 / 47 / 49 / 68 / 125 / 198` — name them or fold their contents. |
+| D6 | The five `Service calendar > …` service copies: keep the **Peak spa** chain as canonical (rename per Table 4); delete or park `Early bird spa`, `Late night spa`, `Non peak spa`, `Massage␣`. |
+
+**Table 3 — Variant renames** *(check by eye — the guesses assume the variants are in creation order)*.
+
+| Component | Current variants | Rename to |
+|---|---|---|
+| `Button` (after M1) | `Main=Default / Hover / Disabled / Down` | `State=Default / Hover / Disabled / Pressed` — then **add `Focus` and `Loading`** |
+| `Checkbox` | `Checkbox=Uncheck / Checked` | `State=Unchecked / Checked` |
+| `Radio Button` | `Property 1=Default / Variant2 / Variant3` | `State=Unselected / Selected / Disabled` *(check by eye)* |
+| `Text Input` | `Property 1=Default / Variant2 / Variant3 / t / Variant5` | `State=Default / Focus / Filled / Error / Disabled` *(check by eye)* |
+| `Long Text Input` | `Property 1=Default / Variant2 / Variant3 / Variant4 / t` | `State=Default / Focus / Filled / Error / Disabled` *(check by eye)* |
+| `Dropdown / Select` | `Drop down menu=D / Select / Disabled` | `State=Default / Open / Disabled` |
+| `Foreign-Key Picker` | `Foreign key picker=Default / Hover` | `State=Default / Hover` |
+| `Date Picker` | `Calendar=No select / Select` | `State=Empty / Selected` |
+| `Avatar` | `Property 1=Default / Variant2 / Variant3` | `State=Image / Initials / Placeholder` *(check by eye)* |
+| `Payment Method / Card Picker` | `Property 1=card picker / Variant2` | `Kind=Card Picker / Saved Card` *(check by eye)* |
+| `Header / Top Nav Bar` | `Property 1=Login / No login` | `State=Signed in / Signed out` |
+| `Card / Account` | `Property 1=Default / Variant2` | `State=Default / Hover` *(check by eye)* |
+
+**Table 4 — Screen renames (Screens page).**
+
+| Current name | Rename to |
+|---|---|
+| `Homepage` | `Public / Home` |
+| `Classes` | `Public / All Classes` |
+| `Staff` | `Public / Instructors` |
+| `Staff / Caleb` | `Public / Instructor Detail` |
+| `Upcoming events␣` | `Public / Upcoming Events` |
+| `Services` | `Shop / Service Catalog` |
+| `Memberships` (the survivor of D1) | `Shop / Subscription Catalog` |
+| `About Knotty Yoga` | `Public / About` |
+| `Event details page > Intro workshop` (survivor of D3) | `Shop / Event Booking` |
+| `Account > User information␣` | `Account / Profile (View)` |
+| `Service calendar > Peak spa` | `Shop / Service Booking` |
+| `Service calendar > Peak spa > Select time` | `Shop / Service Booking / Select Time` |
+| `Service calendar > Peak spa > Select time > Summary` | `Shop / Service Booking / Summary` |
+| `Service calendar > Peak spa > Select time > Summary > Confirmed` | `Shop / Service Booking / Confirmed` |
+| `Account dashboard` | `Account / Home` |
 
 # The prioritized list for Ryan
+
 - Mason- Can you replace this with a bulleted list of the ordered priorities that Ryan should work on next in order based on a mix of what needs to be done first and what is most important?
+- Claude- ✅ Here it is — ordered by "unblocks the most" first, then by traffic/impact. Items 1–2 unblock the engineering side (Mason and I start pulling values the moment they exist); everything after is design work in impact order.
+
+1. **Housekeeping (~45 min).** Work the rename & cleanup tables above top to bottom (Tables 1 → 2 → 3 → 4). Purely mechanical, and it's what makes the Figma ↔ code mapping automatic from here on.
+2. **Figma Variables — the token pass.** Create variables for: the palette (primary `#ED1C26`, ink `#000000`, surface `#FFFFFF`, surface-tint `#F3F3F3`, **plus the five badge tone pairs already mined from your Badge component** — promote them to the Color palette frame; **no orange**), the neutral text grey, font roles (display / heading / body), and corner radii — then rewire the components to reference the variables instead of raw values. *This is the highest-leverage hour in the whole list: the engineering token file is written straight from it.*
+3. **Header / Top Nav Bar + Mobile Menu Drawer** — the flattened menu model from Delta #2, desktop **and 375**, including a mobile cart affordance. Every page on the site shows this.
+4. **Mobile (375) frames for the 12 screens that already exist** — Public / Home first (fold the Delta #2 recomposition in while you're there), then the payment-adjacent flows (Shop / Event Booking, the Shop / Service Booking chain), then the rest. Mobile is the primary canvas — this is the biggest gap in the file today.
+5. **The fake-studio proof frame** — duplicate Public / Home + the header, swap in an invented brand (Quick Win #6's three tasks). Quick once #2 and #3 exist, and it validates the whole token wiring.
+6. **Bucket 1 — screens that genuinely need design** (unique layouts, new interaction patterns, or top traffic — in order):
+	1. **Public / Our Classes** — the rebuilt schedule; top-traffic page with the new chip-in-row column.
+	2. **Shop / Cart + Shop / Checkout** — the conversion funnel; mobile-first with the Sticky Bottom Action Bar + Native Payment Buttons.
+	3. **Calendar / Home + the Calendar Event Chip/Card three-density set** — the single biggest component item in the inventory; the calendar is the most visually dense page.
+	4. **Public / Class Detail** — viewer-aware pricing, skills, series runs.
+	5. **Public / Blog + the Prose text styles** — the prose styles outlive the blog.
+	6. **Shop / Series Booking** — the series checkout with summary card + coupons panel.
+	7. **Public / Getting Started** — simple, but it's the funnel's front door.
+	8. **Account / My Schedule** — the novel weekly-plan grid (Eligible-Slot Checkbox Cards).
+	9. **Account / My Events** — the Series Rollup Panel + the multi-step Inline Cancel Flow (bottom sheet on mobile).
+7. **Bucket 2 — design the pattern once, it covers the set:**
+	- **Auth / Login + Register** → *the form-page pattern* (Verify inherits it).
+	- **Shop / Catalog + Product Detail + Subscription Signup** → *the catalog/detail pattern*.
+	- **Account / Today's Classes + Workshops & Series + Attendance History** → *the list-row + status-chip pattern*.
+	- **Account / Notification Preferences** → *the preference-card pattern*.
+	- Atoms to slot in as they come up: **Empty State, Spinner, Alert Card**, and the **Data Table mobile strategies** (one example of each of the three renditions).
+8. **Bucket 3 — skip: global styles cover them.** Mason's instinct is right — these compose entirely from the shared blocks and pick up the new look in the engineering sweep: Account / Profile (Edit), Change Password, Purchase History, Purchase Detail, Saved Cards, My Subscriptions, Subscription Detail, Gift Permissions, My Vouchers, My Skills, Favorite Instructors, Auth / Verify Email, Public / Provider Bio (still a placeholder page), and the optional Staff / Class Check-In. Revisit one only if it looks off after the restyle lands.
 
 ## Open questions — ✅ all resolved (Mason, 8/4/2026)
 

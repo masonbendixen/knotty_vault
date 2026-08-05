@@ -128,6 +128,11 @@ Config-secret key per token: `site_theme_<role>` (e.g. `site_theme_primary`, `si
 
 The three `--font-*` rows hold a **family name**, and the family inventory is per-tenant data (`site_fonts`, D4 — CDN reference or uploaded file); the bundled D-DIN stacks are Knotty Yoga's defaults and the fallback when a named family is missing.
 
+> **Catalog value updates (8/4/2026, from Ryan's file via the API + Mason's answers in [[Component Inventory for Designer]]):**
+> 1. **Primary:** Ryan's brand red is **`#ED1C26`**, not the `#F50C22` in code today — it becomes the KY default when the integration Track A token file lands.
+> 2. **Accent: retired for Knotty Yoga.** Mason: the orange does not survive. The role stays in the catalog (other tenants may want one); KY's value defaults to the primary. The code's sole orange usage is the footer background — restyled to Ryan's Footer design during integration.
+> 3. **Status tones are now real pairs** (background / on-tone), mined from Ryan's Badge component: Success `#BAF7CD`/`#000000` · Warn `#FFE4E5`/`#B4191D` · Danger `#ED1C26`/`#FFFFFF` (per OQ-T1: split role, red-ish value for KY) · Info `#7B7B7B`/`#FFFFFF` · Neutral `#F3F3F3`/`#000000`. The single-value tone rows above become **pairs** (`--theme-success` + `--theme-on-success`, etc.) when Phase 4 writes the stylesheet.
+
 The exact status-tone hex values in use get pinned during Phase 4 grounding (they're scattered across badge SCSS today; the makeover's badge consolidation is where they become one set).
 
 ---
