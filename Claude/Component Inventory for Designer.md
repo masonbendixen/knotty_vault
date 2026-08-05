@@ -544,7 +544,7 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 **Track D — The "eventually" list (standing backlog, in order).**
 
 - Ryan: the ✏️ rename pass → mobile frames for what exists (Home + Header/Drawer first) → the missing 32 screens + July/Delta components, per the two Quick-wins lists → Figma Variables + the fake-studio proof frame.
-	- Mason- Can you create buckets of 
+	- Mason- Can you create buckets of screens that you would like to see with the buckets organized from most useful to least useful. I'm sure that there are quite a few that will be totally fine as is with the global style defaults.
 - Us: makeover Phase 3's mobile additions (Sticky Bottom Action Bar, Bottom Sheet, native Apple/Google Pay buttons), dark mode (makeover Phase 6, consuming theming D8's structure), optional visual-regression CI — and then [[Tenant Theming and Branding]] Phases 1–8 turn the whole token/content layer per-tenant.
 - Dependency note: Track A's variable file is shared ground between makeover 2.1 and theming Phase 4 — whichever lands first creates it, the other consumes.
 
@@ -553,6 +553,7 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 ### Suggested order (fits the quick-wins lists)
 
 1. The ✏️ rename pass + duplicate deletions (~30 min, purely mechanical, makes everything else trackable).
+	- Mason- Can you give detailed instructions with a list of exactly what needs to be renamed and what the current value is and a guess of what you think the rename should look like? Please make this easy for us.
 2. The ❓ four answers, written inline above.
 3. Mobile frames for what exists — Home + Header/Drawer first (mobile is the primary canvas).
 4. Then the missing-work priorities already ranked in "Quick wins" and "Quick wins #2".
