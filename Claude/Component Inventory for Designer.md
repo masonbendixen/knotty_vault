@@ -600,21 +600,21 @@ Already correct, no action: `Footer`, `Checkbox`, `Tooltip`, `Avatar`, `Photo ca
 
 **Table 2 — Merges & deletions.**
 
-| # | Action |
-|---|---|
-| M1 | `Primary button` + `Secondary button` + `Tertiary button␣` → **one** `Button` component set with a `Kind` property (Primary / Secondary / Tertiary). Kills the trailing space too. |
-| M2 | `Badge pill` → merge anything unique into `Badge / Pill`, then **delete** `Badge pill`. |
-| M3 | `Toast` + `Snackbar` → one `Toast / Snackbar` — keep whichever looks better, delete the other. |
-| M4 | `` `simple-text` `` → its State variants (Default/Focus/Disabled/Error) are the *correct* state set — move them into `Text Input`, then **delete** `simple-text`. |
-| M5 | `Calendar select` + `Calendar button` → fold into `Date Picker` (variants or internals). |
-| M6 | `Drop down select` (a frame, not a component) → fold into `Dropdown / Select` or delete. |
-| M7 | `Button holder`, `Nav button_2`, `Large book now button` → fold into `Button` as variants, or rename to what they actually are. |
-| D1 | Delete the duplicate `Memberships` frame (two identical copies on Screens). |
-| D2 | Keep `Staff / Caleb` (rename per Table 4); **delete** `Staff / Mason`. |
-| D3 | Keep one `Event details page > Intro workshop`; delete the other two — or if they're intentional states, suffix them (`… / Guest added`, etc.). |
-| D4 | Delete `TV - 1` (the stray play-button frame, far right of Screens) — or name it if it's real. |
-| D5 | Foundations frames `Frame 23 / 47 / 49 / 68 / 125 / 198` — name them or fold their contents. |
-| D6 | The five `Service calendar > …` service copies: keep the **Peak spa** chain as canonical (rename per Table 4); delete or park `Early bird spa`, `Late night spa`, `Non peak spa`, `Massage␣`. |
+| #   | Action                                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | `Primary button` + `Secondary button` + `Tertiary button␣` → **one** `Button` component set with a `Kind` property (Primary / Secondary / Tertiary). Kills the trailing space too.            |
+| M2  | `Badge pill` → merge anything unique into `Badge / Pill`, then **delete** `Badge pill`.                                                                                                       |
+| M3  | `Toast` + `Snackbar` → one `Toast / Snackbar` — keep whichever looks better, delete the other.                                                                                                |
+| M4  | `` `simple-text` `` → its State variants (Default/Focus/Disabled/Error) are the *correct* state set — move them into `Text Input`, then **delete** `simple-text`.                             |
+| M5  | `Calendar select` + `Calendar button` → fold into `Date Picker` (variants or internals).                                                                                                      |
+| M6  | `Drop down select` (a frame, not a component) → fold into `Dropdown / Select` or delete.                                                                                                      |
+| M7  | `Button holder`, `Nav button_2`, `Large book now button` → fold into `Button` as variants, or rename to what they actually are.                                                               |
+| D1  | Delete the duplicate `Memberships` frame (two identical copies on Screens).                                                                                                                   |
+| D2  | Keep `Staff / Caleb` (rename per Table 4); **delete** `Staff / Mason`.                                                                                                                        |
+| D3  | Keep one `Event details page > Intro workshop`; delete the other two — or if they're intentional states, suffix them (`… / Guest added`, etc.).                                               |
+| D4  | Delete `TV - 1` (the stray play-button frame, far right of Screens) — or name it if it's real.                                                                                                |
+| D5  | The **never-named frames** on Foundations (Figma auto-names). Identified from the file: `Frame 47` = a stray "BACK TO SERVICES" back-link → fold into `Page Header / Back Nav` or delete · `Frame 23` = a loose "SIGN UP" text → delete · `Frame 68` = two Primary-button instances side by side → delete, or name it if it documents a spacing rule · `Frame 49` (465×215) → open it and decide · `Frame 125` → dissolves with M6 · `Frame 198` = the "Hint text" row inside `simple-text`'s variants → rename `Helper text` (rides along in M4). |
+| D6  | The five `Service calendar > …` service copies: keep the **Peak spa** chain as canonical (rename per Table 4); delete or park `Early bird spa`, `Late night spa`, `Non peak spa`, `Massage␣`. |
 
 **Table 3 — Variant renames** *(check by eye — the guesses assume the variants are in creation order)*.
 
