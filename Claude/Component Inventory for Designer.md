@@ -454,6 +454,7 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 4. **Public / Blog + the prose text styles** — the prose styles outlive the blog (any future long-form content reuses them).
 5. **Public / Getting Started** — seven cards, quick to compose from Button/Card/Icon.
 6. **The 🎨 pass** — variable-ize the brand slots in your Foundations file and produce the one fake-studio proof frame. This is the piece the future theming doc builds on, so it's the highest-leverage hour after the screens.
+	- Mason- Ryan is unsure what you mean when you say "The \<icon\>pass". The icon is cute but can you use a word here? What exactly do you want him to do here?
 
 ## 🔍 Figma name audit — live file vs this doc (run 8/4/2026, via the Figma API)
 
@@ -557,6 +558,9 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 2. The ❓ four answers, written inline above.
 3. Mobile frames for what exists — Home + Header/Drawer first (mobile is the primary canvas).
 4. Then the missing-work priorities already ranked in "Quick wins" and "Quick wins #2".
+
+# The prioritized list for Ryan
+- Mason- Can you replace this with a bulleted list of the ordered priorities that Ryan should work on next in order based on a mix of what needs to be done first and what is most important?
 
 ## Open questions — ✅ all resolved (Mason, 8/4/2026)
 
