@@ -522,6 +522,7 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 - [x] Mine his palette from the live file *(done 8/4 via the API)*: **primary `#ED1C26`** — note this is NOT the code's current red (`#F50C22`); his is presumably the intended brand value — plus ink `#000000`, surface `#FFFFFF`, surface-tint `#F3F3F3`.
 - [ ] Ryan fills the palette gaps: accent (does the code's orange survive?), neutral text grey, and the four status tones (his **Badge** component's Success/Warning/Danger/Info fills are probably already them — confirm and promote to the palette), plus radius + type scale as Figma Variables (the 1.1.A deliverable), using the theming doc's Token Catalog names or his own (reconcile there — his win).
+	- Mason- The orange does not survive. Yes to the badge components. Let me know if he needs to change anything for you to map this over.
 - [ ] Us: write the token stylesheet — `--theme-*`, `--font-*`, `--radius-*` with his values as the defaults, legacy `--red`/`--orange` aliased onto it so every existing `theme-red` Tailwind usage restyles instantly.
 
 **Track B — CSS consolidation (us, no Ryan dependency — the "bespoke → standard" work).** [[Website Makeover]] Phase 2, executed with today's facts (the `@honuware/ui` library is already de-Tailwinded and bans hardcoded colors, so it restyles through the variables for free):
@@ -536,12 +537,14 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 **Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
 
 - [ ] Atoms first, biggest leverage: Button (his three kinds), Text/Long Text inputs, Checkbox + Radio, Dropdown, Card, Badge, Avatar, Toast/Tooltip/Modal, Pagination — because they restyle through the shared layer, every page shifts at once.
+	- Mason- Did you see all of these in Ryan's design? Please let me know here if there is anything that is missing.
 - [ ] **Header + Footer** to his design — the largest single visual change on every page (both are 🎨 slots, so his layout + token values, no hardcoded brand).
 - [ ] Per-screen layout polish for the **12 screens he has designed** (desktop): Home, About, Instructors + Detail, All Classes, Upcoming Events, Service Catalog + Booking flow, Subscription Catalog, Event Booking, Profile, Account Home. Mobile keeps today's responsive behavior until his 375 frames exist — no guessing at layouts he hasn't drawn.
 
 **Track D — The "eventually" list (standing backlog, in order).**
 
 - Ryan: the ✏️ rename pass → mobile frames for what exists (Home + Header/Drawer first) → the missing 32 screens + July/Delta components, per the two Quick-wins lists → Figma Variables + the fake-studio proof frame.
+	- Mason- Can you create buckets of 
 - Us: makeover Phase 3's mobile additions (Sticky Bottom Action Bar, Bottom Sheet, native Apple/Google Pay buttons), dark mode (makeover Phase 6, consuming theming D8's structure), optional visual-regression CI — and then [[Tenant Theming and Branding]] Phases 1–8 turn the whole token/content layer per-tenant.
 - Dependency note: Track A's variable file is shared ground between makeover 2.1 and theming Phase 4 — whichever lands first creates it, the other consumes.
 
