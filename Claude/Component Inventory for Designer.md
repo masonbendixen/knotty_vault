@@ -476,10 +476,13 @@ His → doc name: Event session card → **Event Session Card** · Section heade
 - **Fill in the blank** — which doc block is this?
 	- Mason- Ryan and I are unsure what you mean by this. Can you elaborate?
 - **Week calendar** — is it the **Date Strip / Week Navigator** (service booking) or a calendar view piece?
-	- Mason- This is t
+	- Mason- This is the date strip for service booking.
 - **Calendar / Calendar select / Calendar button** — is this trio the **Date Picker**?
+	- Mason- Yes
 - **TV - 1** (1106×623 frame on Screens) — what is it?
+	- Mason- We are unsure what you are talking about.
 - (Extras that are fine but unmapped: Card_product, Card_account, Card_split — if they stay, the underscore naming should at least become `Card / Product` style. KnottyYoga_Logo + SafeSpace_icon are 🎨 slots — name them **Logo** and **Hero Secondary Image** so the theming work lands on slots, not brand names.)
+	- Mason- So just rename these to be Card / Thing?
 
 ### ✏️ Screens — rename map (his → doc)
 
