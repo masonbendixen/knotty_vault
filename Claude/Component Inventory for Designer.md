@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 8/4/2026
-Version: 0.4
+Version: 0.5
 tags: 
 ---
 
@@ -454,6 +454,60 @@ The 7/19 note ("the 'Our Classes' dropdown now leads with Our Schedule…") is o
 4. **Public / Blog + the prose text styles** — the prose styles outlive the blog (any future long-form content reuses them).
 5. **Public / Getting Started** — seven cards, quick to compose from Button/Card/Icon.
 6. **The 🎨 pass** — variable-ize the brand slots in your Foundations file and produce the one fake-studio proof frame. This is the piece the future theming doc builds on, so it's the highest-leverage hour after the screens.
+
+## 🔍 Figma name audit — live file vs this doc (run 8/4/2026, via the Figma API)
+
+Audited `figma.com/design/IxWR3NfPQbJfYJ7oCPmaER/Knotty-Yoga` (last modified 8/4/2026; pages **Foundations** + **Screens**) against the names in this doc. Four buckets; the ✏️ renames are mechanical and worth doing first — they're what makes the engineering mapping automatic.
+
+### ✅ Components that map cleanly (rename = case/punctuation only)
+
+His → doc name: Event session card → **Event Session Card** · Section header → **Section Header** · Page header / Back nav → **Page Header / Back Nav** · Footer ✅ · Card / surface → **Card / Surface** · Checkbox ✅ · Tooltip ✅ · Avatar ✅ · Modal → **Modal / Dialog** · Pagination → **Pagination Controls** · Photo carousel → **Photo Carousel** · Photo upload control → **Photo Upload Control** · Foreign key picker → **Foreign-Key Picker** · Seat assignment widget → **Seat Assignment Widget** · Room occupancy badge → **Room Occupancy Badge** · Book for selector → **Book-For Selector** · Payment method → **Payment Method / Card Picker** · Text input → **Text Input** · Long Text input → **Long Text Input** · Drop down menu → **Dropdown / Select** · Top navigation → **Header / Top Nav Bar** · 404 error illustration → **404 / Page Not Found** · **Badge** → **Badge / Pill** — and his Badge's tone variants (Success/Warning/Danger/Info/Neutral) are *exactly* the doc's vocabulary. Card_membership → **Membership Tier Card** (a Delta #2 block he already built — nice).
+
+### ✏️ Structural fixes (merges + variant hygiene)
+
+- **Three button components → one.** Primary button / Secondary button / "Tertiary button " (note the trailing space) should be a single **Button** component set with a `Kind` property — plus his states (Default/Hover/Disabled/Down) are missing the doc's **Focus** and **Loading**. Calendar button / Large book now button / Nav button_2 / Button holder: fold into Button variants or give them real names.
+- **Duplicate pairs to merge:** `Badge` + `Badge pill` (keep Badge, it has the right tones; Badge pill's variants are unnamed) · `Toast` + `Snackbar` → one **Toast / Snackbar** · `` `simple-text` `` + `Text input` → keep **Text Input** (ironically `simple-text`'s State=Default/Focus/Disabled/Error variants are the *correct* state set — merge them in).
+- **Variant naming:** many components have `Property 1=Variant2 / Variant3 / t / ==` — these are the names the engineer maps to state/kind enums, so they need real values (e.g. `State=Filled`, `Kind=Secondary`).
+- **Trailing spaces break exact-name mapping:** "Tertiary button ", "Upcoming events ", "Account > User information ", "Service calendar > Massage ".
+- **Anonymous top-level frames** in Foundations (Frame 23/47/49/68/125/198…) — name or fold them.
+
+### ❓ Four things only Ryan can answer (map or rename)
+
+- **Fill in the blank** — which doc block is this?
+- **Week calendar** — is it the **Date Strip / Week Navigator** (service booking) or a calendar view piece?
+- **Calendar / Calendar select / Calendar button** — is this trio the **Date Picker**?
+- **TV - 1** (1106×623 frame on Screens) — what is it?
+- (Extras that are fine but unmapped: Card_product, Card_account, Card_split — if they stay, the underscore naming should at least become `Card / Product` style. KnottyYoga_Logo + SafeSpace_icon are 🎨 slots — name them **Logo** and **Hero Secondary Image** so the theming work lands on slots, not brand names.)
+
+### ✏️ Screens — rename map (his → doc)
+
+| His frame | → Figma name from this doc |
+|---|---|
+| Homepage | **Public / Home** *(also needs the Delta #2 recomposition)* |
+| Classes | **Public / All Classes** *(the catalog — the `/classes` URL now belongs to the rebuilt schedule page)* |
+| Staff | **Public / Instructors** |
+| Staff / Caleb, Staff / Mason | **Public / Instructor Detail** *(keep one)* |
+| Upcoming events␣ | **Public / Upcoming Events** |
+| Services | **Shop / Service Catalog** |
+| Memberships **(duplicated — two identical frames)** | **Shop / Subscription Catalog** *(delete one)* |
+| About Knotty Yoga | **Public / About** |
+| Event details page > Intro workshop **(×3 same-size copies)** | **Shop / Event Booking** *(if the three are states, suffix them: `… / Default`, `… / Guest added`, …)* |
+| Account > User information␣ | **Account / Profile (View)** |
+| Service calendar > … (7-frame flow incl. Select time / Summary / Confirmed) | **Shop / Service Booking** + state suffixes — *the flow-state structure here is exactly right, keep it* |
+| Account dashboard | **Account / Home** |
+
+### ❌ Not in the file yet (the honest gap list)
+
+- **Mobile: zero 375 frames — every screen is 1440-wide desktop only.** This is the single biggest gap vs the locked scope (375 + 1280, mobile first). Also note desktop is 1440 vs the doc's 1280 — fine either way, but pick one and it becomes the standard (updating the doc to 1440 is a one-line change if that's his canvas).
+- **Screens (29 of 44 in scope):** all Auth (Login/Register/Verify), Shop Catalog / Product Detail / Cart / Checkout / Subscription Signup / Series Booking, Public Class Detail / **Our Classes** (rebuilt schedule — top traffic) / Blog / Getting Started / Provider Bio, **Calendar / Home**, and the Account wave (Profile Edit, Change Password, Purchase History + Detail, My Events, Saved Cards, My Subscriptions + Detail, Gift Permissions, My Vouchers, My Skills, My Schedule, Today's Classes, Workshops & Series, Notification Preferences, Attendance History, Favorite Instructors).
+- **Components:** the July-wave blocks (Tag Chip, Filter Chip Row, **Calendar Event Chip/Card**, Kind Badge, Favorite Toggle, Skill Chip + Prerequisite Banner, Attendance/Booking Status Chips, Signup-Window Indicator, Segmented Toggle, Week Navigator, Eligible-Slot Checkbox Card, Attendance Plan Row, Series Run/Summary/Rollup, Coupon & Voucher Panel, Guest Booking Fieldset, Skill Badge Card, Skill Requirement Dialog, Inline Cancel Flow) + the base set still open (Date Picker*, Alert Card, **Empty State**, Spinner, Data Table / List, **Mobile Menu Drawer**, Sticky Bottom Action Bar, Bottom Sheet, Native Payment Buttons) + the Delta #2 additions (Offering Highlight Panel, Blog Post Card, Prose text styles, Date Navigator, Getting Started Step Card, Get Started Banner, Home Summary Card). *\*possibly covered by his Calendar/Week calendar components — see the ❓ list.*
+
+### Suggested order (fits the quick-wins lists)
+
+1. The ✏️ rename pass + duplicate deletions (~30 min, purely mechanical, makes everything else trackable).
+2. The ❓ four answers, written inline above.
+3. Mobile frames for what exists — Home + Header/Drawer first (mobile is the primary canvas).
+4. Then the missing-work priorities already ranked in "Quick wins" and "Quick wins #2".
 
 ## Open questions — ✅ all resolved (Mason, 8/4/2026)
 
