@@ -71,16 +71,29 @@ My initial recommendation was Option B, leaning on four pillars: honuware/Postgr
 - Chrome being the browser actually *strengthens* Qt: Chrome's cookie store can't be read reliably on Windows (app-bound encryption), but a QtWebEngine **embedded Instagram login inside the app** produces its own cookies — one login powers yt-dlp downloads, Instaloader enumeration, and in-app post preview (wanted per Q12).
 - Honest residual risks, with mitigations: (1) QMediaPlayer (FFmpeg backend) is good but less battle-tested than the browser player — the player sits behind an `IVideoPlayer` seam so libmpv can be swapped in if speed/scrub quality disappoints; (2) Qt is a new framework for Mason — Claude writes the code, and conventions stay knottyyoga-style (naming, layering, GoogleTest, no fixtures); (3) Qt + WebEngine is a chunky one-time install — Phase 0 scripts/documents it.
 
-**Decided stack:** C++20 · Qt 6.8 LTS (Widgets + Multimedia + MultimediaWidgets + Sql + Network + WebEngineWidgets) · SQLite via Qt Sql (FTS5 keyword search with LIKE fallback) · CMake + GoogleTest (FetchContent) · external tools: yt-dlp + ffmpeg/ffprobe (already installed, winget) + Python 3.13 venv with Instaloader. No Conan, no Postgres, no Angular, no web server.
+**Decided stack:** C++20 · Qt 6.8.3 LTS prebuilt MSVC2022 binaries (Widgets + Multimedia + MultimediaWidgets + Sql + Network + WebEngineWidgets), fetched unattended by script · **Conan 2 for all library dependencies** (knottyyoga `conanfile.py` pattern — gtest now, room to grow) · SQLite via Qt Sql (FTS5 keyword search with LIKE fallback) · CMake · external tools: yt-dlp + ffmpeg/ffprobe (winget) + Python 3.13 venv with Instaloader. No Postgres, no Angular, no web server.
 - Mason- I very much want Conan. I also want a script that does winget, etc to pull down the dependencies onto a clean machine. The only reason I have these libraries on my machine is because of Conan. Please look at knotty yoga server and/or server components to do the conan / CMake integration.
+	- → Claude: done — the build adopts the knottyyoga/server_components Conan integration wholesale (`conanfile.py` with the `Library` list + generated `ConanLibImports.cmake`, `conan_provider.cmake` invoked via `CMAKE_PROJECT_TOP_LEVEL_INCLUDES` in CMakeSettings.json), and `tools/setup_machine.ps1` bootstraps a clean machine (winget + pip + venv + Qt). Qt itself stays *outside* Conan for the validated reasons below.
+
+### Toolchain validation: can Qt come from Conan? (checked 2026-08-06)
+
+**Yes, technically — no, not for this app.** ConanCenter carries `qt/6.8.3`, `qt/6.10.3`, and `qt/6.11.1`; the 6.x recipe builds on MSVC and does package moc/rcc/uic and even windeployqt, pulling ninja/winflexbison as build tools — so AUTOMOC and friends would work. Three findings rule it out here:
+
+1. **The Conan build of QtMultimedia has no FFmpeg backend.** The recipe declares no ffmpeg dependency anywhere (only ALSA/OpenAL audio bits), and Qt Multimedia's maintained playback backend *is* FFmpeg — official Qt binaries bundle FFmpeg *libraries* at Qt build time (unrelated to our ffmpeg.exe CLI tool). A Conan-built Qt leaves the player on the legacy Windows-native (WMF) backend at best, and users report self-built Qt with *no* working video backend at all. The player is the heart of this app; this alone is disqualifying.
+2. **QtWebEngine does not build on Windows via the recipe** — open conan-center issue since Nov 2024 (Chromium's nested paths blow past Windows/Ninja path limits; no workaround found).
+3. **No prebuilt Qt binaries exist on ConanCenter** for our configuration — the first `conan install` would compile Qt from source for multiple hours and ~10+ GB of build space, and any option change recompiles.
+
+So the split is: **Conan owns every library dependency** (exactly the knottyyoga pattern), and **Qt 6.8.3 official prebuilt binaries are fetched by `tools/setup_machine.ps1`** using `aqtinstall` — a pip tool that downloads the same MSVC2022 binaries as the online installer, unattended, no Qt account — wired into CMake via `CMAKE_PREFIX_PATH`. One script still bootstraps a clean machine end-to-end. If full-Conan-Qt is ever insisted on, the price is explicit: hours-long builds, no WebEngine, and WMF-or-nothing playback.
 
 **Portable-library contract:** everything the catalog needs lives under the library root — `library.db` at the root, media under `{Category}/{YYYY}/{MM}/{DD}/`, thumbnails/staging/backups under `.videolibrary/` — and every path stored in the DB is root-relative with forward slashes, so the folder can be copied/moved wholesale and opened on any machine. Per-machine state (tool paths, window geometry, recent libraries, Instagram session/cookies) lives in QSettings/AppData, never inside the library.
 
 ## Instagram tooling suggestions
 
-**Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. Since Mason uses Chrome (whose cookie store can't be read reliably on Windows due to app-bound encryption), the app supplies its own: log into Instagram once inside the app (embedded QtWebEngine browser with a persistent per-machine profile) and the app exports a Netscape `cookies.txt` from that session for yt-dlp (`--cookies <file>`). Fallback if WebEngine is skipped: manual export via a cookies.txt Chrome extension. The app shells out to yt-dlp with politeness delays and surfaces yt-dlp staleness (Instagram breaks old extractors regularly; yt-dlp stays winget-managed).
+**Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. The cookie source is a **configurable setting with a login-status probe** (Phase 5.1), tried in this order: (1) `--cookies-from-browser chrome` passthrough — Mason's preference; (2) embedded QtWebEngine Instagram login that exports a Netscape `cookies.txt`; (3) a user-supplied `cookies.txt` (browser-extension export). The probe determines what actually works on each machine and the UI says so. The app shells out to yt-dlp with politeness delays and surfaces yt-dlp staleness (Instagram breaks old extractors regularly; yt-dlp stays winget-managed).
 
 Mason- Please note that I do yt-dlp --cookies-from-browser on my machine for things that need login / aren't public. That always works and seems like the best option here.
+
+→ Claude: it's the first thing the app tries — but a heads-up on current reality: Chrome 127+ (July 2024) moved its cookies to "app-bound encryption," and yt-dlp cannot decrypt those v20 cookies on Windows; the yt-dlp issue asking for a fix was still open as of March 2026. It genuinely does work for Firefox (and, so far, Edge), and it worked for Chrome before the rollout — which may explain the "always works" experience, or your Instagram session cookie predates the migration. Rather than argue from search results, the design makes it empirical: the login-status probe runs your preferred mode first and only falls back (embedded login → cookies.txt file) if Instagram reports "not logged in."
 
 **Enumerating your saved list** (no official API for personal saved posts — all options are unofficial):
 1. **Instaloader** (recommended) — mature Python library; the helper script builds its session from the same cookies the embedded login harvested (`load_session`), then `get_saved_posts()` yields shortcode/URL/owner/caption/date/thumbnail without downloading. We wrap it in a small helper script emitting JSON that the app invokes and reconciles.
@@ -92,6 +105,8 @@ Mason- Please note that I do yt-dlp --cookies-from-browser on my machine for thi
 **Risk note:** any automated enumeration violates Instagram ToS and can flag the account it runs as. Mitigations planned: manual sync button (not a background poller) with a minimum interval, low volume, politeness delays, cached results, and the option to run against a secondary account (Open Questions #8).
 
 Mason- I'm fine with using Instaloader. Please just make sure to make a config script for people to run to pull down the needed dependencies to their machine.
+
+→ Claude: `tools/setup_machine.ps1` (Phase 0.1) is exactly that — winget for yt-dlp/ffmpeg/CMake, pip for aqtinstall + Qt, a per-machine Python venv with Instaloader, plus a `-Mode runtime` variant for the assistant's machine that skips the dev-only pieces.
 
 # Open Questions
 
@@ -139,12 +154,16 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 
 13. (was Q5 — still open) Where does the existing video library live on disk, should Phase 3.6 adopt it into the catalog, and what categories should be seeded besides **Inbox** (rope, partner acro, handstands, fitness idea + …)?
 	- Mason- I need to organize the existing library to match this schema. Could we have an option to manually import a local file like an Instagram download?
+	- → Claude: yes — added Phase 2.7: Import files… (menu + drag-and-drop onto the window) runs local video files through the same import pipeline with a category/metadata dialog. Organize the existing tree whenever you like; Phase 3.6's adoption scan ingests it once it matches the schema.
 14. Qt install: the official online installer (needs a free Qt account) or an unattended `aqtinstall` script I provide (no account needed)? And which Visual Studio do you have — 2019 or 2022? Qt 6.8's prebuilt Windows binaries are MSVC-2022-built, so VS 2022 is the smooth path.
 	- Mason- I'm currently using VS2022. Do we need to install Qt? Qt is listed in conan center so I think it can just be pulled down via that. I think it should pull down MOC and all the stuff needed? It would be really nice to have this done via Conan instead of needed an installer.
+	- → Claude: validated — Qt *is* on ConanCenter (6.8.3/6.10.3/6.11.1, and yes, moc/rcc/uic come with it) but it's source-only (hours-long first build), the Conan build has **no FFmpeg multimedia backend** (kills the player), and **WebEngine won't build on Windows** (open issue since Nov 2024). Full findings in "Toolchain validation" up in the Decision section. Resolution: Conan owns every library dependency in the knottyyoga pattern; Qt 6.8.3 prebuilt MSVC2022 binaries come from `tools/setup_machine.ps1` via aqtinstall — no Qt account, no installer clicking.
 15. QtWebEngine is the one heavyweight module (roughly a GB installed; ~150 MB added to the deployed app folder). It powers the embedded Instagram login — our only reliable cookie source given Chrome — and in-app post preview. Include it (**my recommendation**), or skip it and manually export `cookies.txt` from a Chrome extension whenever the session expires?
 	- Mason- I'm fine including it but if we use yt-dlp with the cookies from chome option, I'm thinking we only need this to be able to play instagram videos in the app.
+	- → Claude: one correction to the premise: `--cookies-from-browser chrome` does not currently work on Windows (Chrome v20 app-bound encryption; open yt-dlp issue as of Mar 2026) — the app probes it first and falls back automatically. WebEngine stays in (prebuilt via the setup script; Conan couldn't build it anyway) as the fallback cookie source (embedded login) and the open-post-in-app view. Playing IG videos in-app doesn't need WebEngine — that's yt-dlp `-g` → the normal player.
 16. How will you and your assistant share the library folder — copied/external drive, NAS, or a synced folder (OneDrive/Dropbox)? SQLite wants one writer at a time: totally fine as long as only one machine has the app open at once. I'll add a stale-lock warning either way, but the real setup shapes the run-book guidance.
 	- Mason- Shared folder on a network drive and than copying the directory to my laptop to take with me to my studio.
+	- → Claude: works with one rule — only one machine has the library open at a time, and close the app before copying. Phase 6.3 adds the stale-lock warning, on-open `quick_check`, and rotating backups; `journal_mode=DELETE` was chosen for exactly this copy-safety.
 
 # Implementation Plan
 
@@ -153,19 +172,20 @@ Layer order within every phase, lowest first: **data** (schema, repositories) �
 Design principles baked into every phase:
 - **Event-driven, single process**: yt-dlp/ffmpeg/python run as async `QProcess`es on the event loop — background downloads with no worker threads. All SQLite access stays on the GUI thread (Qt SQL connections are thread-bound), which also avoids write contention. Long filesystem scans run on a worker and marshal results back.
 - **Portable library**: every path stored in the DB is library-root-relative with forward slashes; `library.db`, thumbnails, staging, and backups all live under the root (`.videolibrary/` for app-managed folders). Per-machine state (tool paths, recent libraries, window geometry, Instagram session/cookies) lives in QSettings/AppData only.
-- **Tests**: GoogleTest via FetchContent, knottyyoga conventions — no fixtures, self-contained tests beside sources, no assumed collection order; the test main spins up a `QCoreApplication`. UI widgets stay thin; logic lives in models, presenters, and pure functions where tests can reach it.
+- **Tests**: GoogleTest via Conan (knottyyoga `conanfile.py` pattern), knottyyoga conventions — no fixtures, self-contained tests beside sources, no assumed collection order; the test main spins up a `QCoreApplication`. UI widgets stay thin; logic lives in models, presenters, and pure functions where tests can reach it.
 
 ## Phase 0 — Toolchain and app skeleton
 
 ### 0.1 Toolchain setup (Mason runs; Claude provides scripts and docs)
-- [ ] `tools/install_qt.ps1` (aqtinstall-based, per #14) or documented online-installer steps: Qt 6.8 LTS, MSVC 64-bit kit, Multimedia + WebEngine modules (#15); README prerequisites section (VS, CMake ≥ 3.24)
-- [ ] `tools/setup_python.ps1`: create a per-machine venv under `%LOCALAPPDATA%\VideoLibrary\python`, `pip install instaloader`, print versions — the "script to install the various python things"
-- [ ] Verify yt-dlp/ffmpeg (already winget-installed) resolve from PATH; document the winget lines for a fresh machine (assistant setup)
+- [ ] `tools/setup_machine.ps1` — one idempotent clean-machine bootstrap (per the Decision-section toolchain note): winget installs (yt-dlp, ffmpeg, CMake if missing), `pip install aqtinstall` + fetch Qt 6.8.3 win64_msvc2022_64 with qtmultimedia/qtwebengine (+qtwebchannel/qtpositioning) into `C:\Qt`, per-machine Python venv under `%LOCALAPPDATA%\VideoLibrary\python` with Instaloader, `conan profile detect` if absent; prints all versions at the end
+- [ ] `-Mode runtime` variant for the assistant's machine: winget tools + Python venv only (the dist folder already bundles Qt)
+- [ ] README prerequisites section: VS2022, then "run the script"; verify yt-dlp/ffmpeg resolve from PATH
 
 ### 0.2 Repository and build skeleton
 - [ ] Repo at `C:\Users\mason\source\repos\video_library`: top-level CMakeLists.txt (C++20, `qt_standard_project_setup`, AUTOMOC) with targets `video_library_core` (static lib — everything testable), `video_library_app` (WIN32 exe — main + UI glue), `video_library_tests` (GoogleTest exe)
-- [ ] GoogleTest via FetchContent; custom test `main.cpp` that creates a `QCoreApplication`; CTest wiring
-- [ ] CMakePresets/CMakeSettings for VS; `.gitignore` / `.gitattributes`; README with build steps
+- [ ] Conan integration mirrored from knottyyoga/server_components: `conanfile.py` with the `Library` list (gtest pinned) generating `ConanLibImports.cmake`, `conan_provider.cmake`, a benign `find_package` to force the provider, `${GTEST_LIB}`-style variables
+- [ ] GoogleTest via Conan; custom test `main.cpp` that creates a `QCoreApplication`; CTest wiring
+- [ ] CMakeSettings.json for VS with `CONAN_CMD` + `CMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake` (knottyyoga pattern) and `CMAKE_PREFIX_PATH` pointing at the 0.1 Qt kit; `.gitignore` / `.gitattributes`; README with build steps
 - [ ] CLAUDE.md seeded with this app's conventions (layer DAG, naming, testing rules, CMake header listing, planning-directory rule)
 - [ ] Smoke: one trivial test proving the test target builds and runs
 
@@ -239,6 +259,10 @@ Design principles baked into every phase:
 - [ ] Downloads view: rows with progress bars, cancel/retry, error details, jump-to-video on success; status-bar active-downloads indicator
 - [ ] Tests for the download-row view-model state mapping
 
+### 2.7 Manual local-file import (per #13)
+- [ ] Import files… (menu + drag-and-drop onto the window): pick video file(s) → dialog for category (default Inbox/today), optional title/creator/source URL, copy-vs-move choice → same ImportService path (ffprobe, thumbnail, catalog row)
+- [ ] Tests: copy from outside the root, move from inside, metadata defaults, filename collision handling
+
 ## Phase 3 — Library browsing and management
 
 ### 3.1 Library tree
@@ -284,12 +308,13 @@ Design principles baked into every phase:
 
 ## Phase 5 — Instagram integration
 
-### 5.1 Embedded login and cookies (per #15)
-- [ ] QtWebEngine login window with a persistent per-machine profile; `CookieHarvester` on QWebEngineCookieStore capturing instagram.com cookies; Netscape `cookies.txt` writer for yt-dlp; session values handed to the Python helper; login-status indicator + re-login flow
-- [ ] Tests: Netscape serialization, cookie filtering/expiry logic (pure functions)
+### 5.1 Cookie sources and login status (per Q7/#15)
+- [ ] Cookie-source setting, probed in order: (1) `--cookies-from-browser <browser>` passthrough (chrome first per Mason's experience; known-broken for Chrome v20 cookies on Windows — the probe decides), (2) embedded QtWebEngine login with a persistent per-machine profile — `CookieHarvester` on QWebEngineCookieStore writes a Netscape `cookies.txt` for yt-dlp and hands session values to the Python helper, (3) user-supplied `cookies.txt` path
+- [ ] Login-status probe (yt-dlp simulate against a login-required URL) surfaced in Settings and the Instagram view; re-login flow
+- [ ] Tests: Netscape serialization, cookie filtering/expiry logic, probe-output parsing (pure functions)
 
 ### 5.2 Saved-list helper script
-- [ ] `tools/list_saved_posts.py`: Instaloader session from the harvested cookies (`load_session`), iterate saved posts, emit JSONL (shortcode, url, owner, caption excerpt, taken_at, is_video, thumbnail_url), `--max-items`, politeness delays; runs in the venv from 0.1
+- [ ] `tools/list_saved_posts.py`: Instaloader session from the active cookie source (`load_session` on values parsed from cookies.txt or harvested cookies), iterate saved posts, emit JSONL (shortcode, url, owner, caption excerpt, taken_at, is_video, thumbnail_url), `--max-items`, politeness delays; runs in the venv from 0.1
 - [ ] C++ JSONL parser with tests on fixture output (the script itself is smoke-tested manually — it hits the real network)
 
 ### 5.3 Sync service
@@ -319,7 +344,7 @@ Design principles baked into every phase:
 
 ### 6.4 Packaging and per-machine setup
 - [ ] `tools/make_dist.ps1`: windeployqt into a self-contained folder (copy to any Windows machine), app icon, version stamp
-- [ ] Assistant run-book in README: copy dist folder, run `setup_python.ps1`, winget lines for yt-dlp/ffmpeg, open the library, log into Instagram, sync + download
+- [ ] Assistant run-book in README: copy dist folder, run `tools/setup_machine.ps1 -Mode runtime` (winget yt-dlp/ffmpeg + Python venv), open the library, set up Instagram cookies (probe-guided), sync + download
 
 ### 6.5 UX polish
 - [ ] Empty states, busy indicators, status-bar toasts for background completions/errors, dark-theme pass, shortcut cheat sheet
@@ -328,7 +353,7 @@ Design principles baked into every phase:
 
 Per phase, after Claude finishes the code (Mason builds and runs — no builds or git from Claude):
 - **Tests**: build and run `video_library_tests` (CTest or the exe directly). The data/services/business-logic layers are covered there; UI glue is covered by the smoke lists.
-- **Manual smoke per phase**: 0 — app launches, creates/opens a library folder, log file appears, Settings shows tool versions. 1 — `library.db` appears with all tables (inspect with any SQLite browser); copy the library folder elsewhere and reopen it. 2 — paste a real Instagram/YouTube URL; it downloads in the background and lands in `Inbox/{y}/{m}/{d}` with a thumbnail; queue two while one runs; cancel one. 3 — browse the tree, rename a file (check disk), recategorize (file moves), tag with autocomplete, search by tag/keyword/date; adopt the existing library and spot-check it. 4 — play a video: every speed, scrub with elapsed/remaining shown, fullscreen, every shortcut; add notes at two timestamps, watch the overlay switch at the second, click a note to jump, copy notes into Obsidian. 5 — log into Instagram in-app; Sync lists saved videos not yet downloaded; download two at once; ignore one; preview one without downloading; re-sync preserves states. 6 — delete a file on disk manually and confirm the checker reports/repairs it; build the dist folder and run it from a clean directory or second machine.
+- **Manual smoke per phase**: 0 — `tools/setup_machine.ps1` completes, first CMake configure resolves Conan deps + Qt kit, app launches, creates/opens a library folder, log file appears, Settings shows tool versions. 1 — `library.db` appears with all tables (inspect with any SQLite browser); copy the library folder elsewhere and reopen it. 2 — paste a real Instagram/YouTube URL; it downloads in the background and lands in `Inbox/{y}/{m}/{d}` with a thumbnail; queue two while one runs; cancel one. 3 — browse the tree, rename a file (check disk), recategorize (file moves), tag with autocomplete, search by tag/keyword/date; adopt the existing library and spot-check it. 4 — play a video: every speed, scrub with elapsed/remaining shown, fullscreen, every shortcut; add notes at two timestamps, watch the overlay switch at the second, click a note to jump, copy notes into Obsidian. 5 — set up Instagram cookies (probe confirms login, via browser passthrough or in-app login); Sync lists saved videos not yet downloaded; download two at once; ignore one; preview one without downloading; re-sync preserves states. 6 — delete a file on disk manually and confirm the checker reports/repairs it; build the dist folder and run it from a clean directory or second machine.
 
 # Process Notes
 
