@@ -138,8 +138,9 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 ## Remaining open questions (numbering continues; answer inline)
 
 13. (was Q5 — still open) Where does the existing video library live on disk, should Phase 3.6 adopt it into the catalog, and what categories should be seeded besides **Inbox** (rope, partner acro, handstands, fitness idea + …)?
-	- Mason- I need to organize the existing library to match this schema. Could we have an option to manually impr
+	- Mason- I need to organize the existing library to match this schema. Could we have an option to manually import a local file like an Instagram download?
 14. Qt install: the official online installer (needs a free Qt account) or an unattended `aqtinstall` script I provide (no account needed)? And which Visual Studio do you have — 2019 or 2022? Qt 6.8's prebuilt Windows binaries are MSVC-2022-built, so VS 2022 is the smooth path.
+	- Mason- I'm currently using VS2022. Do we need to install Qt? Qt is listed in 
 15. QtWebEngine is the one heavyweight module (roughly a GB installed; ~150 MB added to the deployed app folder). It powers the embedded Instagram login — our only reliable cookie source given Chrome — and in-app post preview. Include it (**my recommendation**), or skip it and manually export `cookies.txt` from a Chrome extension whenever the session expires?
 16. How will you and your assistant share the library folder — copied/external drive, NAS, or a synced folder (OneDrive/Dropbox)? SQLite wants one writer at a time: totally fine as long as only one machine has the app open at once. I'll add a stale-lock warning either way, but the real setup shapes the run-book guidance.
 
