@@ -63,20 +63,24 @@ Please create a plan with phases of implementation. Within each phase, please re
 **Option C — Web backend now, desktop shell later**
 - Option B's backend is UI-agnostic; if you ever want a "real window," wrap the Angular app in Edge app-mode (zero work), or Tauri/Electron later. This is a door Option B leaves open, not a separate build.
 
-## Recommendation
+## Recommendation → Decision (2026-08-06)
 
-**Option B.** The "native C++ app would be more powerful" intuition is mostly about file access and embedding — but the file access lives in the C++ server either way, and the one thing Qt genuinely does better (embedded Instagram webview for login) is replaceable by a one-time cookie export. Meanwhile the video player, tag autocomplete, search UI, and note overlays — the bulk of this app — are things the browser + Angular/Material do better than Qt Widgets, in a stack you already know, reusing components you already built and test infrastructure you already trust. Qt would be a from-scratch framework investment for a worse fit.
+My initial recommendation was Option B, leaning on four pillars: honuware/Postgres reuse, Angular familiarity, LAN/tablet access, and avoiding a new framework. Mason's answers to the open questions knock out three of them: SQLite is the choice (so the Postgres data layer, table_helpers, admin CRUD, and DB test infrastructure don't transfer anyway), LAN access is explicitly not wanted, and the goal is a **self-contained portable tool** — open a library folder from any machine, no server, no Docker, no browser. With those constraints, **Option A (native Qt) is the right call, not a compromise**:
 
-**Database sub-decision:** PostgreSQL (existing Docker pattern, new `video_library` database) rather than SQLite. It reuses your entire data layer, table_helpers, generic CRUD/admin framework, and test transaction support, and gives real full-text search (tsvector). Cost: Docker must be running to use the app (launcher script handles it). If you'd rather the app be a single self-contained exe, SQLite is viable but means writing a new thin data-access layer and losing the table_helpers/test reuse — see Open Questions #2.
+- The portability requirement (library folder = `library.db` + media, copyable between machines, usable by an assistant) is exactly the desktop-app shape. A localhost web stack would fight it.
+- Chrome being the browser actually *strengthens* Qt: Chrome's cookie store can't be read reliably on Windows (app-bound encryption), but a QtWebEngine **embedded Instagram login inside the app** produces its own cookies — one login powers yt-dlp downloads, Instaloader enumeration, and in-app post preview (wanted per Q12).
+- Honest residual risks, with mitigations: (1) QMediaPlayer (FFmpeg backend) is good but less battle-tested than the browser player — the player sits behind an `IVideoPlayer` seam so libmpv can be swapped in if speed/scrub quality disappoints; (2) Qt is a new framework for Mason — Claude writes the code, and conventions stay knottyyoga-style (naming, layering, GoogleTest, no fixtures); (3) Qt + WebEngine is a chunky one-time install — Phase 0 scripts/documents it.
 
-**Proposed stack:** C++17 Crow server (port 18081) + honuware via FetchContent + Conan 2 + PostgreSQL 13 (Docker) + Angular 21 / Material / Tailwind + GoogleTest + yt-dlp + ffmpeg + Python 3.13 with Instaloader for the saved-list.
+**Decided stack:** C++20 · Qt 6.8 LTS (Widgets + Multimedia + MultimediaWidgets + Sql + Network + WebEngineWidgets) · SQLite via Qt Sql (FTS5 keyword search with LIKE fallback) · CMake + GoogleTest (FetchContent) · external tools: yt-dlp + ffmpeg/ffprobe (already installed, winget) + Python 3.13 venv with Instaloader. No Conan, no Postgres, no Angular, no web server.
+
+**Portable-library contract:** everything the catalog needs lives under the library root — `library.db` at the root, media under `{Category}/{YYYY}/{MM}/{DD}/`, thumbnails/staging/backups under `.videolibrary/` — and every path stored in the DB is root-relative with forward slashes, so the folder can be copied/moved wholesale and opened on any machine. Per-machine state (tool paths, window geometry, recent libraries, Instagram session/cookies) lives in QSettings/AppData, never inside the library.
 
 ## Instagram tooling suggestions
 
-**Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. Options: `--cookies-from-browser firefox` (works; Chrome/Edge on Windows are unreliable for this due to app-bound cookie encryption) or an exported Netscape `cookies.txt` (e.g. the "Get cookies.txt LOCALLY" extension) with `--cookies <file>`. The app will shell out to yt-dlp with the configured cookie source, use `--sleep-requests`-style politeness, and surface yt-dlp updates (Instagram breaks extractors regularly; you already have winget-managed yt-dlp).
+**Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. Since Mason uses Chrome (whose cookie store can't be read reliably on Windows due to app-bound encryption), the app supplies its own: log into Instagram once inside the app (embedded QtWebEngine browser with a persistent per-machine profile) and the app exports a Netscape `cookies.txt` from that session for yt-dlp (`--cookies <file>`). Fallback if WebEngine is skipped: manual export via a cookies.txt Chrome extension. The app shells out to yt-dlp with politeness delays and surfaces yt-dlp staleness (Instagram breaks old extractors regularly; yt-dlp stays winget-managed).
 
 **Enumerating your saved list** (no official API for personal saved posts — all options are unofficial):
-1. **Instaloader** (recommended) — mature Python library; log in once (`instaloader --login <user>`, supports 2FA, session file persisted), then `get_saved_posts()` yields shortcode/URL/owner/caption/date/thumbnail without downloading. We wrap it in a small helper script emitting JSON that the server invokes and reconciles.
+1. **Instaloader** (recommended) — mature Python library; the helper script builds its session from the same cookies the embedded login harvested (`load_session`), then `get_saved_posts()` yields shortcode/URL/owner/caption/date/thumbnail without downloading. We wrap it in a small helper script emitting JSON that the app invokes and reconciles.
 2. **instagrapi** — private mobile-API library; more capable (per-collection access) but a heavier risk profile.
 3. **gallery-dl** — multi-platform downloader that can target the saved page with cookies; less Instagram-specialized than Instaloader.
 4. **Browser extension** that scrapes your saved page in your real session and posts to the local server — lowest ban risk, most build effort. (Fallback idea, not planned.)
@@ -91,12 +95,15 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 **Architecture**
 1. Approve **Option B (Crow + Angular + honuware + Postgres)**? If you want Qt native anyway, say so and I'll restructure the plan before any code.
 	- Mason- I believe that I want to have a native Qt app. This isn't something that I'm going to ship. I have an assistant who downloads these files for me. It would be nice to have a script to run to install the various python things but just have a self contained Windows app to run. It would be nice to be able to run it from any machine and just point it to the SQLLite database at the root of the file system where this stuff is stored (and use relative paths from here so this can be copied around and still opened)
+	- → Claude: not a horrible idea at all — with these constraints it's the better fit. Decision locked: native Qt app; plan below rebuilt around it (see Recommendation → Decision).
 2. Database: **PostgreSQL (reuse everything, Docker required at runtime)** vs SQLite (self-contained exe, new data layer, no admin/test reuse)?
 	- Mason- Yes, I'm aware that using SQL lite unfortunately doesn't allow any reuse of my postgres database code but this also isn't a production app and the database needs are small. I also don't really care about ACID that much per se since I anticipate only one user at a time. Honestly, I could probably just do this as a big JSON file but the SQL support for queries and keyword searches is nice.
+	- → Claude: SQLite it is, with FTS5 for keyword search (LIKE fallback). Agreed — SQL queries earn their keep over a JSON blob, and single-user means the ACID trade-offs don't bite.
 3. Repo/app name and location? Default: **`C:\Users\mason\source\repos\video_library`**, working title "Video Library", honuware pinned to the same SHA knottyyoga uses. (Name ideas if you want one: Clip Vault, Move Library, Beta Reel.)
 	- Mason- This is a fine spot for the repo.
 4. Server port **18081** (knottyyoga uses 18080) — OK?
 	- Mason- I am strongly leaning not to make this a web page.
+	- → Claude: moot — native app, no server, no port.
 
 **Library**
 5. Where does your existing video library live on disk, should Phase 3.7 adopt it into the catalog, and what's the real category list to seed? (Overview mentions rope, partner acro, handstands, fitness idea — plus **Inbox** as the default.)
@@ -106,6 +113,7 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 **Instagram**
 7. Which browser are you logged into Instagram with? (**Firefox → automatic `--cookies-from-browser`**; Chrome/Edge → manual cookies.txt export extension.)
 	- Mason- Chrome
+	- → Claude: Chrome's cookie store can't be read on Windows (app-bound encryption), so the app embeds its own Instagram login (QtWebEngine) and exports its own cookies — nothing needs to touch Chrome.
 8. Run enumeration/downloads as your main account or a **secondary account**? And is "all saved posts" enough, or do you use specific saved *collections* (collections push toward instagrapi)?
 	- Mason- Main account.
 9. Saved *photo/carousel* posts: **videos only** for now, or should images be imported too (viewer instead of player)?
@@ -116,8 +124,10 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 **Scope**
 11. LAN/tablet access wanted? Default **localhost-only, no auth**; LAN adds a small auth + bind item in Phase 6.
 	- Mason- This is a big part of why I just want a local app that I can just open a directory with a sql lite file and the directory structure.
+	- → Claude: this became the design's centerpiece — see the portable-library contract in the Decision section.
 12. Preview-not-yet-downloaded videos: is **open-post-in-new-tab** enough, or do you want in-app streaming preview (Phase 5.4, resolves the direct media URL via yt-dlp on click)?
 	- Mason- Given that I want a native app, let's go with in app preview.
+	- → Claude: planned (Phase 5.5) — resolve the direct media URL via yt-dlp and play it in the player without saving, or open the post in the embedded logged-in browser.
 
 # Implementation Plan
 
