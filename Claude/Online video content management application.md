@@ -72,13 +72,15 @@ My initial recommendation was Option B, leaning on four pillars: honuware/Postgr
 - Honest residual risks, with mitigations: (1) QMediaPlayer (FFmpeg backend) is good but less battle-tested than the browser player — the player sits behind an `IVideoPlayer` seam so libmpv can be swapped in if speed/scrub quality disappoints; (2) Qt is a new framework for Mason — Claude writes the code, and conventions stay knottyyoga-style (naming, layering, GoogleTest, no fixtures); (3) Qt + WebEngine is a chunky one-time install — Phase 0 scripts/documents it.
 
 **Decided stack:** C++20 · Qt 6.8 LTS (Widgets + Multimedia + MultimediaWidgets + Sql + Network + WebEngineWidgets) · SQLite via Qt Sql (FTS5 keyword search with LIKE fallback) · CMake + GoogleTest (FetchContent) · external tools: yt-dlp + ffmpeg/ffprobe (already installed, winget) + Python 3.13 venv with Instaloader. No Conan, no Postgres, no Angular, no web server.
-- Mason- I very much want Conan. I also want a script that does winget, etc to pull down the dependencies onto a clean machine. The only reason I have these libraries on my machine is because of Conan. Please look at knotty yoga server and/or server components to do the conan
+- Mason- I very much want Conan. I also want a script that does winget, etc to pull down the dependencies onto a clean machine. The only reason I have these libraries on my machine is because of Conan. Please look at knotty yoga server and/or server components to do the conan / CMake integration.
 
 **Portable-library contract:** everything the catalog needs lives under the library root — `library.db` at the root, media under `{Category}/{YYYY}/{MM}/{DD}/`, thumbnails/staging/backups under `.videolibrary/` — and every path stored in the DB is root-relative with forward slashes, so the folder can be copied/moved wholesale and opened on any machine. Per-machine state (tool paths, window geometry, recent libraries, Instagram session/cookies) lives in QSettings/AppData, never inside the library.
 
 ## Instagram tooling suggestions
 
 **Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. Since Mason uses Chrome (whose cookie store can't be read reliably on Windows due to app-bound encryption), the app supplies its own: log into Instagram once inside the app (embedded QtWebEngine browser with a persistent per-machine profile) and the app exports a Netscape `cookies.txt` from that session for yt-dlp (`--cookies <file>`). Fallback if WebEngine is skipped: manual export via a cookies.txt Chrome extension. The app shells out to yt-dlp with politeness delays and surfaces yt-dlp staleness (Instagram breaks old extractors regularly; yt-dlp stays winget-managed).
+
+Mason- Please note that I do yt-dlp --cookies-from-browser on my machine for things that need login / aren't public. That always works and seems like the best option here.
 
 **Enumerating your saved list** (no official API for personal saved posts — all options are unofficial):
 1. **Instaloader** (recommended) — mature Python library; the helper script builds its session from the same cookies the embedded login harvested (`load_session`), then `get_saved_posts()` yields shortcode/URL/owner/caption/date/thumbnail without downloading. We wrap it in a small helper script emitting JSON that the app invokes and reconciles.
@@ -88,6 +90,8 @@ My initial recommendation was Option B, leaning on four pillars: honuware/Postgr
 5. **Manual paste of URLs** — ships first regardless, as the always-works path (and covers YouTube for free).
 
 **Risk note:** any automated enumeration violates Instagram ToS and can flag the account it runs as. Mitigations planned: manual sync button (not a background poller) with a minimum interval, low volume, politeness delays, cached results, and the option to run against a secondary account (Open Questions #8).
+
+Mason- I'm fine with using Instaloader. Please just make sure to make a config script for people to run to pull down the needed dependencies to their machine.
 
 # Open Questions
 
@@ -115,6 +119,7 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 7. Which browser are you logged into Instagram with? (**Firefox → automatic `--cookies-from-browser`**; Chrome/Edge → manual cookies.txt export extension.)
 	- Mason- Chrome
 	- → Claude: Chrome's cookie store can't be read on Windows (app-bound encryption), so the app embeds its own Instagram login (QtWebEngine) and exports its own cookies — nothing needs to touch Chrome.
+	- Mason- Note taht we can use yt-dlp --cookies-from-browser and everything should just work.
 8. Run enumeration/downloads as your main account or a **secondary account**? And is "all saved posts" enough, or do you use specific saved *collections* (collections push toward instagrapi)?
 	- Mason- Main account.
 9. Saved *photo/carousel* posts: **videos only** for now, or should images be imported too (viewer instead of player)?
@@ -133,6 +138,7 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 ## Remaining open questions (numbering continues; answer inline)
 
 13. (was Q5 — still open) Where does the existing video library live on disk, should Phase 3.6 adopt it into the catalog, and what categories should be seeded besides **Inbox** (rope, partner acro, handstands, fitness idea + …)?
+	- Mason- I need to organize the existing library to match this schema. Could we have an option to manually impr
 14. Qt install: the official online installer (needs a free Qt account) or an unattended `aqtinstall` script I provide (no account needed)? And which Visual Studio do you have — 2019 or 2022? Qt 6.8's prebuilt Windows binaries are MSVC-2022-built, so VS 2022 is the smooth path.
 15. QtWebEngine is the one heavyweight module (roughly a GB installed; ~150 MB added to the deployed app folder). It powers the embedded Instagram login — our only reliable cookie source given Chrome — and in-app post preview. Include it (**my recommendation**), or skip it and manually export `cookies.txt` from a Chrome extension whenever the session expires?
 16. How will you and your assistant share the library folder — copied/external drive, NAS, or a synced folder (OneDrive/Dropbox)? SQLite wants one writer at a time: totally fine as long as only one machine has the app open at once. I'll add a stale-lock warning either way, but the real setup shapes the run-book guidance.
