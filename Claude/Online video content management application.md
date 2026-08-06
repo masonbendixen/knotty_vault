@@ -18,6 +18,12 @@ Ideally I would have an app that could:
 - Do playback of the video or host the page embedded with the video to play it
 - Choose to download the video which would start the download of the video in the background but allow me to keep watching and initiating the download of more videos
 - Be able to go through the videos I've downloaded
+	- Have metadata for the video (creator, original URL, title, category, when downloaded, etc)
+	- Be able to change the name of the file in the UI that changes the file on disk
+	- Categorize the file which causes it to be placed in the correct area on disk (they default to Inbox/{year}/{month}/{day_downloaded}/{filename})
+	- Be able to go into categories and drill down into category/year/month/day
+	- Watch a video in the UI
+		- Be able to watch in the window or full s
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
