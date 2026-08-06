@@ -39,4 +39,253 @@ I'm not sure how best to do this app. I'm leaning towards a native C++ app using
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
-# Place plan here
+# Architecture Assessment
+
+## What I found in your environment
+
+- yt-dlp `2026.07.04` and ffmpeg/ffprobe are already installed (winget), Python 3.13.1, CMake, Conan 2.15.1, Docker 27.5.1, Node 22.14.0 / npm 11.1. No Qt installation exists on this machine.
+- You have the `knottyyoga` stack (Crow C++ server + Angular 21 + Material/Tailwind + PostgreSQL in Docker) and the reusable `honuware` component libraries (foundation: types/json/logging/thread_pool/file_util/http client; data: transactions/schema; platform: table_helpers framework, generic CRUD + admin endpoints, auth, web core) consumed via CMake FetchContent — plus an established GoogleTest setup with transaction-abort test cleanup.
+
+## Options considered
+
+**Option A — Native Qt 6 C++ desktop app** (your initial lean)
+- How it meets the requirements: Qt Widgets UI, QMediaPlayer/QVideoWidget (FFmpeg backend, default on Windows in Qt 6.5+) for playback with `setPlaybackRate` (0.25x–2x), seek, fullscreen; QShortcut for keys; SQLite via Qt SQL; QProcess for yt-dlp; QtWebEngine (embedded Chromium) to show/log into Instagram in-app and harvest cookies.
+- Pros: single-window "real app" feel; direct filesystem access; embedded Instagram login/preview is elegant; no server + browser juggling.
+- Cons: an entirely new framework for you (multi-GB Qt install, new build kit, LGPL deployment care); Qt Widgets is much more verbose than Angular+Material for grids/forms/autocomplete; QMediaPlayer is decent but the browser `<video>` element is a more mature player; **zero reuse** of honuware, your Angular skills, your Postgres data layer, or your test infrastructure; desktop-only (no tablet in the studio).
+- Variant: Qt + libmpv for a best-in-class player — even more power, even more new surface.
+
+**Option B — Crow C++ server + Angular front end, running locally (recommended)**
+- Every "hard" UI requirement is a native strength of the browser: `<video>` gives playback speed (0.25x–2x via `playbackRate`), frame-accurate seeking, fullscreen API; overlays/notes are trivial HTML/CSS; Material chips + autocomplete for tags; keyboard shortcuts are simple event handlers. The server side has identical power to a native app (it's local C++ with full disk access — rename/move/download all server-side).
+- Massive reuse: honuware foundation (logging, json_value, thread_pool, http client, file_util), data layer (transactions), platform (table_helpers pattern, generic CRUD + free admin tables UI, endpoint/test harness), your Conan/CMake/VS workflow, your Angular 21 shell patterns, and your transaction-abort test framework.
+- Bonus: reachable from a tablet/TV on your LAN later (watching reference video with notes *in the studio* seems like a real use case for an acrobatics business).
+- Cons: two processes (server + browser — mitigated with a launcher script and Edge/Chrome `--app=` mode, which gives a chromeless app-like window); must implement an HTTP Range streaming endpoint for seek-able video (well-understood, planned below); can't embed instagram.com in an iframe (mitigation: cookie export + open-post-in-new-tab / stream-preview, below).
+
+**Option C — Web backend now, desktop shell later**
+- Option B's backend is UI-agnostic; if you ever want a "real window," wrap the Angular app in Edge app-mode (zero work), or Tauri/Electron later. This is a door Option B leaves open, not a separate build.
+
+## Recommendation
+
+**Option B.** The "native C++ app would be more powerful" intuition is mostly about file access and embedding — but the file access lives in the C++ server either way, and the one thing Qt genuinely does better (embedded Instagram webview for login) is replaceable by a one-time cookie export. Meanwhile the video player, tag autocomplete, search UI, and note overlays — the bulk of this app — are things the browser + Angular/Material do better than Qt Widgets, in a stack you already know, reusing components you already built and test infrastructure you already trust. Qt would be a from-scratch framework investment for a worse fit.
+
+**Database sub-decision:** PostgreSQL (existing Docker pattern, new `video_library` database) rather than SQLite. It reuses your entire data layer, table_helpers, generic CRUD/admin framework, and test transaction support, and gives real full-text search (tsvector). Cost: Docker must be running to use the app (launcher script handles it). If you'd rather the app be a single self-contained exe, SQLite is viable but means writing a new thin data-access layer and losing the table_helpers/test reuse — see Open Questions #2.
+
+**Proposed stack:** C++17 Crow server (port 18081) + honuware via FetchContent + Conan 2 + PostgreSQL 13 (Docker) + Angular 21 / Material / Tailwind + GoogleTest + yt-dlp + ffmpeg + Python 3.13 with Instaloader for the saved-list.
+
+## Instagram tooling suggestions
+
+**Downloading (keep yt-dlp).** Instagram now sits almost entirely behind a login wall — anonymous yt-dlp requests fail, so downloads need cookies. Options: `--cookies-from-browser firefox` (works; Chrome/Edge on Windows are unreliable for this due to app-bound cookie encryption) or an exported Netscape `cookies.txt` (e.g. the "Get cookies.txt LOCALLY" extension) with `--cookies <file>`. The app will shell out to yt-dlp with the configured cookie source, use `--sleep-requests`-style politeness, and surface yt-dlp updates (Instagram breaks extractors regularly; you already have winget-managed yt-dlp).
+
+**Enumerating your saved list** (no official API for personal saved posts — all options are unofficial):
+1. **Instaloader** (recommended) — mature Python library; log in once (`instaloader --login <user>`, supports 2FA, session file persisted), then `get_saved_posts()` yields shortcode/URL/owner/caption/date/thumbnail without downloading. We wrap it in a small helper script emitting JSON that the server invokes and reconciles.
+2. **instagrapi** — private mobile-API library; more capable (per-collection access) but a heavier risk profile.
+3. **gallery-dl** — multi-platform downloader that can target the saved page with cookies; less Instagram-specialized than Instaloader.
+4. **Browser extension** that scrapes your saved page in your real session and posts to the local server — lowest ban risk, most build effort. (Fallback idea, not planned.)
+5. **Manual paste of URLs** — ships first regardless, as the always-works path (and covers YouTube for free).
+
+**Risk note:** any automated enumeration violates Instagram ToS and can flag the account it runs as. Mitigations planned: manual sync button (not a background poller) with a minimum interval, low volume, politeness delays, cached results, and the option to run against a secondary account (Open Questions #8).
+
+# Open Questions
+
+Answer inline here (or in chat) — defaults in bold are what I'll assume if unanswered.
+
+**Architecture**
+1. Approve **Option B (Crow + Angular + honuware + Postgres)**? If you want Qt native anyway, say so and I'll restructure the plan before any code.
+2. Database: **PostgreSQL (reuse everything, Docker required at runtime)** vs SQLite (self-contained exe, new data layer, no admin/test reuse)?
+3. Repo/app name and location? Default: **`C:\Users\mason\source\repos\video_library`**, working title "Video Library", honuware pinned to the same SHA knottyyoga uses. (Name ideas if you want one: Clip Vault, Move Library, Beta Reel.)
+4. Server port **18081** (knottyyoga uses 18080) — OK?
+
+**Library**
+5. Where does your existing video library live on disk, should Phase 3.7 adopt it into the catalog, and what's the real category list to seed? (Overview mentions rope, partner acro, handstands, fitness idea — plus **Inbox** as the default.)
+6. Delete behavior: **permanent delete with a confirm dialog**, or send to Recycle Bin?
+
+**Instagram**
+7. Which browser are you logged into Instagram with? (**Firefox → automatic `--cookies-from-browser`**; Chrome/Edge → manual cookies.txt export extension.)
+8. Run enumeration/downloads as your main account or a **secondary account**? And is "all saved posts" enough, or do you use specific saved *collections* (collections push toward instagrapi)?
+9. Saved *photo/carousel* posts: **videos only** for now, or should images be imported too (viewer instead of player)?
+10. Auto-sync on a schedule, or **manual Sync button only** (safer for rate limits)?
+
+**Scope**
+11. LAN/tablet access wanted? Default **localhost-only, no auth**; LAN adds a small auth + bind item in Phase 6.
+12. Preview-not-yet-downloaded videos: is **open-post-in-new-tab** enough, or do you want in-app streaming preview (Phase 5.4, resolves the direct media URL via yt-dlp on click)?
+
+# Implementation Plan
+
+Layer order within every phase: db_schema → table_helpers → low-level services → business_logic → endpoints → Angular UI. Tests accompany every layer that is testable (GoogleTest server-side per knottyyoga conventions — no fixtures, tests beside sources; Jasmine/Karma for Angular logic). Checkboxes get checked as items are implemented.
+
+## Phase 0 — Project scaffolding and infrastructure
+
+### 0.1 Repository and build skeleton
+- [ ] Create repo folder (per Q3) with top-level CMakeLists.txt consuming honuware via FetchContent (pinned SHA), `conanfile.py` as superset of honuware deps, `.gitignore`/`.gitattributes` copied from knottyyoga pattern
+- [ ] App targets: `video_library_core` (static lib), `video_library_server` (Crow exe), `video_library_tests` (GoogleTest exe), `video_library_database_helper` (DB bootstrap exe)
+- [ ] VS/Windows build config (CMakeSettings.json), README with build steps (you build; steps documented for Windows first)
+- [ ] Seed CLAUDE.md distilled from knottyyoga conventions (layering, naming, testing, CMake header listing, planning-directory rules)
+- [ ] Smoke test: one trivial GoogleTest proving the test target builds and runs
+
+### 0.2 Database bootstrap
+- [ ] New `video_library` PostgreSQL database using the existing database_server container pattern (reuse container/network; `HONUWARE_DB_NAME` override)
+- [ ] `video_library_database_helper` following the create_database.cpp pattern (config secrets table via honuware; empty app schema at this point; destructive-guard env var respected)
+- [ ] Wire GlobalDatabaseTestSupport so all table tests run inside aborted transactions against pre-created tables
+- [ ] Tests: database_helper creates the database idempotently; config secret read/write round-trip
+
+### 0.3 Process runner, tool registry, app configuration
+- [ ] `ProcessRunner` low-level service (launch external exe with args, capture stdout/stderr incrementally, exit code, timeout, kill/cancel) — cross-platform (Boost.Process); `TestProcessRunner` fake for tests, plus its own tests
+- [ ] App configuration (config secrets pattern): `library_root`, `staging_dir`, `thumbnail_dir`, `yt_dlp_path`, `ffmpeg_path`, `ffprobe_path`, `python_path`, `cookies_file_path` (or browser name), `max_concurrent_downloads`, `instagram_username`
+- [ ] `ToolRegistry`: probe yt-dlp/ffmpeg/python versions at startup via ProcessRunner; results exposed on `/api/health`; parsing tests with fake runner
+- [ ] Endpoint: `/api/health` reporting server + DB + tool status; endpoint test
+
+### 0.4 Angular workspace scaffold
+- [ ] `ng new` Angular 21 app (Material + Tailwind, matching knottyyoga ui conventions and path-alias style), proxy.conf.json → localhost:18081
+- [ ] App shell: sidebar navigation (Library, Instagram, Downloads, Search, Settings), header, routing, empty pages
+- [ ] `ServerAccessNetwork`-style HTTP service; Settings page showing `/api/health` tool status
+- [ ] `ng test` wired with one passing service test
+
+## Phase 1 — Catalog data layer
+
+### 1.1 Schema (db_schema + registration)
+- [ ] `categories` (id BIGSERIAL, name UNIQUE, directory_name UNIQUE, created_at) — seeded with Inbox + initial category list (Q5)
+- [ ] `videos` (id, category_id FK, relative_path, file_name, title, creator, platform, source_url, source_id UNIQUE NULL, description, duration_ms, width, height, file_size_bytes, downloaded_at, published_at NULL, thumbnail_path, created_at, updated_at)
+- [ ] `tags` (id, name UNIQUE case-insensitive) and `video_tags` (video_id FK, tag_id FK, PK(video_id, tag_id))
+- [ ] `notes` (id, video_id FK, timestamp_ms, body, created_at, updated_at)
+- [ ] `source_items` (id, platform, external_id UNIQUE, url, creator, caption, thumbnail_path, posted_at NULL, first_seen_at, last_seen_at, state: new|queued|downloaded|ignored|gone, video_id FK NULL) — the cached Instagram saved list
+- [ ] `downloads` (id, source_item_id FK NULL, url, state: queued|running|success|error|canceled, progress_percent, error_message, staging_path, created_at, started_at, finished_at)
+- [ ] Full admin registration for every table (all steps of the knottyyoga "Adding a New Database Table" checklist) so the generic admin CRUD UI works day one
+- [ ] Search support: generated tsvector column on videos (title, description, creator) + GIN index
+- [ ] Tests: schema creation via database_helper; FK ordering
+
+### 1.2 Table helpers
+- [ ] CRUD helpers per table following table_helpers conventions (KeyValueTable in/out, no business logic), each with tests: uniqueness conflicts, FK cascade behavior, `source_items` and `downloads` state transitions, tag find-or-create, tag prefix search (for autocomplete), notes ordered by timestamp
+
+### 1.3 Search queries
+- [ ] Filtered video query builder: category, year, month, day (derived from downloaded_at), tags (all-of), keyword (tsvector match on videos + join into notes bodies), with paging + sort
+- [ ] Library tree counts query (category → year → month → day with video counts)
+- [ ] Tests: month/year boundary correctness, tag intersection, keyword hits in title vs note body, empty-filter behavior
+
+### 1.4 Path planning and file operations (business_logic/library)
+- [ ] `PathPlanner`: target path `{directory_name}/{YYYY}/{MM}/{DD}/{file_name}` from category + downloaded_at; Windows-safe filename sanitization (reserved chars/names, length cap); collision resolution via numeric suffix; tests
+- [ ] `FileOperations`: rename in place, move-with-directory-creation, cross-volume fallback, delete; disk-op-first-then-DB update sequencing with revert on DB failure; tests using temp directories
+
+## Phase 2 — Acquisition pipeline (after this phase the app already replaces the manual yt-dlp workflow)
+
+### 2.1 yt-dlp client (business_logic/acquisition)
+- [ ] Metadata probe: `--dump-single-json` → `VideoMetadata` struct (id, title, uploader, duration, dimensions, canonical URL, upload timestamp, thumbnail URL); URL canonicalization for Instagram share links (reel/p/tv forms, strip `igsh` params)
+- [ ] Download: into staging_dir with output template, parseable progress (`--newline --progress-template`), cookie args from config, cancel via process kill, error taxonomy (auth required / gone / network / unknown)
+- [ ] Tests against captured fixture outputs with TestProcessRunner — no network in tests
+
+### 2.2 Download manager
+- [ ] Queue backed by `downloads` table; worker slots on honuware thread_pool (default 2 concurrent); state machine queued→running→success|error|canceled; retry; startup re-queue of interrupted items; progress readable for polling
+- [ ] Tests with fake yt-dlp client: concurrency cap, cancel mid-download, error propagation, restart recovery
+
+### 2.3 Import service
+- [ ] On download success: ffprobe metadata, thumbnail extraction (ffmpeg frame grab into thumbnail_dir), PathPlanner target under `Inbox/{download date}`, move from staging, insert `videos` row, link + mark `source_items` row downloaded; duplicate detection by source_id (skip + surface)
+- [ ] Tests: full import flow with temp library root and fake tools; duplicate handling; failure mid-import leaves staging intact
+
+### 2.4 Acquisition endpoints
+- [ ] `POST /api/videos/add_by_url` (accepts one or many URLs → probe + enqueue), `GET /api/downloads` (with progress), `POST /api/downloads/{id}/cancel`, `POST /api/downloads/{id}/retry` — thin endpoints per conventions, with endpoint tests
+
+### 2.5 Angular: Downloads page + Add-by-URL
+- [ ] Add-by-URL box (multi-line paste) in the shell toolbar
+- [ ] Downloads page: rows with progress bars (1s polling), cancel/retry, error details, link to resulting video
+- [ ] Jasmine tests for the download-state mapping service
+
+## Phase 3 — Library browsing and management
+
+### 3.1 Query endpoints
+- [ ] `GET /api/library/tree` (categories → year → month → day + counts), `GET /api/videos` (filters + paging), `GET /api/videos/{id}` (full metadata incl. tags), `GET /api/videos/{id}/thumbnail`, `GET /api/tags?prefix=` (autocomplete); endpoint tests
+
+### 3.2 Mutation endpoints
+- [ ] Rename (new file_name → disk rename + DB), recategorize (→ disk move to `{category}/{y}/{m}/{d}` + DB), edit title/creator/description, set/add/remove tags (find-or-create), delete video (per Q6); endpoint tests exercising real disk effects under a temp library root
+
+### 3.3 Angular: library browse
+- [ ] Sidebar tree component: category → year → month → day with counts, selection drives the grid
+- [ ] Video grid: thumbnail, title, creator, duration, downloaded date, tag chips; sorting (date, title, duration)
+
+### 3.4 Angular: video details editor
+- [ ] Details panel: inline rename, category picker (shows resulting path), description editor, creator/source URL display, size/resolution/date metadata
+- [ ] Tag editor: Material chips with autocomplete from `/api/tags?prefix=` + create-on-enter
+- [ ] Delete with confirmation
+- [ ] Jasmine tests for edit-state service logic
+
+### 3.5 Angular: search page
+- [ ] Keyword box + filters (category, year/month, tags multi-select) → results grid; filter-serialization tests
+
+### 3.6 Existing-library adoption
+- [ ] Scanner service: walk an existing `{category}/{year}/{month}/{day}` tree, dry-run report (what would be created), apply mode (create categories/videos, ffprobe metadata, downloaded_at from folder path, generate thumbnails); tests with fabricated temp trees
+- [ ] Endpoints + Settings-page trigger with dry-run preview and apply
+
+## Phase 4 — Player and notes
+
+### 4.1 Range streaming endpoint
+- [ ] `GET /api/videos/{id}/stream` with HTTP Range support (206 Partial Content, single ranges, suffix ranges, 416 handling, chunk-size cap, correct Content-Type) — required for instant seeking in `<video>`
+- [ ] Tests: no-range, mid-file range, suffix range, out-of-bounds, byte-exact content verification
+
+### 4.2 Notes endpoints
+- [ ] CRUD: create at timestamp_ms, edit body/timestamp, delete, list ordered by timestamp; endpoint tests
+
+### 4.3 Angular: player component
+- [ ] `<video>` wrapper playing `/api/videos/{id}/stream`; controls bar: play/pause, speed selector (0.25/0.5/0.75/1/1.25/1.5/2), seek slider with elapsed and remaining time, volume/mute, fullscreen (in-window and Fullscreen API)
+- [ ] Remember last playback position per video (nice-to-have)
+
+### 4.4 Keyboard shortcuts
+- [ ] Space play/pause, ←/→ ±5s, Shift+←/→ ±10s, ↑/↓ speed step, F fullscreen, M mute, N new note, ? shortcut overlay — data-driven shortcut map service with Jasmine tests
+
+### 4.5 Notes UX
+- [ ] Add note: pauses playback, inline editor pre-stamped with current timestamp
+- [ ] Overlay on the video showing the active note — active = most recent note at or before current time, stays until the next note's timestamp; pure resolver function with Jasmine tests (before-first, between, exact-hit, after-last, note added/deleted mid-playback)
+- [ ] Notes side list: click seeks to timestamp, inline edit, delete with confirm
+- [ ] "Copy notes as Markdown" (H:MM:SS + text) for pasting into Obsidian
+
+## Phase 5 — Instagram saved-list integration
+
+### 5.1 Cookie/session setup
+- [ ] Settings UI + config for cookie source (cookies.txt path or `--cookies-from-browser firefox`); server-side login-status probe (yt-dlp simulate against an auth-required URL) surfaced in Settings; cookie-file format validation with tests
+
+### 5.2 Saved-list enumeration
+- [ ] Python helper `tools/list_saved_posts.py` using Instaloader (session created once via `instaloader --login`, supports 2FA): emits JSON lines (shortcode, url, owner, caption excerpt, posted_at, is_video, thumbnail_url) with politeness delays and a max-items argument
+- [ ] `SavedListSyncService`: run helper via ProcessRunner, parse, reconcile into `source_items` (insert new, refresh last_seen, preserve ignored/downloaded states), download thumbnails server-side into thumbnail cache; minimum-interval guard between syncs
+- [ ] `POST /api/instagram/sync` + status endpoint; tests with fixture JSONL covering the reconciliation state machine (new/known/ignored/downloaded/gone)
+
+### 5.3 Angular: Instagram page
+- [ ] Grid of not-yet-downloaded saved items (thumbnail, creator, caption snippet), state filter, Sync button with last-synced time
+- [ ] Actions: Download (single + multi-select → Phase 2 pipeline), Ignore, Open post in new tab; rows auto-update as downloads complete
+
+### 5.4 Preview without download (per Q12)
+- [ ] Preview action: server resolves the direct media URL on click (yt-dlp `-g`) and the player streams it without saving; fallback is open-in-new-tab
+
+### 5.5 Optional per Q10
+- [ ] Scheduled background sync via the honuware scheduler pattern (default off)
+
+### 5.6 YouTube parity
+- [ ] Verify add-by-URL handles YouTube end-to-end (formats, thumbnails, metadata); document Watch-Later enumeration (cookies + `:ytwatchlater`) as a future provider
+
+## Phase 6 — Hardening and polish
+
+### 6.1 Consistency checker
+- [ ] Report: DB rows with missing files, files under library_root not in DB, stale source_item links; repair actions (relink, adopt, remove row); tests on checker logic; Settings-page UI
+
+### 6.2 Tool health and updates
+- [ ] yt-dlp version staleness surfaced in Settings (Instagram breaks old versions); update guidance (winget)
+
+### 6.3 Backup
+- [ ] pg_dump backup script + restore documentation (media files are plain files covered by normal backup; DB holds the catalog)
+
+### 6.4 Launcher
+- [ ] `start_video_library.cmd`: ensure Postgres container running, start server, open browser in app-mode window; README run-book
+
+### 6.5 UX polish
+- [ ] Empty states, toasts for background completions/errors, busy indicators, keyboard cheat-sheet overlay, dark theme pass
+
+### 6.6 Optional per Q11
+- [ ] LAN access: bind beyond localhost + honuware auth login
+
+# Verification
+
+Per phase, after I finish the code (you build and run — I won't invoke builds or git):
+- **Server tests**: build and run `video_library_tests` (GoogleTest; DB tests run in aborted transactions against the dev database).
+- **Angular tests**: `ng test` in the ui folder.
+- **Manual smoke per phase**: 0 — server starts, `/api/health` shows tools green, Angular shell loads. 1 — admin CRUD pages show the new tables. 2 — paste a real Instagram/YouTube URL, watch it download in the background and land in `Inbox/{y}/{m}/{d}` with a thumbnail; queue two while one runs. 3 — browse the tree, rename a file (verify on disk), recategorize (verify the file moved), tag with autocomplete, search by tag/keyword/date. 4 — play a video: all speeds, scrub, fullscreen, every shortcut; add notes at two timestamps and confirm the overlay switches at the second; click a note to jump; copy notes as Markdown into Obsidian. 5 — Sync shows saved posts not yet downloaded; download two at once; ignore one; confirm re-sync preserves states. 6 — kill a file on disk manually and confirm the checker reports it; launcher cold-starts everything.
+
+# Process Notes
+
+- Mason builds the server, runs all tests, and handles all git commits/pushes; Claude writes code + tests, checks off plan checkboxes as items complete, and avoids git and external prompt-requiring tools (internal file tools only).
+- Questions go into the Open Questions section of this document, not interactive prompts.
+- Every change that can be tested gets tests (GoogleTest server-side, Jasmine/Karma for Angular logic), following knottyyoga conventions: no test fixtures, tests beside sources, no assumed collection order.
