@@ -90,17 +90,22 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 
 **Architecture**
 1. Approve **Option B (Crow + Angular + honuware + Postgres)**? If you want Qt native anyway, say so and I'll restructure the plan before any code.
-	- Mason- I believe that I want to have a native Qt app. This isn't something that I'm going to ship. I have an assistant who downloads these files for me. 
+	- Mason- I believe that I want to have a native Qt app. This isn't something that I'm going to ship. I have an assistant who downloads these files for me. It would be nice to have a script to run to install the various python things but just have a self contained Windows app to run. It would be nice to be able to run it from any machine and just point it to the SQLLite database at the root of the file system where this stuff is stored (and use relative paths from here so this can be copied around and still opened)
 2. Database: **PostgreSQL (reuse everything, Docker required at runtime)** vs SQLite (self-contained exe, new data layer, no admin/test reuse)?
+	- Mason- Yes, I'm aware that using SQL lite unfortunately doesn't allow any reuse of my postgres database code but this also isn't a production app and the database needs are small. I also don't really care about ACID that much per se since I anticipate only one user at a time. Honestly, I could probably just do this as a big JSON file but the SQL support for queries and keyword searches is nice.
 3. Repo/app name and location? Default: **`C:\Users\mason\source\repos\video_library`**, working title "Video Library", honuware pinned to the same SHA knottyyoga uses. (Name ideas if you want one: Clip Vault, Move Library, Beta Reel.)
+	- Mason- This is a fine spot for the repo.
 4. Server port **18081** (knottyyoga uses 18080) — OK?
+	- Mason- I am strongly leaning not to make this a web page.
 
 **Library**
 5. Where does your existing video library live on disk, should Phase 3.7 adopt it into the catalog, and what's the real category list to seed? (Overview mentions rope, partner acro, handstands, fitness idea — plus **Inbox** as the default.)
 6. Delete behavior: **permanent delete with a confirm dialog**, or send to Recycle Bin?
+	- Mason- Send to recycle bin.
 
 **Instagram**
 7. Which browser are you logged into Instagram with? (**Firefox → automatic `--cookies-from-browser`**; Chrome/Edge → manual cookies.txt export extension.)
+	- Mason- Chro
 8. Run enumeration/downloads as your main account or a **secondary account**? And is "all saved posts" enough, or do you use specific saved *collections* (collections push toward instagrapi)?
 9. Saved *photo/carousel* posts: **videos only** for now, or should images be imported too (viewer instead of player)?
 10. Auto-sync on a schedule, or **manual Sync button only** (safer for rate limits)?
