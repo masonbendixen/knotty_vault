@@ -22,8 +22,17 @@ Ideally I would have an app that could:
 	- Be able to change the name of the file in the UI that changes the file on disk
 	- Categorize the file which causes it to be placed in the correct area on disk (they default to Inbox/{year}/{month}/{day_downloaded}/{filename})
 	- Be able to go into categories and drill down into category/year/month/day
+	- Be able to put a description on the video
+	- Be able to assign tags (have a tag database with auto complete)
+	- Be able to do a search by year / month / category / keyword / tag
 	- Watch a video in the UI
-		- Be able to watch in the window or full s
+		- Be able to watch in the window or full screen
+		- Be able to control playback speed (.25x/.5x/.75x/1x/1.25x/1.5x/2x)
+		- Be able to slide around within the video and see timestamp and time remaining
+		- Have keyboard shortcuts for playback speed, play, pause, go forward 5/10 seconds and backwards
+		- Be able to pause and add a note at a specific timestamp
+		- Have a note show up during playback when the timestamp is hit and stay on screen until another timestamp with a note replaces it
+		- Be able to see the list of notes in the UI and be able to click on a not
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
