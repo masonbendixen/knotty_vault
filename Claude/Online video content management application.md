@@ -90,6 +90,7 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 
 **Architecture**
 1. Approve **Option B (Crow + Angular + honuware + Postgres)**? If you want Qt native anyway, say so and I'll restructure the plan before any code.
+	- Mason- I believe that I want to have a native Qt app. This isn't something that I'm going to ship. I have an assistant who downloads these files for me. 
 2. Database: **PostgreSQL (reuse everything, Docker required at runtime)** vs SQLite (self-contained exe, new data layer, no admin/test reuse)?
 3. Repo/app name and location? Default: **`C:\Users\mason\source\repos\video_library`**, working title "Video Library", honuware pinned to the same SHA knottyyoga uses. (Name ideas if you want one: Clip Vault, Move Library, Beta Reel.)
 4. Server port **18081** (knottyyoga uses 18080) — OK?
