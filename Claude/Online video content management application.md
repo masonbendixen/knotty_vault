@@ -105,14 +105,19 @@ Answer inline here (or in chat) — defaults in bold are what I'll assume if una
 
 **Instagram**
 7. Which browser are you logged into Instagram with? (**Firefox → automatic `--cookies-from-browser`**; Chrome/Edge → manual cookies.txt export extension.)
-	- Mason- Chro
+	- Mason- Chrome
 8. Run enumeration/downloads as your main account or a **secondary account**? And is "all saved posts" enough, or do you use specific saved *collections* (collections push toward instagrapi)?
+	- Mason- Main account.
 9. Saved *photo/carousel* posts: **videos only** for now, or should images be imported too (viewer instead of player)?
+	- Mason- Just videos.
 10. Auto-sync on a schedule, or **manual Sync button only** (safer for rate limits)?
+	- Mason- Let's do manual for now.
 
 **Scope**
 11. LAN/tablet access wanted? Default **localhost-only, no auth**; LAN adds a small auth + bind item in Phase 6.
+	- Mason- This is a big part of why I just want a local app that I can just open a directory with a sql lite file and the directory structure.
 12. Preview-not-yet-downloaded videos: is **open-post-in-new-tab** enough, or do you want in-app streaming preview (Phase 5.4, resolves the direct media URL via yt-dlp on click)?
+	- Mason- Given that I want a native app, let's go with in app preview.
 
 # Implementation Plan
 
