@@ -177,32 +177,40 @@ Design principles baked into every phase:
 ## Phase 0 — Toolchain and app skeleton
 
 ### 0.1 Toolchain setup (Mason runs; Claude provides scripts and docs)
-- [ ] `tools/setup_machine.ps1` — one idempotent clean-machine bootstrap (per the Decision-section toolchain note): winget installs (yt-dlp, ffmpeg, CMake if missing), `pip install aqtinstall` + fetch Qt 6.8.3 win64_msvc2022_64 with qtmultimedia/qtwebengine (+qtwebchannel/qtpositioning) into `C:\Qt`, per-machine Python venv under `%LOCALAPPDATA%\VideoLibrary\python` with Instaloader, `conan profile detect` if absent; prints all versions at the end
-- [ ] `-Mode runtime` variant for the assistant's machine: winget tools + Python venv only (the dist folder already bundles Qt)
-- [ ] README prerequisites section: VS2022, then "run the script"; verify yt-dlp/ffmpeg resolve from PATH
+- [x] `tools/setup_machine.ps1` — one idempotent clean-machine bootstrap (per the Decision-section toolchain note): winget installs (yt-dlp, ffmpeg, CMake, Git, GitHub CLI, Python), `pip install aqtinstall` + fetch the newest Qt 6.8.x `win64_msvc2022_64` with qtmultimedia/qtwebengine (+qtwebchannel/qtpositioning/qtimageformats) into `C:\Qt`, per-machine Python venv with Instaloader, Conan + `conan profile detect` if absent, sets `Qt6_ROOT` and Qt's `bin` on PATH; prints a version summary at the end
+- [x] `-Mode runtime` variant for the assistant's machine: winget tools + Python venv only (the dist folder already bundles Qt)
+- [x] README prerequisites section: VS2022, then "run the script"; the script's summary table is what verifies yt-dlp/ffmpeg resolve
+
+Implementation notes: the venv lives at `%LOCALAPPDATA%\Honuware\VideoLibrary\python`, which is exactly what `AppPaths::pythonVenvDirectory()` returns — the script and `foundation/app_info.h` must stay in agreement. Qt is discovered through the `Qt6_ROOT` env var rather than a hard-coded `CMAKE_PREFIX_PATH`, so the version can move without editing `CMakeSettings.json`. PATH is only rewritten when the raw user PATH has no `%VARIABLE%` references (rewriting one would freeze them); otherwise the script prints the entry to add by hand.
 
 ### 0.2 Repository and build skeleton
-- [ ] Repo at `C:\Users\mason\source\repos\video_library`: top-level CMakeLists.txt (C++20, `qt_standard_project_setup`, AUTOMOC) with targets `video_library_core` (static lib — everything testable), `video_library_app` (WIN32 exe — main + UI glue), `video_library_tests` (GoogleTest exe)
-- [ ] Conan integration mirrored from knottyyoga/server_components: `conanfile.py` with the `Library` list (gtest pinned) generating `ConanLibImports.cmake`, `conan_provider.cmake`, a benign `find_package` to force the provider, `${GTEST_LIB}`-style variables
-- [ ] GoogleTest via Conan; custom test `main.cpp` that creates a `QCoreApplication`; CTest wiring
-- [ ] CMakeSettings.json for VS with `CONAN_CMD` + `CMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake` (knottyyoga pattern) and `CMAKE_PREFIX_PATH` pointing at the 0.1 Qt kit; `.gitignore` / `.gitattributes`; README with build steps
-- [ ] CLAUDE.md seeded with this app's conventions (layer DAG, naming, testing rules, CMake header listing, planning-directory rule)
-- [ ] Smoke: one trivial test proving the test target builds and runs
+- [x] Repo at `C:\Users\mason\source\repos\video_library`: top-level CMakeLists.txt (C++20, `qt_standard_project_setup`, AUTOMOC) with targets `video_library_core` (static lib — everything testable), `video_library_app` (WIN32 exe — `main.cpp` only, output `VideoLibrary.exe`), `video_library_tests` (GoogleTest exe)
+- [x] Conan integration mirrored from knottyyoga/server_components: `conanfile.py` with the `Library` list (gtest pinned to knottyyoga's 1.12.1, so it is already in the local cache) generating `ConanLibImports.cmake`, vendored `conan_provider.cmake`, a benign `find_package(GTest)` to force the provider, `${GTEST_LIB}`-style variables
+- [x] GoogleTest via Conan; custom test `main.cpp` that creates a `QCoreApplication` and enables `QStandardPaths` test mode; CTest wiring
+- [x] CMakeSettings.json for VS (x64-Debug + x64-Release) with `CMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake`; `.gitignore` / `.gitattributes`; README with build steps, the Qt-not-from-Conan rationale, and troubleshooting
+- [x] CLAUDE.md seeded with this app's conventions (layer DAG, portability rule, naming, testing rules, CMake header listing, Qt gotchas, planning-directory rule)
+- [x] Smoke: `test/smoke_test.cpp` proves Conan+Qt+GoogleTest are linked and the runner's isolation is on
+
+Deviations from the plan text, and why: `CONAN_CMD` is not in CMakeSettings.json — the vendored provider reads `CONAN_COMMAND`, and `conan` is already on PATH, so nothing is needed (the override is documented in the README instead). `CMAKE_PREFIX_PATH` is likewise absent in favour of `Qt6_ROOT`. Qt Multimedia/MultimediaWidgets/WebEngineWidgets are found as *optional* components now: a missing module prints a warning naming the phase that needs it instead of blocking Phase 0.
 
 ### 0.3 App bootstrap and logging
-- [ ] `main.cpp` + `MainWindow` shell: left navigation (Library, Instagram, Downloads, Search, Settings) over a stacked central area, menu bar, status bar
-- [ ] Logging: `qInstallMessageHandler` → rotating file in AppData + IDE console; startup banner with app/Qt/tool versions
-- [ ] `MachineSettings` (QSettings wrapper): recent libraries, window geometry, tool-path overrides; tests for the serialization logic
+- [x] `main.cpp` + `MainWindow` shell: left navigation (Library, Instagram, Downloads, Search, Settings) over a stacked central area, File/Help menus, status bar showing the open library
+- [x] Logging: `qInstallMessageHandler` → size-rotating file in AppData (5 MB, 5 generations) + stderr + `OutputDebugStringW` for the VS Output window; startup banner with app/Qt versions and the settings/log paths (tool versions join it in 2.2)
+- [x] `MachineSettings` (QSettings wrapper): recent libraries, window geometry/state, tool-path overrides, reopen-on-launch; `QSettings` is injected so tests use a throwaway .ini
+- [x] Tests: `logging_test.cpp` (format for every severity, category and source-location rules, rotation generations, reopen-appends, no-op when unopened), `machine_settings_test.cpp` (MRU order, case-insensitive dedupe, cap, binary round-trip, tool overrides), `app_paths_test.cpp`
 
 ### 0.4 Library open/create
-- [ ] `LibraryContext`: holds the root; creates `library.db` + `.videolibrary/{thumbnails,staging,backups}` on first open; resolve/relativize helpers that enforce root-relative forward-slash paths and reject escapes; tests (resolve, relativize, containment, slash normalization)
-- [ ] Open/Create Library folder flow (folder picker), recent-libraries menu, reopen-last-on-launch, "library missing/moved" handling
+- [x] `LibraryContext`: holds the root; creates `.videolibrary/{thumbnails,thumbnails/sources,staging,backups}`; resolve/relativize helpers that enforce root-relative forward-slash paths and reject escapes; `prepare()` is idempotent so opening also repairs a missing subdirectory
+- [x] Open/Create Library folder flow (folder picker with confirmation prompts), recent-libraries menu with Clear, reopen-last-on-launch, "library missing/moved" handling
+- [x] Tests: `library_context_test.cpp` (normalization, layout, safe/unsafe relative paths, sibling-prefix containment `C:/Videos/Acro` vs `C:/Videos/AcroOld`, root-is-not-contained, prepare idempotence and repair, isLibrary before/after)
+
+`library.db` itself is deliberately NOT created here — `DatabaseManager` owns that in Phase 1.1. A folder counts as a library once `.videolibrary/` exists, so "Open Library…" can tell an existing library from an ordinary folder and offer to create one. A last library that is unreachable stays in the recent list rather than being forgotten, because the usual cause is a network share that is not connected yet.
 
 ### 0.5 GitHub repository under honuware (Mason runs)
 
 Timing: run this as soon as 0.2 produces a first successful build. Claude's part is making sure the repo is push-ready; the commands are Mason's to run (per process notes, Claude never runs git).
 
-- [ ] (Claude, folded into 0.2) `.gitignore` covers `out/`, `build/`, `.vs/`, `dist/`, generated files (`ConanLibImports.cmake` is generated by the conanfile and must not be committed), and `CMakeUserPresets.json`
+- [x] (Claude, folded into 0.2) `.gitignore` covers `out/`, `build/`, `.vs/`, `dist/`, generated files (`ConanLibImports.cmake` is generated by the conanfile and must not be committed), and `CMakeUserPresets.json`
 - [ ] (Mason) create `honuware/video_library` on GitHub and push, using the commands below
 
 Notes before running: the GitHub CLI is **not currently installed** on this machine — the block installs it via winget (one time). The default branch is `master` to match knottyyoga and server_components. The repo is created **private**; flip it later with `gh repo edit honuware/video_library --visibility public --accept-visibility-change-consequences` or in the repo's web Settings. `gh auth login` must use the account that owns the honuware org.
