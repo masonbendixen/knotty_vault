@@ -396,6 +396,24 @@ Hardening on the player side while chasing this, neither of them the cause: the 
 - [x] `followDefaultAudioDevice`, called at construction and again on `QMediaDevices::audioOutputsChanged`, moves playback to whatever Windows currently calls the default output, and logs the move. Plugging in headphones now takes the sound with it instead of leaving the app playing to the device that happened to be default at startup.
 - `QMediaDevices` is declared before `QAudioOutput` so it outlives the output watching it — the same reverse-declaration-order rule that put `QAudioOutput` before `QMediaPlayer`.
 
+**Still silent with the default confirmed as Realtek**, so following the default was not enough either. Enumerating the machine's *active* render endpoints is what finally explained it:
+
+| Shown as | Actually is |
+| --- | --- |
+| Speakers | Realtek(R) Audio — **where playback was going** |
+| Speakers | Mason's iPhone Hands-Free (Bluetooth) |
+| Headphones | Oculus Virtual Audio Device |
+| Realtek Digital Output | Realtek(R) Audio (S/PDIF) |
+| BenQ PD3200U | NVIDIA High Definition Audio |
+| LG Ultra HD | NVIDIA High Definition Audio |
+
+Six active outputs, **two of them both called "Speakers"**, and two different Realtek endpoints — analog and S/PDIF — that both read as "Realtek Audio" in the tray. Windows' own per-app session record confirmed the binding: `singlelineouttopo_c1` on the Realtek codec, the rear analog jack. Nothing was broken at any layer; a working pipeline was pointed at a jack nobody was listening to, and the device names made that impossible to see.
+
+- [x] `MachineSettings::audioOutputDeviceId` stores a chosen output as `QAudioDevice::id()`. Empty follows the system default, which stays the sane starting point.
+- [x] A **Playback** group on the Settings page lists every output, marks which one Windows currently considers the default, and lets one be named outright. The id identifies the device because the description cannot — two entries share a name.
+- [x] The backend honours the choice while the device exists and falls back to the default when it does not, so unplugging a headset gives sound somewhere rather than silence.
+- [x] Test: the setting defaults to empty, round-trips an id, and going back to the default sticks rather than springing back to the last pick.
+
 Three lessons from this one, all of them about diagnosis rather than code. The first fix was necessary but not sufficient, and stopping there would have looked like a failure. Every layer reported success — no error from Qt, a valid file, correct deployment — because nothing was *broken*; a working pipeline was pointed at the wrong end. And the thing that finally cracked it was logging the state rather than reasoning about it: three rounds of plausible theories cost more than one line of output.
 
 Worth keeping in mind for anything similar: some Instagram posts genuinely have no audio track. `Video by stefan.crainic.mp4` in the test library is one, so testing sound against the wrong clip proves nothing.
