@@ -257,34 +257,46 @@ After this, day-to-day flow is the usual `git add` / `git commit` / `git push` f
 ## Phase 1 — Data layer (SQLite)
 
 ### 1.1 Database manager and migrations
-- [ ] `DatabaseManager`: opens `library.db` (QSQLITE), pragmas (`foreign_keys=ON`, `busy_timeout`, `journal_mode=DELETE` for copy-safety), `schema_migrations` table + ordered migration runner
-- [ ] FTS5 availability probe at open (`pragma compile_options`) setting a capability flag; LIKE-based fallback path when absent
-- [ ] Tests: fresh create, reopen idempotence, migration ordering, probe behavior
+- [x] `DatabaseManager`: opens `library.db` (QSQLITE) on a per-instance connection name, pragmas (`foreign_keys=ON`, `busy_timeout=5000`, `journal_mode=DELETE` for copy-safety), creates missing parent folders, `schema_migrations` table + version-sorted migration runner (each migration in its own transaction)
+- [x] FTS5 availability probe at open (`sqlite_compileoption_used('ENABLE_FTS5')`) setting a capability flag; LIKE-based fallback path when absent
+- [x] Tests: fresh create, reopen idempotence (no re-seeding), migration recording, version uniqueness, journal mode, foreign-key enforcement, probe/index agreement, two catalogues open at once, failure paths
+
+Design note: the FTS tables are created *outside* the migration list (`ensureSearchIndex`), because a migration has to apply on any SQLite build and FTS5 is a compile-time option. They index the base tables and hold no original data, so they can be created — and rebuilt — at any point. `probeFullTextSearch` also warns loudly in the one bad case (index present, FTS5 missing), where writes would otherwise fail with an error that points nowhere.
 
 ### 1.2 Schema v1
-- [ ] `categories` (id, name UNIQUE COLLATE NOCASE, directory_name UNIQUE, created_at) — seeded with Inbox (+ #13 list)
-- [ ] `videos` (id, category_id FK, relative_path, file_name, title, creator, platform, source_url, source_id UNIQUE NULL, description, duration_ms, width, height, file_size_bytes, downloaded_at, published_at NULL, thumbnail_relative_path, created_at, updated_at)
-- [ ] `tags` (id, name UNIQUE COLLATE NOCASE) and `video_tags` (video_id FK, tag_id FK, PK(video_id, tag_id), CASCADE)
-- [ ] `notes` (id, video_id FK CASCADE, timestamp_ms, body, created_at, updated_at)
-- [ ] `source_items` (id, platform, external_id UNIQUE, url, creator, caption, thumbnail_relative_path, posted_at NULL, first_seen_at, last_seen_at, state: new|queued|downloaded|ignored|gone, video_id FK NULL) — the cached Instagram saved list
-- [ ] `downloads` (id, source_item_id FK NULL, url, state: queued|running|success|error|canceled, progress_percent, error_message, staging_name, created_at, started_at, finished_at)
-- [ ] `library_settings` (key, value) — per-library preferences (e.g., last playback positions)
-- [ ] FTS5: `videos_fts` (title, description, creator) and `notes_fts` (body) as external-content tables with sync triggers; indexes on FKs, downloaded_at, and state columns
-- [ ] Tests: schema creation, FK cascade behavior, FTS trigger sync on insert/update/delete, fallback parity when FTS5 is flagged off
+- [x] `categories` (id, name UNIQUE COLLATE NOCASE, directory_name UNIQUE COLLATE NOCASE, created_at) — seeded with Inbox, Rope, Partner Acro, Handstands, Fitness Ideas
+- [x] `videos` (id, category_id FK RESTRICT, relative_path UNIQUE COLLATE NOCASE, file_name, title, creator, platform, source_url, source_id UNIQUE NULL, description, duration_ms, width, height, file_size_bytes, downloaded_at, published_at NULL, thumbnail_relative_path, created_at, updated_at)
+- [x] `tags` (id, name UNIQUE COLLATE NOCASE) and `video_tags` (video_id FK, tag_id FK, PK(video_id, tag_id), CASCADE)
+- [x] `notes` (id, video_id FK CASCADE, timestamp_ms, body, created_at, updated_at)
+- [x] `source_items` (…, state CHECK IN (new|queued|downloaded|ignored|gone), video_id FK SET NULL) — the cached Instagram saved list
+- [x] `downloads` (…, state CHECK IN (queued|running|success|error|canceled), progress_percent, error_message, staging_name, **video_id FK SET NULL**, created_at, started_at, finished_at)
+- [x] `library_settings` (key, value) — per-library preferences (e.g., last playback positions)
+- [x] FTS5: `videos_fts` (title, description, creator) and `notes_fts` (body) as external-content tables with insert/update/delete triggers; indexes on FKs, downloaded_at, and state columns
+- [x] Tests (`schema_test.cpp`): seeding, case-insensitive uniqueness on category names and relative paths, source_id unique-but-optional, FK enforcement, category delete RESTRICT, video delete cascading to notes/tags while leaving the tag and the source_item, CHECK rejection of unknown states, FTS trigger sync across insert/update/delete
+
+Additions beyond the plan text, and why: `downloads.video_id` (Phase 2.6 needs "jump to the video" once a download succeeds); `CHECK` constraints on both state columns (a typo'd state would otherwise sit in the database silently); `relative_path UNIQUE COLLATE NOCASE` (Windows treats `Rope/clip.mp4` and `rope/CLIP.mp4` as one file, and two rows for one file would corrupt every later rename).
 
 ### 1.3 Repositories
-- [ ] One repository per table, thin CRUD only (knottyyoga table_helpers spirit): `CategoryRepository`, `VideoRepository`, `TagRepository` (find-or-create, prefix search for autocomplete), `NoteRepository` (ordered by timestamp), `SourceItemRepository` (state transitions), `DownloadRepository` (queue queries, startup requeue), `LibrarySettingsRepository`
-- [ ] Tests per repository on temp-file DBs: uniqueness conflicts, cascades, state transitions, ordering, prefix search
+- [x] One repository per table, thin CRUD only (knottyyoga table_helpers spirit): `CategoryRepository` (find-or-create, safe folder-name derivation with collision suffix), `VideoRepository` (+ `setLocation` for rename/recategorize), `TagRepository` (find-or-create, prefix search for autocomplete, transactional `setTagsForVideo`), `NoteRepository` (ordered by timestamp then id), `SourceItemRepository` (state transitions, `linkToVideo`), `DownloadRepository` (queue queries, startup requeue), `LibrarySettingsRepository` (upsert, typed helpers)
+- [x] Shared `RepositoryBase` + `SqlUtil` (prepare/exec/executeAll/tableExists + RAII `Transaction`) so every repository reports failures identically
+- [x] Tests per repository on temp-file databases: uniqueness conflicts, cascades, state transitions, ordering, prefix search, LIKE-wildcard escaping, path-escape rejection, clamping
+
+Design note: repositories store the **connection name**, not a `QSqlDatabase`. A `QSqlDatabase` is a reference-counted handle, and Qt warns ("connection is still in use") if a copy outlives `removeDatabase()`; holding only the name means repositories and the `DatabaseManager` can be destroyed in any order.
 
 ### 1.4 Search queries
-- [ ] `VideoQuery`: filters (category, year/month/day derived from downloaded_at, tags all-of, keyword via FTS5-or-LIKE across title/description/creator/notes), sort (date/title/duration), paging
-- [ ] `LibraryTreeQuery`: category → year → month → day with video counts
-- [ ] Tests: month/year boundaries, tag intersection, keyword in title vs note body, empty filters, both search backends
+- [x] `VideoQuery`: filters (category, year/month/day derived from downloaded_at, tags all-of, keyword via FTS5-or-LIKE across title/description/creator/note bodies), five sort orders, limit/offset paging with a whole-set `count()`
+- [x] `LibraryTreeQuery`: category → year → month → day with counts rolled up, empty categories included, newest years first
+- [x] Tests: year boundary half an hour apart, month/day narrowing, tag intersection vs. union, keyword found via title / description / creator / note body, punctuation that is FTS5 syntax, prefix completion, combined filters, sorting, paging — the keyword tests run against **both** backends and assert the same result set
 
 ### 1.5 Path planning and file operations
-- [ ] `PathPlanner`: `{directory_name}/{YYYY}/{MM}/{DD}/{file_name}` from category + date; Windows-safe sanitization (illegal characters, reserved device names, trailing dots/spaces, length cap); collision resolution via numeric suffix
-- [ ] `FileOperations`: rename, move-with-directory-creation (same-volume fast path), delete → `QFile::moveToTrash` (Q6), disk-op-first-then-DB sequencing helper with revert on DB failure
-- [ ] Tests with QTemporaryDir: happy paths, collisions, sanitization table, trash behavior
+- [x] `PathPlanner`: `{directory_name}/{YYYY}/{MM}/{DD}/{file_name}`; collision resolution via " (2)" suffix before the extension; keeps the original extension when a new name brings none
+- [x] `PathUtil::sanitizeFileName` (in foundation, so the data layer can use it too): illegal characters, control characters, reserved device names (CON/NUL/COM1…), trailing dots and spaces, 120-character cap preserving the extension
+- [x] `FileOperations`: rename, move-with-directory-creation, import from outside (copy or move), delete → `QFile::moveToTrash` (Q6), empty-parent pruning that stops at the category folder, plus the `applyFileChangeThenDatabaseChange` sequencing helper with revert on catalogue failure
+- [x] Tests with QTemporaryDir: happy paths, collisions, sanitization table, refusal to overwrite or escape the library, pruning vs. non-empty folders, real Recycle Bin behaviour, and all four sequencing outcomes
+
+### 1.6 Wired into the shell (added so Phase 1 is verifiable by hand)
+- [x] `MainWindow` opens the catalogue when a library opens and closes it when the library closes; a library whose database will not open is refused rather than half-opened
+- [x] The Library page shows video count, schema version, and which search backend is active — enough to confirm Phase 1 without a SQLite browser
 
 ## Phase 2 — Acquisition pipeline (milestone: replaces the manual yt-dlp workflow)
 
