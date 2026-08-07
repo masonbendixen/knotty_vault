@@ -364,20 +364,26 @@ Improvement made while wiring this up: the download command now also asks yt-dlp
 ## Phase 3 — Library browsing and management
 
 ### 3.1 Library tree
-- [ ] Tree dock (Category → Year → Month → Day with counts) as a QAbstractItemModel over `LibraryTreeQuery`; selection drives the grid; refreshes on library changes; model tests
+- [x] `LibraryTreeModel`, a QAbstractItemModel over `LibraryTreeQuery`: Category → Year → Month → Day with counts rolled up into the label, months shown by name, empty categories included, and `filterFor(index)` so selecting a node and filtering the grid are one act
+- [x] Tests: nesting, `parent()` walking back up from every level, counts in labels, per-node filters, month naming, `indexForCategory`, clearing
 
 ### 3.2 Video grid
-- [ ] `VideoListModel` over `VideoQuery` + QListView icon mode with a thumbnail delegate (async thumbnail loading); sorting (date/title/duration); model tests
+- [x] `VideoListModel` over `VideoQuery` + a QListView in icon mode; five sort orders; tooltip carries what a tile has no room for
+- [x] Tests: filtering, exposed roles, sorting without refiltering, `indexForVideo`, duration/size/title formatting
+- Deviation: thumbnails load lazily on first draw and are cached (including the misses) rather than on a background thread. They are ~30 KB local JPEGs decoded only for rows on screen, so a loader thread would add concurrency for a delay nobody could perceive. Revisit if a library of thousands makes scrolling stutter.
 
 ### 3.3 Details panel
-- [ ] Inline rename (disk + DB), category picker showing the resulting path (disk move), description editor, creator/source-URL (opens browser)/date/size/resolution display, Open in Explorer, delete → Recycle Bin with confirm
-- [ ] Presenter tests for every mutation path (rename collision, move-failure revert, delete)
+- [x] `VideoEditor` (business logic): rename, change category, edit details, delete — every file-moving operation paired with its catalogue update through `applyFileChangeThenDatabaseChange`
+- [x] `VideoDetailsPanel`: inline rename, category picker that shows the resulting path and asks before moving, title/creator/notes, facts line (duration, dimensions, size, date), clickable source URL, Show in Explorer, delete to the Recycle Bin with a confirm
+- [x] Tests (10): rename moves file and row together, collision steps past rather than overwrites, empty name and missing video refused, category change keeps the download date and prunes emptied folders, same-category is a no-op, **a move the catalogue refuses is undone on disk**, preview without side effects, details edit never moves the file, delete takes file + thumbnail + row + notes, deleting a video whose file is already gone still clears the row
 
 ### 3.4 Tag editor
-- [ ] Chip-style tag row + QCompleter over TagRepository prefix search; Enter creates a new tag; per-chip remove; tests for assignment logic and the completer model
+- [x] `TagEditor`: chips in a wrapping row, a box completing against tags already in the library, Enter to add (case-insensitive, so "rope" attaches the existing "Rope"), Remove button and double-click to detach
+- The assignment logic itself is `TagRepository`, already covered by 12 tests in Phase 1; the widget adds no logic worth a second set
 
 ### 3.5 Search view
-- [ ] Keyword box + filters (category, year/month, tags multi-select) driving the same grid; filter-state model with tests
+- [x] Keyword box and sort selector in the library toolbar, composing with whatever the tree has selected — narrowing by folder and searching by word combine rather than fighting
+- [ ] **Still to do**: the standalone Search page with tag multi-select and an explicit year/month picker
 
 ### 3.6 Existing-library adoption (per #13)
 - [ ] Background scan of a structured `{category}/{year}/{month}/{day}` tree (worker, filesystem-only) → dry-run report dialog → apply: categories/videos rows, ffprobe metadata, thumbnails, downloaded_at from the folder path
