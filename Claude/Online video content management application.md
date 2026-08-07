@@ -328,19 +328,23 @@ Discovery worth recording: `--print` **implies `--quiet` and `--simulate`**. Lef
 ### 2.5 Import service
 - [x] `MediaProbe`: ffprobe JSON → duration/dimensions/size (first *video* stream, container duration with a stream fallback), ffmpeg single-frame thumbnail seeking a quarter of the way in
 - [x] `ImportService`: probe → duplicate check by `source_id` → PathPlanner target under `{Category}/{Y}/{M}/{D}` → move (download) or copy (manual import) → `videos` row → link `source_items` and the `downloads` row → thumbnail named after the row id. Imports run one at a time so two cannot both believe the same file name is free.
-- [x] Tests: 6 for MediaProbe (argument construction and JSON parsing)
-- [ ] **Still to do**: ImportService end-to-end tests (full flow with a temp library and scripted tools; duplicates surfaced not re-imported; mid-import failure leaves staging intact)
+- [x] Tests: 6 for MediaProbe (argument construction and JSON parsing), 9 for ImportService end to end against a real temp library with scripted tools — file filed and catalogued, manual import copies and leaves the original, duplicate surfaced not re-imported, same-name files both survive, unreadable file still imported, missing source fails cleanly, download row and saved post tied to the video, thumbnail recorded when ffmpeg produces one, imports serialised
 
 Design note: a file ffprobe cannot read is still imported, with no duration or dimensions and a warning in the log — losing a downloaded video because its metadata was unreadable would be worse than an incomplete catalogue row. A missing thumbnail is likewise cosmetic and never fails an import. The file moves before the catalogue row is written, through `applyFileChangeThenDatabaseChange`, so a rejected row puts the file back instead of leaving it invisible inside the library.
 
 ### 2.6 UI: Add-by-URL and Downloads view
-- [ ] Add by URL action (toolbar + menu): multi-line paste dialog → probe + enqueue
-- [ ] Downloads view: rows with progress bars, cancel/retry, error details, jump-to-video on success; status-bar active-downloads indicator
-- [ ] Tests for the download-row view-model state mapping
+- [x] Add by Link (File menu, Ctrl+D): multi-line paste box that extracts the links out of whatever is pasted and shows the count before committing; queues them and switches to Downloads
+- [x] Downloads view: state / progress / link / details table, cancel, try again, show video, clear finished, and a status-bar count of running downloads
+- [x] Tests: 8 for the `DownloadRowView` state mapping (waiting shows no progress bar, running rounds and clamps its percentage, done offers the video only once it is filed, failed shows the reason and offers a retry, cancelled can be restarted, unknown state still shows something)
+
+The table is rebuilt from the database on every change rather than kept in step by hand, so what it shows survives a restart and cannot drift. Progress is the one exception — it arrives many times a second, so only that cell is touched, and selection is restored by download id rather than row number so a moving queue does not move the user's selection.
 
 ### 2.7 Manual local-file import (per #13)
-- [ ] Import files… (menu + drag-and-drop onto the window): pick video file(s) → dialog for category (default Inbox/today), optional title/creator/source URL, copy-vs-move choice → same ImportService path (ffprobe, thumbnail, catalog row)
-- [ ] Tests: copy from outside the root, move from inside, metadata defaults, filename collision handling
+- [x] Import Files (File menu, Ctrl+I) and drag-and-drop onto the window: pick video files → dialog for category, optional creator, copy-vs-move → the same ImportService path (ffprobe, thumbnail, catalogue row)
+- [x] Covered by the ImportService tests above: copy from outside the library leaves the original, move from staging does not, no title falls back to the file's own name, colliding names both survive
+- [x] Copy is the default, and a drop of mixed files imports the videos and ignores the rest
+
+Improvement made while wiring this up: the download command now also asks yt-dlp to print the title, creator, id, platform, and upload date (a second `--print after_move:` with a marker and separator). Without it an imported video arrived titled with its platform id — "ABC123" — which is exactly the renaming chore the app exists to remove. It costs no extra request, since it comes from the run that already happened.
 
 ## Phase 3 — Library browsing and management
 
