@@ -408,6 +408,10 @@ This leaves Q7's conclusion intact (browser cookie extraction only works with th
 - [x] `PlayerController` holds every decision: speed presets 0.25/0.5/0.75/1/1.25/1.5/2, clamped seek, throttled position ticks, and resume-on-open
 - [x] Tests (17) against `FakeVideoPlayerBackend`: speed steps stop at the ends rather than wrapping, speed carries across videos, seek clamps to both ends and works before the duration is known, ticks are throttled but a state change always forces one, resume waits for the duration and is ignored when it is trivially small or within five seconds of the end
 
+**Two crash-class defects found while chasing a crash on the speed keys**, both real, neither yet confirmed as the cause:
+- `QtVideoPlayerBackend` declared `QMediaPlayer player_` before `QAudioOutput audioOutput_`. Members die in reverse declaration order, so the audio output was destroyed first and the player spent its own destructor holding a borrowed pointer to a dead object. The declaration order is now reversed, which is what makes the player die first.
+- `PlayerView` showed the playback-error dialog on a **direct** connection. The backend emits `errorOccurred` from inside its own calls (`setSource`, `setPlaybackRate`), and a modal dialog runs a nested event loop — opening one on top of the media pipeline's own stack re-enters it mid-operation. The connection is now `Qt::QueuedConnection`, so the dialog opens after the backend's call has unwound.
+
 Two decisions worth recording. **Resume is deferred until `durationChanged`**: seeking before the backend knows the length is silently dropped by QMediaPlayer, so a naive resume-on-open loses the position on every video. **A resume point near the end is discarded** — finishing a video and reopening it should start at the beginning, not at the last frame.
 
 ### 4.2 Player view
