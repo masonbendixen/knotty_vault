@@ -429,6 +429,15 @@ Qt's FFmpeg backend goes silent on an endpoint whose shared format is not 16-bit
 - The user-side fix is Sound control panel → the device → Properties → Advanced → **16 bit, 48000 Hz**.
 - If the FFmpeg backend keeps costing time, `QT_MEDIA_BACKEND=windows` swaps in Media Foundation and takes `swresample` out of the picture entirely. It would want the download format preference moved to H.264 first, since Media Foundation cannot be relied on for VP9 — which is what yt-dlp currently produces.
 
+**A workaround that outlived its theory.** With Media Foundation the speakers finally played, but toggling speeds gave a black screen after a while. That was ours, not Qt's: the audio detach-and-reattach written to dodge the "rate change" crash was still there, and pulling an audio output mid-playback rebuilds Media Foundation's whole topology. The crash it was written for turned out to be the 32-bit endpoint, so the workaround was solving nothing and breaking something.
+
+- [x] `applyPlaybackRate` sets the rate and does nothing else.
+- [x] `audioPlaysAt` / `isAudioPlaying` / `updateAudioControls` removed with it, along with their two tests. **Sound plays at every speed again.** The restriction was reasoned from a wrong cause and dressed up as a product decision about pitch correction, which made it sound more considered than it was.
+- [x] The decoder is a setting: **Settings → Playback → Decoder**, written to `QT_MEDIA_BACKEND` from `main()` before `QApplication` exists, because Qt reads it when the multimedia plugin first loads. Changing it needs a restart and says so rather than looking like a setting that did not take. The startup banner logs which backend is running.
+- [x] Test: the setting is unset until chosen and normalises case, since it becomes an environment variable.
+
+Both backends have now cost real time around playback speed — the feature this app exists for. If it keeps happening, **libmpv is the answer rather than another workaround**: it changes speed as a first-class operation and has pitch correction, so audio stays intelligible at 0.5x. `VideoPlayerBackend` was put there for exactly this, and `PlayerController` and its tests would not change.
+
 Three lessons from this one, all of them about diagnosis rather than code. The first fix was necessary but not sufficient, and stopping there would have looked like a failure. Every layer reported success — no error from Qt, a valid file, correct deployment — because nothing was *broken*; a working pipeline was pointed at the wrong end. And the thing that finally cracked it was logging the state rather than reasoning about it: three rounds of plausible theories cost more than one line of output.
 
 Worth keeping in mind for anything similar: some Instagram posts genuinely have no audio track. `Video by stefan.crainic.mp4` in the test library is one, so testing sound against the wrong clip proves nothing.
