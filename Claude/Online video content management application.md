@@ -348,7 +348,7 @@ The table is rebuilt from the database on every change rather than kept in step 
 
 Found by testing: a login-walled Instagram post failed with "would not serve this without being signed in", because `CookieSettings` was never populated — no cookie flags reached yt-dlp at all. Waiting for Phase 5.1 would have left Instagram downloads broken in the meantime, which is most of the point of the app.
 
-- [x] `MachineSettings` stores the cookie source per machine: browser name for `--cookies-from-browser`, or a `cookies.txt` path for `--cookies`. **Defaults to Chrome** (per Q7) rather than to nothing, so Instagram works on first run instead of failing until someone finds the setting. An explicitly cleared value is respected and does not spring back to the default.
+- [x] `MachineSettings` stores the cookie source per machine: browser name for `--cookies-from-browser`, or a `cookies.txt` path for `--cookies`. **Cookies are off until they are asked for** — see 2.9 for why the original Chrome default was wrong. `suggestedCookieBrowser()` is what the Settings picker starts on, not something that gets sent.
 - [x] Real Settings page replacing the placeholder: which external tools were found with their versions and locations (the status model 2.2 promised), a Check Again button, and the cookie source — browser picker, cookies.txt picker, or off. Changes apply as they are made and are pushed straight into the download client.
 - [x] Startup logs the cookie source, and warns when there is none, so the log says why Instagram downloads are failing.
 - [x] Tests: default, deliberate-off, browser name normalised to lower case, cookie path stored with forward slashes
@@ -360,6 +360,18 @@ Two bugs this exposed, both fixed:
 - An unrecognised failure summarised as "The download failed." and put yt-dlp's own words on the third line, so the status-bar toast (first line only) said nothing at all. `summarizeError` now returns the tool's own words for anything unrecognised, and `describeError` no longer repeats them underneath.
 
 Improvement made while wiring this up: the download command now also asks yt-dlp to print the title, creator, id, platform, and upload date (a second `--print after_move:` with a marker and separator). Without it an imported video arrived titled with its platform id — "ABC123" — which is exactly the renaming chore the app exists to remove. It costs no extra request, since it comes from the run that already happened.
+
+### 2.9 Cookies are opt-in, and never fatal (correction to 2.8)
+
+Found by using it: with Chrome as the default cookie source, downloads started failing for **public** posts that never needed a login at all. Defaulting cookies on was the wrong call. `--cookies-from-browser chrome` fails outright while Chrome is running, and yt-dlp treats that as fatal — it gives up on the cookie database *before* it asks the site anything, so the post's own permissions never come into it. Turning cookies on to help with login-walled posts made every other post fail.
+
+- [x] `cookieBrowser()` returns empty until someone chooses one. `defaultCookieBrowser()` is renamed `suggestedCookieBrowser()` so the name stops claiming to be something that gets applied — it is only where the Settings picker lands when nothing has been chosen.
+- [x] **A cookie failure now falls back instead of failing.** When cookies were sent and the attempt dies with `CookieAccess`, `YtDlpDownloadTask` starts the same download once more with the cookie flags stripped. A public post downloads; a genuinely walled one comes back as a login wall, which is the honest answer. Once only — a second cookie failure is a real one.
+- [x] Tests (3 on the client, 2 on the settings): the fallback runs and succeeds with the second command line free of cookie flags but still carrying the same URL, the fallback is attempted only once, no second attempt is made when no cookies were sent, cookies are off by default, and the picker still starts on a browser.
+
+The lifetime detail worth recording: the retry replaces the process handle from inside that handle's own `finished` signal, so the spent handle is disconnected and handed to `deleteLater()` rather than destroyed underneath the call that is still running — the same rule `DownloadManager::releaseTask` follows.
+
+This leaves Q7's conclusion intact (browser cookie extraction only works with the browser fully closed, so cookies.txt is the practical route here) but changes what the app does about it: cookies are a thing you turn on when a post needs one, not a thing that can take down downloads that don't.
 
 ## Phase 3 — Library browsing and management
 
