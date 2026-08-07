@@ -344,6 +344,17 @@ The table is rebuilt from the database on every change rather than kept in step 
 - [x] Covered by the ImportService tests above: copy from outside the library leaves the original, move from staging does not, no title falls back to the file's own name, colliding names both survive
 - [x] Copy is the default, and a drop of mixed files imports the videos and ignores the rest
 
+### 2.8 Cookie configuration (pulled forward from 5.1)
+
+Found by testing: a login-walled Instagram post failed with "would not serve this without being signed in", because `CookieSettings` was never populated — no cookie flags reached yt-dlp at all. Waiting for Phase 5.1 would have left Instagram downloads broken in the meantime, which is most of the point of the app.
+
+- [x] `MachineSettings` stores the cookie source per machine: browser name for `--cookies-from-browser`, or a `cookies.txt` path for `--cookies`. **Defaults to Chrome** (per Q7) rather than to nothing, so Instagram works on first run instead of failing until someone finds the setting. An explicitly cleared value is respected and does not spring back to the default.
+- [x] Real Settings page replacing the placeholder: which external tools were found with their versions and locations (the status model 2.2 promised), a Check Again button, and the cookie source — browser picker, cookies.txt picker, or off. Changes apply as they are made and are pushed straight into the download client.
+- [x] Startup logs the cookie source, and warns when there is none, so the log says why Instagram downloads are failing.
+- [x] Tests: default, deliberate-off, browser name normalised to lower case, cookie path stored with forward slashes
+
+Still open (Q7): whether `--cookies-from-browser chrome` actually reads cookies on this machine. Chrome 127+ encrypts them in a way yt-dlp cannot decrypt on Windows, but that is a claim from release notes, not from this machine — the Settings page now makes it a one-click experiment, with a cookies.txt fallback if the browser path does not work.
+
 Improvement made while wiring this up: the download command now also asks yt-dlp to print the title, creator, id, platform, and upload date (a second `--print after_move:` with a marker and separator). Without it an imported video arrived titled with its platform id — "ABC123" — which is exactly the renaming chore the app exists to remove. It costs no extra request, since it comes from the run that already happened.
 
 ## Phase 3 — Library browsing and management
