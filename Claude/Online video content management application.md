@@ -408,7 +408,16 @@ This leaves Q7's conclusion intact (browser cookie extraction only works with th
 - [x] `PlayerController` holds every decision: speed presets 0.25/0.5/0.75/1/1.25/1.5/2, clamped seek, throttled position ticks, and resume-on-open
 - [x] Tests (17) against `FakeVideoPlayerBackend`: speed steps stop at the ends rather than wrapping, speed carries across videos, seek clamps to both ends and works before the duration is known, ticks are throttled but a state change always forces one, resume waits for the duration and is ignored when it is trivially small or within five seconds of the end
 
-**Two crash-class defects found while chasing a crash on the speed keys**, both real, neither yet confirmed as the cause:
+**Changing the playback speed crashed**, and the fix is a workaround for a Qt bug rather than a correction to our code.
+
+Located in two steps. First, it happened from the speed box with the mouse *and* from the Up/Down keys — and those two routes share exactly one thing that does real work, `setPlaybackRate`. That one fact ruled out the key handling, the shortcut table, and the combo-box round trip without needing to read any of them. Second, the stack trace: **swresample below ffmpegmediaplugin**. swresample is FFmpeg's audio resampler, so Qt's FFmpeg backend is crashing while reconfiguring a running audio renderer for the new rate. Nothing in the player's own code was ever involved.
+
+- [x] `applyPlaybackRate` detaches the audio output, sets the rate, and reattaches it. With no audio output there is no live resampler to reconfigure, and reattaching builds a fresh one at the new rate. `audioOutput_` is the same object either side, so its volume and muted state survive.
+- [x] The rate is applied from the event loop rather than in the caller's stack. This did not fix the crash and was not kept for that reason: detaching and rebuilding an audio renderer is heavier work than a property set, and both routes in arrive from inside widget event delivery — one with a combo box popup closing on the same stack. Rapid presses coalesce to the last value, and `playbackRate()` reports the pending one so a caller is told what it asked for.
+- Unchanged either side of this: `PlayerController` and its 17 tests. The fake backend is synchronous and knows nothing about audio renderers, which is the seam earning its keep — the bug was entirely on the far side of it.
+- **If this resurfaces**, the escalation is `QT_MEDIA_BACKEND=windows` (Media Foundation instead of FFmpeg — fewer codecs, no swresample) and then libmpv, which `VideoPlayerBackend` exists to make a contained change.
+
+Two further crash-class defects found while chasing it, both real, neither confirmed as the cause:
 - `QtVideoPlayerBackend` declared `QMediaPlayer player_` before `QAudioOutput audioOutput_`. Members die in reverse declaration order, so the audio output was destroyed first and the player spent its own destructor holding a borrowed pointer to a dead object. The declaration order is now reversed, which is what makes the player die first.
 - `PlayerView` showed the playback-error dialog on a **direct** connection. The backend emits `errorOccurred` from inside its own calls (`setSource`, `setPlaybackRate`), and a modal dialog runs a nested event loop — opening one on top of the media pipeline's own stack re-enters it mid-operation. The connection is now `Qt::QueuedConnection`, so the dialog opens after the backend's call has unwound.
 
