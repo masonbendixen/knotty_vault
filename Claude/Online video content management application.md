@@ -301,12 +301,17 @@ Design note: repositories store the **connection name**, not a `QSqlDatabase`. A
 ## Phase 2 — Acquisition pipeline (milestone: replaces the manual yt-dlp workflow)
 
 ### 2.1 Process runner
-- [ ] `IProcessRunner` + `QProcessRunner` (async start, line-buffered stdout/stderr signals, exit code, kill/cancel, timeout) and `TestProcessRunner` scripted fake (the knottyyoga TestHttpClient pattern)
-- [ ] Tests: line splitting across chunk boundaries, exit/error propagation, cancel, fake behaviors
+- [x] `LineBuffer` (foundation): turns arbitrary pipe chunks into whole lines; handles `\n`, `\r\n`, and the bare `\r` ffmpeg uses, including a `\r` that lands on a chunk boundary
+- [x] `IProcessRunner` + `QProcessRunner`/`QProcessHandle` (deferred start, line-buffered stdout/stderr signals, exit code, kill/cancel, timeout, kills the child on handle destruction) and `TestProcessRunner` scripted fake with auto and manual modes
+- [x] `waitForCondition`/`pumpEventLoop` (foundation, test-only): async tests fail with a readable assertion instead of hanging
+- [x] Tests: 11 for line splitting across chunk boundaries; 10 against **real** `cmd.exe` processes (output, working directory, exit codes, missing executable, cancel, cancel-before-start, timeout, no-orphan-on-destroy); 10 for the fake
+
+Design note: both runners start the process from the event loop rather than from `start()`. A caller connects *after* `start()` returns, so a synchronous start would let it miss the first output — and worse, the fake would pass where the real thing fails. Making the fake asynchronous in the same way is what keeps the acquisition tests honest.
 
 ### 2.2 Tool registry
-- [ ] Resolve yt-dlp/ffmpeg/ffprobe/python(venv) from machine-settings overrides → PATH; async version probes; status model consumed by the Settings view
-- [ ] Tests with the fake runner: found/missing/bad-output parsing
+- [x] Resolves yt-dlp/ffmpeg/ffprobe/python from a Settings override → the setup script's venv (Python) → the system PATH; a configured path that no longer exists is ignored rather than permanently hiding a working tool
+- [x] Asynchronous, time-boxed version probes; per-tool `statusChanged` plus `refreshFinished`; status carries version, path, and a problem message that names the fix
+- [x] Tests with the fake runner: version parsing per tool (yt-dlp bare, ffmpeg banner, `Python 3.13.1`, blank/odd output), override wins over PATH, missing tool advises `setup_machine.ps1`, stale override ignored, present-but-unrunnable reported distinctly, all four probed, probes carry a timeout
 
 ### 2.3 yt-dlp client
 - [ ] URL canonicalization for Instagram (reel/p/tv forms, strip `igsh`/share params) and YouTube passthrough; dedupe key extraction
