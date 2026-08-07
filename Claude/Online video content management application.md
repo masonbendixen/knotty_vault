@@ -386,6 +386,20 @@ It presents as a broken player rather than a broken download, which is why it su
 
 Hardening on the player side while chasing this, neither of them the cause: the audio output's volume and muted state are now set explicitly at construction rather than inherited from whatever `QAudioOutput` starts at, and the volume slider is connected *before* its initial value is set, so that value reaches the backend instead of the slider merely claiming to be at full volume.
 
+**The merge fix was necessary but not sufficient** — files downloaded after it do contain AAC stereo audio (confirmed with ffprobe against the library) and were still silent. Ruled out by inspection rather than guesswork: the audio stream is normal in every respect including disposition and duration, every Qt multimedia DLL and the FFmpeg media plugin are deployed beside the executable, and the app logged no playback error at all.
+
+- [x] `handleMediaStatusChanged` selects the first audio track when the file has tracks but the backend chose none. A file can load with audio present and nothing selected — the video plays, no error is raised, and nothing reaches the speakers, which is indistinguishable from a file with no sound in it. yt-dlp's merge output here is VP9 muxed into MP4, unusual enough for track auto-selection to come up empty.
+- [x] The same handler logs the track count, the active track, the output device, and the volume, once per source. When sound is missing that one line replaces three separate guesses.
+
+**Still silent, and the diagnostic is what finally located it.** The log line read `Audio: 1 track(s), active 0, output "Speakers (Realtek(R) Audio)", volume 1` — a track selected, a real device, full volume, not muted. Everything on the decode side was working; the sound was going somewhere nobody was listening. The machine has five *active* render endpoints (Speakers, Headphones, Realtek Digital Output, and two monitors that accept audio over DisplayPort), and a default-constructed `QAudioOutput` takes the default device once at construction and keeps it forever.
+
+- [x] `followDefaultAudioDevice`, called at construction and again on `QMediaDevices::audioOutputsChanged`, moves playback to whatever Windows currently calls the default output, and logs the move. Plugging in headphones now takes the sound with it instead of leaving the app playing to the device that happened to be default at startup.
+- `QMediaDevices` is declared before `QAudioOutput` so it outlives the output watching it — the same reverse-declaration-order rule that put `QAudioOutput` before `QMediaPlayer`.
+
+Three lessons from this one, all of them about diagnosis rather than code. The first fix was necessary but not sufficient, and stopping there would have looked like a failure. Every layer reported success — no error from Qt, a valid file, correct deployment — because nothing was *broken*; a working pipeline was pointed at the wrong end. And the thing that finally cracked it was logging the state rather than reasoning about it: three rounds of plausible theories cost more than one line of output.
+
+Worth keeping in mind for anything similar: some Instagram posts genuinely have no audio track. `Video by stefan.crainic.mp4` in the test library is one, so testing sound against the wrong clip proves nothing.
+
 ## Phase 3 — Library browsing and management
 
 ### 3.1 Library tree
