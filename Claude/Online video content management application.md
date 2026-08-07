@@ -414,6 +414,21 @@ Six active outputs, **two of them both called "Speakers"**, and two different Re
 - [x] The backend honours the choice while the device exists and falls back to the default when it does not, so unplugging a headset gives sound somewhere rather than silence.
 - [x] Test: the setting defaults to empty, round-trips an id, and going back to the default sticks rather than springing back to the last pick.
 
+**The actual root cause, found by comparing a working device against a broken one.** Sound played through either monitor but not through the analog speakers, and every other application on those same speakers was fine. Reading each endpoint's configured format settled it:
+
+| Device | Format | Plays in the app |
+| --- | --- | --- |
+| BenQ PD3200U | 48000 Hz **16-bit** | yes |
+| LG Ultra HD | 48000 Hz **16-bit** | yes |
+| Realtek Digital Output | 48000 Hz 16-bit | — |
+| **Speakers (Realtek)** | 48000 Hz **32-bit** | **no** |
+
+Qt's FFmpeg backend goes silent on an endpoint whose shared format is not 16-bit — no error, no warning, nothing. Every 16-bit endpoint works; the one 32-bit endpoint does not. This is also almost certainly the same defect as the speed-change crash: both are the FFmpeg backend's audio conversion path, which is `swresample`, which is where that stack trace pointed.
+
+- [x] The player warns when the chosen output is not 16-bit, naming the device, the depth, and both fixes — change the format in the Windows Sound control panel, or pick another output under Settings → Playback. The format belongs to Windows, so warning is the whole of what can be done from inside the app.
+- The user-side fix is Sound control panel → the device → Properties → Advanced → **16 bit, 48000 Hz**.
+- If the FFmpeg backend keeps costing time, `QT_MEDIA_BACKEND=windows` swaps in Media Foundation and takes `swresample` out of the picture entirely. It would want the download format preference moved to H.264 first, since Media Foundation cannot be relied on for VP9 — which is what yt-dlp currently produces.
+
 Three lessons from this one, all of them about diagnosis rather than code. The first fix was necessary but not sufficient, and stopping there would have looked like a failure. Every layer reported success — no error from Qt, a valid file, correct deployment — because nothing was *broken*; a working pipeline was pointed at the wrong end. And the thing that finally cracked it was logging the state rather than reasoning about it: three rounds of plausible theories cost more than one line of output.
 
 Worth keeping in mind for anything similar: some Instagram posts genuinely have no audio track. `Video by stefan.crainic.mp4` in the test library is one, so testing sound against the wrong clip proves nothing.
