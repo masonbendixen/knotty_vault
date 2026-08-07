@@ -400,11 +400,13 @@ Two decisions worth recording. **Resume is deferred until `durationChanged`**: s
 
 ### 4.2 Player view
 - [x] `PlayerView`: `QGraphicsVideoItem` in a `QGraphicsScene`, so the note overlay is a sibling graphics item rather than a widget layered over native video output — the latter is unreliable on Windows, the former always composites
-- [x] Controls bar: play/pause, speed selector, seek slider, elapsed/remaining clock, mute, full-screen toggle
+- [x] Controls bar: play/pause, speed selector, seek slider, elapsed/remaining clock, volume, mute, full-screen toggle. The clock follows the slider while it is being dragged and only commits the seek on release, so scrubbing does not fight the position the backend is still reporting
 - [x] Remembers the last playback position per video in `library_settings`, written on close, on switching videos, and on the way out of the window
 - [x] Tests: `NoteTimeline::elapsedAndRemaining` (elapsed plus time left, clamped so a position that overshoots the duration reads `-0:00`, and a not-yet-known duration reads sensibly)
 
 Full screen belongs to `MainWindow`, not to the view: the window is the thing with a menu bar, a navigation list, and a status bar to hide. `PlayerView` emits `fullScreenRequested(bool)` and the window does the rest, restoring a maximized window as maximized rather than quietly un-maximizing it. Leaving full screen also happens on close, so the saved geometry is never a chromeless window the next launch would reopen into.
+
+Deviation from "in-window and true full screen": there is one full-screen mode, not two. The notes panel stays visible in it deliberately — the whole point of watching a drill full screen is to write about what you are seeing, and hiding the panel would make N open an editor nobody can see. Everything that is *not* the video or the notes goes away.
 
 Two lifetime bugs found while wiring it up, both fixed rather than left to bite later: Qt deletes child widgets in `~QObject`, *after* `MainWindow`'s own members are gone, so the player would have written its resume position through an already-destroyed `DatabaseManager` — `~MainWindow` now hands the player a null catalogue while there is still something to write to. Closing a library does the same thing for the same reason.
 
