@@ -373,6 +373,19 @@ The lifetime detail worth recording: the retry replaces the process handle from 
 
 This leaves Q7's conclusion intact (browser cookie extraction only works with the browser fully closed, so cookies.txt is the practical route here) but changes what the app does about it: cookies are a thing you turn on when a post needs one, not a thing that can take down downloads that don't.
 
+### 2.10 Downloads were arriving silent
+
+Found by noticing no video had any sound. The download command never passed `--ffmpeg-location`. yt-dlp's default format choice fetches video and audio as **separate streams and merges them with ffmpeg**, so a yt-dlp that cannot find one falls back to whatever single stream it can get whole — video, no audio. Our ffmpeg is often somewhere only the Settings page knows about, so leaving it to PATH was never safe.
+
+It presents as a broken player rather than a broken download, which is why it survived all of Phase 4 unnoticed: the files play perfectly, they simply have no audio track in them.
+
+- [x] `buildDownloadArguments` takes the ffmpeg path and passes `--ffmpeg-location`; `startDownload` fills it from the `ToolRegistry`. An empty path passes nothing at all rather than an empty flag — yt-dlp would take an empty location at its word and stop looking on PATH.
+- [x] Startup warns when ffmpeg is missing, saying what actually happens: the download still succeeds and the file still plays, it just has no sound.
+- [x] Tests (3): the flag and its value are present, nothing is emitted when there is no ffmpeg to point at, and a *started* download really carries the resolved path — building the arguments correctly is no use if the client never passes them in. The bench now resolves a fake ffmpeg as well as a fake yt-dlp, since a bench that cannot resolve one would let that go untested.
+- **Already-downloaded files are not repaired by this.** They have no audio track and have to be fetched again.
+
+Hardening on the player side while chasing this, neither of them the cause: the audio output's volume and muted state are now set explicitly at construction rather than inherited from whatever `QAudioOutput` starts at, and the volume slider is connected *before* its initial value is set, so that value reaches the backend instead of the slider merely claiming to be at full volume.
+
 ## Phase 3 — Library browsing and management
 
 ### 3.1 Library tree
