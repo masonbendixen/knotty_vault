@@ -314,18 +314,24 @@ Design note: both runners start the process from the event loop rather than from
 - [x] Tests with the fake runner: version parsing per tool (yt-dlp bare, ffmpeg banner, `Python 3.13.1`, blank/odd output), override wins over PATH, missing tool advises `setup_machine.ps1`, stale override ignored, present-but-unrunnable reported distinctly, all four probed, probes carry a timeout
 
 ### 2.3 yt-dlp client
-- [ ] URL canonicalization for Instagram (reel/p/tv forms, strip `igsh`/share params) and YouTube passthrough; dedupe key extraction
-- [ ] Metadata probe: `--dump-single-json` → `VideoMetadata` struct (id, title, uploader, duration, dimensions, canonical URL, upload date, thumbnail URL)
-- [ ] Download into `.videolibrary/staging` with output template, `--newline --progress-template` progress parsing, `--cookies <file>` when configured, cancel via process kill, error taxonomy (login-required / gone / network / unknown)
-- [ ] Tests against captured fixture outputs with TestProcessRunner — no network in tests
+- [x] `SourceUrl`: Instagram reel/reels/p/tv (including `/creator/reel/<code>`) and YouTube watch/youtu.be/shorts all collapse to one reference; `igsh`, `img_index`, `list`, `t` dropped; unknown hosts still download, just without a dedupe id; `extractUrls` pulls links out of a pasted block
+- [x] `YtDlpOutput` (pure): progress percent, the final-path marker line, `--dump-single-json` → `VideoMetadata`, `YYYYMMDD` → storage timestamp, and an error taxonomy (login-required / unavailable / network / unsupported / unknown) with an `isWorthRetrying` verdict
+- [x] `YtDlpClient` + `IDownloadClient`: async download and metadata tasks over the process runner, cookie settings (`--cookies` file wins over `--cookies-from-browser`), staging via `-P`, cancel, per-outcome results
+- [x] Tests: 10 for URL handling, 14 for output parsing, 11 for the client — all against scripted output, no network
+
+Discovery worth recording: `--print` **implies `--quiet` and `--simulate`**. Left alone, the download command would report a file path for a download that never happened, and show no progress at all. It therefore passes `--no-simulate` and `--progress` explicitly, and a test pins both so they do not get tidied away later. The final path comes from `--print after_move:` rather than from parsing `[download] Destination:`, because that fires after any merge or remux and is where the file actually ended up.
 
 ### 2.4 Download manager
-- [ ] Queue persisted in `downloads`; up to N concurrent async QProcesses (default 2); state machine queued→running→success|error|canceled; retry; startup requeue of interrupted items; progress/state signals for the UI
-- [ ] Tests with a scripted fake client: concurrency cap, mid-download cancel, error propagation, restart recovery
+- [x] Queue persisted in `downloads`; concurrency capped (default 2); state machine queued→running→success|error|canceled; retry; startup requeue of interrupted items; progress/state signals for the UI; URLs canonicalized on the way in
+- [x] Tests with a scripted fake client: nothing runs before `start()`, restart recovery, concurrency cap, next-starts-on-finish, progress persisted and announced, success/failure recording, cancel while running and while queued, retry clears the old error, staging directory and politeness delay reach the client, queue drains
 
 ### 2.5 Import service
-- [ ] On success: ffprobe metadata, thumbnail frame-grab into `.videolibrary/thumbnails/`, PathPlanner target under `Inbox/{download date}`, same-volume move out of staging, `videos` row insert, `source_items` link/mark downloaded; duplicate detection by source_id (skip + surface)
-- [ ] Tests: full flow with temp root and fake tools; duplicates surfaced not re-imported; mid-import failure leaves staging intact
+- [x] `MediaProbe`: ffprobe JSON → duration/dimensions/size (first *video* stream, container duration with a stream fallback), ffmpeg single-frame thumbnail seeking a quarter of the way in
+- [x] `ImportService`: probe → duplicate check by `source_id` → PathPlanner target under `{Category}/{Y}/{M}/{D}` → move (download) or copy (manual import) → `videos` row → link `source_items` and the `downloads` row → thumbnail named after the row id. Imports run one at a time so two cannot both believe the same file name is free.
+- [x] Tests: 6 for MediaProbe (argument construction and JSON parsing)
+- [ ] **Still to do**: ImportService end-to-end tests (full flow with a temp library and scripted tools; duplicates surfaced not re-imported; mid-import failure leaves staging intact)
+
+Design note: a file ffprobe cannot read is still imported, with no duration or dimensions and a warning in the log — losing a downloaded video because its metadata was unreadable would be worse than an incomplete catalogue row. A missing thumbnail is likewise cosmetic and never fails an import. The file moves before the catalogue row is written, through `applyFileChangeThenDatabaseChange`, so a rejected row puts the file back instead of leaving it invisible inside the library.
 
 ### 2.6 UI: Add-by-URL and Downloads view
 - [ ] Add by URL action (toolbar + menu): multi-line paste dialog → probe + enqueue
