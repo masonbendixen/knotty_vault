@@ -353,7 +353,11 @@ Found by testing: a login-walled Instagram post failed with "would not serve thi
 - [x] Startup logs the cookie source, and warns when there is none, so the log says why Instagram downloads are failing.
 - [x] Tests: default, deliberate-off, browser name normalised to lower case, cookie path stored with forward slashes
 
-Still open (Q7): whether `--cookies-from-browser chrome` actually reads cookies on this machine. Chrome 127+ encrypts them in a way yt-dlp cannot decrypt on Windows, but that is a claim from release notes, not from this machine — the Settings page now makes it a one-click experiment, with a cookies.txt fallback if the browser path does not work.
+**Q7 answered, by testing on the machine itself (2026-08-07).** `--cookies-from-browser chrome` fails here with `Could not copy Chrome cookie database` ([yt-dlp #7271](https://github.com/yt-dlp/yt-dlp/issues/7271)) — not the app-bound encryption I had assumed from release notes, but a plain file lock: Chrome was running with 56 processes and holds the database open. `edge` gives the same Chromium error; `firefox` is not installed. So browser cookie extraction works only with the browser fully closed, and **the cookies.txt route is the practical default here**.
+
+Two bugs this exposed, both fixed:
+- `classifyError` did not recognise the message ("cookie database" is not "cookies"), so it fell through to Unknown. There is now a `CookieAccess` kind, checked before the login-wall patterns, whose message names the actual fix — close the browser, or export a cookies.txt. It is retryable, because closing the browser and trying again *is* the fix.
+- An unrecognised failure summarised as "The download failed." and put yt-dlp's own words on the third line, so the status-bar toast (first line only) said nothing at all. `summarizeError` now returns the tool's own words for anything unrecognised, and `describeError` no longer repeats them underneath.
 
 Improvement made while wiring this up: the download command now also asks yt-dlp to print the title, creator, id, platform, and upload date (a second `--print after_move:` with a marker and separator). Without it an imported video arrived titled with its platform id — "ABC123" — which is exactly the renaming chore the app exists to remove. It costs no extra request, since it comes from the run that already happened.
 
