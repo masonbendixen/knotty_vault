@@ -464,11 +464,23 @@ Worth keeping in mind for anything similar: some Instagram posts genuinely have 
 
 ### 3.5 Search view
 - [x] Keyword box and sort selector in the library toolbar, composing with whatever the tree has selected — narrowing by folder and searching by word combine rather than fighting
-- [ ] **Still to do**: the standalone Search page with tag multi-select and an explicit year/month picker
+- [x] Standalone `SearchView` page: keyword, category, year and month pickers, tag multi-select, sort, and a Clear all. Double-click plays; Show in Library jumps to the video in the tree
+- [x] Tags narrow rather than widen — a video must carry *every* ticked tag. That is the useful direction for finding one drill among hundreds, and the opposite of what most search boxes do, so the group box says so outright
+- [x] The year picker offers only years the library actually has, rather than a fixed range mostly pointing at nothing. Month is disabled until a year is chosen: a month alone would match August of every year, which is not what a month picker looks like it promises
+- No new data-layer work was needed. `VideoFilter` already carried `tagNames` with AND semantics, year/month/day, category, keyword, and sort, and `VideoQuery` already implemented them — Phase 1 built the filter for the tree and the search page at once, and this page is the part that finally uses all of it
 
 ### 3.6 Existing-library adoption (per #13)
-- [ ] Background scan of a structured `{category}/{year}/{month}/{day}` tree (worker, filesystem-only) → dry-run report dialog → apply: categories/videos rows, ffprobe metadata, thumbnails, downloaded_at from the folder path
-- [ ] Tests on fabricated temp trees: dry-run counts, apply idempotence, malformed folders skipped with a report
+
+Two pieces, split so the rule can be tested away from both the disk and the catalogue.
+
+- [x] `LibraryScan` reads a filed tree back out of its folders: `Rope/2026/08/06/entry drill.mp4` is the Rope category, downloaded that day. `parseRelativePath` is pure and holds the whole rule — exactly five path segments, a real date, zero-padded the way the app writes it, a video extension. **The scan writes nothing.**
+- [x] `LibraryAdopter` writes the report into the catalogue in one transaction. It moves no files: the videos are already where they belong, which is why the folders could be read at all. Titles come from file names with underscores turned back into spaces
+- [x] `AdoptFilesDialog` (File → Adopt Files Already Filed): scans on open, shows what will be added and what is being left alone with a reason for each, then adopts on request and rescans so the report stays honest
+- [x] Tests (13): date padding refused where it does not match, 2026/02/31 rejected while 2024/02/29 is kept, wrong depths in both directions, non-video files skipped for that specific reason, the app's own `.videolibrary` subtree ignored entirely, already-catalogued paths compared case-insensitively so Windows casing cannot duplicate a video, a walked tree grouped correctly, adoption round-tripped into rows with the folder date and file size, adopting twice adding nothing, a stale report replayed adding nothing, and one category created once for many videos
+
+Two deliberate limits, both stated in the dialog rather than left to be discovered: **duration, dimensions, and thumbnails are not filled in** — those need ffprobe per file, and holding a folder-sized adoption behind hundreds of probes would turn a quick operation into a long one. Adopted rows carry title, category, path, date, and file size, which is enough to browse and search. And the date is midnight, because a folder path carries no time of day.
+
+- [ ] **Follow-up**: backfill duration, dimensions, and thumbnails for rows that have none, as a background pass. Worth doing before Phase 6.
 
 ## Phase 4 — Player and notes
 
