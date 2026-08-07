@@ -392,23 +392,41 @@ Improvement made while wiring this up: the download command now also asks yt-dlp
 ## Phase 4 — Player and notes
 
 ### 4.1 Player controller
-- [ ] `IVideoPlayer` seam + QMediaPlayer/QAudioOutput implementation (libmpv is the swap-in if playback quality disappoints); state, speed presets 0.25/0.5/0.75/1/1.25/1.5/2, seek, throttled position ticks
-- [ ] Controller logic tests against a fake player (speed cycling, seek clamping, tick throttling)
+- [x] `VideoPlayerBackend` seam (named for what it is rather than `IVideoPlayer`, matching the rest of the codebase) + `QtVideoPlayerBackend` over QMediaPlayer/QAudioOutput; libmpv remains the swap-in if playback quality disappoints, and the seam is the only thing that would have to change
+- [x] `PlayerController` holds every decision: speed presets 0.25/0.5/0.75/1/1.25/1.5/2, clamped seek, throttled position ticks, and resume-on-open
+- [x] Tests (17) against `FakeVideoPlayerBackend`: speed steps stop at the ends rather than wrapping, speed carries across videos, seek clamps to both ends and works before the duration is known, ticks are throttled but a state change always forces one, resume waits for the duration and is ignored when it is trivially small or within five seconds of the end
+
+Two decisions worth recording. **Resume is deferred until `durationChanged`**: seeking before the backend knows the length is silently dropped by QMediaPlayer, so a naive resume-on-open loses the position on every video. **A resume point near the end is discarded** — finishing a video and reopening it should start at the beginning, not at the last frame.
 
 ### 4.2 Player view
-- [ ] QGraphicsVideoItem-based view (overlay-capable); controls bar: play/pause, speed selector, seek slider with elapsed and remaining time, volume/mute, fullscreen toggle; in-window and true fullscreen; remembers last playback position per video (`library_settings`)
+- [x] `PlayerView`: `QGraphicsVideoItem` in a `QGraphicsScene`, so the note overlay is a sibling graphics item rather than a widget layered over native video output — the latter is unreliable on Windows, the former always composites
+- [x] Controls bar: play/pause, speed selector, seek slider, elapsed/remaining clock, mute, full-screen toggle
+- [x] Remembers the last playback position per video in `library_settings`, written on close, on switching videos, and on the way out of the window
+- [x] Tests: `NoteTimeline::elapsedAndRemaining` (elapsed plus time left, clamped so a position that overshoots the duration reads `-0:00`, and a not-yet-known duration reads sensibly)
+
+Full screen belongs to `MainWindow`, not to the view: the window is the thing with a menu bar, a navigation list, and a status bar to hide. `PlayerView` emits `fullScreenRequested(bool)` and the window does the rest, restoring a maximized window as maximized rather than quietly un-maximizing it. Leaving full screen also happens on close, so the saved geometry is never a chromeless window the next launch would reopen into.
+
+Two lifetime bugs found while wiring it up, both fixed rather than left to bite later: Qt deletes child widgets in `~QObject`, *after* `MainWindow`'s own members are gone, so the player would have written its resume position through an already-destroyed `DatabaseManager` — `~MainWindow` now hands the player a null catalogue while there is still something to write to. Closing a library does the same thing for the same reason.
 
 ### 4.3 Keyboard shortcuts
-- [ ] Space play/pause; ←/→ ±5s; Shift+←/→ ±10s; ↑/↓ speed step; F fullscreen; M mute; N new note; Esc exits fullscreen; ? cheat-sheet overlay — data-driven `ShortcutMap` with tests
+- [x] Data-driven `playerShortcuts()`: Space play/pause; ←/→ ±5s; Shift+←/→ ±10s; ↑/↓ speed step; F full screen; Esc exits it; M mute; N new note; ? cheat sheet. One list feeds both the key handler and the cheat sheet, so they cannot disagree about what a key does
+- [x] Tests (9): every bound key resolves, unbound keys resolve to `None`, modifiers are matched exactly (Left and Shift+Left are different keys), irrelevant modifiers such as Num Lock are masked off, no two bindings claim the same key, and the cheat sheet lists every binding
+
+Writing the last of those tests found a dead binding: `?` is Shift+/ on most layouts, so Qt folds the Shift into the key code *and* still reports the modifier. Matching modifiers strictly meant `Qt::Key_Question` + `NoModifier` could never match anything a keyboard can produce, and the cheat sheet was unreachable. Shift is now dropped for that one key, with a test that presses it the way a keyboard really does.
+- Every control in the view is `Qt::NoFocus`, including the notes list, so clicking a button or a note never takes Space and the arrows away from the video. The note editor is the one exception, and while it has focus the keys are its own — typing "n" in a note must not start another note.
 
 ### 4.4 Active note resolution
-- [ ] Pure `ActiveNoteResolver`: active note = most recent note at or before current time, held until the next note's timestamp; tests (before first, between, exact hit, after last, add/edit/delete mid-playback)
+- [x] `NoteTimeline::activeIndexAt`: the active note is the most recent one at or before the current position, held until the next note's timestamp; nothing before the first, and the last one stays after it
+- [x] Tests: before the first, between two, exactly on a timestamp, after the last, an empty list, and a list that changes mid-playback
 
 ### 4.5 Notes UX
-- [ ] Add note: pauses playback, inline editor pre-stamped with the current timestamp
-- [ ] On-video overlay showing the active note, replaced when the next noted timestamp is reached
-- [ ] Notes dock: click seeks to the timestamp, inline edit, delete with confirm — list-model tests
-- [ ] Copy notes as Markdown (H:MM:SS + body) for pasting into Obsidian; formatter tests
+- [x] Add note (N or the button) pauses playback first — a note is written about the frame on screen, and the video running on underneath would move it — then opens an inline editor pre-stamped with the current timestamp. Ctrl+Enter saves, Esc cancels, both as widget shortcuts because `QPlainTextEdit` swallows Ctrl+Enter as a newline
+- [x] On-video overlay showing the active note over a translucent backdrop, replaced when the next noted timestamp is reached. The backdrop is not decoration: white text alone vanishes over a bright frame, which is most handstand footage shot against a window
+- [x] Notes list: click seeks to the timestamp, Edit reopens the same inline editor over the existing note, Delete confirms by naming the timestamp
+- [x] Copy notes as Markdown for pasting into Obsidian — `## title` then `- **0:05** body`, with multi-line bodies indented so they stay inside the bullet
+- [x] Tests (17 across `NoteTimeline`): timestamp formatting either side of an hour, Markdown shape, multi-line indenting, the empty-list case saying so rather than handing over an empty clipboard, and note lookup by id returning -1 for a stale id rather than falling back to the first note
+
+Deviation: the notes list is a plain `QListWidget` rebuilt from the repository on every change, not a `QAbstractListModel`. A video has tens of notes, not thousands, and every mutation already round-trips through SQLite; a model would add a layer with nothing in it worth testing. The logic that *is* worth testing — which note is active, how a timestamp reads, what the Markdown looks like, finding a note by id — is in `NoteTimeline`, where `QCoreApplication`-only tests can reach it.
 
 ## Phase 5 — Instagram integration
 
