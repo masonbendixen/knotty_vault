@@ -551,17 +551,22 @@ Deviation: the notes list is a plain `QListWidget` rebuilt from the repository o
 ## Phase 5 — Instagram integration
 
 ### 5.1 Cookie sources and login status (per Q7/#15)
-- [ ] Cookie-source setting, probed in order: (1) `--cookies-from-browser <browser>` passthrough (chrome first per Mason's experience; known-broken for Chrome v20 cookies on Windows — the probe decides), (2) embedded QtWebEngine login with a persistent per-machine profile — `CookieHarvester` on QWebEngineCookieStore writes a Netscape `cookies.txt` for yt-dlp and hands session values to the Python helper, (3) user-supplied `cookies.txt` path
-- [ ] Login-status probe (yt-dlp simulate against a login-required URL) surfaced in Settings and the Instagram view; re-login flow
-- [ ] Tests: Netscape serialization, cookie filtering/expiry logic, probe-output parsing (pure functions)
+- [x] Cookie-source setting, done early as **2.8/2.9** because Instagram downloads were broken without it: browser passthrough or a `cookies.txt` path, off by default, with a cookie failure falling back to a cookie-less attempt rather than sinking the download
+- [x] `NetscapeCookies`: the format yt-dlp and Instaloader both accept, which makes it the one thing the browser, the downloader, and the Python helper can all agree on. Serialize, parse, filter
+- [x] Tests (8): the header yt-dlp insists on, a round trip, comments and malformed lines stepped over (a jar exported by a browser extension routinely has something in it this does not need), **session cookies and expired ones dropped** with the clock passed in so expiry is testable, only the cookies Instagram actually needs kept — writing the whole jar would put more of someone's browsing on disk than the job calls for — and signed-in meaning `sessionid` and nothing less
+- [ ] **Still to do**: the embedded QtWebEngine login with a persistent profile, harvesting cookies from `QWebEngineCookieStore` into that format, and the login-status probe. The serialization those need is now in place and tested; what is missing is the browser and the probe around it
 
 ### 5.2 Saved-list helper script
-- [ ] `tools/list_saved_posts.py`: Instaloader session from the active cookie source (`load_session` on values parsed from cookies.txt or harvested cookies), iterate saved posts, emit JSONL (shortcode, url, owner, caption excerpt, taken_at, is_video, thumbnail_url), `--max-items`, politeness delays; runs in the venv from 0.1
-- [ ] C++ JSONL parser with tests on fixture output (the script itself is smoke-tested manually — it hits the real network)
+- [x] `tools/list_saved_posts.py`: Instaloader session from a Netscape `cookies.txt`, iterate saved posts, emit JSONL (shortcode, url, owner, caption excerpt, taken_at, is_video, thumbnail_url), `--max-items`, politeness delay. One object per line rather than one array, so a long list is consumed as it arrives and one unreadable post cannot cost the run
+- [x] `SavedPostParser` with tests (10) on fixture output: one line to one post, a broken line costing only itself, unreadable lines **counted rather than swallowed** (silently dropping them would make a broken sync look like a short saved list, which is the one thing the user could not tell apart), the script's own error line read as a message, a missing URL rebuilt from the shortcode, photos filtered out per Q9
+- [x] The script ends with `{"complete": true}` and the parser carries it through. "No more lines" and "the list ended" are identical on a pipe, and only a list read to the end may retire posts that did not appear in it — so the script says so outright rather than leaving it to be inferred
 
 ### 5.3 Sync service
-- [ ] `SavedListSyncService`: run the helper via ProcessRunner, reconcile into `source_items` (insert new, refresh last_seen, preserve ignored/downloaded, flag gone), videos-only filter (Q9), thumbnail fetch (QNetworkAccessManager → `.videolibrary/thumbnails/sources/`), minimum-interval sync guard (Q10)
-- [ ] Tests: reconciliation state machine on fixtures (new/known/ignored/downloaded/gone), interval guard
+- [x] `SavedListReconciler`: takes the fetched list and the stored rows and returns a **plan**, changing nothing. The caller applies it, which is what lets every rule below be tested with no database and no network
+- [x] Tests (10) on the state machine: a new post inserted, a known one only touched, a retired post revived when saved again, already-gone rows not retired over and over (which would report a change on every sync forever), and a whole mixed sync planned in one pass
+- [x] **A decision outlives the post.** Downloaded, ignored, and queued rows are never retired when a post leaves the saved list: unsaving something on a phone does not un-download the video, undo a months-old "no", or cancel a download in flight. Re-saving an ignored post touches it rather than offering it again
+- [x] **An incomplete fetch retires nothing.** A `--max-items` cap or a run that stopped early has not seen the posts it never reached; absence proves nothing about a list that was never read to the end, and retiring on it would quietly hide posts still saved
+- [ ] **Still to do**: `SavedListSyncService` — running the helper through ProcessRunner, applying the plan to `source_items`, fetching thumbnails into `.videolibrary/thumbnails/sources/`, and the minimum-interval guard (Q10)
 
 ### 5.4 Instagram view
 - [ ] Grid of not-yet-downloaded saved items (thumbnail, creator, caption snippet, saved date), Sync button with last-synced time, state filter
