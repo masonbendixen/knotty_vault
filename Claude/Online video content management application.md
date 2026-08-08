@@ -554,7 +554,10 @@ Deviation: the notes list is a plain `QListWidget` rebuilt from the repository o
 - [x] Cookie-source setting, done early as **2.8/2.9** because Instagram downloads were broken without it: browser passthrough or a `cookies.txt` path, off by default, with a cookie failure falling back to a cookie-less attempt rather than sinking the download
 - [x] `NetscapeCookies`: the format yt-dlp and Instaloader both accept, which makes it the one thing the browser, the downloader, and the Python helper can all agree on. Serialize, parse, filter
 - [x] Tests (8): the header yt-dlp insists on, a round trip, comments and malformed lines stepped over (a jar exported by a browser extension routinely has something in it this does not need), **session cookies and expired ones dropped** with the clock passed in so expiry is testable, only the cookies Instagram actually needs kept — writing the whole jar would put more of someone's browsing on disk than the job calls for — and signed-in meaning `sessionid` and nothing less
-- [ ] **Still to do**: the embedded QtWebEngine login with a persistent profile, harvesting cookies from `QWebEngineCookieStore` into that format, and the login-status probe. The serialization those need is now in place and tested; what is missing is the browser and the probe around it
+- [x] `InstagramLoginDialog`: real Instagram in an embedded QtWebEngine view with a persistent per-machine profile, harvesting cookies from `QWebEngineCookieStore`. Nothing typed there reaches the app -- only the cookies Instagram hands back, and only the few it needs. WebEngine is optional at build time, and without it the dialog **explains the cookies.txt route** rather than leaving a dead button
+- [x] `InstagramSession`: the harvested file lives under `AppPaths`, never in the library -- a session is not something to copy to a network share -- and is written owner-only, because it is a password in all but name
+- [x] Login-status probe with `classifyProbeOutput`, pure so every branch is testable. **A rejected session says "sign in again" rather than "sign in"**, and a network failure reports as unavailable rather than signed out: sending somebody to re-authenticate because their wifi dropped teaches them to ignore the message
+- [x] Tests (10 more): the file outside the library, a round trip, writing refused for cookies that are not a session or are already expired, signing out twice not an error, and each probe outcome
 
 ### 5.2 Saved-list helper script
 - [x] `tools/list_saved_posts.py`: Instaloader session from a Netscape `cookies.txt`, iterate saved posts, emit JSONL (shortcode, url, owner, caption excerpt, taken_at, is_video, thumbnail_url), `--max-items`, politeness delay. One object per line rather than one array, so a long list is consumed as it arrives and one unreadable post cannot cost the run
@@ -566,17 +569,28 @@ Deviation: the notes list is a plain `QListWidget` rebuilt from the repository o
 - [x] Tests (10) on the state machine: a new post inserted, a known one only touched, a retired post revived when saved again, already-gone rows not retired over and over (which would report a change on every sync forever), and a whole mixed sync planned in one pass
 - [x] **A decision outlives the post.** Downloaded, ignored, and queued rows are never retired when a post leaves the saved list: unsaving something on a phone does not un-download the video, undo a months-old "no", or cancel a download in flight. Re-saving an ignored post touches it rather than offering it again
 - [x] **An incomplete fetch retires nothing.** A `--max-items` cap or a run that stopped early has not seen the posts it never reached; absence proves nothing about a list that was never read to the end, and retiring on it would quietly hide posts still saved
-- [ ] **Still to do**: `SavedListSyncService` — running the helper through ProcessRunner, applying the plan to `source_items`, fetching thumbnails into `.videolibrary/thumbnails/sources/`, and the minimum-interval guard (Q10)
+- [x] `SavedListSyncService`: runs the helper through `ProcessRunner`, parses as lines arrive, reconciles, applies the plan, and fetches preview images into `.videolibrary/thumbnails/sources/`. A failed image is a cosmetic loss, not a failed sync
+- [x] Minimum-interval guard (Q10), default 15 minutes. Instagram counts requests and the Sync button is something a person can lean on; refusing early is politer to the account than being rate limited by it. Injectable so the guard is tested without waiting a quarter of an hour
+- [x] Tests (11) against a fake process runner and a real catalogue: a fresh list inserted, a second sync touching rather than duplicating, photos never becoming rows, an incomplete run retiring nothing, a complete one retiring what left, **a downloaded item surviving being unsaved**, the interval guard never reaching the network, the helper's own error surfaced, unreadable lines counted into the result, no session failing before any network call, and the last-sync time stored in `library.db` so it travels with the folder
 
 ### 5.4 Instagram view
-- [ ] Grid of not-yet-downloaded saved items (thumbnail, creator, caption snippet, saved date), Sync button with last-synced time, state filter
-- [ ] Actions: Download (single + multi-select → Phase 2 pipeline), Ignore, Preview, Open post (embedded browser); rows auto-update as downloads complete
+- [x] `InstagramView` replaces the placeholder: a grid of saved posts with preview image, creator, and caption snippet, a Sync button showing when it last ran, and a state filter that defaults to **what is still worth acting on** — downloaded and ignored posts are decided, and showing them would bury the ones that are not
+- [x] Actions: Download (multi-select, straight into the Phase 2 pipeline), Ignore, Preview, Open Post. Downloading marks the row queued so a sync running alongside cannot retire it mid-download
+- [x] `SourceItemModel` rebuilt from the catalogue on every change rather than kept in step by hand, so what it shows survives a restart and cannot drift. Preview images load lazily and are cached, misses included
+- [x] Tests (7) on the model: the default view, the state filter, what a tile says, a 400-character caption cut without breaking the grid while the tooltip keeps all of it, a post with no creator falling back to its shortcode, lookup by id, and a library closing underneath it leaving the model empty rather than stale
 
 ### 5.5 In-app preview (per Q12)
-- [ ] Preview resolves the direct media URL on click (yt-dlp `-g`; the URLs expire quickly, so resolve per view) and plays it in the player without saving; alternate action opens the post page in the embedded logged-in browser
+- [x] `MediaUrlResolver` runs yt-dlp `-g` and hands the URL to `PlayerView::openExternal`. **Nothing is written**: no file, no catalogue row, no resume position. Most saved posts turn out not to be worth keeping, and finding that out should not cost a download
+- [x] Resolved per view, never cached: these URLs are signed and expire in minutes, so a stored one would be a broken link by the time anybody used it
+- [x] Progressive formats only (`acodec!=none`) — a plain player cannot merge separate video and audio streams, and a preview that played silently would look like a broken app rather than a format choice
+- [x] Open Post opens the real page in the system browser as the alternate action
+- [x] Tests (6): the command prints instead of downloading, nothing that would write a file, cookies sent only when there are some, the first of two printed URLs taken, noise around the URL stepped over, and output with no URL resolving to nothing
 
 ### 5.6 YouTube parity
-- [ ] Verify Add-by-URL handles YouTube end-to-end (formats, thumbnail, metadata); document Watch-Later enumeration (cookies + `:ytwatchlater`) as a future provider
+- [x] Verified by test rather than by assertion: every shape of YouTube link — `watch?v=`, `youtu.be`, `youtube-nocookie`, and one with a playlist and timestamp hung off it — reduces to **one canonical URL and one external id**, which is what stops the same video arriving twice under two links
+- [x] A pasted batch mixing Instagram and YouTube links is picked up as both; a channel or search page is correctly not a video
+- [x] The rest of the pipeline was already shared: `--ffmpeg-location` (2.10) matters most for YouTube, where video and audio genuinely do arrive as separate streams
+- Watch Later enumeration (cookies + `:ytwatchlater`) stays a future provider. `SourceItemRepository` is already keyed by platform, so it would be a second sync service beside this one rather than a change to any of it
 
 ## Phase 6 — Hardening, portability, packaging
 
