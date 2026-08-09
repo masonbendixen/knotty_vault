@@ -598,6 +598,22 @@ Deviation: the notes list is a plain `QListWidget` rebuilt from the repository o
 - [x] `SourceItemModel` rebuilt from the catalogue on every change rather than kept in step by hand, so what it shows survives a restart and cannot drift. Preview images load lazily and are cached, misses included
 - [x] Tests (7) on the model: the default view, the state filter, what a tile says, a 400-character caption cut without breaking the grid while the tooltip keeps all of it, a post with no creator falling back to its shortcode, lookup by id, and a library closing underneath it leaving the model empty rather than stale
 
+### 5.4b Instagram page, second pass (from use)
+
+Found by actually using it. The grid worked and was miserable.
+
+- [x] **Posts appear as they arrive.** The whole list was written at the end, so nothing was usable until the last post landed — minutes of a populated-looking page that ignored every click. Each post is now written and announced the moment its line arrives; only retiring waits for the end, because only absence needs the whole list to have been seen
+- [x] **Preview images.** Instagram's CDN answers an unrecognised client with 403 rather than a picture, so every tile had a hole where one should be and the grid looked broken. The fetch now claims to be a browser arriving from instagram.com, and logs the byte count so a missing image can be told from a refused one
+- [x] **Selection is visible.** Multi-select was already there and looked like it was not, because an icon-mode tile barely changes when picked. Shift and Ctrl worked the whole time; nothing on screen said so
+- [x] **A way out of the player.** Double-clicking a post opened it with no exit but guessing at the navigation list. There is a Back control now, and Escape backs out when not in full screen
+- [x] **Move to...** sets the bucket by hand for any selection. Downloaded is deliberately not offered: it means a video is in the library, and letting it be set by hand would make the grid lie about what has been kept
+- [x] Downloading already marked the row downloaded — `ImportService::linkToVideo` has done that since Phase 2 — but nothing told the grid, so the tile sat in "still to deal with" having been dealt with. The window refreshes it when an import finishes
+- [x] Tests (2 more): posts announced with ids that already resolve rather than promises of them, and posts from an interrupted run kept rather than discarded
+
+**Not done: removing a post from the saved list on Instagram.** There is no supported way to unsave through Instaloader, and doing it by hand means an authenticated POST to an undocumented endpoint — a write to somebody's account, on the API that has already rate limited this one twice. Ignore does the same job locally and permanently, and Open Post is one click from doing it properly in a browser. Worth revisiting only if Instagram ever documents it.
+
+**Not done: choosing a category before download.** Downloads land in Inbox and are moved from the Library page. Doing it here means threading a category through `DownloadManager` and `DownloadRepository` into `ImportRequest`, which is a data-layer change rather than a button, and belongs in its own pass rather than bolted onto this one.
+
 ### 5.5 In-app preview (per Q12)
 - [x] `MediaUrlResolver` runs yt-dlp `-g` and hands the URL to `PlayerView::openExternal`. **Nothing is written**: no file, no catalogue row, no resume position. Most saved posts turn out not to be worth keeping, and finding that out should not cost a download
 - [x] Resolved per view, never cached: these URLs are signed and expire in minutes, so a stored one would be a broken link by the time anybody used it
