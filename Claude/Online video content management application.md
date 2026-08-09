@@ -603,6 +603,16 @@ Deviation: the notes list is a plain `QListWidget` rebuilt from the repository o
 - [x] The rest of the pipeline was already shared: `--ffmpeg-location` (2.10) matters most for YouTube, where video and audio genuinely do arrive as separate streams
 - Watch Later enumeration (cookies + `:ytwatchlater`) stays a future provider. `SourceItemRepository` is already keyed by platform, so it would be a second sync service beside this one rather than a change to any of it
 
+### 5.7 Logs page (added on request)
+
+Every difficult problem in this project so far was found by reading `video_library.log` — which meant leaving the app, finding a folder under AppData, and opening the file in something else. Putting it on a page costs almost nothing and turns "it hangs" into a line somebody can paste.
+
+- [x] `LogTailer` in `foundation`: follows a file that is still being written. Three things the naive version gets wrong and this is tested against — the file growing between reads, a line only half written when the read happens, and rotation replacing the file underneath the reader
+- [x] Tests (7): only new lines returned, a half-written line held back until it is finished rather than arriving as two, a rotated log read from its start rather than spliced onto the old offset, the tail read on open rather than megabytes of history, Windows carriage returns stripped, a missing file empty rather than an error and picked up when it appears, and switching files starting over
+- [x] `LogView` page: monospaced, read-only but **selectable** — a disabled edit cannot be copied from, and copying is the point. Level filter, text filter, Follow, Copy All (what is shown, filter included), Reload, and Open Folder, with the file's own path on screen and selectable
+- [x] Following stops when the page is not in front, so a timer is not polling a file nobody is looking at
+- [x] Auto-scroll only when already at the bottom, so reading back through the log is not yanked away every second by a line arriving
+
 ## Phase 6 — Hardening, portability, packaging
 
 ### 6.1 Consistency checker
