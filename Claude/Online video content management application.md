@@ -610,7 +610,18 @@ Found by actually using it. The grid worked and was miserable.
 - [x] Downloading already marked the row downloaded — `ImportService::linkToVideo` has done that since Phase 2 — but nothing told the grid, so the tile sat in "still to deal with" having been dealt with. The window refreshes it when an import finishes
 - [x] Tests (2 more): posts announced with ids that already resolve rather than promises of them, and posts from an interrupted run kept rather than discarded
 
-**Not done: removing a post from the saved list on Instagram.** There is no supported way to unsave through Instaloader, and doing it by hand means an authenticated POST to an undocumented endpoint — a write to somebody's account, on the API that has already rate limited this one twice. Ignore does the same job locally and permanently, and Open Post is one click from doing it properly in a browser. Worth revisiting only if Instagram ever documents it.
+**A preview looked like it could take notes, and could not.** Every note action checks for a video id, and a preview has none — so the panel sat there enabled, and N and the buttons silently did nothing. A dead control is worse than an absent one: it looks like the feature and fails without saying so.
+
+- [x] The notes panel is disabled during a preview and says why: notes belong to a video in the library, and a preview is deliberately not one
+- [x] A **Download This** button appears in the player for a preview, routed through the same queue the grid uses, so one status message serves both. It closes the player afterwards — pressing Download while watching means the deciding is over
+- [x] The player was otherwise a dead end for a post that turned out to be worth keeping: watch it, then guess at the navigation list and find it again in the grid
+
+**Removing a post from the saved list on Instagram** — refused once, then built. The first answer was over-cautious. It is the user's own account and their own data, and unsaving is precisely what they would otherwise do by hand; the reasonable objection was never "should this exist" but "should it be quiet or explicit".
+
+- [x] `--unsave <shortcode>` in the helper: a POST to the endpoint Instagram's own web client uses, with the CSRF token from the cookie jar. **The only write this app makes to anybody's account**
+- [x] **Remove from Saved** on the Instagram page, one item at a time, behind a confirmation that says plainly it changes Instagram and not just the grid, and that anything downloaded stays in the library
+- [x] Never automatic. Downloading does not unsave, and nothing else does either — a saved list emptied as a side effect of something else is not recoverable from in here
+- [x] On success the row becomes **Gone**, which is what that state already means: no longer in the saved list. On failure it says so and leaves the row alone, because the post really is still saved whatever the grid would rather show
 
 **Not done: choosing a category before download.** Downloads land in Inbox and are moved from the Library page. Doing it here means threading a category through `DownloadManager` and `DownloadRepository` into `ImportRequest`, which is a data-layer change rather than a button, and belongs in its own pass rather than bolted onto this one.
 
