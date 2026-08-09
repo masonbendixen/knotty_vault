@@ -469,6 +469,19 @@ Worth keeping in mind for anything similar: some Instagram posts genuinely have 
 - [x] The year picker offers only years the library actually has, rather than a fixed range mostly pointing at nothing. Month is disabled until a year is chosen: a month alone would match August of every year, which is not what a month picker looks like it promises
 - No new data-layer work was needed. `VideoFilter` already carried `tagNames` with AND semantics, year/month/day, category, keyword, and sort, and `VideoQuery` already implemented them — Phase 1 built the filter for the tree and the search page at once, and this page is the part that finally uses all of it
 
+### 3.7 Category management (added on request)
+
+The four categories the schema seeds are a guess at what one person films, not a fixed vocabulary. A library that cannot grow new ones stops matching how its owner thinks about their training within a month.
+
+- [x] `CategoryEditor` holds the rules, away from the dialog so they can be tested: names trimmed and refused empty, duplicates refused **case-insensitively** because two folders differing only in case is something Windows will not have, and anything that cannot become a folder name refused outright since the folder is where the videos will live
+- [x] **Inbox cannot be removed**, however empty it is. Every download lands there — `ImportService` falls back to `defaultCategoryId()` whenever a request names no category, which is every download — so it is the one category guaranteed to exist. The dialog shows it labelled rather than hiding it
+- [x] **A category holding videos cannot be removed**, and the refusal says how many are in the way, because "move these somewhere else first" is the actual next step
+- [x] Removing an empty category takes its folder too — but only if the folder is empty. `rmdir` refuses one with anything in it, which is exactly right: a stray file is somebody's data whatever the catalogue believed about it
+- [x] `removalObjection()` is separate from `remove()`, so the button is disabled with the reason on screen rather than failing when pressed
+- [x] `CategoriesDialog`, opened from the Library page beside the tree it edits rather than from Settings — categories are the library's own data and travel with the folder, unlike anything in there. Shows each category's video count and folder name
+- [x] Tests (9): creation, trimming, empty names, case-insensitive duplicates, Inbox protected however it is capitalised, a populated category refused with its count named, an empty one removed along with its empty folder, a folder with a stray file surviving, and removing something that is not there refused rather than ignored
+- Renaming is deliberately not offered. `directory_name` is kept separate from `name` precisely so a rename does not silently move every file, and doing it properly means a folder move with its own progress and failure handling — a different job from a dialog with an Add button.
+
 ### 3.6 Existing-library adoption (per #13)
 
 Two pieces, split so the rule can be tested away from both the disk and the catalogue.
@@ -620,7 +633,11 @@ Found by actually using it. The grid worked and was miserable.
 
 - [x] `--unsave <shortcode>` in the helper: a POST to the endpoint Instagram's own web client uses, with the CSRF token from the cookie jar. **The only write this app makes to anybody's account**
 - [x] **Remove from Saved** on the Instagram page, one item at a time, behind a confirmation that says plainly it changes Instagram and not just the grid, and that anything downloaded stays in the library
-- [x] Never automatic. Downloading does not unsave, and nothing else does either — a saved list emptied as a side effect of something else is not recoverable from in here
+- [x] **Unsave after downloading**, a checkbox on the Instagram page rather than buried in Settings, off until turned on. It changes what a download does to somebody's account, so it belongs where that is visible
+- [x] Hung off `handleImportFinished` on the success path only, which is the one place that knows the file is in the library and catalogued rather than merely requested. A failed import and a duplicate both return before it, so neither can unsave anything
+- [x] A downloaded row **stays Downloaded** rather than becoming Gone. Both are true after an automatic unsave, but only one of them remembers that the video was kept, and that is what these states exist for
+- [x] Unsaves are queued one at a time. A batch of finished downloads asking at once would lose all but the first, and firing them together is exactly how this account got rate limited twice already
+- Superseded: ~~Never automatic. Downloading does not unsave, and nothing else does either — a saved list emptied as a side effect of something else is not recoverable from in here.~~ Asked for outright, and reasonable: the saved list is a queue, and a queue nothing ever leaves is not one
 - [x] On success the row becomes **Gone**, which is what that state already means: no longer in the saved list. On failure it says so and leaves the row alone, because the post really is still saved whatever the grid would rather show
 
 **Not done: choosing a category before download.** Downloads land in Inbox and are moved from the Library page. Doing it here means threading a category through `DownloadManager` and `DownloadRepository` into `ImportRequest`, which is a data-layer change rather than a button, and belongs in its own pass rather than bolted onto this one.
