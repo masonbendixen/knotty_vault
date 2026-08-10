@@ -520,6 +520,13 @@ Two further crash-class defects found while chasing it, both real, neither confi
 - `QtVideoPlayerBackend` declared `QMediaPlayer player_` before `QAudioOutput audioOutput_`. Members die in reverse declaration order, so the audio output was destroyed first and the player spent its own destructor holding a borrowed pointer to a dead object. The declaration order is now reversed, which is what makes the player die first.
 - `PlayerView` showed the playback-error dialog on a **direct** connection. The backend emits `errorOccurred` from inside its own calls (`setSource`, `setPlaybackRate`), and a modal dialog runs a nested event loop — opening one on top of the media pipeline's own stack re-enters it mid-operation. The connection is now `Qt::QueuedConnection`, so the dialog opens after the backend's call has unwound.
 
+**Intermittent "a codec is missing", found in the log's timestamps.** The error arrived 8-17ms after the media loaded, and the same file played on the next attempt. Not a codec problem: `openVideo` called `play()` on the line after `open()`, so play reached a backend that had not finished opening the file and had no decoder yet. Media Foundation answers that with a missing-codec error rather than waiting.
+
+- [x] `open(source, resume, playWhenReady)` holds the play until the backend reports a duration -- the same deferral the resume seek already used, and for the same reason. The seek still goes first, so playback starts where it is meant to rather than at zero and jumping
+- [x] `close()` cancels a pending play, so a duration arriving after a video was closed cannot start one the player has moved on from
+- [x] Tests (4): playing waits for the duration, opening without asking to play stays paused, a resumed video is seeked before it starts, and closing first cancels it
+- [x] The 32-bit audio warning fired on **every play** -- once per device now. It is a property of the sound card and cannot change between two clips, so repeating it buried the log in a warning nobody can act on twice
+
 Two decisions worth recording. **Resume is deferred until `durationChanged`**: seeking before the backend knows the length is silently dropped by QMediaPlayer, so a naive resume-on-open loses the position on every video. **A resume point near the end is discarded** — finishing a video and reopening it should start at the beginning, not at the last frame.
 
 ### 4.2 Player view
