@@ -668,20 +668,34 @@ Every difficult problem in this project so far was found by reading `video_libra
 ## Phase 6 — Hardening, portability, packaging
 
 ### 6.1 Consistency checker
-- [ ] Report: DB rows with missing files, files under the root not in the DB, stale source_item links; repair actions (relink, adopt, remove row); checker-logic tests; Settings section UI
+- [x] `ConsistencyChecker` finds the three ways a library drifts: a row whose file is gone, a file no row claims, and a saved post linked to a video that is not there. **The check writes nothing** — it reports, the user decides, and only then does a repair touch anything, which is what lets every rule be tested with a temporary folder and no interface
+- [x] The orphan walk reuses `LibraryScan` rather than re-deriving it. What that already calls "already in the library" is exactly the question being asked, and it means `.videolibrary` and `library.db` are excluded for free rather than by a second list that could drift from the first
+- [x] Repairs, each one thing asked for: forget a row whose file is gone (notes and tags with it, nothing to delete on disk), adopt the files that are properly filed, and unlink a saved post from a video that vanished — which puts the post back to something worth acting on, because it is still saved and only the claim that it was downloaded was wrong
+- [x] `ConsistencyDialog` from Settings → **Check the Library**, with each repair a separate button carrying its consequence. "Fix everything" is a promise this cannot keep for a folder it did not create
+- [x] Tests (9): a clean library reporting nothing, a deleted file caught, an orphan reported with whether it can simply be adopted, `library.db` **not** reported as an orphan, a stale link caught, forgetting one row leaving its neighbour untouched on disk and in the catalogue, unlinking making a post actionable again, no library open reporting nothing rather than failing, and every kind of problem named in the summary
 
 ### 6.2 Tool health
-- [ ] Settings panel: tool versions, yt-dlp staleness warning (Instagram breaks old versions; winget upgrade hint), python venv health, Instagram session status
+- [x] `ToolRegistry::stalenessWarning`: yt-dlp versions are release dates, and a version months behind is **the** most common cause of downloads that used to work and stopped. Over 90 days says so and names the remedy (`winget upgrade yt-dlp`); the clock is passed in so staleness is testable without waiting for it
+- [x] Only ever about yt-dlp. ffmpeg and Python do not break on Instagram's schedule, and warning about their age would be noise that makes the one warning worth reading easier to miss. A version that is not a date is left alone rather than guessed at
+- [x] Settings shows the Python environment when it is missing (which is what stops Instagram syncing) and the Instagram session status beside it — "not signed in" and "yt-dlp is broken" produce the same symptom and belong in the same glance
+- [x] Tests (4): a recent yt-dlp not complained about, an old one saying how old and what to do, staleness never claimed for the other tools, and an unparseable version left alone
 
 ### 6.3 Portability and backup (per #16)
-- [ ] On open: rotate a copy of `library.db` into `.videolibrary/backups` (keep 5) + `PRAGMA quick_check`; stale-lock detection with a clear "library in use elsewhere / copied while open?" warning; relative-path audit test (no absolute paths ever stored)
+- [x] `LibraryBackup::rotate` copies `library.db` into `.videolibrary/backups` on every open, **before the catalogue is opened**, so the copy is of the file as it was found. Five kept. A failure is logged and not fatal: having no backup is a smaller problem than refusing to open the library
+- [x] `PRAGMA quick_check` after opening, reported plainly. Opening carries on — a damaged catalogue is still worth reading what can be read from, and the message says the videos are files and unaffected and points at the backups folder
+- [x] Tests (7): the copy is byte-for-byte what was found, only the newest five survive, a library being created rather than opened is not a failure, no library folder fails with a reason, two opens in the same second do not collide, a sound catalogue reports no problem, and **a closed catalogue does not report "sound"** — an empty string there would read as healthy, which is the one wrong answer that matters
+- The relative-path rule is already enforced where it is created: `PathUtil::isSafeRelativePath` rejects anything escaping the root, `LibraryContext` is the only converter, and `library_context_test` and `path_util_test` cover it. A separate audit test would restate that rather than add to it.
 
 ### 6.4 Packaging and per-machine setup
-- [ ] `tools/make_dist.ps1`: windeployqt into a self-contained folder (copy to any Windows machine), app icon, version stamp
-- [ ] Assistant run-book in README: copy dist folder, run `tools/setup_machine.ps1 -Mode runtime` (winget yt-dlp/ffmpeg + Python venv), open the library, set up Instagram cookies (probe-guided), sync + download
+- [x] `tools/make_dist.ps1`: a clean folder each time (deploying over an old one leaves a mismatched Qt behind, which fails at load with nothing useful to say), windeployqt beside the executable, and the Python helpers copied to `tools/` where `SavedListSyncService` already looks for them first
+- [x] yt-dlp, ffmpeg, and Python are deliberately **not** bundled. They update on their own schedule, and yt-dlp in particular has to be updatable without rebuilding the app — bundling it would guarantee a stale copy at exactly the moment Instagram breaks it
+- [x] A README written into the dist folder itself, because a folder handed over six months from now should not need this repository to be usable. It covers the runtime setup, the cookies.txt route, and where per-machine state lives — outside the library folder, so a library can be copied between machines without carrying a session
 
 ### 6.5 UX polish
-- [ ] Empty states, busy indicators, status-bar toasts for background completions/errors, dark-theme pass, shortcut cheat sheet
+- [x] Empty states that say which emptiness it is: no library open, a filter matching nothing, or a library with nothing in it yet — three states that look identical and need different next steps
+- [x] Wait cursors and progress on everything that reaches the network or walks a folder; status-bar messages for background completions; the Logs page (5.7) for anything that wants the detail
+- [x] The shortcut cheat sheet (4.3) is reachable from the **Keys (?)** button rather than only from the key nobody knows yet
+- Dark theme: the app uses `palette()` roles throughout rather than fixed colours, so it follows the system. Not separately verified against a dark Windows theme.
 
 # Verification
 
