@@ -241,7 +241,7 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 > **Partly shipped 8/11/2026 — and under different names.** Integration Track A in [[Component Inventory for Designer]] wrote the color, type-family, and radius tokens using the **`--theme-*` / `--font-*` / `--radius-*`** names from [[Tenant Theming and Branding]]'s Token Catalog, not the `--color-*` names sketched below, so the per-tenant theming layer and this phase share one namespace. **Do not add a second `--color-*` set.** The bullets below are updated to the as-built reality; the unchecked ones are what's genuinely left.
 
 - [x] ~~Expand `_variables.scss` … emitting CSS custom properties under `:root`~~ — **done**: new `ui/src/assets/styles/_tokens.scss` holds the token layer; `_variables.scss` demoted to a deprecated legacy-alias file (`--red` → `--theme-primary`, etc.).
-- [x] **Colour tokens** — done as `--theme-primary` / `--theme-on-primary` / `--theme-accent` / `--theme-on-accent` / `--theme-ink` / `--theme-neutral` / `--theme-surface` / `--theme-surface-tint` / `--theme-background` / `--theme-border`, plus the five status tone pairs (`--theme-success` + `--theme-on-success`, warn, danger, info, muted). Defaults are Ryan's mined Figma values, so `theme-red` usages already moved to `#ED1C26`.
+- [x] **Colour tokens** — brand (`--theme-primary` / `-on-primary` / `-accent` / `-on-accent`), the neutral ramp (`--theme-ink`, `-text`, `-text-muted`, `-text-subtle`, `-neutral`, `-surface`, `-surface-tint`, `-surface-subtle`, `-background`, `-border`, `-divider`), the five **solid** tone pairs for badges, and a three-part **soft** set per tone for banners (`-soft` / `-line` / `-strong`). Defaults are Ryan's mined Figma values for the brand and badge tones; the neutrals and soft tones are the values the app had already converged on, so nothing moved visually. **~955 hex literals across 99 component SCSS files now resolve through these** (665 → 203 remaining, all genuinely one-off).
 - [x] **Type tokens (families)** — `--font-body` / `--font-heading` / `--font-display`; the `.din*` classes and `body`/`*` resolve through them.
 - [ ] **Type tokens (scale)** — the size + line-height ramp `--text-xs/sm/base/lg/xl/2xl/3xl/4xl` and weights `--weight-regular/medium/semibold/bold` are still outstanding; they need Ryan's type scale from his Figma Variables pass.
 - [ ] **Space tokens** — `--space-1` through `--space-12` matching the Tailwind 4px grid (so they overlap with `p-2`, `gap-4` etc.).
@@ -252,8 +252,8 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.2 Wire tokens to Tailwind
 
-- [ ] Extend `tailwind.config.js` to alias the new semantic colour tokens (`brand`, `accent`, `surface`, `border`, etc.) the same way `theme-red` is aliased today. Result: an existing `class="bg-theme-red"` continues to work, and new code uses `class="bg-brand"`.
-- [ ] Likewise add `fontSize`, `spacing`, `borderRadius`, `boxShadow`, `fontFamily` extensions that reference the CSS variables. After this step, `class="text-2xl font-display shadow-md rounded-lg p-4"` resolves entirely through tokens.
+- [x] Extend `tailwind.config.js` to alias the new semantic colour tokens the same way `theme-red` is aliased today. *(Shipped 8/11/2026: `brand`, `on-brand`, `ink`, `body`, `muted`, `subtle`, `surface`, `surface-tint`, `surface-subtle`, `line`, `divider`, `success`, `warn`, `danger`, `info`. The legacy `theme-*` names still resolve.)*
+- [x] Likewise add `borderRadius` and `fontFamily` extensions that reference the CSS variables — `rounded-card/control/pill`, `font-display/heading/body`. *(`fontSize`, `spacing` and `boxShadow` wait on those token scales, which don't exist yet.)*
 
 ### 2.3 Realign Material theme to brand (quick visible win)
 
@@ -292,7 +292,7 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.7 Shared data-density / table classes
 
-- [ ] Add `.data-table` (the bordered, hover-row table pattern from `event-session-card.attendee-table`, `event-session-card.staff-table`, etc.). Promote the white header background, `font-size: 0.85rem`, hover rows. Tests: spec renders a table and asserts header background. *(Still open — the table pattern lives mostly in the back office, which isn't being redesigned.)*
+- [x] Add `.data-table` (the bordered, hover-row table pattern from `event-session-card.attendee-table`, `event-session-card.staff-table`, etc.). *(Shipped 8/11/2026 in `_tables.scss`, in two shapes — the full grid and a `--ruled` variant for the lighter row-separated tables — plus `.data-table-scroll` for narrow screens. Adopted in the shared Event Session Card; the 12 back-office tables drop onto it as they're touched. Header background and rule colour asserted in the style-guide spec.)*
 - [x] Add `.empty-state` and `.empty-state__icon` for the recurring "no items yet" state with a large grey icon. *(Shipped in `_patterns.scss` 8/11/2026 — defined and demoed on the style guide; the ~40 pages with bespoke empty states adopt it as they're touched, since each swap is a small visual change best made with Ryan's frames in hand.)*
 
 ### 2.8 Form layout helpers
