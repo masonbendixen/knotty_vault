@@ -104,25 +104,33 @@ Locked as working decisions; each has an open question below only where a real a
 
 # Token Catalog v1
 
-The starting contract between Ryan's Figma Variables (Makeover 1.1.A / 4.1) and the code. **Names get reconciled once Ryan's Foundations file lands** — if his layer names differ, his win and this table updates; values below are Knotty Yoga's defaults (= today's live values).
+The contract between Ryan's Figma Variables (Makeover 1.1.A / 4.1) and the code. **As-built 8/11/2026** — the table below is no longer a proposal: it is exactly what `ui/src/assets/styles/_tokens.scss` emits under `:root`, written during [[Component Inventory for Designer]] integration Track A. Values are Knotty Yoga's defaults; Phase 4 overrides the same custom-property names per tenant at boot.
 
 | Role | CSS variable | KY default | Notes |
 |---|---|---|---|
-| Primary / brand | `--theme-primary` | `#F50C22` (the red) | Aliases today's `--red`; keep `--red` as a deprecated alias until the makeover sweep retires it |
-| Secondary / accent | `--theme-accent` | `#FF9933` (the orange) | Aliases `--orange` |
-| Neutral text | `--theme-neutral` | `#666666` | Aliases `--gray` |
+| Primary / brand | `--theme-primary` | `#ED1C26` | Ryan's brand red — replaced the old `#F50C22`. Legacy `--red` aliases onto it, so `theme-red` Tailwind usages already restyled |
+| On-primary | `--theme-on-primary` | `#FFFFFF` | Text/icon color on a primary fill |
+| Secondary / accent | `--theme-accent` | `var(--theme-primary)` | Role retained for other tenants; **retired for KY** (the orange does not survive) |
+| On-accent | `--theme-on-accent` | `var(--theme-on-primary)` | 〃 |
+| Neutral text | `--theme-neutral` | `#666666` | Aliases `--gray`. Ryan's replacement grey still pending — swap the value when it lands |
 | Ink / black | `--theme-ink` | `#000000` | Aliases `--black` |
 | Surface / white | `--theme-surface` | `#FFFFFF` | Aliases `--white` |
+| Surface tint | `--theme-surface-tint` | `#F3F3F3` | Ryan's subtle fill (table headers, inactive chips); also backs the neutral badge tone |
 | Page background | `--theme-background` | `#FFFFFF` | Distinct from surface so cards can sit on a tinted page |
-| Success tone | `--theme-success` | (green in use by badges) | Status *semantics* fixed; tenants tune the shade only |
-| Warn tone | `--theme-warn` | (amber in use) | 〃 |
-| Danger tone | `--theme-danger` | (red in use — decouple from brand red) | 〃 |
-| Info tone | `--theme-info` | (blue in use) | 〃 |
-| Display font | `--font-display` | `D-DIN Condensed Bold` stack | `.din-condensed-bold` becomes `font-family: var(--font-display)` |
-| Heading/bold font | `--font-heading` | `D-DIN Bold` stack | `.din-bold` → `var(--font-heading)` |
-| Body font | `--font-body` | `D-DIN` stack | `.din` → `var(--font-body)` |
+| Border | `--theme-border` | `#D1D5DB` | The card/table border duplicated across 56+ component SCSS files — the token Makeover 2.5's `.surface-card` consumes |
+| Success tone | `--theme-success` / `--theme-on-success` | `#BAF7CD` / `#000000` | Status *semantics* fixed; tenants tune the shade only |
+| Warn tone | `--theme-warn` / `--theme-on-warn` | `#FFE4E5` / `#B4191D` | 〃 |
+| Danger tone | `--theme-danger` / `--theme-on-danger` | `#ED1C26` / `#FFFFFF` | Separate role from primary (OQ-T1); KY sets both red |
+| Info tone | `--theme-info` / `--theme-on-info` | `#7B7B7B` / `#FFFFFF` | 〃 |
+| Muted / neutral tone | `--theme-muted` / `--theme-on-muted` | `var(--theme-surface-tint)` / `var(--theme-ink)` | The fifth Badge tone. Named `muted`, not `neutral`, so it never collides with the neutral *text* grey |
+| Display font | `--font-display` | `D-DIN Condensed Bold` stack | `.din-condensed-bold` resolves through it (done) |
+| Heading/bold font | `--font-heading` | `D-DIN Bold` stack | `.din-bold` → `var(--font-heading)` (done) |
+| Body font | `--font-body` | `D-DIN` stack | `.din` + `body`/`*` → `var(--font-body)` (done) |
 | Card radius | `--radius-card` | `8px` | The mat-card/post-card radius in use |
 | Control radius | `--radius-control` | `4px` | Buttons/inputs/chips |
+| Pill radius | `--radius-pill` | `9999px` | The Material button shape (`_mat-button.scss` consumes it) |
+
+**Deliberate exception, carried in code:** `--orange` was *not* aliased onto `--theme-accent`. The accent role now resolves to the brand red, and `--orange`'s only consumer is the footer background — aliasing would turn the footer red ahead of its redesign. It stays a literal `#FF9933` until integration Track C restyles the footer, then the alias and the `.bg-theme-orange` usage get deleted together.
 
 Config-secret key per token: `site_theme_<role>` (e.g. `site_theme_primary`, `site_theme_font_body`, `site_theme_radius_card`). The `theme` object in `/api/site_info` maps CSS-variable name → value, so the frontend applies it without a lookup table.
 
