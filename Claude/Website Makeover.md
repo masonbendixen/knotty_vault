@@ -247,7 +247,7 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 - [x] **Space tokens** — `--space-1|2|3|4|5|6|8|12` on the Tailwind 4px grid, shipped 8/11/2026; 1375 padding/margin/gap values resolve through them.
 - [x] **Radius tokens** — `--radius-control` (4px) / `--radius-panel` (6px) / `--radius-card` (8px) / `--radius-pill`; the pill-button override in `_mat-button.scss` reads `var(--radius-pill)`. Plus two fixed app metrics that were repeated as literals: `--square-card-height` (89px) and `--photo-thumb` (96px).
 - [x] **Shadow / elevation** — `--shadow-sm/md/lg` shipped 8/11/2026, plus `--theme-scrim` / `--theme-scrim-strong` for overlays; the one-off `box-shadow` and `rgba(0,0,0,…)` values now resolve through them.
-- [ ] **Z-index tokens** — `--z-header`, `--z-dropdown`, `--z-modal`, `--z-toast` (today the header uses `z-[999]` and `z-[9999]` ad-hoc).
+- [x] **Z-index tokens** — `--z-sticky|header|dropdown|modal|toast`, shipped 8/11/2026, exposed to Tailwind as `z-header` / `z-dropdown` etc.; the header's ad-hoc `z-[999]` / `z-[9999]` now use them. (Only 7 z-indexes existed app-wide — the scale is here to stop the *next* component guessing higher, not to fix a mess.)
 - [x] ~~Add tests: a tiny `tokens.spec.ts`~~ — **done**: `ui/src/app/shared/design-tokens.spec.ts`, 10 specs covering token presence, the mined brand/tone values, legacy-alias wiring, the Tailwind `theme-red` → token chain, the `.din*` font classes, and the Material pill radius.
 
 ### 2.2 Wire tokens to Tailwind

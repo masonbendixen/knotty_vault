@@ -595,7 +595,9 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 **Where it landed:** component SCSS **12,510 → 10,565 lines** (−16%) with **zero** colour literals, **zero** font-weight literals, **zero** icon triples, and 5 rgba. The shared layer — tokens, six stylesheets, two mixin modules — is now where the styling decisions live.
 
-- [ ] **Still open, deliberately:** the ~40 local variants of the shared classes (each is a *design* question — should this page really differ? — best answered against Ryan's frames); wider `.page-header` / `.empty-state` / `.data-table` adoption; z-index tokens; and the single-declaration repeats (`width: 100%`, `cursor: pointer`, `margin: 0`) which are just CSS, not duplication worth abstracting.
+- [x] **Round 5b — the last scraps.** `--shadow-text` (the tag-chip legibility outline, duplicated verbatim), the z-index scale (`--z-sticky|header|dropdown|modal|toast` — small today, but the header had reached `z-[9999]` by guesswork), and the final 5 rgba values. **Component SCSS now has zero colour literals and zero rgba.**
+- [x] **"Try another studio" on the style guide** — two invented studios (different palette, radii, and fonts) that write their tokens onto the page live, exactly as the tenant theming layer will at boot. This is the running-code twin of the fake-studio proof frame (OQ-D3), and the fastest way to show Ryan that the token layer is real: everything restyles, nothing moves, and anything that *doesn't* change is a hard-coded value we still owe a token.
+- [ ] **Still open, deliberately:** the ~40 local variants of the shared classes (each is a *design* question — should this page really differ? — best answered against Ryan's frames); wider `.page-header` / `.empty-state` / `.data-table` adoption; and the single-declaration repeats (`width: 100%`, `cursor: pointer`, `margin: 0`) which are just CSS, not duplication worth abstracting.
 
 **Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
 
