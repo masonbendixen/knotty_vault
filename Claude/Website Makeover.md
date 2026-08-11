@@ -257,9 +257,11 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.3 Realign Material theme to brand (quick visible win)
 
-- [ ] In `_angular-material-theme.scss`, replace `mat.m2-define-palette(mat.$m2-indigo-palette)` with a generated palette built from the brand red (and an accent palette from the brand orange). This alone re-skins every `mat-raised-button color="primary"`, `mat-form-field`, `mat-slide-toggle`, etc., across the whole app for free.
-- [ ] Refresh the `_mat-button.scss` override to use the radius token.
-- [ ] Add tests: extend `app.component.spec.ts` (or a new `theme.smoke.spec.ts`) to render a `<button mat-raised-button color="primary">` and assert the computed background is the brand red, not indigo. Catches a future palette regression.
+> **Shipped 8/11/2026.** The palette is generated from `#ED1C26` with Sass `color.mix` tints/shades. Accent = the same brand palette rather than an orange one (the orange is retired); warn keeps Material's stock red so destructive actions still read as destructive. Material's typography config now passes `var(--font-body)` instead of the literal family, so a tenant font swap reaches Material components. The one unavoidable duplication: Sass can't read a CSS custom property, so the red is a literal in this file — the spec below is what stops it drifting from the token.
+
+- [x] In `_angular-material-theme.scss`, replace `mat.m2-define-palette(mat.$m2-indigo-palette)` with a generated palette built from the brand red. This alone re-skins every `mat-raised-button color="primary"`, `mat-form-field`, `mat-slide-toggle`, etc., across the whole app for free.
+- [x] Refresh the `_mat-button.scss` override to use the radius token (`--radius-pill`).
+- [x] Add tests: render a `<button mat-raised-button color="primary">` and assert the computed background is the brand red, not indigo. *(In `style-guide.component.spec.ts`, asserted against `--theme-primary` rather than a hard-coded hex, so it tracks the token.)*
 
 ### 2.4 Shared layout primitives (replace duplicated wrappers)
 
@@ -282,23 +284,25 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.6 Shared badge / status classes
 
-- [ ] Add `.badge`, `.badge--success`, `.badge--warn`, `.badge--danger`, `.badge--info`, `.badge--neutral`. Replace the inline `.applied-badge`, `.suggestion-badge`, `.status-badge`, `.role-badge`, `.bundle-savings-tag`, `.bool-true/false`, `.session-time` colour blocks one by one in Phase 3.
-- [ ] Document the role-colour mapping in a comment block so Phase 3 refactors are mechanical.
-- [ ] Add tests: render each badge variant in a sandbox spec, assert background colour token.
+> **Shipped 8/11/2026** as `_badges.scss`, and the replacement sweep (originally deferred to Phase 3) ran with it across controls/shared, public, shop, account. The design gained a piece the plan didn't anticipate: a **status-name → tone map** (`.badge.status-confirmed`, `.status-waitlisted`, `.status-no-show`, …), because components already choose a `status-*` class from a `getStatusClass()` helper — so adding `badge` to the element is the whole migration for those, no colour rules at all.
+
+- [x] Add `.badge`, `.badge--success`, `.badge--warn`, `.badge--danger`, `.badge--info`, `.badge--neutral` (+ `--sm/--lg`). Replaced `.applied-badge`, `.suggestion-badge`, `.status-badge`, `.role-badge`, `.bundle-savings-tag`, `.booking-status`, `.kind-badge`, `.default-badge`, `.status-chip`, `.walkin-tag`, `.permission-badge`, `.purchase-status-badge`, `.entitlement-status-badge`, `.booked-badge`, `.kind-chip`, the schedule-keeper badges, and the sold-out / members-only badges.
+- [x] Document the role-colour mapping in a comment block so the refactors are mechanical.
+- [x] Add tests: every tone asserted against its token in `style-guide.component.spec.ts`.
 
 ### 2.7 Shared data-density / table classes
 
-- [ ] Add `.data-table` (the bordered, hover-row table pattern from `event-session-card.attendee-table`, `event-session-card.staff-table`, etc.). Promote the white header background, `font-size: 0.85rem`, hover rows. Tests: spec renders a table and asserts header background.
-- [ ] Add `.empty-state` and `.empty-state__icon` for the recurring "no items yet" state with a large grey icon.
+- [ ] Add `.data-table` (the bordered, hover-row table pattern from `event-session-card.attendee-table`, `event-session-card.staff-table`, etc.). Promote the white header background, `font-size: 0.85rem`, hover rows. Tests: spec renders a table and asserts header background. *(Still open — the table pattern lives mostly in the back office, which isn't being redesigned.)*
+- [x] Add `.empty-state` and `.empty-state__icon` for the recurring "no items yet" state with a large grey icon. *(Shipped in `_patterns.scss` 8/11/2026 — defined and demoed on the style guide; the ~40 pages with bespoke empty states adopt it as they're touched, since each swap is a small visual change best made with Ryan's frames in hand.)*
 
 ### 2.8 Form layout helpers
 
-- [ ] Add `.form-card` (`.surface-card` + flex column + gap), `.form-actions`, `.field-row` (label + value flex row used on `user_information`). Helps the auth + account + admin entry-form pages.
+- [x] Add `.form-card` (`.surface-card` + flex column + gap), `.form-actions`, `.field-row` (label + value flex row used on `user_information`). Helps the auth + account + admin entry-form pages. *(Shipped 8/11/2026 in `_patterns.scss`, including a mobile stack for `.field-row`; `user_information` — the page the pattern came from — is migrated.)*
 
 ### 2.9 Style guide page (the safety net for the rest of the migration)
 
-- [ ] Add a dev-only `/admin/style-guide` route that renders every primitive (`page-narrow`, `surface-card`, all badge variants, the type ramp, the colour swatches, every form element in default + error + disabled states, Material buttons in every colour). This *is* the regression test for the design system — when Phase 3 starts ripping out bespoke SCSS, opening this page will tell you instantly if a token regressed.
-- [ ] Add an `app-style-guide.component.spec.ts` that renders the component and snapshots/asserts the token strings.
+- [x] Add a dev-only `/admin/style-guide` route that renders every primitive. *(Shipped 8/11/2026: token swatches with live values, the five tone pairs, type roles, radii, badges in every tone and size, surfaces + alert cards, page-header / empty-state / form patterns, and Material buttons/inputs/toggles/spinner. Registered as a sibling of the admin table editor so it renders on its own page, behind the existing admin guard.)*
+- [x] Add an `app-style-guide.component.spec.ts` that renders the component and asserts the token strings. *(9 specs, including "Material primary is the brand red, not indigo" — which is also 2.3's regression test.)*
 
 ---
 
