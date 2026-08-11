@@ -574,7 +574,19 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 **Where component SCSS ended up** (across 132 files): font-weight literals **0**, icon triples **0**, rgba **5**, font-size literals **31** (all genuine one-offs — oversized placeholder art), hex literals **203** (illustration colours, Material toast overrides, DB-driven tag swatches).
 
-- [ ] **Still open, deliberately:** adopting `.page-header` / `.empty-state` (full form) / `.data-table` on the ~40 pages that still have bespoke versions — each is a *visual* change rather than a mechanical one, so it wants Ryan's frames; and the spacing / z-index token scales (spacing especially wants his grid).
+**Round 4 (same day) — shared rules, not just shared values.** Mason: "a lot of repeated magic numbers and a lot of bespoke classes with the same values." Rounds 2–3 tokenised *values*; this round went after duplicated *rules*, driven by a script that hashes every rule body in the app and reports what repeats.
+
+- [x] **Spacing scale** — `--space-1|2|3|4|5|6|8|12` on the 4px grid (px and rem were being used interchangeably: `8px` and `0.5rem` both appeared hundreds of times). **1375 padding/margin/gap values** across 119 files now resolve through it. Radius literals followed: **102 more**.
+- [x] **Page containers are no longer a per-page decision.** 63 pages each declared their own `max-width` + `margin: 0 auto` + padding, at nine widths and six paddings. They now use four shared classes — `.page-compact` 600 / `.page-narrow` 640 / `.page-medium` 800 / `.page-wide` 1200 — with one gutter. A spec pins the widths and the gutter.
+- [x] **Repeated class names became one definition.** The analysis found the same class name carrying the same body in file after file: `.loading-container` (27 files), `.error-container` (24), `.inline-spinner` (18), `.empty-card` (17), `.state-row` (15), `.empty-container` (13), `.subtitle` (7, all identical), `.page-title`, `.filter-row`, `.filter-bar`, `.form-grid`, `.hint`, `.section-loading`. Each is now defined once; **49 byte-identical local copies were deleted**. Pages that genuinely differ kept theirs (and still win, since component styles out-specify the global sheet).
+- [x] **11 more hand-rolled banners** folded onto `.notice notice--<tone>` (`.result-banner`, `.error-banner`, `.error-container` variants).
+- [x] **39 components were redefining Tailwind's own utilities** (`.mb-4 { margin-bottom: 1rem }`, `.mt-3`, …) — deleted; Tailwind already emits them.
+- [x] The shared stylesheets now model their own rules — no literals left in them either (they use the tokens and the icon mixin).
+- [x] Style guide gained the page-state and page-container sections; specs pin the container widths, the gutter, and the spacing scale. **2942 green**, build clean, lint unchanged.
+
+**Net effect on the codebase:** component SCSS went from **12,510 → 11,777 lines** while the shared layer holds **1,052** — and the shared layer is where the decisions now live. Page-specific SCSS is increasingly just the layout that is genuinely unique to that page.
+
+- [ ] **Still open, deliberately:** the ~40 remaining local variants of the shared classes (each differs from the shared body — a *design* call about whether the page really needs to differ, best made with Ryan's frames); adopting `.page-header` / `.empty-state` full form / `.data-table` more widely; and z-index tokens.
 
 **Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
 

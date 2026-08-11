@@ -244,7 +244,7 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 - [x] **Colour tokens** — brand (`--theme-primary` / `-on-primary` / `-accent` / `-on-accent`), the neutral ramp (`--theme-ink`, `-text`, `-text-muted`, `-text-subtle`, `-neutral`, `-surface`, `-surface-tint`, `-surface-subtle`, `-background`, `-border`, `-divider`), the five **solid** tone pairs for badges, and a three-part **soft** set per tone for banners (`-soft` / `-line` / `-strong`). Defaults are Ryan's mined Figma values for the brand and badge tones; the neutrals and soft tones are the values the app had already converged on, so nothing moved visually. **~955 hex literals across 99 component SCSS files now resolve through these** (665 → 203 remaining, all genuinely one-off).
 - [x] **Type tokens (families)** — `--font-body` / `--font-heading` / `--font-display`; the `.din*` classes and `body`/`*` resolve through them.
 - [x] **Type tokens (scale)** — shipped 8/11/2026 as six steps (`--text-xs|sm|base|lg|xl|2xl`, values matching Tailwind's ramp) plus `--weight-regular|medium|semibold|bold`. 322 font-size and 137 font-weight declarations collapsed onto them; ~25 accidentally-different sizes became 6. Ryan's scale, when it lands, is a value swap in one file rather than a re-typing of the app.
-- [ ] **Space tokens** — `--space-1` through `--space-12` matching the Tailwind 4px grid (so they overlap with `p-2`, `gap-4` etc.).
+- [x] **Space tokens** — `--space-1|2|3|4|5|6|8|12` on the Tailwind 4px grid, shipped 8/11/2026; 1375 padding/margin/gap values resolve through them.
 - [x] **Radius tokens** — done as `--radius-card` (8px) / `--radius-control` (4px) / `--radius-pill` (9999px); the pill-button override in `_mat-button.scss` now reads `var(--radius-pill)`.
 - [x] **Shadow / elevation** — `--shadow-sm/md/lg` shipped 8/11/2026, plus `--theme-scrim` / `--theme-scrim-strong` for overlays; the one-off `box-shadow` and `rgba(0,0,0,…)` values now resolve through them.
 - [ ] **Z-index tokens** — `--z-header`, `--z-dropdown`, `--z-modal`, `--z-toast` (today the header uses `z-[999]` and `z-[9999]` ad-hoc).
@@ -269,8 +269,7 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 - [x] Extend `_theme.scss` (rename to `_layout.scss` or add a new partial) with:
   - `.page-container` — already exists, keep it for full-bleed pages.
-  - `.page-narrow` — `max-width: 640px; margin: 0 auto; padding: var(--space-6) var(--space-4);` — replaces today's `.account-page-container`, `.cart-container`, `.checkout-container`, the inline `max-w-[420px]` on login, etc.
-  - `.page-wide` — `max-width: 1200px; …` — replaces `.catalog .page-container` override.
+  - `.page-compact` (600) / `.page-narrow` (640) / `.page-medium` (800) / `.page-wide` (1200) — **all 63 bespoke page containers now use one of these**, with a single shared gutter. A spec pins the widths so they can't drift back.
   - `.section-stack > * + *` — vertical rhythm helper, kills repeated `margin-bottom: 1.5rem` declarations.
 - [ ] Add unit tests: `layout-primitives.spec.ts` rendering each class in a sandbox component, asserting computed max-width and padding match the tokens.
 
