@@ -263,7 +263,9 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.4 Shared layout primitives (replace duplicated wrappers)
 
-- [ ] Extend `_theme.scss` (rename to `_layout.scss` or add a new partial) with:
+> **Shipped 8/11/2026** as `_layout.scss` (`_theme.scss` deleted): `.page-container` (unchanged), `.page-narrow` 640, `.page-medium` 800 (the width half the account pages actually use), `.page-wide` 1200, `.section-stack`. Adopted on the six account pages whose bespoke container matched exactly; pages with different padding kept theirs rather than being silently re-laid-out. Padding is literal `24px 16px` until the space tokens exist.
+
+- [x] Extend `_theme.scss` (rename to `_layout.scss` or add a new partial) with:
   - `.page-container` — already exists, keep it for full-bleed pages.
   - `.page-narrow` — `max-width: 640px; margin: 0 auto; padding: var(--space-6) var(--space-4);` — replaces today's `.account-page-container`, `.cart-container`, `.checkout-container`, the inline `max-w-[420px]` on login, etc.
   - `.page-wide` — `max-width: 1200px; …` — replaces `.catalog .page-container` override.
@@ -272,7 +274,9 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.5 Shared surface / card classes (kill the 65× mat-card border duplication)
 
-- [ ] Add `.surface-card` (border, radius, padding, background, optional shadow) and `.surface-card--interactive` (hover shadow + cursor) to a new `_surfaces.scss` partial. Apply it via a global selector that targets `mat-card` and `mat-expansion-panel` by default — this is allowed because CLAUDE.md already documents that every card in the app *should* have that border. **Result: ~65 component SCSS files lose their bespoke border declaration in one stroke.**
+> **Shipped 8/11/2026** as `_surfaces.scss`. The duplication was **170 copies across 99 files**, not 65. Customer-facing pages are fully swept (94 copies remain, all back office). Note the cascade trap: Material injects its card CSS at runtime, so the global rule must be `mat-card.mat-mdc-card` / `mat-expansion-panel.mat-expansion-panel` — a bare element or single-class selector loses. `.alert-card` ships in all five tones (not just danger/success) and is in use on the class-detail prerequisite banners.
+
+- [x] Add `.surface-card` (border, radius, padding, background, optional shadow) and `.surface-card--interactive` (hover shadow + cursor) to a new `_surfaces.scss` partial. Apply it via a global selector that targets `mat-card` and `mat-expansion-panel` by default — this is allowed because CLAUDE.md already documents that every card in the app *should* have that border. **Result: ~65 component SCSS files lose their bespoke border declaration in one stroke.**
 - [ ] Add `.alert-card`, `.alert-card--danger`, `.alert-card--success` for the recurring red/green tinted card pattern (visible in dashboard alerts, cart suggestions, cancel-session dialog).
 - [ ] Add tests: `surface-card.spec.ts` renders a `<mat-card>` and asserts the computed border is the token value. Add a Jasmine matcher comparing to `getComputedStyle(document.documentElement).getPropertyValue('--color-border')`.
 
