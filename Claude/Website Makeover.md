@@ -238,14 +238,17 @@ The goal of this phase is to make every value that's currently hard-coded *expre
 
 ### 2.1 Design-token CSS variables (server: N/A, frontend: assets/styles)
 
-- [ ] Expand `_variables.scss` (or split into `_tokens-color.scss`, `_tokens-type.scss`, `_tokens-space.scss`, `_tokens-radius.scss`, `_tokens-shadow.scss`) emitting CSS custom properties under `:root`. Aim for the same shape that Figma uses so they map 1:1 in Phase 4.
-- [ ] **Colour tokens** — semantic, not raw: `--color-bg`, `--color-surface`, `--color-surface-muted`, `--color-border`, `--color-border-strong`, `--color-text`, `--color-text-muted`, `--color-text-inverse`, `--color-brand`, `--color-brand-on`, `--color-accent`, `--color-accent-on`, `--color-success`, `--color-success-bg`, `--color-warn`, `--color-warn-bg`, `--color-danger`, `--color-danger-bg`, `--color-info`, `--color-info-bg`. Provide defaults that visually match the current brand (replace today's indigo defaults with the existing brand red/orange).
-- [ ] **Type tokens** — `--font-sans`, `--font-display`, `--font-mono`; size + line-height ramp `--text-xs/sm/base/lg/xl/2xl/3xl/4xl`; weight tokens `--weight-regular/medium/semibold/bold`. Move the DIN-condensed-bold display style behind `--font-display` so swapping fonts per tenant becomes trivial.
+> **Partly shipped 8/11/2026 — and under different names.** Integration Track A in [[Component Inventory for Designer]] wrote the color, type-family, and radius tokens using the **`--theme-*` / `--font-*` / `--radius-*`** names from [[Tenant Theming and Branding]]'s Token Catalog, not the `--color-*` names sketched below, so the per-tenant theming layer and this phase share one namespace. **Do not add a second `--color-*` set.** The bullets below are updated to the as-built reality; the unchecked ones are what's genuinely left.
+
+- [x] ~~Expand `_variables.scss` … emitting CSS custom properties under `:root`~~ — **done**: new `ui/src/assets/styles/_tokens.scss` holds the token layer; `_variables.scss` demoted to a deprecated legacy-alias file (`--red` → `--theme-primary`, etc.).
+- [x] **Colour tokens** — done as `--theme-primary` / `--theme-on-primary` / `--theme-accent` / `--theme-on-accent` / `--theme-ink` / `--theme-neutral` / `--theme-surface` / `--theme-surface-tint` / `--theme-background` / `--theme-border`, plus the five status tone pairs (`--theme-success` + `--theme-on-success`, warn, danger, info, muted). Defaults are Ryan's mined Figma values, so `theme-red` usages already moved to `#ED1C26`.
+- [x] **Type tokens (families)** — `--font-body` / `--font-heading` / `--font-display`; the `.din*` classes and `body`/`*` resolve through them.
+- [ ] **Type tokens (scale)** — the size + line-height ramp `--text-xs/sm/base/lg/xl/2xl/3xl/4xl` and weights `--weight-regular/medium/semibold/bold` are still outstanding; they need Ryan's type scale from his Figma Variables pass.
 - [ ] **Space tokens** — `--space-1` through `--space-12` matching the Tailwind 4px grid (so they overlap with `p-2`, `gap-4` etc.).
-- [ ] **Radius tokens** — `--radius-sm/md/lg/full`. The pill-button override in `_mat-button.scss` becomes `border-radius: var(--radius-full)`.
+- [x] **Radius tokens** — done as `--radius-card` (8px) / `--radius-control` (4px) / `--radius-pill` (9999px); the pill-button override in `_mat-button.scss` now reads `var(--radius-pill)`.
 - [ ] **Shadow / elevation** — `--shadow-sm/md/lg`.
 - [ ] **Z-index tokens** — `--z-header`, `--z-dropdown`, `--z-modal`, `--z-toast` (today the header uses `z-[999]` and `z-[9999]` ad-hoc).
-- [ ] Add tests: a tiny `tokens.spec.ts` that asserts `getComputedStyle(document.documentElement).getPropertyValue('--color-brand')` is non-empty when the styles bundle is loaded (catches accidental deletion of the token sheet).
+- [x] ~~Add tests: a tiny `tokens.spec.ts`~~ — **done**: `ui/src/app/shared/design-tokens.spec.ts`, 10 specs covering token presence, the mined brand/tone values, legacy-alias wiring, the Tailwind `theme-red` → token chain, the `.din*` font classes, and the Material pill radius.
 
 ### 2.2 Wire tokens to Tailwind
 

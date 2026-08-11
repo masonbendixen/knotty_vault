@@ -136,12 +136,9 @@ Config-secret key per token: `site_theme_<role>` (e.g. `site_theme_primary`, `si
 
 The three `--font-*` rows hold a **family name**, and the family inventory is per-tenant data (`site_fonts`, D4 — CDN reference or uploaded file); the bundled D-DIN stacks are Knotty Yoga's defaults and the fallback when a named family is missing.
 
-> **Catalog value updates (8/4/2026, from Ryan's file via the API + Mason's answers in [[Component Inventory for Designer]]):**
-> 1. **Primary:** Ryan's brand red is **`#ED1C26`**, not the `#F50C22` in code today — it becomes the KY default when the integration Track A token file lands.
-> 2. **Accent: retired for Knotty Yoga.** Mason: the orange does not survive. The role stays in the catalog (other tenants may want one); KY's value defaults to the primary. The code's sole orange usage is the footer background — restyled to Ryan's Footer design during integration.
-> 3. **Status tones are now real pairs** (background / on-tone), mined from Ryan's Badge component: Success `#BAF7CD`/`#000000` · Warn `#FFE4E5`/`#B4191D` · Danger `#ED1C26`/`#FFFFFF` (per OQ-T1: split role, red-ish value for KY) · Info `#7B7B7B`/`#FFFFFF` · Neutral `#F3F3F3`/`#000000`. The single-value tone rows above become **pairs** (`--theme-success` + `--theme-on-success`, etc.) when Phase 4 writes the stylesheet.
+> **History:** the three 8/4/2026 catalog updates mined from Ryan's Figma file (brand red `#ED1C26` replacing `#F50C22`; the accent role retired for KY; the status tones becoming real background/on-tone pairs) are **folded into the table above** and shipped in code on 8/11/2026. Nothing is pending from that list.
 
-The exact status-tone hex values in use get pinned during Phase 4 grounding (they're scattered across badge SCSS today; the makeover's badge consolidation is where they become one set).
+**Still open from Ryan:** the neutral text grey (`--theme-neutral` holds the app's inherited `#666666` until he names one) and the type scale / weights — both part of his Figma Variables pass. Neither blocks anything: they are value swaps in one file.
 
 ---
 
@@ -208,13 +205,16 @@ Backend first, then the page rewire, then the editor.
 
 Colors/radius first (pure variable plumbing), then the font machinery.
 
+> **Head start (8/11/2026):** the *default* half of this phase already shipped via integration Track A — `ui/src/assets/styles/_tokens.scss` emits the whole catalog above, the legacy aliases resolve through it, and `ui/src/app/shared/design-tokens.spec.ts` guards the values. What remains here is the **runtime override**: the server carrying `site_theme_*` values and the boot applying them over these defaults.
+
 - [ ] Server: accept + serve `site_theme_*` keys in the `theme` object (CSS-var name → validated value). *(hw)*
-- [ ] Frontend: boot application — write each `theme` entry onto `document.documentElement`; alias the legacy `--red`/`--orange`/`--gray` to the new `--theme-*` so existing Tailwind mappings restyle immediately.
+- [x] ~~Frontend: alias the legacy `--red`/`--orange`/`--gray` to the new `--theme-*` so existing Tailwind mappings restyle immediately~~ — **done 8/11/2026** (Track A; `--orange` intentionally excluded, see the catalog's exception note).
+- [ ] Frontend: boot application — write each `theme` entry onto `document.documentElement` (inline properties beat the `:root` defaults, so the token file stays the fallback).
 - [ ] **`site_fonts` table** (framework tenant-DB table per D11 — CommunityFinder wants fonts too): family name, face rows (weight, style), source kind `cdn`/`uploaded`, CDN family + weights for `cdn`, binary bytes + format for `uploaded`. Table helper + magic-byte/size validation + the CDN origin allow-list constant (Google Fonts first). *(hw)*
 - [ ] **Font serving endpoint** — public, cacheable (long max-age; CloudFront caches it like photos), correct `font/*` Content-Type + `nosniff`. *(hw)*
 - [ ] `site_info`'s `theme` object gains **font-face descriptors** per tenant family: `cdn` entries as family+weights (client constructs the allow-listed stylesheet URL), `uploaded` entries as family/weight/style/format + the serving URL. *(hw)*
 - [ ] Frontend boot: inject the constructed CDN `<link>`s and generated `@font-face` rules in the same pre-render initializer; set the `--font-*` role variables; every role carries a system-font fallback stack with `font-display: swap` (a dead CDN or deleted upload degrades to readable text, never blank). *(app)*
-- [ ] `.din*` font classes re-based onto `--font-*` variables; the bundled D-DIN faces stay as Knotty Yoga's default role values (no `site_fonts` rows needed for KY). *(app)*
+- [x] ~~`.din*` font classes re-based onto `--font-*` variables; the bundled D-DIN faces stay as Knotty Yoga's default role values (no `site_fonts` rows needed for KY)~~ — **done 8/11/2026** (Track A; `body`/`*` re-based too, `.din-italic` deliberately left on the bundled face since italic is a face, not a role). *(app)*
 - [ ] Material bridge: override the `--mat-*` system tokens that map to primary/accent at boot (D9) — scoped to what's visibly brand-colored today (buttons, toggles, spinner), not a full re-theme.
 - [ ] Reconcile token names with Ryan's Foundations file when it lands (his names win; update the catalog above).
 - [ ] Tests: token application function (writes vars, skips invalid); a themed boot restyles a `theme-red` consumer; font-class regression spec; `site_fonts` helper CRUD; upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; CDN descriptor round-trip; URL-construction unit test (allow-listed origin only).
