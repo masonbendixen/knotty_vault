@@ -586,7 +586,16 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 
 **Net effect on the codebase:** component SCSS went from **12,510 → 11,777 lines** while the shared layer holds **1,052** — and the shared layer is where the decisions now live. Page-specific SCSS is increasingly just the layout that is genuinely unique to that page.
 
-- [ ] **Still open, deliberately:** the ~40 remaining local variants of the shared classes (each differs from the shared body — a *design* call about whether the page really needs to differ, best made with Ryan's frames); adopting `.page-header` / `.empty-state` full form / `.data-table` more widely; and z-index tokens.
+**Round 5 (same day) — zero colour literals, and layout mixins.** Mason: "still a lot of `color:` with magic numbers, and a ton of duplication of `display: flex` / `align-items: center` / `flex: 1` / …".
+
+- [x] **Component SCSS now contains zero colour literals.** The last 202 were mapped by a classifier rather than a hand-written table: low-saturation colours land on the neutral ramp by lightness, chromatic ones on the tone family their hue falls in (danger / warn / success / info) and then soft / line / strong. Accidental variation — five different "soft greens", four "error reds" — collapsed onto the palette.
+- [x] **Layout mixins** (`mixins/layout`): `row`, `between`, `stack`, `center`, `fill`, `grid`. **378 flex clusters** across 104 files converted, so a rule now says what it *is* ("a row with a small gap") instead of restating the mechanics. `display: flex` went **520 → 152**; `align-items: center` fell out of the top ten entirely. `layout.fill` bundles `flex: 1` with the `min-width: 0` everyone forgets — the reason long names used to overflow their cards.
+- [x] **The last magic numbers named:** `--radius-panel` (6px — the app's other favourite radius, 52 uses), `--square-card-height` (89px, the Square card iframe — reserving it is why the checkout form doesn't jump as the iframe loads), `--photo-thumb` (96px).
+- [x] Two scripted mistakes caught and repaired: a 3-character-hex regex matched the `#add-card-container` **ID selector**, and near-black text (`#111827`, `#1f2937`) was read as "blue" by the hue classifier and turned class-detail's headings blue. Both were found by diffing every change against HEAD rather than trusting the script — worth remembering for refactors at this scale.
+
+**Where it landed:** component SCSS **12,510 → 10,565 lines** (−16%) with **zero** colour literals, **zero** font-weight literals, **zero** icon triples, and 5 rgba. The shared layer — tokens, six stylesheets, two mixin modules — is now where the styling decisions live.
+
+- [ ] **Still open, deliberately:** the ~40 local variants of the shared classes (each is a *design* question — should this page really differ? — best answered against Ryan's frames); wider `.page-header` / `.empty-state` / `.data-table` adoption; z-index tokens; and the single-declaration repeats (`width: 100%`, `cursor: pointer`, `margin: 0`) which are just CSS, not duplication worth abstracting.
 
 **Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
 
