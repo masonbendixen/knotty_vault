@@ -562,7 +562,19 @@ Claude- ✅ Yes to all three — plan below. Short answers first: **(1)** the be
 - [x] **`.data-table` + `--ruled` + `.data-table-scroll`** (makeover 2.7) — adopted in the shared Event Session Card; the 12 back-office tables can drop onto it as they're touched.
 - [x] **Tailwind semantic aliases** (makeover 2.2) — `bg-surface`, `bg-surface-subtle`, `text-body`, `text-muted`, `text-subtle`, `border-line`, `border-divider`, `text-brand`, `font-display/heading/body`, `rounded-card/control/pill`, all resolving to tokens. The legacy `theme-*` names still work.
 - [x] Style guide extended with the soft tones, notices, data tables and the empty card; specs grew to cover them (**2938 green**), `ng build` clean, `ng lint` unchanged at its pre-existing baseline.
-- [ ] **Still open, deliberately:** adopting `.page-header` / `.empty-state` (full form) / `.data-table` on the ~40 pages that still have bespoke versions — each is a small *visual* change rather than a mechanical one, so it wants Ryan's frames; the space / shadow / z-index token scales; and the ~200 genuinely one-off literals.
+**Round 3 (same day) — type, weight, alpha, and icon sizing.** Mason's second read was also right: the colours were centralized but the *type* was still bespoke everywhere.
+
+- [x] **A type scale.** The app had ~25 accidentally-different font sizes all meaning the same thing (`0.8rem`, `0.85rem`, `0.875rem`, `0.9rem`, `13px`, `14px` …). Six steps now: `--text-xs|sm|base|lg|xl|2xl`, values matching Tailwind's ramp so a `text-sm` in a template and a `var(--text-sm)` in SCSS are finally the same size. **322 declarations** collapsed onto it; sizes moved by at most ~1px.
+- [x] **Weight tokens** — `--weight-regular|medium|semibold|bold`. **137 declarations**, i.e. *every* `font-weight` in the app, now resolves through them. Zero literals left.
+- [x] **Text alphas** — the `rgba(0, 0, 0, 0.6)` / `0.54` / `0.7` family (28 uses) was standing in for "body / muted / subtle"; they now use the neutral ramp, so text colour is one system rather than two. Remaining `rgba` count: **44 → 5**.
+- [x] **Elevation + overlay tokens** — `--shadow-sm|md|lg` and `--theme-scrim` / `-strong` replaced the one-off `box-shadow` and overlay values (makeover 2.1's shadow scale, which had been deferred).
+- [x] **Icon sizing is a mixin.** Material icons need `font-size` + `width` + `height` set together, and that trio was pasted **66 times across 41 files**. `src/assets/styles` is now on the Sass include path, so component styles do `@use "mixins/icons"; @include icons.size(icons.$sm);`. Zero triples left — and this unlocks shared *mixins* for future work, not just shared classes.
+- [x] **Tailwind carries the same ramp** — `fontSize`, `fontWeight`, `boxShadow` now resolve to the tokens (with Tailwind's paired line-heights preserved, or every `text-sm` in a template would have re-spaced).
+- [x] Style guide grew a type-scale ramp, a weight list, and an elevation row; specs assert the scale is monotonic and that Tailwind's `text-sm` matches `--text-sm` with its line-height intact. **2940 green.**
+
+**Where component SCSS ended up** (across 132 files): font-weight literals **0**, icon triples **0**, rgba **5**, font-size literals **31** (all genuine one-offs — oversized placeholder art), hex literals **203** (illustration colours, Material toast overrides, DB-driven tag swatches).
+
+- [ ] **Still open, deliberately:** adopting `.page-header` / `.empty-state` (full form) / `.data-table` on the ~40 pages that still have bespoke versions — each is a *visual* change rather than a mechanical one, so it wants Ryan's frames; and the spacing / z-index token scales (spacing especially wants his grid).
 
 **Track C — Port his finished designs (after A + B — the "looking like his design" ask).**
 
