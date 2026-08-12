@@ -896,8 +896,8 @@ Items 1–3 of the recommended cut (black hero band, the white/grey/black sectio
 - **OQ-D13 — Membership tier icons.** His tier cards have gold laurel icons; today every tier renders the same `card_membership` Material icon. Is the laurel one shared icon for all tiers, or per-tier (which means a new field on the tier record and a picker in Manage, like the Getting Started icons)?
 	- Mason/Ryan- We need three different icons. Again, I'd like this in the database. If you can pull his images down and populate them with create_database.cpp, that would be awesome.
 - **OQ-D14 — The events card's second button.** His card has **SIGN UP** *and* **EVENT DETAILS →**. Today the card has one Book Now that goes straight to `/shop/event/:id`. Where should "Event details" go — a new public event-detail page (doesn't exist), or the class-detail page for the class behind that event?
-	- Mason/Ryan-
+	- Mason/Ryan- We talked about it and we aren't going to do even details for now.
 - **OQ-D15 — Scope for tonight vs. later.** Do you want me to land items 1–3 now (hero band, section rhythm, card/row layouts) and leave the four new sections as a follow-up, or hold the whole Home port until the copy exists so the page changes once rather than twice?
-	- Mason/Ryan-
+	- Mason/Ryan- Let's land the items. Can you make them database driven and then populate the database with his design items in create_database.cpp? You can put the images in an img directory next to create_database.cpp or some other place that makes sense and that database_helper has access to.
 
 **One flag for Ryan while he's here:** his frames are **1440** wide; the inventory locked desktop at **1280**. That's fine — but it means every fixed width in his file needs reading as proportional, not literal, and the 375 mobile frames are still the real gap (there are none in the file yet). If he's picking what to draw next, mobile Home + the header/drawer is worth more than any remaining desktop screen.
