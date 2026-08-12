@@ -901,3 +901,25 @@ Items 1–3 of the recommended cut (black hero band, the white/grey/black sectio
 	- Mason/Ryan- Let's land the items. Can you make them database driven and then populate the database with his design items in create_database.cpp? You can put the images in an img directory next to create_database.cpp or some other place that makes sense and that database_helper has access to.
 
 **One flag for Ryan while he's here:** his frames are **1440** wide; the inventory locked desktop at **1280**. That's fine — but it means every fixed width in his file needs reading as proportional, not literal, and the 375 mobile frames are still the real gap (there are none in the file yet). If he's picking what to draw next, mobile Home + the header/drawer is worth more than any remaining desktop screen.
+
+---
+
+# 🧱 Home sections as data — backend landed 8/11/2026
+
+Answering OQ-D10/D11/D12/D15: the new marketing blocks are **database rows**, not markup.
+
+**`home_sections` table** (`db_schema/home_sections.{h,cpp}`): `home_section_id`, `ordinal`, `kind`, `title`, `body`, `link_route`, `link_label`, `active`, timestamps. The image is *not* a column — photos attach through the framework's `table_item_photos` association, so the table is registered in `photo_support_tables` and in the public scaled-photo allow-list, and the page reads images through the existing `/api/get_scaled_photo/home_sections/{id}/{w}/{h}` route. No new image plumbing.
+
+`kind` is `feature` (image beside text, alternating sides down the page) or `banner` (full-bleed image with the title over it). One ordinal sequence covers both, so the page order is editable without a second concept.
+
+**Seeded from Ryan's file.** His artwork was exported through the Figma API into `server/knottyyoga_server/src/database_helper/img/` — photographs as JPEG at 1.5×, the brand slab and tier icons as PNG (2.9 MB total, down from 7 MB by not exporting photos as PNG). `create_database.cpp` seeds five rows and attaches each image via `ImageHelper::UploadAndAssociatePhoto`, so **a fresh database looks like the design** rather than like a wireframe. CMake copies `img/` next to the built `knottyyoga_database_helper`, and `HONUWARE_SEED_IMAGE_DIR` overrides the location; a missing file logs and skips rather than failing the create.
+
+**`GET /api/home_sections`** — anonymous, active rows only, in display order.
+
+**Two bugs the tests caught**, both worth remembering:
+- The endpoint 404'd until it was added to the **dead-strip anchor list** in `web_app.cpp`. A self-registering route in a static library is silently dropped by the linker otherwise — the anchor list is what keeps it.
+- Postgres renders a `bool` as `"t"`/`"f"`, not `"true"`/`"false"`; the first version of the table-helper test asserted the wrong thing.
+
+**Gate: 4745 C++ tests green** in the Linux container (up from 4459 — 9 new, and the count floor is satisfied).
+
+**Still to come for this feature:** the Angular side (ServerAccess seam ×5, the Home rendering with alternating sides, specs), the per-tier membership icons, and the shared **Manage → Page Content** editor recorded in [[Tenant Theming and Branding]] Phase 3.
