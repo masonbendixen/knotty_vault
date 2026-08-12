@@ -786,9 +786,9 @@ Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, wh
 - **OQ-D7 — There's no 14px step.** His scale is 12 / 16 / 20 / 24 / 40. The code's scale is 12 / 14 / 16 / 18 / 20 / 24, and **14px is the workhorse — 183 declarations** (dense table rows, meta lines, captions). Should those become 12, become 16, or should 14 stay in the scale as an in-between step he doesn't need to draw?
 	- Mason/Ryan- Let's do 12 / 14 / 16 / 20 / 24 / 40
 - **OQ-D8 — Where did Event Session Card go?** It was in the 8/4 audit as `Event session card` and isn't in the file now. Did it become `Card / Details` or `Card / Series`?
-	- Mason/Ryan- 
+	- Mason/Ryan- Card / Series
 - **OQ-D9 — What is `Chips`?** Is that the **Tag Chip** (per-class colour chip, colour comes from the database) or the **Filter Chip Row** (the single-select filter row)? They're different components in the inventory.
-	- Mason/Ryan-
+	- Mason/Ryan- He said it was supposed to be for like the refund policy but I think it is handled by toast notifications. If this is throwing things off, ignore it.
 
 ## Small cleanup still outstanding in the file
 
