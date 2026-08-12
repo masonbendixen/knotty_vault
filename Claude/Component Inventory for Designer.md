@@ -934,3 +934,17 @@ Answering OQ-D10/D11/D12/D15: the new marketing blocks are **database rows**, no
 **Tests:** 2 mock specs (order + works-signed-out) and 5 component specs (alternation, image URL, banners vs features, no-link omits the button, endpoint failure contained). **Angular 2954 green**, build and lint clean. **C++ 4745 green** and `knottyyoga_database_helper` builds.
 
 **What this does not include yet:** the per-tier membership icons (images downloaded, association not written), and the **Manage → Page Content** editor — until that lands, sections are editable through the generic admin table editor at `/admin`, which is the debug surface rather than the real one.
+
+## The hero band — rebuilt as live text (8/11/2026)
+
+Ryan's hero export had **the headline baked into the photograph** — one flat 1441×439 image, no text nodes. That breaks design rule 5 ("no brand baked into artwork"), can't reflow on a phone, reads as nothing to a screen reader, and can't be edited without Figma. Mason supplied the photo **without** the type on it, so the band is now built properly:
+
+- A third `kind` — **`hero`** — on `home_sections`. For a hero row `body` is *not* a paragraph: it's the accent line rendered in the brand colour under the headline ("Get into the best shape of your life," / **"The right way."**). Documented on the schema constant so the next reader doesn't have to guess.
+- The photograph has a deliberately empty right-hand side, which is where the type sits on a wide screen. **Below `md` the type moves beneath the image** onto the black band rather than sitting on top of the subject.
+- The headline scales with `clamp()`, so it fills the band on a 1440 screen and stays readable at 375.
+
+**His design also swaps two pieces of copy**, which is now reflected: "Get into the best shape of your life, the right way" is promoted to the hero, and the old `<h1>` — "Knotty Yoga is an inclusive, high-level acrobatic fitness studio" — is demoted to a centred **intro strip** beneath it, with the **safe-space badge at the 142px the design draws it**. It had been rendering at half the column width, which is why it dominated the top of the page.
+
+**Also replaced:** `home_join_the_fun.jpg` with the text-free group shot (1.7 MB → 431 KB), so the overlay title sits on a clean photograph instead of on top of bitmap text.
+
+**Gates:** Angular **2957 green**, C++ **4745 green**, `knottyyoga_database_helper` builds, lint unchanged. Two of my own earlier specs needed updating — the old title-case hero copy moved to the intro strip, and the mock's first row is now the hero.
