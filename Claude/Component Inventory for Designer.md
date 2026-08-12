@@ -782,11 +782,11 @@ Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, wh
 - **OQ-D5 — Does the amber survive after all?** On 8/4 the answer was "the orange does not survive," but the file now has a full `secondary` amber ramp (`#f0a202` base) and the **warn** badges are built from it. Is amber the accent colour now (i.e. `--theme-accent` becomes amber), or is it warn-only and the accent stays collapsed onto the primary red?
 	- Mason/Ryan- Yes, the amber lives on.
 - **OQ-D6 — Danger is pink now.** `quaternary` (`#fccde5` / `#84135f`) rather than the brand red. That's exactly what OQ-T1 asked for — danger decoupled from primary — but it's a visible change everywhere a No-show / Sold-out / Cancelled badge appears. Confirm?
-	- Mason/Ryan-
+	- Mason/Ryan- Yes. We want something that stands out from the red.
 - **OQ-D7 — There's no 14px step.** His scale is 12 / 16 / 20 / 24 / 40. The code's scale is 12 / 14 / 16 / 18 / 20 / 24, and **14px is the workhorse — 183 declarations** (dense table rows, meta lines, captions). Should those become 12, become 16, or should 14 stay in the scale as an in-between step he doesn't need to draw?
-	- Mason/Ryan-
+	- Mason/Ryan- Let's do 12 / 14 / 16 / 20 / 24 / 40
 - **OQ-D8 — Where did Event Session Card go?** It was in the 8/4 audit as `Event session card` and isn't in the file now. Did it become `Card / Details` or `Card / Series`?
-	- Mason/Ryan-
+	- Mason/Ryan- 
 - **OQ-D9 — What is `Chips`?** Is that the **Tag Chip** (per-class colour chip, colour comes from the database) or the **Filter Chip Row** (the single-select filter row)? They're different components in the inventory.
 	- Mason/Ryan-
 
