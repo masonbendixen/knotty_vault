@@ -948,3 +948,15 @@ Ryan's hero export had **the headline baked into the photograph** — one flat 1
 **Also replaced:** `home_join_the_fun.jpg` with the text-free group shot (1.7 MB → 431 KB), so the overlay title sits on a clean photograph instead of on top of bitmap text.
 
 **Gates:** Angular **2957 green**, C++ **4745 green**, `knottyyoga_database_helper` builds, lint unchanged. Two of my own earlier specs needed updating — the old title-case hero copy moved to the intro strip, and the mock's first row is now the hero.
+
+## Two corrections on the banners (8/11/2026)
+
+**The join-the-fun photo was never duplicated** — the database had one row with the new text-free image (1512×1512, 431 KB). What looked like "the old image with text on it" was the *`WELCOME TO KNOTTY YOGA` slab*, a different row: Ryan's graphic has its lettering baked in, and the page was drawing the row's title over it, so it read twice.
+
+That produced a fourth kind — **`artwork`**: a finished graphic that already carries its own lettering, drawn full width with **no overlay**, where the title is the image's accessible name rather than a caption. Worth keeping as a concept for any studio that uploads a lettered graphic, even though nothing uses it now (see below).
+
+**The pixelation was a sizing bug, not the source image.** The page asked the scaler for a `2160×924` box; the scaler only ever *shrinks* and preserves aspect ratio, so a square upload was capped by the height and came back **924×924**, which CSS then stretched across a ~1300px container. Banners now request the source at its own size (`1800×1800`) and the band sets `aspect-ratio: 21/9` with `object-fit: cover` — so **any shape a studio uploads crops to the band instead of stretching**, and it downscales rather than upscales.
+
+**Then Mason cut the slab entirely.** The seed entry, the `home_welcome_slab.png` file, and the live row (plus its photo chain — scaled, association, source, instance; verified no orphans) are all gone. The `artwork` kind and its rendering stayed: it costs a filter and a template block, and it is exactly what the next studio needs when it uploads a graphic with words in it. **Nothing uses it today** — if that offends the no-unused-paths rule, it is a clean ten-line revert.
+
+Home is now: hero band → intro strip → Get Started → events → series/workshops → carousel → three alternating features → the join-the-fun band → memberships → footer.
