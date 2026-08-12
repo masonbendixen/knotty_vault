@@ -880,3 +880,24 @@ I exported **Public / Home** (1440×5351) and read it properly rather than porti
 **Four of those sections don't exist in the product at all**, and in his frame they carry lorem text — so they need real copy and images before they can ship, and per the theming rules they should land as 🎨 content slots (DB-backed), not hard-coded markup. That's a content decision, not an engineering one, which is why I stopped rather than inventing copy.
 
 **Recommended next cut**, in order: (1) the black hero band + Get Started band — biggest visual delta, no new content needed; (2) the alternating white/grey/black section rhythm, which is most of what makes his page feel like his page; (3) the events-card and series-row layouts; (4) the four new marketing sections, once copy and images exist. Everything above item 4 is pure engineering against frames that already exist.
+
+## Decisions needed before the Home port — please answer inline
+
+Items 1–3 of the recommended cut (black hero band, the white/grey/black section rhythm, the events-card and series-row layouts) need **no decisions** — I can build those straight through against his frame. Everything below is what actually blocks finishing the page.
+
+**Already checked, so you don't have to wonder:** the photo carousel *does* already support per-photo captions (`photo.title`), so his captioned carousel needs no backend work — and the footer *does* already have a "Join our mailing list" button, so that part of his footer is a restyle, not a new feature.
+
+- **OQ-D10 — The four new marketing sections.** "Why Knotty Yoga", "Types of classes", "Additional health services", and the "COME JOIN THE FUN!" photo band don't exist in the product, and his frame fills them with lorem text. Two questions: **(a)** who writes the real copy, and by when — or should I ship them with his lorem so the layout lands and you fill it in after? **(b)** hard-coded markup, or **DB-backed content slots** like the Getting Started steps? The theming rules say slots (they're per-studio content), which costs a table + a Manage page but means you can edit the home page without me.
+	- Mason/Ryan- 
+- **OQ-D11 — Images for those sections.** Each needs a photo (the group shot, the aerial-silks shot, the massage shot, the overhead floor shot). Are those coming from Ryan as exported assets, from the existing studio photo library, or should they be uploadable per-slot?
+	- Mason/Ryan-
+- **OQ-D12 — The "WELCOME TO KNOTTY YOGA" slab.** Is that a flat exported image from Ryan, or should it be built in HTML/CSS (which would let it re-theme per studio, but is fiddly to match)? If it's an image, it's a 🎨 brand asset and needs a slot.
+	- Mason/Ryan-
+- **OQ-D13 — Membership tier icons.** His tier cards have gold laurel icons; today every tier renders the same `card_membership` Material icon. Is the laurel one shared icon for all tiers, or per-tier (which means a new field on the tier record and a picker in Manage, like the Getting Started icons)?
+	- Mason/Ryan-
+- **OQ-D14 — The events card's second button.** His card has **SIGN UP** *and* **EVENT DETAILS →**. Today the card has one Book Now that goes straight to `/shop/event/:id`. Where should "Event details" go — a new public event-detail page (doesn't exist), or the class-detail page for the class behind that event?
+	- Mason/Ryan-
+- **OQ-D15 — Scope for tonight vs. later.** Do you want me to land items 1–3 now (hero band, section rhythm, card/row layouts) and leave the four new sections as a follow-up, or hold the whole Home port until the copy exists so the page changes once rather than twice?
+	- Mason/Ryan-
+
+**One flag for Ryan while he's here:** his frames are **1440** wide; the inventory locked desktop at **1280**. That's fine — but it means every fixed width in his file needs reading as proportional, not literal, and the 375 mobile frames are still the real gap (there are none in the file yet). If he's picking what to draw next, mobile Home + the header/drawer is worth more than any remaining desktop screen.
