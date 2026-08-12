@@ -745,3 +745,60 @@ Already correct, no action: `Footer`, `Checkbox`, `Tooltip`, `Avatar`, `Photo ca
 - **OQ-D1 — Blog editor:** ✅ **RESOLVED — strictly 🚫.** *(Mason: "I'll go with your recommendation.")* The blog editor stays out of scope entirely; the optional-exception note has been removed from the 🚫 section above so no time gets spent there.
 - **OQ-D2 — The theming document:** ✅ **RESOLVED — yes.** *(Mason: "Sure, that sounds great.")* Drafted: **[[Tenant Theming and Branding]]** — the token catalog, the content-slot inventory, the storage/endpoint design, and the admin "Site Theme" page now live there. This doc keeps only the 🎨 markers and the five design rules; when the theming doc's token catalog and Ryan's Figma Variables disagree on a name, reconcile there, not here.
 - **OQ-D3 — Fake second studio frame:** ✅ **RESOLVED — yes, one Home + header frame.** *(Mason: "Sure, I'll go with your recommendation.")* Kept as rule 4 + Quick Win #6. The theming doc's final phase includes the engineering twin of this proof — a second local tenant with an invented brand — so Ryan's frame and the running site can be compared side by side.
+
+---
+
+# 🔌 Live Figma pull — 8/11/2026 (Ryan on site)
+
+Read straight from the file via the API (`IxWR3NfPQbJfYJ7oCPmaER`), so this is what the file *actually* contains tonight, not what the 8/4 audit inferred.
+
+## What's changed since the 8/4 audit — all good news
+
+- **The rename pass is essentially done.** 26 components now carry the inventory names exactly, including the `Button` merge (one component set with Kind / Size / State rather than three components), `Radio Button`, `Date Picker`, `Date Strip / Week Navigator`, `Badge / Pill`, `Logo`, `Hero Secondary Image`. Tables 1–3 look worked through.
+- **Most of the missing screens now exist.** On the Screens page: Our Classes, Class Detail, Blog, Getting Started, Calendar / Home, Cart + Checkout, Series Booking, Catalog + Product Detail + Subscription Signup, My Schedule (+ weekly plan), Today's Classes + Workshops & Series + Attendance History, Notification Preferences, My Events, Auth Login + Register, Home, Instructor Detail. **Buckets 1 and 2 are effectively complete** against the gap list.
+- **A real two-layer palette exists** — `primary`, `secondary`, `tertiary`, `quaternary`, `quinary`, `grey`, each 100→700 with a `base`. That's the two-layer scheme agreed in the makeover's Q6.
+- **The Variables REST endpoint returns 403** (Enterprise-only, as expected). It doesn't block anything: the palette and every text style were read from node properties instead. A plugin JSON export is only needed if we want to preserve the variable *names*.
+
+## The engineering diff — his file vs what shipped 8/11
+
+Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, which maps straight onto the code's soft / line / strong triple.
+
+| Token | Shipped in code today | Ryan's file |
+|---|---|---|
+| primary | `#ED1C26` | `#ed1c26` ✅ (primary/400) |
+| success | `#BAF7CD` / `#000000` | `#dff7e1` / `#47684a` (tertiary 100/500) |
+| warn | `#FFE4E5` / `#B4191D` | `#ffd1a6` / `#613f00` (secondary 100/500) |
+| danger | `#ED1C26` / `#FFFFFF` | `#fccde5` / `#84135f` — **pink/magenta**, decoupled from the brand red |
+| info | `#7B7B7B` / `#FFFFFF` | `#b9dfff` / `#00709c` (quinary 100/400) |
+| neutral | `#F3F3F3` / `#000000` | `#c8c3c3` / `#3a3333` (grey 200/600) |
+| neutral text ramp | `#666666` (inherited, never designed) | `grey/100 #edecec` → `grey/700 #1a1616` |
+
+**Type styles in the file:** Title `DIN Alternate 40/700` · Subtitle `DIN Alternate 24/700` · Top nav `DIN Alternate 16/700` · Button `DIN Alternate 16/700` · Large button `DIN Alternate 20/700` · Badge text `DIN Alternate 12/700` · **Paragraph `Roboto 16/400`** · **Caption `Roboto 12/400`**.
+
+## Open questions — please answer inline
+
+- **OQ-D4 — Two font families?** The file uses **Roboto** for body copy and **DIN Alternate** for headings / buttons / badges. The app currently uses D-DIN for everything. Confirm the two-family system — and note **DIN Alternate is a macOS system font, not a licensed web font**, so it won't render for Windows or Android visitors. What do we actually serve as the heading face: keep the bundled D-DIN, license a DIN, or pick a Google-hosted stand-in?
+	- Mason/Ryan- The Roboto usage stays. For DIN, let's use Barlow. It's a Google open source font.
+- **OQ-D5 — Does the amber survive after all?** On 8/4 the answer was "the orange does not survive," but the file now has a full `secondary` amber ramp (`#f0a202` base) and the **warn** badges are built from it. Is amber the accent colour now (i.e. `--theme-accent` becomes amber), or is it warn-only and the accent stays collapsed onto the primary red?
+	- Mason/Ryan- Yes, the amber lives on.
+- **OQ-D6 — Danger is pink now.** `quaternary` (`#fccde5` / `#84135f`) rather than the brand red. That's exactly what OQ-T1 asked for — danger decoupled from primary — but it's a visible change everywhere a No-show / Sold-out / Cancelled badge appears. Confirm?
+	- Mason/Ryan-
+- **OQ-D7 — There's no 14px step.** His scale is 12 / 16 / 20 / 24 / 40. The code's scale is 12 / 14 / 16 / 18 / 20 / 24, and **14px is the workhorse — 183 declarations** (dense table rows, meta lines, captions). Should those become 12, become 16, or should 14 stay in the scale as an in-between step he doesn't need to draw?
+	- Mason/Ryan-
+- **OQ-D8 — Where did Event Session Card go?** It was in the 8/4 audit as `Event session card` and isn't in the file now. Did it become `Card / Details` or `Card / Series`?
+	- Mason/Ryan-
+- **OQ-D9 — What is `Chips`?** Is that the **Tag Chip** (per-class colour chip, colour comes from the database) or the **Filter Chip Row** (the single-select filter row)? They're different components in the inventory.
+	- Mason/Ryan-
+
+## Small cleanup still outstanding in the file
+
+- [ ] `Page Header` → **`Page Header / Back Nav`**
+- [ ] `Toast` → **`Toast / Snackbar`**
+- [ ] `Calendar / chip` → **`Calendar Event Chip`**
+- [ ] `Coupons and vouchers` → **`Coupon & Voucher Panel`**
+- [ ] `Card / Series/Icon/404` — the name has a slash inside it, which reads as nesting; rename to something flat
+- [ ] `Start date ` — trailing space
+- [ ] `Bundle and save`, `Payment complete`, `Shopping cart` are sitting on the **Foundations** page but look like screen sections — move to Screens, or name them as the components they are
+- [ ] Still not in the file as components (may be drawn inside screens rather than extracted): Alert Card, Blog Post Card, Bottom Sheet, Card / Surface, Data Table, Empty State, Favorite Toggle, Filter Chip Row, Getting Started Step Card, Kind Badge, Long Text Input, Mobile Menu Drawer, Offering Highlight Panel, Spinner, Sticky Bottom Action Bar, Tag Chip
+
+**Once OQ-D4 to OQ-D7 are answered, re-pointing the code is a single file** (`ui/src/assets/styles/_tokens.scss`) — every page, badge, banner, and Material control follows automatically, and the style guide's "Try another studio" buttons prove it in front of you.
