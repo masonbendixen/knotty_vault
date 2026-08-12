@@ -923,3 +923,14 @@ Answering OQ-D10/D11/D12/D15: the new marketing blocks are **database rows**, no
 **Gate: 4745 C++ tests green** in the Linux container (up from 4459 — 9 new, and the count floor is satisfied).
 
 **Still to come for this feature:** the Angular side (ServerAccess seam ×5, the Home rendering with alternating sides, specs), the per-tier membership icons, and the shared **Manage → Page Content** editor recorded in [[Tenant Theming and Branding]] Phase 3.
+
+## Angular side landed — the sections now render
+
+- **`getHomeSections()`** through the full `ServerAccess` seam (interface → proxy → network → mock), plus `HomeSection` and a `homeSectionImageUrl()` helper in `shared/types/home.types.ts`. The mock carries the same five rows `create_database.cpp` seeds, so `ng serve -c local` shows what a fresh database produces.
+- **Home renders them**: features as an image beside copy with **the image side alternating down the page** (driven by position, so re-ordering rows in the editor keeps the rhythm), banners full-bleed with the title over the image. Below `md` both orders collapse to picture-then-words — reading order beats alternation on a phone.
+- Images come from `/api/get_scaled_photo/home_sections/{id}/{w}/{h}`, which works signed-out because the table is in the public allow-list. Requested sizes are a maximum, not a crop.
+- The fetch **fails closed** like every other on that page: a dead endpoint costs the sections, not the page — asserted by a spec.
+
+**Tests:** 2 mock specs (order + works-signed-out) and 5 component specs (alternation, image URL, banners vs features, no-link omits the button, endpoint failure contained). **Angular 2954 green**, build and lint clean. **C++ 4745 green** and `knottyyoga_database_helper` builds.
+
+**What this does not include yet:** the per-tier membership icons (images downloaded, association not written), and the **Manage → Page Content** editor — until that lands, sections are editable through the generic admin table editor at `/admin`, which is the debug surface rather than the real one.
