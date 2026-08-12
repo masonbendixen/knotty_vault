@@ -138,7 +138,11 @@ The three `--font-*` rows hold a **family name**, and the family inventory is pe
 
 > **History:** the three 8/4/2026 catalog updates mined from Ryan's Figma file (brand red `#ED1C26` replacing `#F50C22`; the accent role retired for KY; the status tones becoming real background/on-tone pairs) are **folded into the table above** and shipped in code on 8/11/2026. Nothing is pending from that list.
 
-**Still open from Ryan:** the neutral text grey (`--theme-neutral` holds the app's inherited `#666666` until he names one) and the type scale / weights — both part of his Figma Variables pass. Neither blocks anything: they are value swaps in one file.
+> **Superseded 8/11/2026 — the catalog above is now one layer of two.** Ryan's Figma file was read directly via the API and applied the same night. `_tokens.scss` gained a **palette layer** (`--palette-primary-100…700`, plus `secondary` amber, `tertiary` green, `quaternary` magenta, `quinary` cyan, and a warm `grey` ramp) with every role above re-pointed at a palette step. That is the two-layer scheme this doc's D-decisions and the makeover's Q6 both assumed, so per-tenant theming now swaps **palette** values and the roles follow.
+>
+> Value changes worth knowing when Phase 4 writes the per-tenant plumbing: **danger is magenta**, deliberately decoupled from the brand red; **the accent is amber** (`#f0a202`) after all; the **neutrals are warm greys** (`#edecec`…`#1a1616`) rather than the inherited blue-greys; the type roles are **Roboto** (body) and **Barlow** (headings/buttons/badges) on a 12/14/16/20/24/40 scale; and two new roles — `--theme-inverse-surface` / `--theme-on-inverse-surface` — carry the black header and footer. All of it is asserted in `design-tokens.spec.ts`, so a tenant override that breaks a role fails a test.
+
+**Closed 8/11/2026:** the neutral text grey and the type scale/weights — both came from Ryan's file.
 
 ---
 

@@ -812,3 +812,22 @@ Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, wh
 - [ ] Still not in the file as components (may be drawn inside screens rather than extracted): Alert Card, Blog Post Card, Bottom Sheet, Card / Surface, Data Table, Empty State, Favorite Toggle, Filter Chip Row, Getting Started Step Card, Kind Badge, Long Text Input, Mobile Menu Drawer, Offering Highlight Panel, Spinner, Sticky Bottom Action Bar, Tag Chip
 
 **Once OQ-D4 to OQ-D7 are answered, re-pointing the code is a single file** (`ui/src/assets/styles/_tokens.scss`) — every page, badge, banner, and Material control follows automatically, and the style guide's "Try another studio" buttons prove it in front of you.
+
+---
+
+# ✅ His design is in the product — 8/11/2026 (applied same night)
+
+All six answers above were applied. **`ui/src/assets/styles/_tokens.scss` is now a two-layer file**, mirroring the structure in Figma: a palette layer holding Ryan's ramps verbatim (`--palette-primary-400`, `--palette-grey-600`, …) and a role layer that points at it (`--theme-primary`, `--theme-danger-soft`, …). Components only ever reference roles, so a re-brand is a palette edit.
+
+**Colour.** Every ramp came across — primary, secondary (amber), tertiary (green), quaternary (magenta), quinary (cyan), grey. The badge tones are his Badge component's pairs exactly, and the soft banner tones follow his own rule: fill with `100`, outline with `200`, write with `500` (`400` for info). Three visible consequences:
+- **Danger is magenta**, not the brand red (OQ-D6) — every No-show / Sold-out / Cancelled badge and every error banner changed.
+- **The amber is the accent** (OQ-D5) — `--theme-accent` is `#f0a202`, Material's `color="accent"` controls are amber, and the legacy `--orange` alias finally points at a real role.
+- **The neutrals are his warm greys**, replacing the blue-greys the code had inherited — that's every body line, caption, border, and divider on the site.
+
+**Type (OQ-D4 + OQ-D7).** Two families now: **Roboto** for reading, **Barlow** for headings, buttons, and badges — Barlow being the open-source stand-in for the DIN Alternate in the file, which is a macOS system font and would not have rendered for Windows or Android visitors. Both load from Google Fonts. The scale is his plus the 14px step: **12 / 14 / 16 / 20 / 24 / 40**, which makes page titles 40px as designed. *Worth knowing:* the bundled D-DIN carried its weight in the font file (`Din Bold` was a separate family), so the `.din-bold` / `.din-condensed-bold` classes never set `font-weight`. Barlow is one family with real weights, so those classes now ask for 700 — without that every heading would have quietly rendered regular.
+
+**The dark shell.** His header and footer are both solid black with white content, in both header states. That's now the biggest visible change on every page: the header is black (the white logo finally makes sense — it used to need its own black tile on a white bar), and the footer's orange band is gone, along with the black/white text alternation that only existed to get contrast on the orange. Both use new `--theme-inverse-surface` / `--theme-on-inverse-surface` roles, so a studio with a light shell re-points two values.
+
+**Verification:** 2946 tests green, production build clean, lint unchanged. The token specs now pin *his* values, so drift from the Figma file fails a test. `/admin/style-guide` shows the whole system, and the "Try another studio" buttons still prove the swap works on top of the new palette.
+
+**Not done — deliberately.** This is the token/shell layer, not the per-screen layout work. His 12+ screen frames (Home, Our Classes, Class Detail, Blog, Getting Started, Calendar, Cart + Checkout, the account wave) still need per-screen composition — that's Track C, and it wants his frames open side by side rather than a script. The three cosmetic Figma nits are also still open: `Calendar event chip` → `Calendar Event Chip` (casing), `Coupons & Voucher Panel` → `Coupon & Voucher Panel` (singular), and the duplicate `Bundle and save` frame on Screens.
