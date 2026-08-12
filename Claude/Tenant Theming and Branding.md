@@ -193,9 +193,30 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 - [ ] `/about` renders `site_about_markdown` through ngx-markdown with the blog's prose styles (route-scoped `provideMarkdown()`, same as `/blog`).
 - [ ] Specs per consumer (the standing component-spec rule) + `SiteConfigService` merge cases + `ServerAccess.mock` returns the dev content block (+ mock spec).
 
-## Phase 3 — Getting Started steps as data (D6)
+## Phase 3 — Getting Started steps *and home sections* as data (D6)
 
 Backend first, then the page rewire, then the editor.
+
+> **Scope grew 8/11/2026 (Mason, answering OQ-D10/D11/D12/D13 in [[Component Inventory for Designer]]).** Ryan's Home design adds marketing sections the product doesn't have — "Why Knotty Yoga", "Types of classes", "Additional health services", a "COME JOIN THE FUN" photo band and the "WELCOME TO KNOTTY YOGA" slab — and Mason's call is that **these are data, exactly like the Getting Started steps**: each row an image, title, body and link, with the layout alternating which side the image sits on. Membership tier icons go the same way (three distinct icons, per-tier, in the database).
+>
+> So this phase now covers **two** row-editors built on one pattern. The `home_sections` table and its seed land first (that's what the Home port needs); the Getting Started rewire follows on the same rails. **Both need the same Manage UI**, and it should be built once as an ordered-rows editor with a photo slot rather than twice — see the shared editor item below.
+>
+> Images are **uploadable per row** (OQ-D11) so a new studio replaces them without touching code; Knotty Yoga's are seeded from Ryan's exports by `create_database.cpp`, which is what makes a fresh database look like the design.
+
+### Home sections (new — drives the Home port)
+
+- [ ] `db_schema/home_sections.{h,cpp}` — app-side table: `id`, `ordinal`, `kind` (`feature` | `banner`), `title`, `body`, `link_route`, `link_label`, `active`, timestamps. Photos attach through the framework's `table_item_photos` (so `home_sections` joins `photo_support_tables` **and** the public scaled-photo allow-list). Full new-table checklist. *(app)*
+- [ ] Table helper + `GET /api/home_sections` (anonymous, ordered by `ordinal`, active only). *(app)*
+- [ ] Seed Ryan's rows + images in `create_database.cpp`, reading from an `img/` directory beside it that `knottyyoga_database_helper` can reach. *(app)*
+- [ ] Frontend: Home renders features alternating image-left / image-right, and banners full-bleed. `ServerAccess` seam ×5 files. Specs.
+
+### Membership tier icons
+
+- [ ] Per-tier icon image (three distinct laurels), attached to the tier row through the same photo association; seeded from Ryan's exports. The tier card falls back to today's Material icon when a tier has no image. *(app)*
+
+### The shared editor
+
+- [ ] **Manage → Page Content** — one ordered-rows editor serving Getting Started steps *and* home sections: reorder, add/remove, title/body/route/label fields, the icon-picker grid where a row uses a Material icon, and a photo upload where a row uses an image. Building this twice is the thing to avoid. Specs.
 
 - [ ] `db_schema/getting_started_steps.{h,cpp}` — **app-side** table, the `home_page_photos` precedent: `id`, `ordinal`, `mat_icon`, `title`, `body`, `link_route`, `link_label`, `hidden_when_logged_in`, timestamps. Registered through the full new-table checklist (`make_app_tables.cpp` + create_database's 11 registration points — admin registration included, so the generic editor doubles as the debug view). App-side because knottyyoga is the only app with a Getting Started page today; the table is a leaf and promotes to honuware cheaply if CommunityFinder ever builds one. *(app)*
 - [ ] Curated **icon allow-list** constant (Material icon names) — one source of truth serving both server-side `mat_icon` validation and the editor's picker grid. *(app)*
