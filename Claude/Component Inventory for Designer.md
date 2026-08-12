@@ -787,7 +787,7 @@ Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, wh
 	- Mason/Ryan- Let's do 12 / 14 / 16 / 20 / 24 / 40
 - **OQ-D8 — Where did Event Session Card go?** It was in the 8/4 audit as `Event session card` and isn't in the file now. Did it become `Card / Details` or `Card / Series`?
 	- Mason/Ryan- Card / Series
-- **OQ-D9 — What is `Chips`?** Is that the **Tag Chip** (per-class colour chip, colour comes from the database) or the **Filter Chip Row** (the single-select filter row)? They're different components in the inventory.
+- **OQ-D9 — What is `Chips`?** It's a component set (354×246) with **seven variants, all labelled "Chip"**. The inventory has three different chip-ish blocks and they behave differently, so I need to know which variants are which: **Tag Chip** (colour comes from the *database* per class tag, so the text has to auto-contrast against any colour), **Filter Chip Row** (single-select, one chip highlighted), and **Kind Badge** (the static "Series" / "Workshop" pill). Which of the seven is which — and is the set meant to cover all three, or just one of them?
 	- Mason/Ryan- He said it was supposed to be for like the refund policy but I think it is handled by toast notifications. If this is throwing things off, ignore it.
 
 ## Small cleanup still outstanding in the file
@@ -797,8 +797,18 @@ Ryan's tones follow a clean rule: **soft = family/100, strong = family/500**, wh
 - [ ] `Calendar / chip` → **`Calendar Event Chip`**
 - [ ] `Coupons and vouchers` → **`Coupon & Voucher Panel`**
 - [ ] `Card / Series/Icon/404` — the name has a slash inside it, which reads as nesting; rename to something flat
-- [ ] `Start date ` — trailing space
-- [ ] `Bundle and save`, `Payment complete`, `Shopping cart` are sitting on the **Foundations** page but look like screen sections — move to Screens, or name them as the components they are
+### Four components that just need inventory names (was a confusing line — rewritten 8/11)
+
+**Ignore the earlier "move them to Screens" note — that was wrong.** I'd assumed from the names that these were screen sections pasted onto Foundations; they're actually proper **components**, all 900px wide, and they belong exactly where they are. Each one *is* a real shared block in the code — they simply have working names rather than inventory names, so nothing maps automatically. Ryan: just rename each one; I'll add matching entries to Part 1.
+
+| Ryan's name | What's in it | What it is in the code | Rename to |
+|---|---|---|---|
+| `Shopping cart` | line items + totals + "Series purchases are non-refundable" | the cart's item list and subtotal block (`cart` → `.cart-card` + `.cart-subtotal`) | **Cart Summary Card** |
+| `Payment complete` | "Purchase details" + "Continue shopping" | the post-payment success panel — shared by **three** screens (cart, service booking, series booking; `.success-card`) | **Payment Success Panel** |
+| `Bundle and save` | "Add bundle" | the cart's upsell block (`.suggestions-section` / `.suggestion-card`) | **Bundle Upsell Panel** |
+| `Start date ` | "Start date", "Discounts available!", "You will be charged immediately…" | the subscription signup's start-date + billing-notice block | **Subscription Start Date Panel** *(also drop the trailing space)* |
+
+- [ ] **Duplicate to resolve:** `Bundle and save` exists twice — as a COMPONENT on Foundations (900×262) *and* as a FRAME on Screens (900×296). Keep the component, delete or rename the frame.
 - [ ] Still not in the file as components (may be drawn inside screens rather than extracted): Alert Card, Blog Post Card, Bottom Sheet, Card / Surface, Data Table, Empty State, Favorite Toggle, Filter Chip Row, Getting Started Step Card, Kind Badge, Long Text Input, Mobile Menu Drawer, Offering Highlight Panel, Spinner, Sticky Bottom Action Bar, Tag Chip
 
 **Once OQ-D4 to OQ-D7 are answered, re-pointing the code is a single file** (`ui/src/assets/styles/_tokens.scss`) — every page, badge, banner, and Material control follows automatically, and the style guide's "Try another studio" buttons prove it in front of you.
