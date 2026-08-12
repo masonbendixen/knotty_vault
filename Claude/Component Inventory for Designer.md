@@ -831,3 +831,52 @@ All six answers above were applied. **`ui/src/assets/styles/_tokens.scss` is now
 **Verification:** 2946 tests green, production build clean, lint unchanged. The token specs now pin *his* values, so drift from the Figma file fails a test. `/admin/style-guide` shows the whole system, and the "Try another studio" buttons still prove the swap works on top of the new palette.
 
 **Not done — deliberately.** This is the token/shell layer, not the per-screen layout work. His 12+ screen frames (Home, Our Classes, Class Detail, Blog, Getting Started, Calendar, Cart + Checkout, the account wave) still need per-screen composition — that's Track C, and it wants his frames open side by side rather than a script. The three cosmetic Figma nits are also still open: `Calendar event chip` → `Calendar Event Chip` (casing), `Coupons & Voucher Panel` → `Coupon & Voucher Panel` (singular), and the duplicate `Bundle and save` frame on Screens.
+
+---
+
+# 🎛️ Track C — atoms ported 8/11/2026; screens scoped
+
+## Done: the atoms (the first Track C bullet)
+
+Specs read from his component sets via the API, not eyeballed.
+
+**Button.** His set has **four** kinds, and the names don't line up with Material's, so the mapping is by function rather than by label:
+
+| His kind | Treatment (rest → hover → press) | Mapped to |
+|---|---|---|
+| Secondary | solid red / white → `#ac1118` → black | `mat-raised-button color="primary"` — the loud CTA (Book Now, Pay) |
+| Primary | grey `#edecec` + red text → solid red / white | `mat-stroked-button` — quiet at rest, loud on hover |
+| Tertiary | text-only red → `#ac1118` | `mat-button` |
+| Navigational | text-only **white** → red | the header's own buttons (it lives on the black bar) |
+
+Geometry came with it: **radius 4, not the 9999px pill the app was forcing**, heights 30 / 40 / 47 for small / medium / large, 8px internal gap, Barlow 700 at 12 / 16 / 20, and one shared disabled pair (`#a59b9c` on `#c8c3c3`). New `--control-*` tokens carry the quiet surface, the disabled pair, and the three heights.
+
+**Badge.** Also not a pill: **radius 8**, 4px/12px padding, Barlow 700 at 12px. The `--sm` variant drops to radius 6.
+
+**Header buttons** now follow his Navigational kind — white on the black bar, red on hover, no fill in any state.
+
+Specs pin all of it (2947 green), so a future change that re-pills a button or re-colours a kind fails a test.
+
+## Scoped, not done: the screens
+
+I exported **Public / Home** (1440×5351) and read it properly rather than porting from coordinates. It is not a restyle of the current page — it's a different page. Section by section, against what's in code today:
+
+| His section | Status in code |
+|---|---|
+| Black hero band, photo left, huge display type right ("GET INTO THE BEST SHAPE OF YOUR LIFE, **THE RIGHT WAY**") | **New composition** — today's hero is a white two-column block |
+| White intro strip + centred SAFE SPACE badge | exists, different placement |
+| Black "GET STARTED" band with red accent word + red CTA | exists as a light banner — needs the black treatment |
+| "Upcoming events" — grey band, 3 cards with photo, price line, SIGN UP + EVENT DETAILS | close to today's card grid; **two buttons per card is new** |
+| "Upcoming series and workshops" — **black** band, row layout, kind badge, "Already under way" in red, BOOK THIS SERIES | exists (Offering Highlight Panel) but light, and laid out differently |
+| Photo carousel with captions + arrows | exists |
+| **"Why Knotty Yoga"** — image/text split + LEARN MORE | **doesn't exist** |
+| **"Types of classes"** — text/image split + VIEW CLASSES | **doesn't exist** |
+| **"Additional health services"** — image/text split + VIEW SERVICES | **doesn't exist** |
+| **"WELCOME TO KNOTTY YOGA"** brand slab | **doesn't exist** |
+| Memberships — grey band, 3 tier cards with laurel icons | exists (Membership Tier Card); icons + band are new |
+| **"COME JOIN THE FUN!"** full-bleed photo band | **doesn't exist** |
+| Footer — black, address left, social + mailing-list CTA centre, tagline right | black shell done; **the mailing-list button and the three-column split are new** |
+
+**Four of those sections don't exist in the product at all**, and in his frame they carry lorem text — so they need real copy and images before they can ship, and per the theming rules they should land as 🎨 content slots (DB-backed), not hard-coded markup. That's a content decision, not an engineering one, which is why I stopped rather than inventing copy.
+
+**Recommended next cut**, in order: (1) the black hero band + Get Started band — biggest visual delta, no new content needed; (2) the alternating white/grey/black section rhythm, which is most of what makes his page feel like his page; (3) the events-card and series-row layouts; (4) the four new marketing sections, once copy and images exist. Everything above item 4 is pure engineering against frames that already exist.
