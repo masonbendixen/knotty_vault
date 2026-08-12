@@ -178,13 +178,44 @@ Not slots (already per-tenant data, no work): carousel photos (`home_page_photos
 
 Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before frontend inside every phase; every item lands with its tests in the same session; Linux docker is the C++ gate, `ng test`/`ng build`/`ng lint` the Angular gate; live hand-testing steps close each phase. Placement tags per D11: **[hw]** = honuware server components (needs a pin bump), **[hw-lib]** = `@honuware/ui`, **[app]** = knottyyoga. Phases 1–3 have no dependency on Ryan or the makeover and can start immediately; Phase 4 defines the CSS variables itself if Makeover 2.1 hasn't landed first (they're the same variables — first mover creates, second consumes); Phase 8 waits for CommunityFinder.
 
-## Phase 1 — Content slots, server side
+## Phase 1 — Content slots, server side ✅ **DONE 8/12/2026**
 
-- [ ] Register the new content-slot secret keys (brand-free *names*) in honuware's `secret_keys.h` + `FillInSecretsStringView`, with empty/neutral framework defaults — mirroring how `kSiteLogoUrl` landed. *(hw — needs a pin bump)*
-- [ ] Register Knotty Yoga default *values* app-side in `business_logic/app_secret_values.cpp` (the table above's right-hand column). *(app)*
-- [ ] Extend `GET /api/site_info` with the `content` object (slot key → resolved value, defaults filled) and the `theme` object (empty until Phase 4 — present so the payload shape is stable). Keep the endpoint public + cacheable; keep the pure builder split. *(hw)*
-- [ ] Server-side validation helpers per D10 (hex color, URL shape, size caps) — shared by site_info's read path (defensive normalize) and Phase 6's write path. *(hw)*
-- [ ] Tests: builder field-mapping for `content`/`theme`; defaults fill when unset; validation accepts/rejects the documented shapes; app suite green proving the new defaults seed on a fresh DB.
+- [x] Register the new content-slot secret keys (brand-free *names*) in honuware's `secret_keys.h` + `FillInSecretsStringView`, with empty/neutral framework defaults — mirroring how `kSiteLogoUrl` landed. *(hw — needs a pin bump)*
+- [x] Register Knotty Yoga default *values* app-side in `business_logic/app_secret_values.cpp` (the table above's right-hand column). *(app)*
+- [x] Extend `GET /api/site_info` with the `content` object (slot key → resolved value, defaults filled) and the `theme` object (empty until Phase 4 — present so the payload shape is stable). Keep the endpoint public + cacheable; keep the pure builder split. *(hw)*
+- [x] Server-side validation helpers per D10 (hex color, URL shape, size caps) — shared by site_info's read path (defensive normalize) and Phase 6's write path. *(hw)*
+- [x] Tests: builder field-mapping for `content`/`theme`; defaults fill when unset; validation accepts/rejects the documented shapes; app suite green proving the new defaults seed on a fresh DB.
+
+### As-built notes (8/12/2026)
+
+**A slot registry, not a loose pile of keys.** The keys landed in honuware's `secret_keys.h`, but the thing that makes them *public* is a new framework module, `components/platform/business_logic/branding/`:
+
+- `site_content_slots.{h,cpp}` — `SiteContentSlots()` is the registry (key + `SlotType`) and the single source of truth for what `/api/site_info` publishes, how each value is validated, and what Phase 6's editor will offer. `LoadSiteContent(secrets, transaction)` reads every slot and returns a `KeyValueTable` with **every** key present, empty when unset — so the SPA's non-empty-wins merge is total and the payload's shape never varies.
+- `site_value_validation.{h,cpp}` — D10 in code. `SlotType` = `Line | Lines | Markdown | Url | Color`; `ValidateSlotValue` returns a *reason string* for Phase 6's 400 body, `NormalizeSlotValue` is the read path's repair-or-blank. Byte caps: line 1 KB, lines 4 KB, markdown 64 KB, URL 2 KB. `IsValidSiteUrl` accepts `http(s)://host…` and root-relative `/path`, and rejects `javascript:`, `data:`, bare relative paths, and **protocol-relative `//host/…`** (an off-origin fetch wearing a relative path's clothes). `IsValidHexColor` is strictly `#RRGGBB` — no shorthand, no alpha — because the value is written straight into a CSS custom property.
+- A guard test asserts every registered slot is a `site_*` key, so no credential-bearing secret can ever be added to a public, cached, unauthenticated endpoint by accident.
+
+**⚠️ The one plan detail that had to change: framework defaults vs app defaults are mutually exclusive.** The bullet above said "register the keys in `FillInSecretsStringView` with empty framework defaults" *and* "register Knotty Yoga values app-side" — but `config_secrets.name` is **UNIQUE** and the seed inserts the framework set then the app set, so defaulting a key on both sides aborts the seed. The split as built:
+
+- **Framework defaults** (`secret_values.cpp`): `site_favicon_url`, `site_hero_image_url` — the two slots whose neutral default is genuinely framework-owned (`""` == "the SPA keeps its bundled asset", the contract `site_logo_url` established).
+- **App defaults** (`app_secret_values.cpp`): the other eleven, all brand *copy* — exactly the `kMailSenderName` precedent, and exactly what D11 describes ("each app contributing its slot defaults").
+
+Three tests pin this so it cannot drift: `EverySlotInTheRegistryHasADefaultFromOneSideOrTheOther` (exactly one side, for every slot), the pre-existing `FrameworkAndAppKeySetsDoNotOverlap`, and a `PopulateFrameworkTables` assertion that each framework default seeds as exactly one row. `components/services/util/secrets/CLAUDE.md` now documents the rule so the next person doesn't "fix" the apparent omission.
+
+**Response shape** (`GET /api/site_info`, unchanged headers — public, `max-age=300`):
+
+```json
+{ "display_name": "…", "website_url": "…", "logo_url": "…",
+  "content": { "site_hero_headline": "…", …13 keys, always all of them… },
+  "theme":   { } }
+```
+
+`theme` ships empty on purpose so Phase 4 fills it without changing the client contract. Values are emitted through `Json::Value`'s map constructor rather than `SqlUtil::KeyValueTableToJson`, because the latter promotes integer-looking strings to numbers and a browser title of "2026" is still text.
+
+**Knotty Yoga's seeded copy** mirrors what the SPA hardcodes today, so Phase 2 can de-hardcode each consumer without changing a rendered page. Two catalog values were reconciled against as-built code: logo alt is `"Knotty Yoga Fitness"` (the shipped `DEFAULT_SITE_CONFIG` value, not the catalog's "Knotty Yoga logo"), and the hero headline is the shipped sentence casing (`"Knotty Yoga is an inclusive, high-level acrobatic fitness studio."`). Non-ASCII characters (the tagline's 💪🤸, the em dashes) are written as explicit `\x` UTF-8 escapes so the bytes survive MSVC's source-charset handling.
+
+**Note for Phase 2 — the hero slots partly overlap `home_sections`.** Since this catalog was written, Home moved its hero and marketing bands to the `home_sections` table (Phase 3's home-sections half landed early). `site_hero_headline` / `site_hero_subline` / `site_hero_image_url` still exist and are still seeded, but Phase 2 should wire `site_hero_headline` to the **intro strip** (`home-intro__text`, currently hardcoded) rather than re-plumbing the hero band, and decide whether `site_hero_subline` has a consumer at all or should be retired from the catalog.
+
+**Gate:** honuware Linux suite green; knottyyoga app Linux suite green (co-dev against the local honuware tree). **Pin bump owed** — the app's `CMakeLists.txt` `GIT_TAG` still points at the pre-Phase-1 honuware SHA, so the honuware half needs pushing and re-pinning before a non-co-dev build sees it.
 
 ## Phase 2 — Content slots, frontend
 
