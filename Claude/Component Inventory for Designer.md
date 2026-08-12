@@ -890,11 +890,11 @@ Items 1–3 of the recommended cut (black hero band, the white/grey/black sectio
 - **OQ-D10 — The four new marketing sections.** "Why Knotty Yoga", "Types of classes", "Additional health services", and the "COME JOIN THE FUN!" photo band don't exist in the product, and his frame fills them with lorem text. Two questions: **(a)** who writes the real copy, and by when — or should I ship them with his lorem so the layout lands and you fill it in after? **(b)** hard-coded markup, or **DB-backed content slots** like the Getting Started steps? The theming rules say slots (they're per-studio content), which costs a table + a Manage page but means you can edit the home page without me.
 	- Mason/Ryan- I'd like these to be items in the database. Basically, each item is an image, title, text, and a link and the layout alternates which side the image is on for alternating items. Let's to this as a database table like the Getting started page entries.
 - **OQ-D11 — Images for those sections.** Each needs a photo (the group shot, the aerial-silks shot, the massage shot, the overhead floor shot). Are those coming from Ryan as exported assets, from the existing studio photo library, or should they be uploadable per-slot?
-	- Mason/Ryan-
+	- Mason/Ryan- I'd like these to be uploadable per slot. This fits with the multi tenant / multi studio vision.
 - **OQ-D12 — The "WELCOME TO KNOTTY YOGA" slab.** Is that a flat exported image from Ryan, or should it be built in HTML/CSS (which would let it re-theme per studio, but is fiddly to match)? If it's an image, it's a 🎨 brand asset and needs a slot.
-	- Mason/Ryan-
+	- Mason/Ryan- That should be stored in the database. I'd love to pull it down from his design and populate it with create_database.cpp. Yes, I know that this is a schema change but it is very visually important for the site.
 - **OQ-D13 — Membership tier icons.** His tier cards have gold laurel icons; today every tier renders the same `card_membership` Material icon. Is the laurel one shared icon for all tiers, or per-tier (which means a new field on the tier record and a picker in Manage, like the Getting Started icons)?
-	- Mason/Ryan-
+	- Mason/Ryan- We need three different icons. Again, I'd like this in the database. If you can pull his images down and populate them with create_database.cpp, that would be awesome.
 - **OQ-D14 — The events card's second button.** His card has **SIGN UP** *and* **EVENT DETAILS →**. Today the card has one Book Now that goes straight to `/shop/event/:id`. Where should "Event details" go — a new public event-detail page (doesn't exist), or the class-detail page for the class behind that event?
 	- Mason/Ryan-
 - **OQ-D15 — Scope for tonight vs. later.** Do you want me to land items 1–3 now (hero band, section rhythm, card/row layouts) and leave the four new sections as a follow-up, or hold the whole Home port until the copy exists so the page changes once rather than twice?
