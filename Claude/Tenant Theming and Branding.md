@@ -228,12 +228,54 @@ Three tests pin this so it cannot drift: `EverySlotInTheRegistryHasADefaultFromO
 
 ⚠️ **Never run two of these suites concurrently.** They own different main databases but create the *same* scratch tenant DBs (`test_honuware_tenant_a/b`), so a parallel run produces phantom failures in `TenantPhysicalIsolationTest.*` and `DatabaseUtilTest.MakeAndClearDatabaseBasic`. Run them serially.
 
-## Phase 2 — Content slots, frontend
+## Phase 2 — Content slots, frontend ✅ **DONE 8/13/2026**
 
-- [ ] `SiteConfig` grows the slot fields; `load()` merges `content` over the existing static defaults (same non-empty-wins rule). The current hardcoded values stay as the fallback constants — a dead API never blanks the site.
-- [ ] De-hardcode the consumers: home hero headline/subline/secondary image, membership blurb, Getting Started intro + step copy (titles/bodies from config, CTAs/routes/icons from the component), `document.title`, favicon swap, logo alt.
-- [ ] `/about` renders `site_about_markdown` through ngx-markdown with the blog's prose styles (route-scoped `provideMarkdown()`, same as `/blog`).
-- [ ] Specs per consumer (the standing component-spec rule) + `SiteConfigService` merge cases + `ServerAccess.mock` returns the dev content block (+ mock spec).
+- [x] `SiteConfig` grows the slot fields; `load()` merges `content` over the existing static defaults (same non-empty-wins rule). The current hardcoded values stay as the fallback constants — a dead API never blanks the site.
+- [x] De-hardcode the consumers: home hero headline/~~subline~~/secondary image, membership blurb, Getting Started intro ~~+ step copy~~, `document.title`, favicon swap, logo alt. *(Two strikeouts explained below — both are catalog drift, not skipped work.)*
+- [x] `/about` renders `site_about_markdown` through ngx-markdown with the blog's prose styles (route-scoped `provideMarkdown()`, same as `/blog`).
+- [x] Specs per consumer (the standing component-spec rule) + `SiteConfigService` merge cases + `ServerAccess.mock` returns the dev content block (+ mock spec).
+
+### As-built notes (8/13/2026)
+
+**`SiteConfig` is now the whole branding surface.** It grew `browserTitle`, `faviconUrl`/`faviconAsset`, `heroHeadline`, `heroSubline`, `heroImageUrl`/`heroImageAsset`, `membershipBlurb`, `startIntro` and `socialLinks: SocialLink[]`, and the previously "app-static" `logoAltText` / `addressLines` / `contactEmail` / `taglineLines` / `aboutText` became API-driven. `DEFAULT_SITE_CONFIG` still holds the exact strings the bundle shipped with, so the fallback contract is unchanged: **nothing on screen moved for Knotty Yoga.**
+
+Merge rules, all exercised by spec:
+- **line** slots — non-empty wins.
+- **lines** slots — `parseLines()` splits on `\n`, trims, drops blank rows; a parsed **non-empty** list wins, so an all-whitespace value keeps the default instead of emptying the footer.
+- **social links** — `parseSocialLinks()` reads `label|url` (first `|` only, so URLs keep their colons and slashes) and skips any line missing a half.
+- **url** slots — stored verbatim, `''` included: that is the "use the bundled asset" contract `logoUrl` established.
+- A response with **no `content` object at all** degrades to defaults rather than throwing inside the app initializer.
+
+**D3's document branding landed here**, not in a component: `load()` stamps `document.title` and repoints `<link rel="icon">` (dropping the bundled `type="image/x-icon"` when a tenant URL wins, since it is as likely to be a PNG/SVG). It runs on the failure path too, so the tab title is right even when the fetch dies. Phase 4 adds the CSS-custom-property writes to the same method.
+
+**The blog's prose styles were lifted, not copied.** `.post-body`'s typography moved out of `blog-list.component.scss` into a global `assets/styles/_prose.scss` `.prose` class; the blog adds `prose` alongside `post-body`, and About consumes the same class. Global on purpose — `<markdown>` renders its HTML at runtime, so a component-scoped rule would need `::ng-deep` in every consumer. Every value still resolves through a design token.
+
+**About was rewritten.** It rendered a lorem-ipsum `aboutText` **twice** and fetched an `aboutMe` it never displayed. It now renders `site_about_markdown` through `<markdown class="prose">`, names the tenant in the heading (`What Makes {{ displayName }} an Amazing Studio?` — previously a hardcoded "Knotty Yoga"), and the dead "How to Join" duplicate section is gone (nothing linked its `#join` anchor). `HomepageService.getAboutText()` was deleted — About reads `SiteConfigService` directly now, one hop instead of two.
+
+**⚠️ Two catalog entries drifted, and Phase 2 respected the drift rather than forcing them:**
+
+1. **Getting Started *step copy* is NOT part of Phase 2.** The bullet predates D6, which moved the steps to `getting_started_steps` **rows**. Only `site_start_intro` is a slot, and only it was wired; the seven steps stay in `allSteps` until Phase 3 replaces them wholesale. Wiring them to config now would have been work Phase 3 immediately deletes.
+2. **`site_hero_subline` has no consumer.** Since the catalog was written, Ryan's Home redesign moved the hero band to `home_sections` (title + body from data), so the slot's natural home is gone. `site_hero_headline` went to the **intro strip** (`home-intro__text`) and `site_hero_image_url` to the **badge** beside it — the "secondary hero image" the catalog describes. The subline is still stored, seeded, merged into `SiteConfig` and will appear in the Phase 6 editor, but nothing renders it. **Decision needed from Ryan/Mason:** give it a slot in the intro strip, or retire it from the catalog. Rendering it unilaterally would have added a line of marketing copy to Ryan's design.
+
+**Bug found and fixed along the way:** `SiteConfigService` seeded itself with `{ ...DEFAULT_SITE_CONFIG }` — a shallow copy, so the live config *shared its arrays* with the exported constant. Any consumer mutating `config.socialLinks` / `addressLines` / `taglineLines` would have rewritten the shipped defaults for the whole app (and for every later spec in a run). Now cloned via `cloneSiteConfig()`, with a spec asserting the identity is never shared.
+
+**Gate:** `npx tsc --noEmit` clean on both `tsconfig.app.json` and `tsconfig.spec.json`; **`ng test` 2989/2989 green**. `ng lint` reports 262 pre-existing problems repo-wide (unused imports, `any`) — **zero in any line this phase wrote or moved**; the only touched file that appears is `homepage.service.ts`, whose long-standing `Observable<any[]>` merely shifted line number.
+
+### Hand-testing steps (live server, blank database)
+
+Phase 2 is a **regression check**: every slot now travels from the database, so the visible test is that a freshly seeded Knotty Yoga looks exactly as it did. Recreate the database with `knottyyoga_database_helper --recreate_database`, start `knottyyoga_the_server`, run the Angular dev server, and sign out before starting.
+
+1. **Browser tab.** With the site open, read the browser tab. It must say **Knotty Yoga Fitness Studio**, and the tab icon must be the Knotty Yoga favicon. *(This is the slot proving itself: the title now arrives from the database, not from `index.html`.)*
+2. **Home — intro strip.** On the landing page, below the hero photograph, the centred sentence must read **"Knotty Yoga is an inclusive, high-level acrobatic fitness studio."** with the round safe-space badge directly beneath it.
+3. **Home — memberships.** Scroll to the **Memberships** section (signed out) and confirm the paragraph under the heading reads **"Unlimited classes, priority sign-ups, and the whole community — pick the tier that fits how you train."**
+4. **Get Started.** Top menu → **Get Started**. The paragraph under the **Get Started** title must read **"New to Knotty Yoga? Here is the whole path, start to finish. You do not have to do these in order — but this is the order most people find easiest."** The seven numbered steps below it are unchanged (still code — Phase 3 moves them).
+5. **About.** Top menu → **About** ▸ **About**. The heading must read **"What Makes Knotty Yoga an Amazing Studio?"** and the body must be the studio blurb ("We are Knotty Yoga, and we've been in the business of…"). Confirm there is **no** "Lorem ipsum" text anywhere and **no** second "How to Join" block — both were placeholder and are gone.
+6. **Footer — address and email.** At the bottom of any page, **Address:** must read **2545 152nd Ave NE, Redmond, WA 98052** and **Email:** must read **info@knottyyoga.com** and open a mail client when clicked.
+7. **Footer — tagline.** The right-hand footer column must show two italic lines: **"That which doesn't kill you"** then **"makes you hotter. 💪🤸"**.
+8. **Footer — social row.** Under **"Follow us on Social Media!"** there must be exactly three round buttons reading **Fa**, **In**, **Tw**, linking to facebook.com, instagram.com and twitter.com respectively.
+9. **Header.** Hover the studio logo in the top-left; its alt/tooltip text is **Knotty Yoga Fitness**.
+
+**Not hand-testable yet:** changing any of these values. `config_secrets` is deliberately excluded from Manage Data, and `knottyyoga_database_helper` has no secrets command (only `--recreate_database` / `--migrate` / `--create_tenant`). **Phase 6's Site Theme page is the first point where a studio can edit a slot**, and the "type a new headline, reload, see it change" walkthrough belongs to that phase's steps.
 
 ## Phase 3 — Getting Started steps *and home sections* as data (D6)
 
