@@ -378,17 +378,80 @@ Scope is narrow as the plan asked: primary, accent and the error tone. Surface/c
 
 **⚠️ Pin bump owed again.** honuware gained `site_theme_tokens.{h,cpp}`, the two new validators and the `site_info` theme wiring after the 8/12 re-pin to `5dcae2c`. Both consumers (`knottyyoga_server/CMakeLists.txt` and `communityfinder_server/CMakeLists.txt`) still point at that SHA, so the honuware half needs pushing and re-pinning before a non-co-dev build sees any of Phase 4.
 
-### What is left in Phase 4 — the fonts-as-data cluster (D4)
+---
 
-A clean, separable slice: the `--font-*` **roles** are already themable through the registry above, so a tenant can already point body/heading/display at any family the browser can resolve. What is missing is the **inventory** — where a family that is not already loaded comes from:
+## Phase 4B — Fonts as data (D4), formalized
 
-- [ ] `site_fonts` framework table + helper: family name, face rows (weight/style), source kind `cdn` | `uploaded`, CDN family + weights, binary bytes + format.
-- [ ] Magic-byte (`wOF2`/`wOFF`/TTF/OTF) + size-cap validation, and the CDN origin allow-list constant (Google Fonts first).
-- [ ] The public, cacheable font-serving endpoint with correct `font/*` Content-Type + `nosniff`.
-- [ ] `site_info`'s `theme` payload gains the per-family font-face descriptors.
-- [ ] Frontend boot: inject the constructed CDN `<link>`s and generated `@font-face` rules in the same pre-render initializer, each role keeping a system-font fallback with `font-display: swap`.
+> **Design settled 8/13/2026 from Mason's font-source proposal.** He supplied the shape directly: *"have a font source like Google with the href values and a flag for the cross origin thing and then the base URL … and then each font could have the `family=Barlow:wght@100..900` for the link tag and then the font-family (like 'Roboto') and the sans-serif to append."* That is the Google Fonts API's own structure, and modelling it as data is what makes "add a font" a row instead of a code change. Three decisions were put to him; his answers are recorded inline below and **supersede D4's original CDN sketch**.
 
-Held back deliberately rather than rushed: it is a binary-upload path plus a public byte-serving endpoint — the one security-sensitive surface in this plan — and it deserves its own pass.
+### D12 — Font sources are tenant-editable rows *(supersedes D4's allow-list)*
+
+**Mason's call, over the recommendation.** D4 said CDN entries would be family+weights against a framework **allow-list of origins**, never a free-form URL. The allow-list is dropped: `site_font_sources` is a per-tenant table an admin can add to.
+
+The three costs were put to him explicitly and accepted:
+- an admin can point the site at any third-party origin;
+- a strict CSP can no longer be enumerated ahead of time (it has to allow the tenant's configured font hosts, or run without one for font origins);
+- CDN mode discloses visitor IPs to a host we never reviewed (D4's recorded GDPR caveat, now unbounded).
+
+What is kept, because it is hygiene rather than policy: every URL must be **`https://`**, well-formed, and free of whitespace/control characters, and the values are length-capped. That does not re-introduce an allow-list — it stops a malformed row breaking every page.
+
+### D13 — A font row carries family AND fallback as separate columns
+
+**Mason's call, rejecting both offered options:** *"I think that we should have both as separate database entries. I don't like the full stack string but I also don't want to assume sanserif."*
+
+So: `family` and `fallback` are **two required columns** on every `site_fonts` row, and **no generic family is ever defaulted in code**. A role token stores the family NAME only (`site_theme_font_body = "Barlow"`); the server composes the stack it serves by looking the row up — `'Barlow', sans-serif` — so the fallback is defined in exactly one place and the admin never types a CSS stack.
+
+This adds a third source kind to D4's two. `source_kind`:
+
+| kind | means | needs |
+|---|---|---|
+| `cdn` | loaded from a font source's stylesheet | a source + a `spec` fragment |
+| `uploaded` | face files stored in the tenant's DB | one or more `site_font_faces` rows |
+| `system` | already on the visitor's machine (Georgia, Helvetica) | nothing but family + fallback |
+
+`system` is what makes "no assumed sans-serif" work without a special case: a studio that wants a pure system stack creates a real row, and the fallback is data like everywhere else.
+
+### D14 — Uploads ship in this pass
+
+**Mason's call:** both CDN and uploaded faces now, not CDN-first. That brings the plan's one security-sensitive surface into scope — binary upload plus a public byte-serving endpoint — so it carries D4's guardrails verbatim: **magic-byte validation** (`wOF2` / `wOFF` / `\x00\x01\x00\x00` / `OTTO` / `true`), a per-face **size cap**, and serving with the correct `font/*` Content-Type plus `X-Content-Type-Options: nosniff` so uploaded bytes can never come back as script. **License responsibility rides with the uploader**, noted in the admin UI.
+
+### The data model
+
+Three tables, all framework (D11 — CommunityFinder wants fonts too), all in the tenant's own database.
+
+**`site_font_sources`** — where a family can be fetched from.
+
+| column | notes |
+|---|---|
+| `source_key` | stable handle, e.g. `google` |
+| `display_name` | what the editor shows, e.g. "Google Fonts" |
+| `base_url` | `https://fonts.googleapis.com/css2` |
+| `query_suffix` | appended once per constructed URL; seeded `display=swap` |
+| `preconnect_lines` | newline-separated `href\|crossorigin`, the `site_social_links` precedent (OQ-T4) rather than a fourth table |
+| `active`, timestamps | |
+
+**`site_fonts`** — the tenant's family inventory. `family`, `fallback`, `source_kind`, `font_source_id` (nullable), `spec` (nullable — the `family=Barlow:wght@100..900` fragment), `ordinal`, `active`, timestamps.
+
+**`site_font_faces`** — uploaded binaries only. `site_font_id`, `weight`, `style`, `format`, `bytes`, timestamps.
+
+### How a page ends up with Barlow on it
+
+1. `GET /api/site_info` gains a **`fonts`** object beside `content` and `theme`:
+   - `preconnects`: `[{href, crossorigin}]` — every active source's, de-duplicated.
+   - `stylesheets`: one constructed URL **per source**, not per font — the `cdn` rows for that source contribute their `spec` fragments joined with `&`, then `query_suffix`. Mason's own example falls straight out: `…/css2?family=Barlow:wght@100..900&family=Roboto:wght@100..900&display=swap`. One request, not two.
+   - `faces`: `[{family, weight, style, format, url}]` for uploaded families, pointing at the serving endpoint.
+2. The `theme` object's `--font-body` / `--font-heading` / `--font-display` arrive **already composed** (`'Barlow', sans-serif`) from the named row's family + fallback.
+3. The boot initializer injects the preconnect links, the stylesheet links, and an `@font-face` rule per uploaded face — then applies the theme tokens exactly as Phase 4A already does.
+
+### Checklist
+
+- [ ] `site_font_sources` + `site_fonts` + `site_font_faces` schema, table helpers, and URL/family/fallback/spec validation. *(hw)*
+- [ ] Magic-byte + size-cap validation for uploaded faces. *(hw)*
+- [ ] `GET /api/site_fonts/<face_id>` — public, long-cache, `font/*` + `nosniff`. *(hw)*
+- [ ] `site_info` gains `fonts`, and composes the `--font-*` role stacks from the named rows. *(hw)*
+- [ ] Seed the Google source + **Barlow** and **Roboto** rows in `create_database.cpp`, and point the three role tokens at them — a fresh database reproduces today's `index.html` links from data. *(app)*
+- [ ] Frontend boot: inject preconnects, stylesheet links and `@font-face` rules pre-render; roles keep their fallback with `font-display: swap`. *(app)*
+- [ ] Tests: helper CRUD; URL construction (one link per source, specs joined, suffix appended); upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; role-stack composition; boot injection.
 
 ## Phase 5 — Imagery v1 (URL-based)
 
