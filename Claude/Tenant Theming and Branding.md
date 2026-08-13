@@ -374,7 +374,9 @@ Registering the whole palette (not just the base step) is what makes a re-brand 
 
 Scope is narrow as the plan asked: primary, accent and the error tone. Surface/container tokens stay Material's so its elevation ramp stays internally consistent. Buttons were already covered — `_mat-button.scss` restyles them from our roles directly; the bridge is what reaches the spinner, toggles, checkboxes, radios and the form-field focus ring. `design-tokens.spec.ts` now asserts every bridged token equals its role **and** that a runtime `--palette-primary-400` override reaches `--mat-sys-primary`.
 
-**Gate:** honuware **1550/1550** (+18), Angular **3026/3026** (+8), both `tsc --noEmit` projects clean.
+**Gate:** honuware **1550/1550** (+18), knottyyoga C++ green in co-dev against the updated honuware, Angular **3026/3026** (+8), both `tsc --noEmit` projects clean. `ng lint` is unchanged at its pre-existing 262 repo-wide problems — zero new findings from Phases 3 or 4.
+
+**⚠️ Pin bump owed again.** honuware gained `site_theme_tokens.{h,cpp}`, the two new validators and the `site_info` theme wiring after the 8/12 re-pin to `5dcae2c`. Both consumers (`knottyyoga_server/CMakeLists.txt` and `communityfinder_server/CMakeLists.txt`) still point at that SHA, so the honuware half needs pushing and re-pinning before a non-co-dev build sees any of Phase 4.
 
 ### What is left in Phase 4 — the fonts-as-data cluster (D4)
 
