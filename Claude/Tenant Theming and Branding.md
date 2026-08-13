@@ -287,28 +287,50 @@ Backend first, then the page rewire, then the editor.
 >
 > Images are **uploadable per row** (OQ-D11) so a new studio replaces them without touching code; Knotty Yoga's are seeded from Ryan's exports by `create_database.cpp`, which is what makes a fresh database look like the design.
 
-### Home sections (new — drives the Home port)
+### Home sections (new — drives the Home port) ✅ **shipped before 8/13/2026**
 
-- [ ] `db_schema/home_sections.{h,cpp}` — app-side table: `id`, `ordinal`, `kind` (`feature` | `banner`), `title`, `body`, `link_route`, `link_label`, `active`, timestamps. Photos attach through the framework's `table_item_photos` (so `home_sections` joins `photo_support_tables` **and** the public scaled-photo allow-list). Full new-table checklist. *(app)*
-- [ ] Table helper + `GET /api/home_sections` (anonymous, ordered by `ordinal`, active only). *(app)*
-- [ ] Seed Ryan's rows + images in `create_database.cpp`, reading from an `img/` directory beside it that `knottyyoga_database_helper` can reach. *(app)*
-- [ ] Frontend: Home renders features alternating image-left / image-right, and banners full-bleed. `ServerAccess` seam ×5 files. Specs.
+- [x] `db_schema/home_sections.{h,cpp}` — app-side table. Full new-table checklist. *(app)*
+- [x] Table helper + `GET /api/home_sections` (anonymous, ordered by `ordinal`, active only). *(app)*
+- [x] Seed Ryan's rows + images in `create_database.cpp`. *(app)*
+- [x] Frontend: Home renders features alternating image-left / image-right, and banners full-bleed. `ServerAccess` seam ×5 files. Specs.
 
 ### Membership tier icons
 
-- [ ] Per-tier icon image (three distinct laurels), attached to the tier row through the same photo association; seeded from Ryan's exports. The tier card falls back to today's Material icon when a tier has no image. *(app)*
+- [ ] Per-tier icon image (three distinct laurels), attached to the tier row through the same photo association; seeded from Ryan's exports. The tier card falls back to today's Material icon when a tier has no image. *(app)* — **NOT DONE; the one item left in Phase 3, see below.**
 
-### The shared editor
+### The shared editor ✅ **DONE 8/13/2026**
 
-- [ ] **Manage → Page Content** — one ordered-rows editor serving Getting Started steps *and* home sections: reorder, add/remove, title/body/route/label fields, the icon-picker grid where a row uses a Material icon, and a photo upload where a row uses an image. Building this twice is the thing to avoid. Specs.
+- [x] **Manage → Page Content** — one ordered-rows editor serving Getting Started steps *and* home sections: reorder, add/remove, title/body/route/label fields, the icon-picker grid where a row uses a Material icon, and a photo upload where a row uses an image. Specs.
 
-- [ ] `db_schema/getting_started_steps.{h,cpp}` — **app-side** table, the `home_page_photos` precedent: `id`, `ordinal`, `mat_icon`, `title`, `body`, `link_route`, `link_label`, `hidden_when_logged_in`, timestamps. Registered through the full new-table checklist (`make_app_tables.cpp` + create_database's 11 registration points — admin registration included, so the generic editor doubles as the debug view). App-side because knottyyoga is the only app with a Getting Started page today; the table is a leaf and promotes to honuware cheaply if CommunityFinder ever builds one. *(app)*
-- [ ] Curated **icon allow-list** constant (Material icon names) — one source of truth serving both server-side `mat_icon` validation and the editor's picker grid. *(app)*
-- [ ] Table helper + `GET /api/getting_started_steps` (anonymous, ordered by `ordinal`) — the public page's feed. Writes ride the generic CRUD endpoints via the admin table registration (admin permission). Route values validated to be root-relative (`/...`). *(app)*
-- [ ] Seed the seven shipped steps in `create_database.cpp` — the "Create your account" row seeded `hidden_when_logged_in = true`. *(app)*
-- [ ] Frontend: `/start` renders from the endpoint — numbering from array position (the signed-in close-up behavior falls out for free), icon/title/body/CTA from the row. `ServerAccess` seam ×5 files per the standing rule. Component + mock specs.
-- [ ] Frontend: dedicated **Manage → Getting Started** editor page (per the "Manage Data is a debug hack" rule — this is the business workflow surface): ordered row list with reorder, add/remove, the icon-picker grid over the curated set, title/body/route/label fields, the hidden-when-signed-in toggle. Specs.
-- [ ] Tests: table helper CRUD + ordering; endpoint anonymity + order; icon + route validation; seed presence on a fresh DB.
+- [x] `db_schema/getting_started_steps.{h,cpp}` — **app-side** table. Registered through the full new-table checklist. *(app)*
+- [x] Curated **icon allow-list** constant (Material icon names) — one source of truth serving both server-side `mat_icon` validation and the editor's picker grid. *(app)*
+- [x] Table helper + `GET /api/getting_started_steps` (anonymous, ordered by `ordinal`). Writes ride the generic CRUD endpoints. Route validated root-relative — **client-side only for now; see the gap note.** *(app)*
+- [x] Seed the seven shipped steps in `create_database.cpp` — "Create your account" seeded `hidden_when_logged_in = true`. *(app)*
+- [x] Frontend: `/start` renders from the endpoint — numbering from array position, icon/title/body/CTA from the row. `ServerAccess` seam ×5 files. Component + mock specs.
+- [x] Frontend: the editor page — delivered as the **shared** Page Content editor rather than a Getting-Started-only page, which is what the "build it once" item asks for.
+- [x] Tests: table helper CRUD + ordering; endpoint anonymity + order; icon + route validation; seed presence on a fresh DB.
+
+### As-built notes (8/13/2026)
+
+**The home-sections half was already shipped** before this session (table, helper, endpoint, seed, Home rendering). Phase 3's remaining work was the steps table, the shared editor, and the tier icons.
+
+**Backend.** `getting_started_steps` follows `home_sections` exactly: DDL, a `TableHelpers::GettingStartedSteps` CRUD wrapper, and an anonymous `GET /api/getting_started_steps`, registered through every checklist point (`make_app_tables`, `CreateTables`, `allowed_tables`, admin column-data-info, column + table friendly names, the `web_app.cpp` anchor, both CMakeLists). The curated icon vocabulary lives in `business_logic/page_content/getting_started_icons.{h,cpp}` and is **served in the endpoint payload** as `allowed_icons` — that is what makes the picker and the server's list structurally incapable of drifting.
+
+**The feed returns EVERY row, including `hidden_when_logged_in` ones.** The client knows the viewer's auth state, so filtering there is what lets the numbering close up without a second round trip — and the rendered number is the array *position*, never `ordinal` (which is sparse: 10, 20, 30…).
+
+**⚠️ Postgres booleans cross the wire as `"t"`/`"f"`** — not `true`/`false`, not a JSON bool. A test caught it. It matters twice: `ServerAccessNetwork.normalizeGettingStartedStep` converts it (an un-normalized `"f"` is a non-empty string, therefore truthy, which would have hidden *every* step from signed-in visitors), and the editor's `toBool` does the same for the generic-CRUD read. **Latent bug spotted next door, not fixed:** the Home page and `ServerAccess.mock` filter `home_sections` with `section.active !== false`, which has the same flaw — currently harmless only because the public endpoint already filters `active = true` server-side. Worth a cleanup pass.
+
+**The editor is one component for both tables** (`/manage/page-content`, reachable from a Manage dashboard card). They are the same shape — ordinal + title + body + one link — differing only in the extras, so the shared parts are written once: reorder via ordinal swap, add/remove with confirm, the copy fields, and a reload-from-server after every write rather than trusting local state. Home sections get the `kind` select, an active toggle and the `hw-photo-upload` control; steps get the icon-picker grid and the hidden-when-signed-in toggle. Reads use `getTableRows`, so **inactive** home sections stay editable — the public feed hides them, the editor must not.
+
+**Gap worth naming: the write path has no server-side validation.** The plan chose generic CRUD for writes, and those endpoints have no per-column hook, so the icon allow-list and the root-relative route rule are enforced **client-side only** today (the picker cannot offer an invalid icon; the route field refuses anything not starting with a single `/`). An admin posting directly to `/api/add_item` could still write junk. Phase 6 builds real validated manage endpoints — the right place to close this, and both the allow-list and the validator already exist server-side waiting for it.
+
+**Deliberate deviation:** the plan listed a "Manage → Getting Started" page *and* a shared "Manage → Page Content" editor. Building both would be the exact duplication the plan warns against, so there is one editor with a list switcher.
+
+**Gate:** C++ **4798/4798** (up from 4779 — 19 new tests) plus an explicit `knottyyoga_database_helper` build (the standard gate does not compile it, and `create_database.cpp` changed). Angular **3018/3018** (up from 2989), both `tsc --noEmit` projects clean.
+
+### What is left in Phase 3
+
+**Membership tier icons only.** It is independent of everything above and needs Ryan's three exported laurel images to seed, so it is a clean standalone slice: attach a per-tier image through the existing photo association, seed from the exports, and have the tier card fall back to today's Material icon when a tier has no image.
 
 ## Phase 4 — Token pipeline (incl. fonts as data — D4)
 
