@@ -215,7 +215,18 @@ Three tests pin this so it cannot drift: `EverySlotInTheRegistryHasADefaultFromO
 
 **Note for Phase 2 — the hero slots partly overlap `home_sections`.** Since this catalog was written, Home moved its hero and marketing bands to the `home_sections` table (Phase 3's home-sections half landed early). `site_hero_headline` / `site_hero_subline` / `site_hero_image_url` still exist and are still seeded, but Phase 2 should wire `site_hero_headline` to the **intro strip** (`home-intro__text`, currently hardcoded) rather than re-plumbing the hero band, and decide whether `site_hero_subline` has a consumer at all or should be retired from the catalog.
 
-**Gate:** honuware Linux suite green; knottyyoga app Linux suite green (co-dev against the local honuware tree). **Pin bump owed** — the app's `CMakeLists.txt` `GIT_TAG` still points at the pre-Phase-1 honuware SHA, so the honuware half needs pushing and re-pinning before a non-co-dev build sees it.
+**Gate:** all green.
+
+| Suite | Result | honuware source |
+|---|---|---|
+| honuware standalone | 1532 / 1532 | — |
+| knottyyoga | 4779 / 4779 | co-dev (local tree) |
+| knottyyoga | 4779 / 4779 | **pinned SHA** (real GitHub clone) |
+| communityfinder | 1553 / 1553 | **pinned SHA** (real GitHub clone) |
+
+**Pin bumped 8/12/2026** — honuware `5dcae2c` ("Phase 1 — Content slots, server side") is pushed and CI-green, and both consumers are re-pinned to it: `knottyyoga_server/CMakeLists.txt` (from `c258a8c`) and `communityfinder_server/CMakeLists.txt` (from `3b1c3dc`, so CF also picks up "Blog support server side"). Both verified against the pinned clone, not the co-dev override.
+
+⚠️ **Never run two of these suites concurrently.** They own different main databases but create the *same* scratch tenant DBs (`test_honuware_tenant_a/b`), so a parallel run produces phantom failures in `TenantPhysicalIsolationTest.*` and `DatabaseUtilTest.MakeAndClearDatabaseBasic`. Run them serially.
 
 ## Phase 2 — Content slots, frontend
 
