@@ -478,9 +478,54 @@ Three tables, all framework (D11 — CommunityFinder wants fonts too), all in th
 
 ## Phase 5 — Imagery v1 (URL-based)
 
-- [ ] Wire `site_hero_image_url` + `site_favicon_url` consumers (Phase 2 stubs them behind defaults; this phase completes fallback behavior + error handling — a 404'd image falls back to the bundled asset, never a broken-image icon).
-- [ ] Document the constraint set for each slot (logo: light-on-dark, height-bounded; hero image: aspect guidance) in the onboarding runbook — these match Ryan's slot-constraint rules in the inventory doc.
+- [x] Wire `site_hero_image_url` + `site_favicon_url` consumers (Phase 2 stubs them behind defaults; this phase completes fallback behavior + error handling — a 404'd image falls back to the bundled asset, never a broken-image icon).
+- [x] Document the constraint set for each slot (logo: light-on-dark, height-bounded; hero image: aspect guidance) — recorded below; Phase 7's runbook and Phase 6's editor hints both consume this table.
 - [ ] *(Deferred, recorded not planned: a `site_assets` upload flow so tenants don't need externally hosted URLs — revisit after the first real second tenant.)*
+
+### As-built notes (8/13/2026)
+
+App-side only — both URL slots already existed from Phase 1, so no honuware change and no pin bump.
+
+**The gap Phase 2 left was "well-formed" vs "resolves".** Server-side validation (D10) proves a URL *parses*; only the browser can discover it 404s. So each image consumer now degrades to its bundled asset:
+
+| Consumer | Mechanism |
+|---|---|
+| Header logo | `(error)` on the `<img>` → swap to `logoAsset` |
+| Home intro badge | `(error)` on the `<img>` → swap to `heroImageAsset` |
+| Favicon | **probe-then-swap** (see below) |
+
+Each fallback is attempted **once**, guarded by a flag: if the bundled asset were itself missing, an unguarded handler would re-fire on its own replacement and loop.
+
+**The favicon needed a different mechanism.** `<link rel="icon">` fires no error event, so a dead tenant URL would silently blank the tab icon with nothing to catch. The bundled icon is installed **first**, then the tenant URL is loaded into an off-document `<img>` purely to see whether it resolves, and only swapped in on success. The probe is deliberately not awaited — boot never waits on an icon, and the bundled one is showing meanwhile.
+
+### Slot constraint set
+
+What a studio needs to know before it supplies each image. These are the engineering half of Ryan's slot-constraint rules in [[Component Inventory for Designer]]; Phase 6's editor should show them as field hints, and Phase 7's runbook should quote them.
+
+| Slot | Constraint | Why |
+|---|---|---|
+| `site_logo_url` | **Light-on-dark.** Sits on the black header band (`--theme-inverse-surface`). A dark logo disappears. | Ryan's shell is solid black; the bundled KY mark is white for this reason. |
+| | **Height-bounded**, rendered at 120px wide in a full-height slot. Supply something that reads at that size. | The header height is fixed; a tall logo is scaled down, not given more room. |
+| | **SVG preferred**, PNG with transparency acceptable. Never a JPEG. | A JPEG's opaque box shows as a white rectangle on the black band. |
+| `site_favicon_url` | Square, ≥32×32. ICO, PNG or SVG. | Browsers pick from what they're given; a non-square icon is letterboxed. |
+| | The stale `type="image/x-icon"` is dropped when a tenant URL wins, so any format works. | index.html declares ICO for the bundled default only. |
+| `site_hero_image_url` | Square-ish badge beside the intro sentence, rendered ~142px wide. | It is a mark, not a photograph — the bundled default is the safe-space badge. |
+| | Transparent background. | It sits on the page background, not a card. |
+| **All three** | `https://` or root-relative (`/…`); never `http://`, never protocol-relative. | Enforced server-side (D10). An `http://` asset would mixed-content-block on an https site. |
+| **All three** | Must actually resolve — a 404 silently degrades to the bundled asset. | The tenant sees *our* branding, not theirs, with no error surfaced. Worth calling out in the editor. |
+
+Carousel photos, home-section images and instructor photos are **not** in this table: they upload through the photo system and are already size-validated and scaled server-side.
+
+### Hand-testing steps (live server, blank database)
+
+Like Phase 2, the visible test is a **regression**: with no tenant URLs configured, every image must still be Knotty Yoga's own. Recreate the database with `knottyyoga_database_helper --recreate_database`, start `knottyyoga_the_server`, run the Angular dev server, and sign out first.
+
+1. **Header logo.** On any page, the top-left mark is the white Knotty Yoga logo on the black band — not a broken-image icon and not an empty gap.
+2. **Browser tab.** The tab icon is the Knotty Yoga favicon and the title reads **Knotty Yoga Fitness Studio**.
+3. **Home badge.** On the landing page, under the intro sentence, the round safe-space badge renders.
+4. **No console errors.** Open the browser console on the landing page: there must be no failed image requests. *(The one place a silent fallback would otherwise hide a problem.)*
+
+**Not hand-testable until Phase 6.** Pointing a slot at a deliberately broken URL — the actual new behaviour — needs the Site Theme editor; `config_secrets` is excluded from Manage Data by design and `knottyyoga_database_helper` has no secrets command. The fallback paths are covered by spec instead (header logo, home badge, and both favicon outcomes). **Add to Phase 6's steps:** set `site_logo_url` to a URL that 404s, reload, and confirm the bundled logo appears rather than a broken image.
 
 ## Phase 6 — Admin "Site Theme" page
 
