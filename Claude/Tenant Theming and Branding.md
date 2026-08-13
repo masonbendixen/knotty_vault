@@ -347,8 +347,46 @@ Colors/radius first (pure variable plumbing), then the font machinery.
 - [ ] Frontend boot: inject the constructed CDN `<link>`s and generated `@font-face` rules in the same pre-render initializer; set the `--font-*` role variables; every role carries a system-font fallback stack with `font-display: swap` (a dead CDN or deleted upload degrades to readable text, never blank). *(app)*
 - [x] ~~`.din*` font classes re-based onto `--font-*` variables; the bundled D-DIN faces stay as Knotty Yoga's default role values (no `site_fonts` rows needed for KY)~~ — **done 8/11/2026** (Track A; `body`/`*` re-based too, `.din-italic` deliberately left on the bundled face since italic is a face, not a role). *(app)*
 - [x] Material bridge: ~~override the `--mat-*` system tokens at boot~~ — **done in CSS instead**, see the as-built note. Scoped to the brand-carrying tokens, not a full re-theme. (D9)
-- [ ] Reconcile token names with Ryan's Foundations file when it lands (his names win; update the catalog above).
-- [ ] Tests: token application function (writes vars, skips invalid); a themed boot restyles a `theme-red` consumer; font-class regression spec; `site_fonts` helper CRUD; upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; CDN descriptor round-trip; URL-construction unit test (allow-listed origin only).
+- [ ] Reconcile token names with Ryan's Foundations file when it lands (his names win; update the catalog above). — *nothing pending; the catalog already matches the as-built `_tokens.scss` mined from his file.*
+- [x] Tests: token application function (writes vars, skips invalid); a themed boot restyles a token consumer; font-class regression spec. **(Colour/radius half.)**
+- [ ] Tests: `site_fonts` helper CRUD; upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; CDN descriptor round-trip; URL-construction unit test (allow-listed origin only). **(Font half.)**
+
+### As-built notes — colour/radius half ✅ **DONE 8/13/2026**
+
+The plan's own sequencing ("colours/radius first, then the font machinery") is the split this session shipped: **the token pipeline is live end to end; the fonts-as-data cluster is untouched.**
+
+**The registry is two-layer, matching the stylesheet.** `components/platform/business_logic/branding/site_theme_tokens.{h,cpp}` maps each `site_theme_*` config-secret key to the CSS custom property it overrides, with a type (`Color` / `Length` / `FontFamily`). It registers all six seven-step **palette** ramps plus the standalone tints, the brand/neutral/status **roles**, the four radius tokens, and the three `--font-*` roles — ~60 tokens.
+
+Registering the whole palette (not just the base step) is what makes a re-brand one layer: every role is `var(--palette-…)` and custom properties resolve at **use** time, so overriding `--palette-primary-400` moves `--theme-primary`, `--theme-primary-hover` and everything downstream. A spec proves exactly that.
+
+**Unset tokens are OMITTED, not sent empty** — the opposite of the content slots, and deliberately so. The SPA's `_tokens.scss` holds every default, so the payload is purely the override layer; an empty custom property is invalid at computed-value time and would break the cascade the defaults provide. "Absent" is the only safe way to say "keep the default", which also means **a token has no config_secrets row until a tenant sets one** — the normal state, and why these keys have no default VALUES on either the framework or the app side.
+
+**Why ~60 keys are not in `secret_keys.h`.** Nothing outside the theming code names a token individually, and the mapping that matters (key → CSS property → type) only a table can express. The registry is the single source of truth; `secret_keys.h` carries a pointer to it.
+
+**New validators (D10).** `IsValidCssLength` takes `8px` / `0.5rem` / `50%` / bare `0` and refuses `calc()`, `var()`, unitless numbers and anything with a `;`. `IsValidFontFamilyList` allows letters, digits, spaces, hyphens, underscores, commas and balanced double quotes — refusing `;` `{` `}` `(` `)` `\` `/`, so a family name cannot become a rule of its own. Both matter because these values land in a custom property: a "corner radius" field must not be able to smuggle CSS.
+
+**The boot applier** writes each entry with `setProperty` on `document.documentElement` — the same mechanism the style guide's live "try another studio" preview already uses. Two client-side guards on top of the server's validation: it only ever writes properties starting with `--` (so a payload can never set a real CSS property), and it skips blanks.
+
+**⚠️ Deliberate deviation — the Material bridge is CSS, not JavaScript.** The plan said "override the `--mat-*` system tokens at boot". Angular Material 21 reads its colours through the M3 **system layer** (`--mat-sys-primary` and friends — verified against the shipped prebuilt theme), so a new `angular-material-overrides/_mat-system-bridge.scss` points those at our roles once. Strictly better than doing it at boot:
+- the boot applier only ever writes `--theme-*` / `--palette-*` — one concept, not two;
+- a tenant override reaches Material through the same `var()` chain, with nothing to keep in sync;
+- the style guide's live preview restyles Material too, because it is the same cascade rather than a boot-time snapshot.
+
+Scope is narrow as the plan asked: primary, accent and the error tone. Surface/container tokens stay Material's so its elevation ramp stays internally consistent. Buttons were already covered — `_mat-button.scss` restyles them from our roles directly; the bridge is what reaches the spinner, toggles, checkboxes, radios and the form-field focus ring. `design-tokens.spec.ts` now asserts every bridged token equals its role **and** that a runtime `--palette-primary-400` override reaches `--mat-sys-primary`.
+
+**Gate:** honuware **1550/1550** (+18), Angular **3026/3026** (+8), both `tsc --noEmit` projects clean.
+
+### What is left in Phase 4 — the fonts-as-data cluster (D4)
+
+A clean, separable slice: the `--font-*` **roles** are already themable through the registry above, so a tenant can already point body/heading/display at any family the browser can resolve. What is missing is the **inventory** — where a family that is not already loaded comes from:
+
+- [ ] `site_fonts` framework table + helper: family name, face rows (weight/style), source kind `cdn` | `uploaded`, CDN family + weights, binary bytes + format.
+- [ ] Magic-byte (`wOF2`/`wOFF`/TTF/OTF) + size-cap validation, and the CDN origin allow-list constant (Google Fonts first).
+- [ ] The public, cacheable font-serving endpoint with correct `font/*` Content-Type + `nosniff`.
+- [ ] `site_info`'s `theme` payload gains the per-family font-face descriptors.
+- [ ] Frontend boot: inject the constructed CDN `<link>`s and generated `@font-face` rules in the same pre-render initializer, each role keeping a system-font fallback with `font-display: swap`.
+
+Held back deliberately rather than rushed: it is a binary-upload path plus a public byte-serving endpoint — the one security-sensitive surface in this plan — and it deserves its own pass.
 
 ## Phase 5 — Imagery v1 (URL-based)
 
