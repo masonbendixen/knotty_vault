@@ -338,15 +338,15 @@ Colors/radius first (pure variable plumbing), then the font machinery.
 
 > **Head start (8/11/2026):** the *default* half of this phase already shipped via integration Track A — `ui/src/assets/styles/_tokens.scss` emits the whole catalog above, the legacy aliases resolve through it, and `ui/src/app/shared/design-tokens.spec.ts` guards the values. What remains here is the **runtime override**: the server carrying `site_theme_*` values and the boot applying them over these defaults.
 
-- [ ] Server: accept + serve `site_theme_*` keys in the `theme` object (CSS-var name → validated value). *(hw)*
+- [x] Server: accept + serve `site_theme_*` keys in the `theme` object (CSS-var name → validated value). *(hw)*
 - [x] ~~Frontend: alias the legacy `--red`/`--orange`/`--gray` to the new `--theme-*` so existing Tailwind mappings restyle immediately~~ — **done 8/11/2026** (Track A; `--orange` intentionally excluded, see the catalog's exception note).
-- [ ] Frontend: boot application — write each `theme` entry onto `document.documentElement` (inline properties beat the `:root` defaults, so the token file stays the fallback).
+- [x] Frontend: boot application — write each `theme` entry onto `document.documentElement` (inline properties beat the `:root` defaults, so the token file stays the fallback).
 - [ ] **`site_fonts` table** (framework tenant-DB table per D11 — CommunityFinder wants fonts too): family name, face rows (weight, style), source kind `cdn`/`uploaded`, CDN family + weights for `cdn`, binary bytes + format for `uploaded`. Table helper + magic-byte/size validation + the CDN origin allow-list constant (Google Fonts first). *(hw)*
 - [ ] **Font serving endpoint** — public, cacheable (long max-age; CloudFront caches it like photos), correct `font/*` Content-Type + `nosniff`. *(hw)*
 - [ ] `site_info`'s `theme` object gains **font-face descriptors** per tenant family: `cdn` entries as family+weights (client constructs the allow-listed stylesheet URL), `uploaded` entries as family/weight/style/format + the serving URL. *(hw)*
 - [ ] Frontend boot: inject the constructed CDN `<link>`s and generated `@font-face` rules in the same pre-render initializer; set the `--font-*` role variables; every role carries a system-font fallback stack with `font-display: swap` (a dead CDN or deleted upload degrades to readable text, never blank). *(app)*
 - [x] ~~`.din*` font classes re-based onto `--font-*` variables; the bundled D-DIN faces stay as Knotty Yoga's default role values (no `site_fonts` rows needed for KY)~~ — **done 8/11/2026** (Track A; `body`/`*` re-based too, `.din-italic` deliberately left on the bundled face since italic is a face, not a role). *(app)*
-- [ ] Material bridge: override the `--mat-*` system tokens that map to primary/accent at boot (D9) — scoped to what's visibly brand-colored today (buttons, toggles, spinner), not a full re-theme.
+- [x] Material bridge: ~~override the `--mat-*` system tokens at boot~~ — **done in CSS instead**, see the as-built note. Scoped to the brand-carrying tokens, not a full re-theme. (D9)
 - [ ] Reconcile token names with Ryan's Foundations file when it lands (his names win; update the catalog above).
 - [ ] Tests: token application function (writes vars, skips invalid); a themed boot restyles a `theme-red` consumer; font-class regression spec; `site_fonts` helper CRUD; upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; CDN descriptor round-trip; URL-construction unit test (allow-listed origin only).
 
