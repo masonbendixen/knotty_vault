@@ -443,15 +443,35 @@ Three tables, all framework (D11 — CommunityFinder wants fonts too), all in th
 2. The `theme` object's `--font-body` / `--font-heading` / `--font-display` arrive **already composed** (`'Barlow', sans-serif`) from the named row's family + fallback.
 3. The boot initializer injects the preconnect links, the stylesheet links, and an `@font-face` rule per uploaded face — then applies the theme tokens exactly as Phase 4A already does.
 
-### Checklist
+### Checklist ✅ **DONE 8/13/2026**
 
-- [ ] `site_font_sources` + `site_fonts` + `site_font_faces` schema, table helpers, and URL/family/fallback/spec validation. *(hw)*
-- [ ] Magic-byte + size-cap validation for uploaded faces. *(hw)*
-- [ ] `GET /api/site_fonts/<face_id>` — public, long-cache, `font/*` + `nosniff`. *(hw)*
-- [ ] `site_info` gains `fonts`, and composes the `--font-*` role stacks from the named rows. *(hw)*
-- [ ] Seed the Google source + **Barlow** and **Roboto** rows in `create_database.cpp`, and point the three role tokens at them — a fresh database reproduces today's `index.html` links from data. *(app)*
-- [ ] Frontend boot: inject preconnects, stylesheet links and `@font-face` rules pre-render; roles keep their fallback with `font-display: swap`. *(app)*
-- [ ] Tests: helper CRUD; URL construction (one link per source, specs joined, suffix appended); upload validation accepts woff2/woff/ttf/otf magic bytes and rejects junk + oversize; serving endpoint MIME/nosniff/cache headers; role-stack composition; boot injection.
+- [x] `site_font_sources` + `site_fonts` + `site_font_faces` schema, table helpers, and URL/family/fallback/spec validation. *(hw)*
+- [x] Magic-byte + size-cap validation for uploaded faces. *(hw)*
+- [x] `GET /api/site_font_face/<id>` — public, long-cache, `font/*` + `nosniff`. *(hw)*
+- [x] `site_info` gains `fonts`, and composes the `--font-*` role stacks from the named rows. *(hw)*
+- [x] Seed the Google source + **Barlow** and **Roboto** rows in `create_database.cpp` — a fresh database reproduces today's `index.html` links from data. *(app)*
+- [x] Frontend boot: inject preconnects, stylesheet links and `@font-face` rules pre-render; roles keep their fallback with `font-display: swap`. *(app)*
+- [x] Tests: helper CRUD; URL construction; upload validation; serving endpoint MIME/nosniff/cache headers; role-stack composition; boot injection.
+
+### As-built notes (8/13/2026)
+
+**The URL builder reproduces Mason's example exactly**, and a test asserts that literal string: two `family=` fragments joined with `&`, then the source's `display=swap`, in **one** request per source rather than one per family. Font order comes from `ordinal` so the URL is byte-stable between requests — a churning URL would miss the CDN cache on every page load. A source that no active family references emits **nothing**, not even a preconnect: opening a connection to a third party for no reason is a cost with no benefit.
+
+**⚠️ The spec grammar is richer than the design sketch.** Writing the validator's test surfaced that Google's real syntax uses **semicolons** (`family=Roboto:ital,wght@0,300;0,400;1,400`) — which the app's own shipped `index.html` URL relies on, and which my first validator rejected. `;`, `%` and `+` are all in the accepted set now; `&`, `?` and `#` stay out so a row can only ever contribute the one parameter its admin configured.
+
+**Uploads (D14).** Format is decided by **magic bytes** (`wOF2`/`wOFF`/`OTTO`/`00 01 00 00`/`true`/`ttcf`), never the filename, and that stored format is what picks the MIME type on the way out — an unrecognised value is refused rather than guessed, because guessing would undo `nosniff`. Faces are served `font/*` + `nosniff` + `max-age=31536000, immutable` (a face is immutable; a replacement upload gets a new id). Byte reads are a separate call from descriptor reads so a manage page never drags font files into memory.
+
+**A shared bytea codec fell out of this.** Binary column values cross the KeyValueTable layer as `\xABCD` hex, and encode/decode lived as two private functions inside `image_helper.cpp`. Fonts made that the second binary store, so it moved to `sql_util/database_access/bytea.{h,cpp}` with its own tests, and `image_helper` now calls it. The rewrite also fixed a latent throw: the old decoder used `std::stoi`, which raises on malformed input — on a read path handling untrusted database content. It now stops at junk instead.
+
+**🐞 A REAL PRODUCTION BUG, found by this work and pre-existing.** `/api/site_font_face` 404'd in the app suite while passing standalone. Root cause: honuware's `Endpoints::RegisterFrameworkEndpoints()` — the function whose entire job is anchoring framework endpoints against `-O2` dead-stripping — **was never called by anything**. Framework endpoints reached the app's link only if the app happened to enumerate them itself in `web_app.cpp`, or if a *test* file referenced them.
+
+`GetSiteInfo` is in neither the app's anchor list nor any app source. So **`/api/site_info` has been dead-stripped out of the production server binary** — the route 404s in production. It passed every test because honuware's `site_info_test.cpp` references `GetSiteInfo`, pulling the object into the *test* binary only. And the failure is invisible from the outside: `SiteConfigService.load()` swallows the error and falls back to bundled branding, so a 404 looks exactly like "tenant hasn't customised anything".
+
+**This means Phases 1, 2 and 4A were never actually reachable in production** — the plumbing was right, the route was absent. Fixed by having the app's `RegisterAllEndpoints()` call `RegisterFrameworkEndpoints()`, which anchors honuware's whole list in one line and means a framework endpoint added later needs no app change. Worth a look at whether any *other* framework endpoint was only ever reachable via its test.
+
+**Gate:** honuware **1601/1601** (+51), knottyyoga C++ **4867/4867** (+51) plus an explicit `knottyyoga_database_helper` build, Angular **3034/3034** (+8), both `tsc --noEmit` projects clean.
+
+**Still to do (small):** `index.html` keeps its hardcoded Google Fonts `<link>` tags. They are now redundant for a seeded tenant but harmless — and removing them trades a parse-time font fetch for one that waits on `/api/site_info`. Worth a deliberate decision rather than a silent change; the fallback stacks and `font-display: swap` make either choice safe.
 
 ## Phase 5 — Imagery v1 (URL-based)
 
