@@ -529,10 +529,32 @@ Like Phase 2, the visible test is a **regression**: with no tenant URLs configur
 
 ## Phase 6 — Admin "Site Theme" page
 
-- [ ] Backend: curated endpoints `GET /api/manage/site_theme` (full editable set, unset-vs-default distinguished) + `PUT /api/manage/site_theme` (validated writes to the tenant's `config_secrets`). Admin-only via the existing permission machinery. **Never** the generic CRUD surface — `config_secrets` stays excluded. *(hw — resolved by OQ-T5/D11; the app contributes its slot list the same way it contributes defaults)*
-- [ ] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** (name, title, logo/favicon URLs, contact, address, socials) / **Copy** (hero, tagline, blurbs — the Getting Started steps have their own editor, Phase 3) / **About** (markdown textarea + live prose preview, reusing the blog editor's split-pane pattern) / **Colors** (color pickers per token role) / **Fonts** (the D4 **font manager**: list the tenant's families; add one as either a CDN family + weights from the allow-listed origin, or a file upload with the license-responsibility note; per-face preview text; assign families to the display/heading/body roles) — with per-field "reset to default". *(app for now; lift candidate in Phase 8)*
-- [ ] "Changes appear within ~5 minutes" note (the site_info cache) + a save-confirmation.
-- [ ] Tests: endpoint auth/validation/round-trip; component specs per section.
+- [x] Backend: curated endpoints `GET /api/manage/site_theme` (full editable set, unset-vs-default distinguished) + `PUT /api/manage/site_theme` (validated writes to the tenant's `config_secrets`). Admin-only via the existing permission machinery. **Never** the generic CRUD surface — `config_secrets` stays excluded. *(hw)*
+- [x] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** / **Copy** / **About** (markdown + live prose preview) / **Colors** (pickers per token role) / **Fonts** (**role assignment**) — with per-field "reset to default". *(app for now; lift candidate in Phase 8)*
+- [x] "Changes appear within ~5 minutes" note (the site_info cache) + a save-confirmation.
+- [x] Tests: endpoint auth/validation/round-trip; component specs per section.
+- [ ] **The font MANAGER** — add/remove families, CDN family+weights vs file upload with the license-responsibility note, per-face preview. **NOT DONE; see the split below.** *(app)*
+
+### As-built notes (8/13/2026)
+
+**The endpoints.** `GET/PUT /api/manage/site_theme` (honuware, admin-only). The GET returns every content slot and every theme token with `key`, `type`, `value` and **`is_set`** — the flag is the whole reason a curated endpoint exists rather than a generic one: a field the studio *cleared* and one they *never touched* are both `""` in `config_secrets`, but only one of them means "reset me to the default", and the editor's reset control has to tell them apart.
+
+**The GET returns the RAW stored value, not the normalized one.** site_info blanks anything that fails validation so a page never breaks — but the editor must show what the studio actually typed, or they cannot see and fix the thing that isn't working. A test pins that.
+
+**PUT validates the whole set before writing any of it.** A half-saved theme is worse than a refused one: the studio sees part of their change land with no idea which part failed. The good field is deliberately listed *first* in the atomicity test so a naive implementation would already have written it.
+
+Three more properties worth naming, each with a test:
+- **Only the keys present are written**, so saving one section can never blank another — which is what makes a section-at-a-time page safe.
+- **Empty clears a theme token** (that IS "reset to default"), so empty is exempt from the value validator, which rightly refuses it everywhere else.
+- **Unrecognised keys are ignored.** `config_secrets` holds live credentials; this curated surface must not become the way to write `mail_app_password`.
+
+**The page** (`/manage/site-theme`, reachable from a Manage dashboard card) has the five sections, saves one section at a time, and shows the "~5 minutes" cache note on success — a studio that reloads immediately and sees nothing has not done anything wrong. Colour tokens are labelled by their **CSS variable** rather than a prettied-up name: that is the vocabulary a designer already uses, and inventing a second one is a sync problem. The colour swatch shows `#000000` for an unset token but keeps the stored value empty until something is actually picked, so "unset" survives being looked at. Phase 5's slot constraints appear as field hints, where the decision is being made rather than in a runbook nobody opens. Validation failures echo the server's own message — the difference between "something went wrong" and a studio fixing its own typo.
+
+**⚠️ Split: the font MANAGER is not built.** The Fonts section does **role assignment** — which of the tenant's families is body/heading/display — because that is what lives in `config_secrets` and therefore belongs to this endpoint. Adding and removing families, and uploading faces, edits `site_fonts` / `site_font_sources` / `site_font_faces` **tables** and needs a multipart upload endpoint. Splitting on the **storage boundary** rather than an arbitrary line: everything the Site Theme page writes is a secret; the font inventory is rows and binaries. The tables, validation, and serving endpoint all exist from Phase 4B — what is missing is the write endpoints and the manager UI.
+
+**Gate:** honuware **1616/1616** (+15), Angular **3060/3060** (+19), both `tsc --noEmit` projects clean.
+
+**Pin bump owed** — honuware gained the two manage endpoints after the `641dd46` re-pin.
 
 ## Phase 7 — Provisioning, runbook, and the fake-studio proof
 
