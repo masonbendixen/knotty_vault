@@ -641,6 +641,25 @@ Nothing exposes a photo's size today. `GET /api/has_photo/<table>/<id>` already 
 
 **Metadata moved under the entry** rather than into its title: ordinal, kind, dimensions, and a Shown/Hidden badge. Dimensions come from the extended `has_photo`, one call per row, no image bytes.
 
+### Caching: `max-age=300` was the wrong call ✅ **FIXED 8/14/2026**
+
+Mason reported that changing `--theme-primary`, saving, and **reloading** left the site's colour unchanged — "it doesn't appear to ever override the default." Everything was, in fact, working: the value was in `config_secrets`, `/api/site_info` served it (verified by running the real server against the real database and curling the endpoint), the boot initializer applied it, and the CSS aliases pointed at it. The browser was replaying its cached copy of the bootstrap response, which a normal reload honours.
+
+`Cache-Control: public, max-age=300` was written as an optimisation, and as a five-minute delay on a rarely-changed value it looks harmless. It isn't, for two reasons:
+
+1. **A stale copy of this response is the tenant's branding silently not applying.** This is the one response that decides how the whole site looks. The failure mode is indistinguishable from the feature being broken — which is exactly the conclusion it produced. Anything that makes a working feature look broken is not a good trade for one saved request per boot on a ~1.5 KB body.
+2. **`public` on a tenant-varying response is a correctness bug, not just a staleness one.** The tenant is resolved from `X-Honuware-Site`, which is not part of a shared cache's key by default. A shared cache in front of the origin could serve one studio's branding to another.
+
+As built: `Cache-Control: no-cache` (still storable — it requires revalidation before reuse, so a shared cache keeps working) plus `Vary: X-Honuware-Site`. Both are asserted in `site_info_test.cpp`.
+
+**The editor no longer waits for a fetch at all.** `SiteConfigService.applyTheme()` is now public, and `SiteThemeComponent.save()` calls it with what was just saved — the same applier boot uses, so what the admin sees is what the next visitor gets. The confirmation reads "Your site is using these changes now."
+
+**The test gap that let this ship.** Every existing theme test asserted the custom *property* changed. None asserted that anything *rendered* followed it, so "applied to the document" and "visible on the site" were never distinguished. `site-config.service.spec.ts` now paints a real element with `var(--theme-primary)` and asserts its **computed colour** changes.
+
+**Two related leaks found while fixing it** — both the same defect class (theme tokens written to `<html>`, which outlives the writer):
+- The new `applyTheme()` call meant the existing save spec restyled the real `<html>` and never put it back, breaking three `design-tokens.spec.ts` assertions later in the run. The spec now snapshots and restores the root inline style rather than guessing which properties a test touched.
+- **A genuine product bug:** `StyleGuideComponent.previewStudio()` writes an invented palette onto `<html>` with no `ngOnDestroy`, so previewing "Cedar & Salt" and navigating away left the **entire app** green until a full reload. Fixed with `ngOnDestroy → resetStudio()`, with a spec that destroys the fixture and asserts the token is back.
+
 ### What is left in Phase 6B
 
 Two items, both app-side frontend, both cleanly separable:
