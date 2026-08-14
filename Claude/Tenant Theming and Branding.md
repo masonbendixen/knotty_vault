@@ -49,7 +49,7 @@ What already exists — this plan builds on it rather than re-inventing it:
 
 **Server (honuware + app):**
 - Multi-tenant Model C is live: per-request tenant resolution (`X-Honuware-Site` / `FixedTenantResolver`), one database per tenant, per-tenant `config_secrets` with at-rest encryption.
-- `GET /api/site_info` (honuware `components/platform/endpoints/site_info.*`) returns `display_name`, `website_url`, `logo_url` for the resolved tenant. Unauthenticated, `Cache-Control: public, max-age=300`. Sources: `::Mail::LoadTenantBranding` (studio name ← `kMailSenderName`, website ← `kWebsiteAddressLogin`) + `Secrets::kSiteLogoUrl` (default `""`), falling back to `TenantContext.displayName`.
+- `GET /api/site_info` (honuware `components/platform/endpoints/site_info.*`) returns `display_name`, `website_url`, `logo_url` for the resolved tenant. Unauthenticated, `Cache-Control: no-cache` + `Vary: X-Honuware-Site` (was `public, max-age=300` until 8/14/2026). Sources: `::Mail::LoadTenantBranding` (studio name ← `kMailSenderName`, website ← `kWebsiteAddressLogin`) + `Secrets::kSiteLogoUrl` (default `""`), falling back to `TenantContext.displayName`.
 - `Mail::TenantBranding` — framework mail templates are already brand-free; app mail templates were parameterized in tenancy Phase 4.5. Emails already carry the right studio name, sender, and links per tenant.
 - App-side secret **defaults** registration exists (`business_logic/app_secret_values.cpp`) — the mechanism that seeds brand default values into every tenant's `config_secrets`. This is the natural home for new content-slot defaults.
 - `config_secrets` is **deliberately not surfaced** in the generic admin CRUD (it holds live credentials) — so anything stored there needs curated endpoints, which Phase 5's Site Theme page provides anyway.
@@ -201,7 +201,7 @@ Conventions per [[../CLAUDE.md|CLAUDE.md]] + standing memory: backend before fro
 
 Three tests pin this so it cannot drift: `EverySlotInTheRegistryHasADefaultFromOneSideOrTheOther` (exactly one side, for every slot), the pre-existing `FrameworkAndAppKeySetsDoNotOverlap`, and a `PopulateFrameworkTables` assertion that each framework default seeds as exactly one row. `components/services/util/secrets/CLAUDE.md` now documents the rule so the next person doesn't "fix" the apparent omission.
 
-**Response shape** (`GET /api/site_info`, unchanged headers — public, `max-age=300`):
+**Response shape** (`GET /api/site_info`; headers revised 8/14/2026 to `Cache-Control: no-cache` + `Vary: X-Honuware-Site` — see Phase 6's caching note):
 
 ```json
 { "display_name": "…", "website_url": "…", "logo_url": "…",
@@ -531,7 +531,7 @@ Like Phase 2, the visible test is a **regression**: with no tenant URLs configur
 
 - [x] Backend: curated endpoints `GET /api/manage/site_theme` (full editable set, unset-vs-default distinguished) + `PUT /api/manage/site_theme` (validated writes to the tenant's `config_secrets`). Admin-only via the existing permission machinery. **Never** the generic CRUD surface — `config_secrets` stays excluded. *(hw)*
 - [x] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** / **Copy** / **About** (markdown + live prose preview) / **Colors** (pickers per token role) / **Fonts** (**role assignment**) — with per-field "reset to default". *(app for now; lift candidate in Phase 8)*
-- [x] "Changes appear within ~5 minutes" note (the site_info cache) + a save-confirmation.
+- [x] ~~"Changes appear within ~5 minutes" note (the site_info cache)~~ + a save-confirmation. → **The cache was removed instead (8/14/2026); a save now applies immediately and the note reads "Your site is using these changes now." See the as-built note below.**
 - [x] Tests: endpoint auth/validation/round-trip; component specs per section.
 - [ ] **The font MANAGER** — add/remove families, CDN family+weights vs file upload with the license-responsibility note, per-face preview. **NOT DONE; see the split below.** *(app)*
 
