@@ -554,7 +554,80 @@ Three more properties worth naming, each with a test:
 
 **Gate:** honuware **1616/1616** (+15), Angular **3060/3060** (+19), both `tsc --noEmit` projects clean.
 
-**Pin bump owed** — honuware gained the two manage endpoints after the `641dd46` re-pin.
+**Pin bumped** — honuware `a4aeb18`; both consumers verified against the pinned clone (knottyyoga 4882, communityfinder 1637).
+
+---
+
+## Phase 6B — Editor usability revision
+
+> **Driven by Mason's 8/14/2026 review of the shipped editors.** He used Page Content and Site Theme and reported what was wrong with them. Most of this is not polish: three items are functionality I simply did not build (the font manager, the type scale, per-token descriptions), and two are things I built that do not work well enough to use (the tab indicators, the colour swatches).
+>
+> Three design questions were put to him; all three answers took the **more thorough** option, so the scope below is the full version rather than the cheap one.
+
+### What he reported
+
+**Page Content**
+1. No image preview — you have to click *edit* to see which photo a row uses.
+2. Image dimensions are not shown anywhere.
+3. **No visual indication of which list is selected** (Home sections vs Getting Started steps).
+4. The row's `kind` is not shown.
+5. *"Honestly, it would be really nice if you just previewed the entry like it will appear on the home page with the metadata below it."*
+
+**Site Theme**
+6. **No visual indication of which tab is selected.** → make them real tabs.
+7. "Colours" → **"Colors"**. (US spelling; the rest of the app uses it.)
+8. Colors **show black instead of the actual colour**, and no RGB value.
+9. No plain-English description of what each colour is *for*.
+10. Colours should be **grouped into sections, each with a visual representative that changes as you edit**.
+
+**Fonts**
+11. Wants to **add/alter font sources and families** — the CDN, the URL suffix, the CSS font indicator, the font name, the fallback. *(This is the font manager I deferred at the end of Phase 6.)*
+12. **Example text that changes with the font.**
+13. The **type scale** (small / medium / headline …) should be listed and editable.
+14. **Weights and styles** should be settable for fonts that support them.
+
+### Decisions (Mason, 8/14/2026)
+
+- **D15 — Previews reuse the REAL Home components.** *(His pick over an editor-specific card.)* `home-page.component.html`'s inline markup splits into per-kind components — hero, feature, banner, artwork — which both the public page and the editor render. The editor draws them at reduced scale with metadata beneath. The cost is a refactor; the payoff is that a preview **cannot drift** from the live page, and the four kinds genuinely look different in the editor because they *are* different components. Getting Started steps get the same treatment (the numbered step card becomes a component).
+- **D16 — Colors get five groups, each with a live specimen.** Brand → buttons and a link. Surfaces & text → a card with heading, body, muted line and border. Status tones → the four badges plus a tinted notice. Shell → the black header/footer bar. Palette ramps → the seven-step swatch row. Each specimen is built from the **real app classes**, so editing a token restyles it in place — the page becomes its own proof. Every row shows a swatch, the resolved `#RRGGBB`, a plain-English description, and reset.
+- **D17 — The font manager ships in full, uploads included.** *(His pick over CDN-only.)* Sources and families become editable, CDN weights get a friendly range control that writes the `spec` string, and uploaded faces get drag-and-drop with the licence-responsibility note (D4) and a per-face specimen.
+
+### The "black swatch" bug, and the right fix
+
+The colour inputs show `#000000` for every unset token. That is my `colorFor()` returning black as a placeholder — but it is the wrong *idea*, not just a wrong value: an unset token is not black, it is **whatever the stylesheet's default is**, and that is the value a studio needs to see before deciding to change it.
+
+The fix is available entirely client-side and needs no server change: the bundle's `_tokens.scss` is already loaded, so
+`getComputedStyle(document.documentElement).getPropertyValue('--theme-primary')` returns the **effective** value — the tenant's override if one is set, the shipped default otherwise. The editor shows that, and uses the server's `is_set` to say whether it is *your value* or *the default*. Resolution happens against a `<div>` carrying the pending edits, so the specimens preview unsaved changes without touching the live page.
+
+### Type scale and weights are missing from the registry
+
+`--text-xs … --text-2xl` and `--weight-regular … --weight-bold` exist in `_tokens.scss` but were never registered as `site_theme_*` tokens, so there is no way to change them — item 13 is a genuine gap, not a UI omission. They join the registry as `Length` and a new numeric-weight type. *(hw)*
+
+### Image dimensions
+
+Nothing exposes a photo's size today. `GET /api/has_photo/<table>/<id>` already answers "is there an image here" for logged-in users; it gains `width`, `height` and `type` when one exists — the same question the editor is asking, one call, and **without fetching the bytes** (a list of eight sections must not pull eight full-size images). *(hw)*
+
+### Checklist
+
+**Backend (hw — needs a pin bump)**
+- [ ] Register the type-scale and weight tokens in the theme registry.
+- [ ] Extend `has_photo` with `width` / `height` / `type`, reading dimensions without the blob.
+- [ ] Font-manager write endpoints: create/update/delete for `site_font_sources` and `site_fonts`; face upload (magic-byte + size validated, reusing Phase 4B's validators) and delete.
+- [ ] Serve per-token English descriptions from `GET /api/manage/site_theme` so the copy lives with the registry rather than being duplicated in the client.
+- [ ] Tests for each.
+
+**Page Content (app)**
+- [ ] Split Home's inline section markup into `hero` / `feature` / `banner` / `artwork` components with a `preview` mode; Home renders them unchanged.
+- [ ] Extract the Getting Started step card the same way.
+- [ ] Editor rows render the real component + metadata (ordinal · kind · dimensions · active/hidden) + the existing actions.
+- [ ] Real `mat-tab-group` for the two lists.
+
+**Site Theme (app)**
+- [ ] Real `mat-tab-group` for the five sections; "Colours" → "Colors".
+- [ ] Colors: resolved swatch + hex + description + reset, five groups, live specimens.
+- [ ] Type scale + weights editable.
+- [ ] Font manager: source editor, family editor (CDN weight range, fallback, live specimen), face upload with the licence note and per-face specimen.
+- [ ] Specs for all of it.
 
 ## Phase 7 — Provisioning, runbook, and the fake-studio proof
 
