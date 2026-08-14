@@ -660,6 +660,12 @@ As built: `Cache-Control: no-cache` (still storable — it requires revalidation
 - The new `applyTheme()` call meant the existing save spec restyled the real `<html>` and never put it back, breaking three `design-tokens.spec.ts` assertions later in the run. The spec now snapshots and restores the root inline style rather than guessing which properties a test touched.
 - **A genuine product bug:** `StyleGuideComponent.previewStudio()` writes an invented palette onto `<html>` with no `ngOnDestroy`, so previewing "Cedar & Salt" and navigating away left the **entire app** green until a full reload. Fixed with `ngOnDestroy → resetStudio()`, with a spec that destroys the fixture and asserts the token is back.
 
+### Editor polish — field rhythm and naming the default ✅ **8/14/2026**
+
+**Spacing.** A field's description is a `mat-hint`, which Material renders *inside* the field's own box. So a container gap is measured from below the description, and the description ends up sitting on the next field's outline. Worst on the Fonts tab, where `.token-group` is a plain block with no gap at all — the panels touched. Fixed with a `.token-group--fields` modifier (a `layout.stack` at `--space-5`) on the font-role section, and the same rhythm applied to the `.form-card` that Brand basics and Copy use. `.about-split` is excluded — it is a two-column grid, not a stack of fields. `.token-group__title` went from `--space-1` to `--space-2`: heading and blurb still read as a pair, and the air now comes from the group's gap.
+
+**"Use the default" now names the default** — `Use the default (Roboto)`. Choosing it was otherwise a blind pick, when deciding whether the default is the font you want is the entire purpose of the row. `resolved()` deliberately prefers the studio's override, so this needed the other half: `stylesheetDefault()` (same cache, no override) plus `defaultFontLabel()`, which takes the leading family off the stack and unquotes it so it reads like the real options. Falls back to the bare wording when a token resolves to nothing.
+
 ### What is left in Phase 6B
 
 Two items, both app-side frontend, both cleanly separable:
