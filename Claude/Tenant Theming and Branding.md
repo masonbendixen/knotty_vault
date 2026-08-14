@@ -609,25 +609,44 @@ Nothing exposes a photo's size today. `GET /api/has_photo/<table>/<id>` already 
 
 ### Checklist
 
-**Backend (hw — needs a pin bump)**
-- [ ] Register the type-scale and weight tokens in the theme registry.
-- [ ] Extend `has_photo` with `width` / `height` / `type`, reading dimensions without the blob.
-- [ ] Font-manager write endpoints: create/update/delete for `site_font_sources` and `site_fonts`; face upload (magic-byte + size validated, reusing Phase 4B's validators) and delete.
-- [ ] Serve per-token English descriptions from `GET /api/manage/site_theme` so the copy lives with the registry rather than being duplicated in the client.
-- [ ] Tests for each.
+**Backend (hw — needs a pin bump)** ✅ **DONE 8/14/2026**
+- [x] Register the type-scale and weight tokens in the theme registry.
+- [x] Extend `has_photo` with `width` / `height` / `type`, reading dimensions without the blob.
+- [x] Font-manager write endpoints: `GET/PUT /api/manage/site_fonts` plus face upload and delete.
+- [x] Serve per-token English descriptions (and the editor GROUP) from `GET /api/manage/site_theme`.
+- [x] Tests for each.
 
 **Page Content (app)**
-- [ ] Split Home's inline section markup into `hero` / `feature` / `banner` / `artwork` components with a `preview` mode; Home renders them unchanged.
-- [ ] Extract the Getting Started step card the same way.
-- [ ] Editor rows render the real component + metadata (ordinal · kind · dimensions · active/hidden) + the existing actions.
-- [ ] Real `mat-tab-group` for the two lists.
+- [ ] Split Home's inline section markup into `hero` / `feature` / `banner` / `artwork` components with a `preview` mode; Home renders them unchanged. **NOT DONE — see below.**
+- [ ] Extract the Getting Started step card the same way. **NOT DONE.**
+- [x] Editor rows show a **thumbnail** plus metadata (ordinal · kind · dimensions · shown/hidden) and the existing actions.
+- [x] Real `mat-tab-group` for the two lists.
 
-**Site Theme (app)**
-- [ ] Real `mat-tab-group` for the five sections; "Colours" → "Colors".
-- [ ] Colors: resolved swatch + hex + description + reset, five groups, live specimens.
-- [ ] Type scale + weights editable.
-- [ ] Font manager: source editor, family editor (CDN weight range, fallback, live specimen), face upload with the licence note and per-face specimen.
-- [ ] Specs for all of it.
+**Site Theme (app)** ✅ **DONE**
+- [x] Real `mat-tab-group` for the five sections; "Colours" → "Colors".
+- [x] Colors: resolved swatch + hex + description + reset, five groups, live specimens.
+- [x] Type scale + weights editable.
+- [x] Specs.
+- [ ] Font manager UI (the backend is done; the screen is not). **NOT DONE — see below.**
+
+### As-built notes (8/14/2026)
+
+**The black-swatch fix went further than a default value.** `resolved()` returns the studio's override if set, otherwise the value `getComputedStyle` reports for that custom property on `:root` — the real shipped default, read from the stylesheet that is already loaded. Each row shows the swatch, that value, the English description from the registry, and a `yours` / `default` marker.
+
+**Two bugs found while doing it:**
+- Resolving against a `@ViewChild` probe carrying the pending edits caused **NG0100** — the probe does not exist on the first change-detection pass, so the binding was `''` then `#ed1c26`. Resolving against `document.documentElement` instead removes the view dependency. The value is cached per property, because a template binding that calls `getComputedStyle` runs on every cycle and these defaults never change.
+- `SharedModule` does not export `MatTabsModule`, so both pages needed it imported explicitly — the tabs failed to render at all until then.
+
+**Live specimens** get the pending overrides through `[ngStyle]`, so editing a token restyles the specimen in place while the row values stay stable. Consequence worth knowing: overriding a *palette* step updates the specimens immediately, but a *role* row still displays its original default until saved and reloaded, because the role's own resolution is cached. The specimen is the live preview; the row is the value.
+
+**Metadata moved under the entry** rather than into its title: ordinal, kind, dimensions, and a Shown/Hidden badge. Dimensions come from the extended `has_photo`, one call per row, no image bytes.
+
+### What is left in Phase 6B
+
+Two items, both app-side frontend, both cleanly separable:
+
+1. **The Home-component extraction (D15).** The editor currently shows a **thumbnail** and metadata, not the real hero/feature/banner/artwork rendering. Doing it properly means splitting `home-page.component.html`'s inline markup into four components with a `preview` mode and having both the public page and the editor render them — which is the only way a preview cannot drift. Deliberately not rushed at the end of a long pass: it touches the live home page.
+2. **The font manager UI.** Every endpoint it needs exists and is tested (`GET/PUT /api/manage/site_fonts`, face upload with magic-byte validation, face delete) — what is missing is the screen: source editor, family editor with a CDN weight-range control, drag-and-drop upload with the licence note, and per-face specimens.
 
 ## Phase 7 — Provisioning, runbook, and the fake-studio proof
 
