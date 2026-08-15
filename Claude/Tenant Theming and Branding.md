@@ -533,7 +533,7 @@ Like Phase 2, the visible test is a **regression**: with no tenant URLs configur
 - [x] Frontend: Manage-portal page (back office — inherits building blocks, no Ryan design) with sections **Brand basics** / **Copy** / **About** (markdown + live prose preview) / **Colors** (pickers per token role) / **Fonts** (**role assignment**) — with per-field "reset to default". *(app for now; lift candidate in Phase 8)*
 - [x] ~~"Changes appear within ~5 minutes" note (the site_info cache)~~ + a save-confirmation. → **The cache was removed instead (8/14/2026); a save now applies immediately and the note reads "Your site is using these changes now." See the as-built note below.**
 - [x] Tests: endpoint auth/validation/round-trip; component specs per section.
-- [ ] **The font MANAGER** — add/remove families, CDN family+weights vs file upload with the license-responsibility note, per-face preview. **NOT DONE; see the split below.** *(app)*
+- [x] **The font MANAGER** — add/remove families, CDN family+weights vs file upload with the license-responsibility note, per-face preview. ✅ **DONE 8/14/2026** — `/manage/site-fonts`, its own page + dashboard card. See the as-built note below.
 
 ### As-built notes (8/13/2026)
 
@@ -665,6 +665,29 @@ As built: `Cache-Control: no-cache` (still storable — it requires revalidation
 **Spacing.** A field's description is a `mat-hint`, which Material renders *inside* the field's own box. So a container gap is measured from below the description, and the description ends up sitting on the next field's outline. Worst on the Fonts tab, where `.token-group` is a plain block with no gap at all — the panels touched. Fixed with a `.token-group--fields` modifier (a `layout.stack` at `--space-5`) on the font-role section, and the same rhythm applied to the `.form-card` that Brand basics and Copy use. `.about-split` is excluded — it is a two-column grid, not a stack of fields. `.token-group__title` went from `--space-1` to `--space-2`: heading and blurb still read as a pair, and the air now comes from the group's gap.
 
 **"Use the default" now names the default** — `Use the default (Roboto)`. Choosing it was otherwise a blind pick, when deciding whether the default is the font you want is the entire purpose of the row. `resolved()` deliberately prefers the studio's override, so this needed the other half: `stylesheetDefault()` (same cache, no override) plus `defaultFontLabel()`, which takes the leading family off the stack and unquotes it so it reads like the real options. Falls back to the bare wording when a token resolves to nothing.
+
+### The font manager ✅ **DONE 8/14/2026**
+
+Mason, plainly: *"I've asked SEVERAL times to have a font source like Google's CDN link and then being able to tie fonts to a source and being able to specify a typeface… You keep ignoring me."* He was right. Phase 4B built the entire backend — three tables, table helpers, validation, `GET/PUT /api/manage/site_fonts`, upload with magic-byte checking, `GET /api/site_font_face/<id>` — and then stopped at the screen. Everything worked over HTTP and none of it was reachable from the UI, so from the studio's chair the feature did not exist. **The lesson for the rest of this plan: a phase is not done when its endpoints are green. It is done when someone can use it.**
+
+**`/manage/site-fonts`** — its own page, its own dashboard card, two tabs.
+
+- **Your fonts** — one card per family. The card leads with a **specimen set in that family's own stack**, because the whole question is "what does this look like". Name, backup font (D13, per-row, never assumed), and where it comes from: a font service / files I upload / already on the device. A CDN family gets a service picker and a spec box with that service's grammar as the placeholder. An uploaded family gets a file list — **one specimen per FILE, at that file's own weight and style**, which is the only way to tell whether the file you just added is the one you meant — plus a named weight picker (`600 — Semi Bold`, not `600`) and the licence-responsibility note.
+- **Font services** — sources as editable rows, added from **presets** (Google, Bunny, "Something else"). The preset only writes starting values; every field stays editable, so this is not the curated list D12 rejected — it just spares the studio from typing `https://fonts.googleapis.com/css2` and Google's preconnect pair from memory.
+
+**Design points worth keeping:**
+- **The preview is the real thing.** The page calls the boot-time font injector (`SiteConfigService.applyFonts`, made public) with the inventory as currently edited, so specimens render in the actual typeface rather than the fallback. Same code path as boot ⇒ a preview cannot drift from what a visitor gets. It is re-applied after every upload and tags what it injects so repeated calls don't pile up `<link>`s.
+- **Removing a source rehomes its families** to "already on the device" instead of leaving rows that reference a source that no longer exists — otherwise the studio gets a validation error with no visible cause.
+- **Adding a second copy of a preset de-duplicates the key** up front, rather than after a failed save.
+- **Server error text is surfaced verbatim.** The server validates the whole payload before writing any of it and names the offending row; replacing that with "could not save" would throw away the only useful part.
+
+**Which font does what** (Site Theme → Fonts) now **previews**: every option in the dropdown is set in the font it names, and each role has a live specimen underneath at the weight and size that role is actually used at — heading and display specimens are bold and larger, because a role preview that lies about weight is not a preview. Specimen text is editable; a studio usually wants to see its own name.
+
+**⚠️ A real backend bug found while building this — the save destroyed uploaded fonts.** `PutManageSiteFonts` deleted every family and re-added it. Uploaded font FILES hang off the family row id, so recreating rows threw away every face the studio had uploaded — triggered by a save that merely renamed an unrelated family, with nothing to recover from. This made the uploaded-typeface path unusable in practice, which is half of what D4/D14 exist for.
+
+Fixed by **reconciling** instead: match sources by `source_key` and families by family name, update in place (new `SiteFonts::UpdateSource` / `UpdateFont`), and delete only what the payload dropped — families before sources, faces before families. `UpdateFont` clears `font_source_id` to NULL via its own statement when a family stops being a `cdn` row: omitting the key would leave the stale id, and an empty string cannot be bound to a bigint. Six new C++ tests, including the one that matters — edit one family, assert another family's uploaded face survives. The Angular mock reconciles the same way, so a spec cannot pass against behaviour the server does not have.
+
+Gate: honuware 1636, app 4902, Angular 3128. **Needs a pin bump after CI.**
 
 ### What is left in Phase 6B
 
