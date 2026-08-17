@@ -970,6 +970,7 @@ Every ambiguity in this format shows up as a round-trip failure, which is why it
 ### Open questions for you
 
 - **OQ-TF1 — Delivery.** Filesystem via `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>` is what I have assumed (it matches "same directory as the json" and makes themes git-reviewable). Do you also want a **download/upload `.zip` in the admin UI** in the first cut, or is that a follow-on?
+	- Mason- I'd like a download / upload in the UI as a first 
 - **OQ-TF2 — Reset semantics.** I have made absent ⇒ reset-to-default the default, with `--merge` as opt-in. Confirm — it is the difference between "load a theme" and "apply a patch", and it is the one decision that changes what "try various alternatives" feels like.
 - **OQ-TF3 — Unknown keys.** I refuse them. The alternative is to warn and skip, which is friendlier when a bundle came from a newer build. Refuse is safer; say if you would rather have skip-with-warning.
 - **OQ-TF4 — Does a theme carry the logo?** I have included `site_logo_url` as a bundled asset. A studio's logo is arguably identity rather than theme — but a theme without a logo cannot really be previewed, and Phase 7's fake-studio proof needs one. Included unless you say otherwise.
