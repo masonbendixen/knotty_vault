@@ -712,6 +712,270 @@ Two items, both app-side frontend, both cleanly separable:
 - [ ] Lift the site-config surface into `@honuware/ui`: a `SiteAccess` seam beside `CrudAccess`/`AuthAccess`/`PhotoAccess` (`getSiteInfo()`), the config service (merge + fallback contract), and the token boot-applier. This *is* the branding surface the componentization plan's Q12 reserved `HONUWARE_BRANDING` for — the service supersedes the token idea. knottyyoga's `SiteConfigService` becomes the app-side provider/consumer; its specs move with it; brand-free library assertions stay. *(hw-lib)*
 - [ ] Evaluate lifting the Site Theme manage page + the Getting Started steps table/editor once CommunityFinder has the surfaces to mount them — recorded, not planned (no-premature-code). *(hw-lib, speculative)*
 
+## Phase 9 — Theme files: save a whole look, load it back
+
+> **Status: SCHEMA PROPOSAL, awaiting sign-off (8/17/2026).** Mason: *"I'd like to create a JSON schema for saving the settings from Site Theme, Fonts, and Page Content… images be filenames to a pathless image file… loaded from and saved to the same directory as the json… It's important that we capture all of the settings. This will be a nice way to be able to work on site themes and try various alternatives."*
+>
+> Nothing below is built. Settle the schema first, then the implementation plan, then the work.
+
+### What this is for
+
+Today a look lives only in one tenant's database. You can build it, but you cannot **keep** it, diff it, hand it to Ryan, or flip between two of them to compare. A theme file makes a look a portable artifact: authored in a directory, checked into git, applied to any tenant.
+
+Three uses drive the design, in priority order:
+
+1. **Try alternatives.** Export the current look, edit or duplicate it, load it back. Switching must be one command and must fully replace — a leftover token from the previous theme is the failure mode that makes A/B comparison worthless.
+2. **Seed a new studio.** Provisioning starts from a theme rather than from Knotty Yoga's defaults. This is Phase 7's recorded `--copy-theme-from` idea, generalised: a file instead of a live tenant.
+3. **Review and version.** A theme is reviewable as a text diff, and its images sit beside it.
+
+### The bundle is a DIRECTORY, not a file
+
+Per your ask: `theme.json` plus every binary as a **pathless sibling filename**.
+
+```
+sunrise-studio/
+  theme.json
+  logo.svg
+  favicon.png
+  hero.jpg
+  home-classes.jpg
+  home-community.jpg
+  StudioSans-Regular.woff2
+  StudioSans-Bold.woff2
+```
+
+Rules, so this stays unambiguous and safe to import from an untrusted bundle:
+
+- Asset references are **bare filenames** — matching `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`. No `/`, no `\`, no `..`, no scheme, no leading dot. Anything else is rejected rather than resolved (an importer that resolves `../../etc/…` is a file-read primitive).
+- A slot that legitimately holds an **external URL** keeps a full `https://…` value. The two forms are distinguished by shape: contains `://` ⇒ URL, otherwise ⇒ a file in this directory. This is why the filename pattern forbids `:` and `/`.
+- Filenames are **case-insensitively unique** within a bundle (macOS/Windows would otherwise collide on import).
+- Every file present must be referenced, and every reference must resolve. Both directions are validation errors, because a silent miss is exactly the bug that leaves you looking at the previous theme's logo.
+
+A **`.zip` of that directory** is the same thing for the admin UI, which cannot hand a browser a folder. Deferred to the implementation plan — the filesystem form is primary because it is what makes a theme git-reviewable.
+
+### Top-level shape
+
+```json
+{
+  "format": "honuware.site-theme",
+  "format_version": 1,
+  "name": "Sunrise Studio",
+  "description": "Warm palette, Barlow display, softer corners.",
+  "exported_at": "2026-08-17T18:22:04Z",
+  "exported_from": { "app": "knottyyoga", "site": "knottyyoga", "honuware": "1e7a3ef" },
+  "theme":        { "content": { }, "tokens": { } },
+  "fonts":        { "sources": [ ], "families": [ ] },
+  "page_content": { "home_sections": [ ], "getting_started_steps": [ ] }
+}
+```
+
+- `format` + `format_version` are the compatibility gate. An importer refuses an unknown `format` and refuses a `format_version` above what it knows. Bump the version only on a breaking change; additive fields do not.
+- `exported_from` is **provenance for a human**, never used to make decisions on import. A theme from another app must still import — that is the point.
+- `name` / `description` are what a future theme picker lists.
+- The three payload sections mirror the three editors exactly, so "where do I change this" has one answer.
+
+### `theme.content` — the 14 content slots
+
+Flat map of `config_secrets` key → value. Every key in `SiteContentSlots()` plus `site_logo_url`, which is served by `/api/site_info` from its own secret rather than the slot registry.
+
+```json
+"content": {
+  "site_browser_title": "Sunrise Studio",
+  "site_logo_alt": "Sunrise Studio",
+  "site_logo_url": "logo.svg",
+  "site_favicon_url": "favicon.png",
+  "site_hero_headline": "Move. Breathe. Belong.",
+  "site_hero_subline": "Classes for every body, seven days a week.",
+  "site_hero_image_url": "hero.jpg",
+  "site_tagline_lines": ["Strength without strain", "Community without ego"],
+  "site_address_lines": ["2545 152nd Ave NE", "Redmond, WA 98052"],
+  "site_social_links": [
+    { "label": "Instagram", "url": "https://instagram.com/sunrise" },
+    { "label": "Facebook",  "url": "https://facebook.com/sunrise" }
+  ],
+  "site_contact_email": "hello@sunrisestudio.com",
+  "site_start_intro": "New here? Start with these three steps.",
+  "site_membership_blurb": "One pass, every class.",
+  "site_about_markdown": "# About us\n\nWe opened in 2019…"
+}
+```
+
+**The one place the file shape deliberately differs from storage.** Three slot types are stored as newline-packed strings because `config_secrets.value` is a single text column. In the file they take their natural JSON shape, because a theme file is meant to be edited by a person:
+
+| Slot type | Stored as | In the file | Why |
+|---|---|---|---|
+| `line`, `markdown` | string | string | unchanged |
+| `url` | string | string — bare filename **or** `https://…` | the asset rule above |
+| `lines` | `"a\nb"` | `["a", "b"]` | `\n` inside a JSON string is unreadable and easy to corrupt by hand |
+| `lines` (social links) | `"Instagram\|https://…"` | `[{label, url}]` | the `\|` packing is an internal storage detail, not a format anyone should have to know |
+
+The importer packs these back to the stored form; the exporter unpacks. `site_social_links` is the only `lines` slot with the `label|url` convention, and the schema knows that by key — worth stating plainly because it is the one piece of per-key special-casing in the format.
+
+### `theme.tokens` — all 83 design tokens
+
+Flat map of `config_secrets` key → value, exactly as `SiteThemeTokens()` registers them. Flat rather than grouped-by-section: the group is presentation metadata that already lives in the server registry, and duplicating it into the file would let the two drift.
+
+```json
+"tokens": {
+  "site_theme_palette_primary_400": "#e8743b",
+  "site_theme_palette_primary_500": "#c85a26",
+  "site_theme_primary": "#e8743b",
+  "site_theme_on_primary": "#ffffff",
+  "site_theme_radius_card": "12px",
+  "site_theme_font_heading": "Barlow",
+  "site_theme_text_base": "1rem",
+  "site_theme_weight_bold": "700"
+}
+```
+
+Full coverage, by group — this is the "capture all the settings" checklist:
+
+| Group | Count | Keys |
+|---|---:|---|
+| Palette ramps | 42 | `site_theme_palette_{primary,secondary,tertiary,quaternary,quinary,grey}_{100…700}` |
+| Palette extras | 2 | `…_surface_tint`, `…_surface_subtle` |
+| Brand | 5 | `primary`, `on_primary`, `primary_hover`, `accent`, `on_accent` |
+| Surfaces & text | 7 | `ink`, `text`, `text_muted`, `surface`, `surface_tint`, `background`, `border` |
+| Header & footer | 2 | `inverse_surface`, `on_inverse_surface` |
+| Status tones | 8 | `{success,warn,danger,info}` + their `on_` pairs |
+| Corners | 4 | `radius_{control,panel,card,pill}` |
+| Font roles | 3 | `font_{body,heading,display}` |
+| Type scale | 6 | `text_{xs,sm,base,lg,xl,2xl}` |
+| Weights | 4 | `weight_{regular,medium,semibold,bold}` |
+| **Total** | **83** | |
+
+A guard test asserts the exporter emits a key for every entry in `SiteThemeTokens()` and `SiteContentSlots()`, so **adding a token to the registry cannot silently fall out of the format.** That test is the real guarantee behind "captures all the settings" — a table in a document goes stale, a test does not.
+
+### `fonts` — sources, families, and the actual font files
+
+```json
+"fonts": {
+  "sources": [
+    {
+      "source_key": "google",
+      "display_name": "Google Fonts",
+      "base_url": "https://fonts.googleapis.com/css2",
+      "query_suffix": "display=swap",
+      "preconnects": [
+        { "url": "https://fonts.googleapis.com", "crossorigin": false },
+        { "url": "https://fonts.gstatic.com",    "crossorigin": true  }
+      ]
+    }
+  ],
+  "families": [
+    {
+      "family": "Barlow",
+      "fallback": "sans-serif",
+      "source_kind": "cdn",
+      "source_key": "google",
+      "spec": "family=Barlow:ital,wght@0,400;0,700;1,400"
+    },
+    {
+      "family": "Studio Sans",
+      "fallback": "serif",
+      "source_kind": "uploaded",
+      "faces": [
+        { "weight": 400, "style": "normal", "file": "StudioSans-Regular.woff2" },
+        { "weight": 700, "style": "normal", "file": "StudioSans-Bold.woff2" }
+      ]
+    },
+    { "family": "Georgia", "fallback": "serif", "source_kind": "system" }
+  ]
+}
+```
+
+- **No ids anywhere.** Sources are identified by `source_key`, families by `family`, faces by `(weight, style)`. This is already how the server's PUT reconciles, so import reuses that path rather than inventing a second one.
+- `preconnects` is structured, not the stored `url|crossorigin` newline packing — same reasoning as `lines` above.
+- **Face files travel as real files** and keep their format. On import the format is re-derived from the **magic bytes**, exactly as the upload endpoint does; the extension in the filename is never trusted. A bundle carrying a renamed `.woff2` that is actually HTML is rejected.
+- Family `ordinal` is **implied by array order** rather than stored. An explicit ordinal in a hand-edited file is a thing to keep consistent for no benefit.
+- `source_kind` decides which fields are meaningful: `cdn` requires `source_key` + `spec`; `uploaded` requires ≥1 face; `system` requires neither. Validated on import, so a bundle cannot produce the "names a font nobody can render" state the editor warns about.
+
+### `page_content` — home sections and Getting Started steps
+
+```json
+"page_content": {
+  "home_sections": [
+    {
+      "kind": "hero",
+      "title": "Move. Breathe. Belong.",
+      "body": "Classes for every body.",
+      "link_route": "/classes",
+      "link_label": "See the schedule",
+      "active": true,
+      "image": "home-hero.jpg"
+    },
+    {
+      "kind": "feature",
+      "title": "Aerial & Acro",
+      "body": "Find your feet in the air.",
+      "link_route": "/classes",
+      "link_label": "Browse classes",
+      "active": true,
+      "image": "home-classes.jpg"
+    }
+  ],
+  "getting_started_steps": [
+    {
+      "mat_icon": "person_add",
+      "title": "Create an account",
+      "body": "Takes about a minute.",
+      "link_route": "/register",
+      "link_label": "Sign up",
+      "hidden_when_logged_in": true
+    }
+  ]
+}
+```
+
+- **Order is the ordinal** in both lists, same as fonts.
+- `image` is a home section's uploaded photo, exported as a sibling file at its **source** resolution — scaled derivatives are a cache and rebuild themselves on demand. Absent ⇒ the section has no photo. Getting Started steps carry a `mat_icon` name, not an image, so they have no asset.
+- `kind` is validated against the four known kinds (`hero`, `feature`, `banner`, `artwork`); `mat_icon` against the server's curated allow-list. An unknown value fails the import rather than seeding a row nothing renders.
+- **These two tables are app-side** (`knottyyoga/src/db_schema`), not framework. See the ownership note below — it is the one structural decision this format forces.
+
+### Import semantics
+
+**Replace is the default, and it is the whole point.** Loading a theme must leave the tenant looking exactly like the bundle — so:
+
+- Any registered content slot or theme token **absent** from the file is **reset to its default**, not left at the previous theme's value. Without this, flipping between two themes accumulates the union of both and neither look is what its author intended.
+- `page_content` lists **replace wholesale** — the tenant ends with exactly the rows in the file, in that order.
+- `fonts` reconcile by key/family (the existing PUT path), and families not in the bundle are removed along with their faces.
+- `--merge` is offered as an explicit opt-in for "apply just these tokens on top of what's there", which is the mode you want while iterating on one colour.
+
+**A theme file is not a database dump.** It carries settings, not identity or history: no ids, no `created_at_us` / `last_updated_at_us`, no `active` flags on fonts (a bundle only lists fonts it wants active).
+
+**Import is atomic.** Validate the whole bundle — JSON shape, every asset reference, every enum, every font's magic bytes — before writing anything, inside one transaction. A half-applied theme is worse than a refused one. Same discipline as the existing `PUT /api/manage/site_theme`.
+
+### What deliberately does NOT travel
+
+This is the security-critical half of the design. `config_secrets` holds **live credentials** — Square tokens, the SMTP password, at-rest-encrypted values. The format is an **allow-list**, never "export the config_secrets table":
+
+- **Only** the keys registered in `SiteContentSlots()`, `SiteThemeTokens()`, and `site_logo_url` are exported. A key that is not in a registry cannot appear in a bundle, and an unrecognised key in a bundle being imported is refused (not ignored — a typo'd token key should be a visible error, and refusing keeps the door shut on `mail_app_password` arriving in a "theme").
+- **Tenant identity stays put**: `website_address`, `website_address_login`, `mail_sender_name` describe *which studio this is*, not what it looks like. A theme applied to Sunrise must not rename it to Knotty Yoga. This is the trap worth naming explicitly, because `mail_sender_name` is the studio's display name and it is tempting to think of it as branding.
+- No people, bookings, products, classes, or blog posts. A theme is a look.
+
+A guard test asserts every exported key starts with `site_` and appears in a registry — the same shape as the existing guard that keeps credentials off the public `/api/site_info`.
+
+### Round-trip is the acceptance test
+
+> Export tenant → import into a blank tenant → export again ⇒ **byte-identical `theme.json` and byte-identical assets.**
+
+Every ambiguity in this format shows up as a round-trip failure, which is why it is the test rather than a checklist. A second test does export → import **into the same tenant** → assert `/api/site_info` is unchanged, which catches the packing/unpacking conversions (`lines`, social links, preconnects) that a same-file comparison alone would not.
+
+### Ownership: framework vs app (D11 tension)
+
+`theme` and `fonts` are entirely honuware. `page_content` is entirely knottyyoga — `home_sections` and `getting_started_steps` are app tables. So the format cannot live wholly on either side.
+
+**Proposal:** honuware owns the envelope, the asset rules, the validation, the atomic apply, and the `theme` + `fonts` sections. It exposes a registration seam for **named app sections**; knottyyoga registers `page_content`. A bundle whose app sections the current app does not recognise imports the framework half and **reports the skipped sections** rather than failing — that is what lets a CommunityFinder theme's colours and fonts be reused by Knotty Yoga even though CF has no `home_sections`.
+
+### Open questions for you
+
+- **OQ-TF1 — Delivery.** Filesystem via `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>` is what I have assumed (it matches "same directory as the json" and makes themes git-reviewable). Do you also want a **download/upload `.zip` in the admin UI** in the first cut, or is that a follow-on?
+- **OQ-TF2 — Reset semantics.** I have made absent ⇒ reset-to-default the default, with `--merge` as opt-in. Confirm — it is the difference between "load a theme" and "apply a patch", and it is the one decision that changes what "try various alternatives" feels like.
+- **OQ-TF3 — Unknown keys.** I refuse them. The alternative is to warn and skip, which is friendlier when a bundle came from a newer build. Refuse is safer; say if you would rather have skip-with-warning.
+- **OQ-TF4 — Does a theme carry the logo?** I have included `site_logo_url` as a bundled asset. A studio's logo is arguably identity rather than theme — but a theme without a logo cannot really be previewed, and Phase 7's fake-studio proof needs one. Included unless you say otherwise.
+
+Once these four are settled I will write the implementation plan (framework seam, exporter, importer, validation, CLI, tests) as Phase 9's checklist.
+
 ---
 
 # Sequencing with the other plans
