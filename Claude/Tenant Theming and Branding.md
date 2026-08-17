@@ -1102,10 +1102,41 @@ Backend before frontend throughout. Every slice is Linux-docker-green before the
 
 **Not yet done in this slice:** the `page_content` section (9.8) is unregistered, so a bundle currently carries theme + fonts only and reports `page_content` as skipped. That is the seam working as designed, but it means an exported theme does not yet include home sections.
 
-### 9.8 — `page_content` section *(app)*
+### 9.8 — `page_content` section *(app)* ✅ **BUILT 8/17/2026**
 
-- [ ] Register the `page_content` exporter/importer with the seam: `home_sections` (+ its photo asset per row) and `getting_started_steps`. Validate `kind` against the four kinds and `mat_icon` against the curated allow-list.
-- [ ] Tests: sections and steps round-trip in order; a home section's photo survives; an unknown `kind` or icon is refused; a bundle with **no** `page_content` imports the framework half and reports it skipped.
+- [x] Register the `page_content` exporter/importer with the seam: `home_sections` (+ its photo asset per row) and `getting_started_steps`. Validate `kind` against the four kinds and `mat_icon` against the curated allow-list.
+- [x] Tests: sections and steps round-trip in order; a home section's photo survives; an unknown `kind` or icon is refused; a bundle with **no** `page_content` imports the framework half and reports it skipped. **11 tests green.**
+
+**Registered at TWO startup points, not one.** `web_app.cpp` covers the server; `RunExportTheme`/`RunImportTheme` register it again because the CLI builds no `WebApp`. Miss the second and the CLI exports a theme with the home page silently absent — the seam reports an unregistered section as "skipped", which is right for a foreign app and wrong for a missing call.
+
+**Photos are named from POSITION and kind** (`home-1-hero.jpg`), never the row id: a bundle carries no ids, and the round trip has to be byte-identical.
+
+**Merge deliberately leaves page content alone.** These are ordered lists whose identity is position, so there is no sensible partial apply — replace is the mode that carries them.
+
+**Two test-harness traps worth knowing** (both cost a red run):
+- `UploadAndAssociatePhoto` **decodes** the file to record width/height, so handmade PNG header bytes are rejected. Use a real encoded image (`boost::gil` + `jpeg_tag`, as `image_helper_test.cpp` does).
+- It reports failure through its **return value**, and `photo_support_tables` is DATA that `create_database.cpp` seeds — the test harness pre-creates tables, not rows. Without the row every upload is refused with "Photos are not supported for table 'home_sections'", silently, and the photo assertions fail somewhere else entirely.
+
+### 9.9 — Admin UI *(app — TF1's first cut)* ✅ **BUILT 8/17/2026**
+
+- [x] ServerAccess: `downloadSiteThemeBundle()` (blob), `validateSiteThemeBundle(file, opts)`, `uploadSiteThemeBundle(file, opts)` — interface, network, proxy, **mock**, and mock specs.
+- [x] A **Theme file** tab on the Site Theme page: Download writes the zip; Upload picks a file, runs the dry-run first, and shows the report — what will change, what was migrated, what is unknown — with Apply / Cancel. Strict is the default; lenient is a checkbox.
+- [x] Reuse `applyTheme()` after a successful apply so the page restyles immediately.
+- [x] Component specs: dry-run runs before apply, the report renders (including unknown keys and skipped sections), Cancel writes nothing, a rejected bundle shows the server's message verbatim. **Angular 3144 green (+16).**
+
+**Changing the strictness checkbox re-runs the preview** — it changes what the import WOULD do, so a stale report answers a different question.
+
+**The section Save button is hidden on this tab**, where it would be a button that saves nothing.
+
+**The mock carries the bundle as JSON inside the Blob, not real zip bytes.** Local mode has no zip library, and what the editor's flow depends on is the report and the dry-run-before-apply ordering, not the container. A spec needing real zip bytes would be testing libzip.
+
+> ⚠️ **VERIFICATION OWED — do not treat 9.8/9.9 as done.** The Docker daemon wedged mid-slice (my fault: several `while docker ps` polling loops), and two checks never ran:
+> 1. **The full app C++ suite** — the 9.8 run built the whole `knotty_yoga_core`/`knotty_yoga_tests` target and passed its 11 tests, so everything compiles and links, but the ~4999-test suite has not passed in one run since these changes.
+> 2. **`knottyyoga_database_helper` has NOT been compiled since 9.8** added two `RegisterPageContentBundleSection()` call sites and an include to `main.cpp`. That target is not built by the standard gate — precisely the hole the `Logging::Log()` typo went through.
+>
+> Both commands are in [[reference_linux_docker_build_clients]]; run them when Docker is healthy.
+>
+> **Process note for next time:** never poll Docker in a `while` loop. The harness re-invokes on background completion; polling is what took the daemon down.
 
 ### 9.9 — Admin UI *(app — TF1's first cut)*
 
