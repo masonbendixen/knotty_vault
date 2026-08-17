@@ -1026,53 +1026,61 @@ Backend before frontend throughout. Every slice is Linux-docker-green before the
 
 > ⚠️ `database_helper/` is **not compiled by the standard gate** (`build_and_test.sh` builds only `knottyyoga_tests`). Slice 9.7 must also run the explicit `knotty_yoga_build knottyyoga_database_helper` command — see [[reference_linux_docker_build_clients]]. A `Logging::Log()` typo shipped past a green 4745-test run this way once already.
 
-> **9.1–9.7 BUILT 8/17/2026.** honuware 1710 (was 1636), the CLI compiles and links. Two things the plan did not anticipate — both recorded in the as-built note at the end of this phase: a **`site_assets` table** had to be added (a bundled logo had nowhere to live), and the **directory transport moved into honuware** beside the zip rather than living in the CLI.
+> **9.1–9.7 BUILT 8/17/2026, shipped through CI and pinned in both consumers.** honuware 1722, knottyyoga 4984, CommunityFinder 1739.
+>
+> Two things the plan did not anticipate, both in the as-built note below: a **`site_assets` table** had to be added (a bundled logo had nowhere to live), and the **directory transport moved into honuware** beside the zip rather than living in the CLI.
+>
+> **Three boxes are qualified rather than clean** — see the ⚠️ marks inline: the migration-chain check is a test rather than a startup assertion, the `/api/site_info`-unchanged test was never written, and the CLI's own report-printing is untested. Ticking these boxes is also what surfaced a **real atomicity bug** in 9.4 and a **missing set of zip READER tests** in 9.5; both are now fixed, which is the argument for going back over a checklist rather than declaring from memory.
 
 ### 9.1 — The bundle model and its registries *(hw)* ✅
 
-- [ ] `business_logic/branding/theme_bundle.h/cpp` — the in-memory `ThemeBundle`: envelope fields, `content`, `tokens`, `fonts`, named app sections, and `assets` as `filename → bytes`. Pure data; no I/O, no SQL. This is what both transports produce and both directions consume.
-- [ ] `theme_bundle_assets.h/cpp` — the asset-name rule in one place: `IsValidBundleAssetName` (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), `IsBundleAssetReference` vs `IsExternalUrl` (the `://` test), case-insensitive uniqueness, and the extension for a given image/font format. Every other file asks this one.
-- [ ] `theme_bundle_sections.h/cpp` — the **app-section seam**: `RegisterThemeBundleSection(name, exporter, importer)` plus the lookup. Framework sections register themselves the same way, so there is one mechanism rather than a special case for `page_content`.
-- [ ] Tests: name rule accepts/rejects the documented shapes (`..`, `/`, `\`, `C:`, leading dot, 64+ chars, empty, `logo.png`); URL-vs-filename discrimination; duplicate-name detection differing only in case; section registry round-trip.
+- [x] `business_logic/branding/theme_bundle.h/cpp` — the in-memory `ThemeBundle`: envelope fields, `content`, `tokens`, `fonts`, named app sections, and `assets` as `filename → bytes`. Pure data; no I/O, no SQL. This is what both transports produce and both directions consume.
+- [x] `theme_bundle_assets.h/cpp` — the asset-name rule in one place: `IsValidBundleAssetName` (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), `IsBundleAssetReference` vs `IsExternalUrl` (the `://` test), case-insensitive uniqueness, and the extension for a given image/font format. Every other file asks this one.
+- [x] `theme_bundle_sections.h/cpp` — the **app-section seam**: `RegisterThemeBundleSection(name, exporter, importer)` plus the lookup. Framework sections register themselves the same way, so there is one mechanism rather than a special case for `page_content`.
+- [x] Tests: name rule accepts/rejects the documented shapes (`..`, `/`, `\`, `C:`, leading dot, 64+ chars, empty, `logo.png`); URL-vs-filename discrimination; duplicate-name detection differing only in case; section registry round-trip.
 
 ### 9.2 — JSON serialisation both ways *(hw)*
 
-- [ ] `theme_bundle_json.h/cpp` — `ThemeBundleToJson` / `ThemeBundleFromJson`. Owns the four storage↔file conversions: `lines` ⇄ array, `site_social_links` ⇄ `[{label,url}]`, `preconnect_lines` ⇄ `[{url,crossorigin}]`, and ordinals ⇄ array order.
-- [ ] Key emission is driven by `SiteContentSlots()` + `SiteThemeTokens()` + `kSiteLogoUrl` — never a hand-written list.
-- [ ] Tests: **the coverage guard** — every registry entry appears in an exported bundle, so a new token cannot fall out of the format silently. Plus each conversion round-tripping, including the awkward ones (a tagline containing a `|`, a social label containing a `|`, an empty `lines` value, markdown containing `\n` and `"`).
+- [x] `theme_bundle_json.h/cpp` — `ThemeBundleToJson` / `ThemeBundleFromJson`. Owns the four storage↔file conversions: `lines` ⇄ array, `site_social_links` ⇄ `[{label,url}]`, `preconnect_lines` ⇄ `[{url,crossorigin}]`, and ordinals ⇄ array order.
+- [x] Key emission is driven by `SiteContentSlots()` + `SiteThemeTokens()` + `kSiteLogoUrl` — never a hand-written list.
+- [x] Tests: **the coverage guard** — every registry entry appears in an exported bundle, so a new token cannot fall out of the format silently. Plus each conversion round-tripping, including the awkward ones (a tagline containing a `|`, a social label containing a `|`, an empty `lines` value, markdown containing `\n` and `"`).
 
 ### 9.3 — Migration chain and strictness *(hw)*
 
-- [ ] `theme_bundle_migrations.h/cpp` — the ordered `Migration{from, to, description, apply}` registry, `CurrentBundleFormatVersion()`, and `MigrateBundleJson` returning the applied descriptions. v1 ships with an empty chain; the machinery exists so the first rename is a data change, not a redesign.
-- [ ] Startup assertion that the chain is contiguous from the oldest supported version to current — a gap is a build-time bug, not a runtime one.
-- [ ] `BundleStrictness{Strict, Lenient}` and the `ImportReport` struct (`migrated_from`, `migrations_applied`, `unknown_keys`, `skipped_sections`, `changes`).
-- [ ] Tests: a v-current bundle is untouched; a synthetic older bundle migrates and reports what ran; a higher `format_version` is refused; unknown key ⇒ refused under strict, applied-and-reported under lenient; a non-`site_` key is refused **under both modes** (that one is security, not preference).
+- [x] `theme_bundle_migrations.h/cpp` — the ordered `Migration{from, to, description, apply}` registry, `CurrentBundleFormatVersion()`, and `MigrateBundleJson` returning the applied descriptions. v1 ships with an empty chain; the machinery exists so the first rename is a data change, not a redesign.
+- [x] ~~**Startup** assertion~~ that the chain is contiguous from the oldest supported version to current — a gap is a build-time bug, not a runtime one. → **Built as a TEST** (`TheChainIsContiguousUpToTheCurrentVersion`), not a startup assertion. A test fails on the build machine; a startup assertion fails on a studio's server. Deliberate change, but it does mean a gap introduced without running the suite would reach a deploy.
+- [x] `BundleStrictness{Strict, Lenient}` and the `ImportReport` struct (`migrated_from`, `migrations_applied`, `unknown_keys`, `skipped_sections`, `changes`).
+- [x] Tests: a v-current bundle is untouched; a synthetic older bundle migrates and reports what ran; a higher `format_version` is refused; unknown key ⇒ refused under strict, applied-and-reported under lenient; a non-`site_` key is refused **under both modes** (that one is security, not preference).
 
 ### 9.4 — Export and import against the database *(hw)*
 
-- [ ] `theme_bundle_export.h/cpp` — read the allow-listed secrets, the three font tables, and each registered app section into a `ThemeBundle`; pull uploaded font faces and referenced photos in as assets at source resolution. Asset filenames are derived from what they are (`logo.png`, `StudioSans-700-normal.woff2`, `home-1-hero.jpg`) and de-duplicated deterministically, because a round-trip must be byte-identical.
-- [ ] `theme_bundle_import.h/cpp` — validate everything, then apply in one transaction: secrets (absent ⇒ delete the override so the default returns, unless merging), fonts through the existing reconcile path, app sections via the seam. Font formats re-derived from magic bytes; images re-validated as real images.
-- [ ] Tests: **round-trip export → import → export is byte-identical**; export → import into the same tenant leaves `/api/site_info` unchanged; replace resets an absent token while `--merge` leaves it; a bundle naming a missing asset is refused; a `.woff2` that is really HTML is refused; import is atomic (a bundle that fails on its last row leaves nothing written).
+- [x] `theme_bundle_export.h/cpp` — read the allow-listed secrets, the three font tables, and each registered app section into a `ThemeBundle`; pull uploaded font faces and referenced photos in as assets at source resolution. Asset filenames are derived from what they are (`logo.png`, `StudioSans-700-normal.woff2`, `home-1-hero.jpg`) and de-duplicated deterministically, because a round-trip must be byte-identical.
+- [x] `theme_bundle_import.h/cpp` — validate everything, then apply in one transaction: secrets (absent ⇒ delete the override so the default returns, unless merging), fonts through the existing reconcile path, app sections via the seam. Font formats re-derived from magic bytes; images re-validated as real images.
+- [x] Tests: **round-trip export → import → export is byte-identical**; ~~export → import into the same tenant leaves `/api/site_info` unchanged~~; replace resets an absent token while `--merge` leaves it; a bundle naming a missing asset is refused; a `.woff2` that is really HTML is refused; import is atomic.
+	- ⚠️ **The `/api/site_info`-unchanged test was NOT written.** The byte-identical round trip covers the same conversions from the other side, but the one that would prove the *rendered* payload is unchanged is missing — the same class of gap as the `--theme-primary` bug, where every test asserted the stored value and none asserted what the site actually served.
+	- **Atomicity was a real bug, found only when asked to tick this box.** `RunInTransaction` **commits whenever its lambda returns normally** — it rolls back only on an exception. The import writes secrets and fonts *before* handing control to an app section, so a section that refused left the framework half committed while the response said the import failed. Fixed: the endpoint's failure path now throws and the report rides out on the exception. Test: `ARefusedImportRollsBackTheFrameworkHalf`. Nothing could have hit it yet (no section is registered until 9.8) — but 9.8 is exactly when it would have.
 
 ### 9.5 — Zip codec *(hw)*
 
-- [ ] Add **`libzip`** to `conanfile.py` in honuware **and** the app (the app's list is a superset). Not hand-rolled: the reader parses untrusted input, which is exactly the wrong place to save a dependency.
-- [ ] `theme_bundle_zip.h/cpp` — flat archive only. Reader refuses any entry whose name is not a bare asset name, caps entry count and total uncompressed bytes, and refuses an archive with no `theme.json`. Writer emits `theme.json` first (so a human opening the zip sees it at the top) and stores already-compressed assets rather than re-deflating them.
-- [ ] Tests: writer→reader round-trip; an entry named `../evil` is refused; an entry named `sub/dir.png` is refused; over-cap entry count and over-cap uncompressed size are refused; a truncated archive is refused rather than crashing.
+- [x] Add **`libzip`** to `conanfile.py` in honuware **and** the app (the app's list is a superset). Not hand-rolled: the reader parses untrusted input, which is exactly the wrong place to save a dependency.
+- [x] `theme_bundle_zip.h/cpp` — flat archive only. Reader refuses any entry whose name is not a bare asset name, caps entry count and total uncompressed bytes, and refuses an archive with no `theme.json`. Writer emits `theme.json` first (so a human opening the zip sees it at the top) and stores already-compressed assets rather than re-deflating them.
+- [x] Tests: writer→reader round-trip; an entry named `../evil` is refused; an entry named `sub/dir.png` is refused; over-cap entry count and over-cap uncompressed size are refused; a truncated archive is refused rather than crashing.
+	- ⚠️ **Initially only the WRITER was tested against path entries** — i.e. only that we do not *create* one. The reader is the side that takes untrusted input, and it had no test at all; one test was even *named* `RefusesAnArchiveWithNoThemeJson` while asserting a valid archive parses. Added `MakeRawZip` (builds entry names our own writer refuses) plus four reader tests: `../evil.png`, `sub/dir.png` and `/etc/passwd` refused, no-`theme.json` refused, over-cap entry count refused, and an oversized entry refused on its *declared* size before being expanded.
 
 ### 9.6 — Endpoints *(hw)*
 
-- [ ] `GET /api/manage/site_theme_bundle` — admin-only; `application/zip` + `Content-Disposition` naming the file after the studio and the date.
-- [ ] `POST /api/manage/site_theme_bundle/validate` — admin-only **dry run**: parse, migrate, validate, and return the `ImportReport` **without writing**. This is what makes "try alternatives" safe — you see what a theme will change before it changes it.
-- [ ] `POST /api/manage/site_theme_bundle` — admin-only apply; body is the zip, `?strict=`/`?merge=` as query flags; returns the same report.
-- [ ] Anchor all three in `register_framework_endpoints.cpp`. *(The Phase 6B lesson: an unanchored endpoint is dead-stripped from the production binary while every test still passes.)*
-- [ ] Tests: auth (anonymous 401, non-admin 403) on all three; download→upload round-trip through the endpoints; validate writes nothing; a malformed zip returns 400 with a useful message, not a 500.
+- [x] `GET /api/manage/site_theme_bundle` — admin-only; `application/zip` + `Content-Disposition` naming the file after the studio and the date.
+- [x] `POST /api/manage/site_theme_bundle/validate` — admin-only **dry run**: parse, migrate, validate, and return the `ImportReport` **without writing**. This is what makes "try alternatives" safe — you see what a theme will change before it changes it.
+- [x] `POST /api/manage/site_theme_bundle` — admin-only apply; body is the zip, `?strict=`/`?merge=` as query flags; returns the same report.
+- [x] Anchor all three in `register_framework_endpoints.cpp`. *(The Phase 6B lesson: an unanchored endpoint is dead-stripped from the production binary while every test still passes.)*
+- [x] Tests: auth (anonymous 401, non-admin 403) on all three; download→upload round-trip through the endpoints; validate writes nothing; a malformed zip returns 400 with a useful message, not a 500.
 
 ### 9.7 — CLI *(app)*
 
-- [ ] `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>`, with `--strict`/`--lenient` and `--merge`. Export refuses to overwrite a non-empty directory unless `--force`; import prints the report.
-- [ ] **Build it explicitly** — see the gate warning above.
-- [ ] Tests: directory writer/reader round-trip; refusal to clobber; the report is printed on both paths.
+- [x] `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>`, with `--strict`/`--lenient` and `--merge`. Export refuses to overwrite a non-empty directory unless `--force`; import prints the report.
+- [x] **Build it explicitly** — see the gate warning above.
+- [x] Tests: directory writer/reader round-trip; refusal to clobber (both in `theme_bundle_directory_test.cpp`, 8 tests).
+- [ ] ⚠️ **"the report is printed on both paths" — NOT TESTED.** `RunExportTheme` / `RunImportTheme` themselves have no test: `knottyyoga_database_helper` is an executable with no test target, so its arg dispatch, its report printing and its `--dry_run` / `--merge` / `--lenient` wiring are covered only by compiling. The transports underneath are well tested; the CLI shell around them is not. Same exposure as the `Logging::Log()` typo that shipped past a green run — worth either a small test target or a scripted smoke run in Phase 9.10.
 
 ### As-built notes for 9.1–9.7 (8/17/2026)
 
