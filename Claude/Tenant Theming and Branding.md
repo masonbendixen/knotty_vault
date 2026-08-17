@@ -1009,23 +1009,92 @@ Every ambiguity in this format shows up as a round-trip failure, which is why it
 
 **Proposal:** honuware owns the envelope, the asset rules, the validation, the atomic apply, and the `theme` + `fonts` sections. It exposes a registration seam for **named app sections**; knottyyoga registers `page_content`. A bundle whose app sections the current app does not recognise imports the framework half and **reports the skipped sections** rather than failing — that is what lets a CommunityFinder theme's colours and fonts be reused by Knotty Yoga even though CF has no `home_sections`.
 
-### Open questions for you
+### Resolved questions (8/17/2026)
 
-- **OQ-TF1 — Delivery.** Filesystem via `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>` is what I have assumed (it matches "same directory as the json" and makes themes git-reviewable). Do you also want a **download/upload `.zip` in the admin UI** in the first cut, or is that a follow-on?
-	- Mason- I'd like a download / upload in the admin UI as a first cut. 
-- **OQ-TF2 — Reset semantics.** I have made absent ⇒ reset-to-default the default, with `--merge` as opt-in. Confirm — it is the difference between "load a theme" and "apply a patch", and it is the one decision that changes what "try various alternatives" feels like.
-	- Mason- That sounds fine.
-- **OQ-TF3 — Unknown keys.** I refuse them. The alternative is to warn and skip, which is friendlier when a bundle came from a newer build. Refuse is safer; say if you would rather have skip-with-warning.
-	- Mason- Can we make "Refuse unknown keys" an option but also allow schema migration?
-- **OQ-TF4 — Does a theme carry the logo?** I have included `site_logo_url` as a bundled asset. A studio's logo is arguably identity rather than theme — but a theme without a logo cannot really be previewed, and Phase 7's fake-studio proof needs one. Included unless you say otherwise.
-	- Mason- Yes, the logo should be included.
+- **OQ-TF1 — Delivery.** ✅ *"I'd like a download / upload in the admin UI as a first cut."* Both transports ship in v1: the zip via the admin page, the directory via the CLI. One format, two wrappers.
+- **OQ-TF2 — Reset semantics.** ✅ *"That sounds fine."* Absent ⇒ reset to default; `--merge` is the explicit opt-in.
+- **OQ-TF3 — Unknown keys.** ✅ *"Can we make 'Refuse unknown keys' an option but also allow schema migration?"* Both, as two separate mechanisms — see the versioning section above. Migration runs first and repairs old bundles; strictness then decides what to do with what is genuinely unrecognised. Default strict.
+- **OQ-TF4 — Logo.** ✅ *"Yes, the logo should be included."* `site_logo_url` travels as a bundled asset.
 
-Once these four are settled I will write the implementation plan (framework seam, exporter, importer, validation, CLI, tests) as Phase 9's checklist.
+---
+
+## Phase 9 implementation plan
+
+Backend before frontend throughout. Every slice is Linux-docker-green before the next starts; honuware slices need a CI push + pin bump in **both** consumers before the app can use them.
+
+**Where things live.** `honuware_platform` owns the envelope, migrations, validation, the atomic apply, the zip codec, the `theme` + `fonts` sections, and both endpoints. knottyyoga registers `page_content` through the section seam. The CLI lives in `knottyyoga_database_helper`.
+
+> ⚠️ `database_helper/` is **not compiled by the standard gate** (`build_and_test.sh` builds only `knottyyoga_tests`). Slice 9.7 must also run the explicit `knotty_yoga_build knottyyoga_database_helper` command — see [[reference_linux_docker_build_clients]]. A `Logging::Log()` typo shipped past a green 4745-test run this way once already.
+
+### 9.1 — The bundle model and its registries *(hw)*
+
+- [ ] `business_logic/branding/theme_bundle.h/cpp` — the in-memory `ThemeBundle`: envelope fields, `content`, `tokens`, `fonts`, named app sections, and `assets` as `filename → bytes`. Pure data; no I/O, no SQL. This is what both transports produce and both directions consume.
+- [ ] `theme_bundle_assets.h/cpp` — the asset-name rule in one place: `IsValidBundleAssetName` (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), `IsBundleAssetReference` vs `IsExternalUrl` (the `://` test), case-insensitive uniqueness, and the extension for a given image/font format. Every other file asks this one.
+- [ ] `theme_bundle_sections.h/cpp` — the **app-section seam**: `RegisterThemeBundleSection(name, exporter, importer)` plus the lookup. Framework sections register themselves the same way, so there is one mechanism rather than a special case for `page_content`.
+- [ ] Tests: name rule accepts/rejects the documented shapes (`..`, `/`, `\`, `C:`, leading dot, 64+ chars, empty, `logo.png`); URL-vs-filename discrimination; duplicate-name detection differing only in case; section registry round-trip.
+
+### 9.2 — JSON serialisation both ways *(hw)*
+
+- [ ] `theme_bundle_json.h/cpp` — `ThemeBundleToJson` / `ThemeBundleFromJson`. Owns the four storage↔file conversions: `lines` ⇄ array, `site_social_links` ⇄ `[{label,url}]`, `preconnect_lines` ⇄ `[{url,crossorigin}]`, and ordinals ⇄ array order.
+- [ ] Key emission is driven by `SiteContentSlots()` + `SiteThemeTokens()` + `kSiteLogoUrl` — never a hand-written list.
+- [ ] Tests: **the coverage guard** — every registry entry appears in an exported bundle, so a new token cannot fall out of the format silently. Plus each conversion round-tripping, including the awkward ones (a tagline containing a `|`, a social label containing a `|`, an empty `lines` value, markdown containing `\n` and `"`).
+
+### 9.3 — Migration chain and strictness *(hw)*
+
+- [ ] `theme_bundle_migrations.h/cpp` — the ordered `Migration{from, to, description, apply}` registry, `CurrentBundleFormatVersion()`, and `MigrateBundleJson` returning the applied descriptions. v1 ships with an empty chain; the machinery exists so the first rename is a data change, not a redesign.
+- [ ] Startup assertion that the chain is contiguous from the oldest supported version to current — a gap is a build-time bug, not a runtime one.
+- [ ] `BundleStrictness{Strict, Lenient}` and the `ImportReport` struct (`migrated_from`, `migrations_applied`, `unknown_keys`, `skipped_sections`, `changes`).
+- [ ] Tests: a v-current bundle is untouched; a synthetic older bundle migrates and reports what ran; a higher `format_version` is refused; unknown key ⇒ refused under strict, applied-and-reported under lenient; a non-`site_` key is refused **under both modes** (that one is security, not preference).
+
+### 9.4 — Export and import against the database *(hw)*
+
+- [ ] `theme_bundle_export.h/cpp` — read the allow-listed secrets, the three font tables, and each registered app section into a `ThemeBundle`; pull uploaded font faces and referenced photos in as assets at source resolution. Asset filenames are derived from what they are (`logo.png`, `StudioSans-700-normal.woff2`, `home-1-hero.jpg`) and de-duplicated deterministically, because a round-trip must be byte-identical.
+- [ ] `theme_bundle_import.h/cpp` — validate everything, then apply in one transaction: secrets (absent ⇒ delete the override so the default returns, unless merging), fonts through the existing reconcile path, app sections via the seam. Font formats re-derived from magic bytes; images re-validated as real images.
+- [ ] Tests: **round-trip export → import → export is byte-identical**; export → import into the same tenant leaves `/api/site_info` unchanged; replace resets an absent token while `--merge` leaves it; a bundle naming a missing asset is refused; a `.woff2` that is really HTML is refused; import is atomic (a bundle that fails on its last row leaves nothing written).
+
+### 9.5 — Zip codec *(hw)*
+
+- [ ] Add **`libzip`** to `conanfile.py` in honuware **and** the app (the app's list is a superset). Not hand-rolled: the reader parses untrusted input, which is exactly the wrong place to save a dependency.
+- [ ] `theme_bundle_zip.h/cpp` — flat archive only. Reader refuses any entry whose name is not a bare asset name, caps entry count and total uncompressed bytes, and refuses an archive with no `theme.json`. Writer emits `theme.json` first (so a human opening the zip sees it at the top) and stores already-compressed assets rather than re-deflating them.
+- [ ] Tests: writer→reader round-trip; an entry named `../evil` is refused; an entry named `sub/dir.png` is refused; over-cap entry count and over-cap uncompressed size are refused; a truncated archive is refused rather than crashing.
+
+### 9.6 — Endpoints *(hw)*
+
+- [ ] `GET /api/manage/site_theme_bundle` — admin-only; `application/zip` + `Content-Disposition` naming the file after the studio and the date.
+- [ ] `POST /api/manage/site_theme_bundle/validate` — admin-only **dry run**: parse, migrate, validate, and return the `ImportReport` **without writing**. This is what makes "try alternatives" safe — you see what a theme will change before it changes it.
+- [ ] `POST /api/manage/site_theme_bundle` — admin-only apply; body is the zip, `?strict=`/`?merge=` as query flags; returns the same report.
+- [ ] Anchor all three in `register_framework_endpoints.cpp`. *(The Phase 6B lesson: an unanchored endpoint is dead-stripped from the production binary while every test still passes.)*
+- [ ] Tests: auth (anonymous 401, non-admin 403) on all three; download→upload round-trip through the endpoints; validate writes nothing; a malformed zip returns 400 with a useful message, not a 500.
+
+### 9.7 — CLI *(app)*
+
+- [ ] `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>`, with `--strict`/`--lenient` and `--merge`. Export refuses to overwrite a non-empty directory unless `--force`; import prints the report.
+- [ ] **Build it explicitly** — see the gate warning above.
+- [ ] Tests: directory writer/reader round-trip; refusal to clobber; the report is printed on both paths.
+
+### 9.8 — `page_content` section *(app)*
+
+- [ ] Register the `page_content` exporter/importer with the seam: `home_sections` (+ its photo asset per row) and `getting_started_steps`. Validate `kind` against the four kinds and `mat_icon` against the curated allow-list.
+- [ ] Tests: sections and steps round-trip in order; a home section's photo survives; an unknown `kind` or icon is refused; a bundle with **no** `page_content` imports the framework half and reports it skipped.
+
+### 9.9 — Admin UI *(app — TF1's first cut)*
+
+- [ ] ServerAccess: `downloadSiteThemeBundle()` (blob), `validateSiteThemeBundle(file, opts)`, `uploadSiteThemeBundle(file, opts)` — interface, network, proxy, **mock**, and mock specs.
+- [ ] A **Theme file** section on the Site Theme page (or its own small page if that tab gets crowded): **Download** writes the zip; **Upload** picks a file, runs the dry-run first, and shows the report — what will change, what was migrated, what is unknown — with Apply / Cancel. Strict is the default; lenient is a checkbox on the confirm step, where the consequence is visible, not buried in settings.
+- [ ] Reuse `applyTheme()` / `applyFonts()` after a successful apply so the page restyles immediately — the same lesson as the `--theme-primary` fix: a save that appears to do nothing reads as broken.
+- [ ] Component specs: download triggers, dry-run runs before apply, the report renders (including unknown keys and skipped sections), Cancel writes nothing, a rejected bundle shows the server's message verbatim.
+
+### 9.10 — Proof
+
+- [ ] Export Knotty Yoga, import into a blank second tenant, walk the Phase 7 fake-studio checklist: nothing Knotty-branded leaks, and the second tenant is visually identical to the first.
+- [ ] Commit a `themes/` directory of at least two real bundles (Knotty Yoga as-is, plus one invented studio) — these become the fixtures for Phase 7's proof and the regression corpus for every future theming change.
+- [ ] Live hand-testing steps per the precise-instructions rule: exact menu → page → button → file, both directions, both strictness modes.
 
 ---
 
 # Sequencing with the other plans
 
+- **Phase 9 (theme files) is independent of Ryan and the makeover** — it serialises settings that already exist. It does depend on Phases 1–6B being done (they are) and it **feeds Phase 7**: the fake-studio proof becomes "import this bundle" instead of "hand-enter a second brand", and Phase 7's recorded `--copy-theme-from <tenant>` idea is better served by a theme file than by tenant-to-tenant copying.
 - **Independent now:** Phases 1–3 (content slots + the steps table) touch nothing Ryan or the makeover owns.
 - **Coordinates with Makeover Phase 2:** Phase 4 shares the CSS-variable layer. Either lands first; whoever is second consumes the other's variables. Ryan's Figma token *names* (Makeover 1.1.A/4.1) get reconciled into the catalog when they exist — they gate nothing.
 - **Supersedes Makeover Phase 5** (noted there when the makeover doc next gets touched; the makeover's dark-mode phase later consumes D8's structure).
