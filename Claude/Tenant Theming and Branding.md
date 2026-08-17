@@ -1026,7 +1026,9 @@ Backend before frontend throughout. Every slice is Linux-docker-green before the
 
 > ⚠️ `database_helper/` is **not compiled by the standard gate** (`build_and_test.sh` builds only `knottyyoga_tests`). Slice 9.7 must also run the explicit `knotty_yoga_build knottyyoga_database_helper` command — see [[reference_linux_docker_build_clients]]. A `Logging::Log()` typo shipped past a green 4745-test run this way once already.
 
-### 9.1 — The bundle model and its registries *(hw)*
+> **9.1–9.7 BUILT 8/17/2026.** honuware 1710 (was 1636), the CLI compiles and links. Two things the plan did not anticipate — both recorded in the as-built note at the end of this phase: a **`site_assets` table** had to be added (a bundled logo had nowhere to live), and the **directory transport moved into honuware** beside the zip rather than living in the CLI.
+
+### 9.1 — The bundle model and its registries *(hw)* ✅
 
 - [ ] `business_logic/branding/theme_bundle.h/cpp` — the in-memory `ThemeBundle`: envelope fields, `content`, `tokens`, `fonts`, named app sections, and `assets` as `filename → bytes`. Pure data; no I/O, no SQL. This is what both transports produce and both directions consume.
 - [ ] `theme_bundle_assets.h/cpp` — the asset-name rule in one place: `IsValidBundleAssetName` (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), `IsBundleAssetReference` vs `IsExternalUrl` (the `://` test), case-insensitive uniqueness, and the extension for a given image/font format. Every other file asks this one.
@@ -1071,6 +1073,26 @@ Backend before frontend throughout. Every slice is Linux-docker-green before the
 - [ ] `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>`, with `--strict`/`--lenient` and `--merge`. Export refuses to overwrite a non-empty directory unless `--force`; import prints the report.
 - [ ] **Build it explicitly** — see the gate warning above.
 - [ ] Tests: directory writer/reader round-trip; refusal to clobber; the report is printed on both paths.
+
+### As-built notes for 9.1–9.7 (8/17/2026)
+
+**Two structural additions the plan missed.**
+
+1. **`site_assets` — a bundled image had nowhere to live.** The URL slots (`site_logo_url`, `site_favicon_url`, `site_hero_image_url`) hold a *URL*, which was fine while Phase 5 was "imagery v1, URL-based". A bundle has to carry the image itself or a theme is not portable, so the bytes needed a home and a route. New table + `TableHelpers::SiteAssets` + `GET /api/site_asset/<name>`, mirroring `site_font_faces` — deliberately NOT the photo_instances machinery, which exists to scale derivatives of photos attached to a table row. A logo is one file, served as-is, addressed by name, belonging to no row. On export a slot pointing at `/api/site_asset/logo.png` comes out as the bare filename `logo.png`; on import the reverse. That keeps the stored value a servable URL, so nothing downstream of the store had to learn a second form.
+2. **The directory transport went into honuware, not the CLI.** It is a transport like the zip, not a CLI concern — `theme_bundle_directory.{h,cpp}` sits beside `theme_bundle_zip.{h,cpp}` and both enforce the same asset-name rule, so neither is the soft way in.
+
+**Asset content is checked, not trusted.** Fonts already derived their format from magic bytes (D14); images now do too (`ImageTypeFromMagicBytes`), and an asset that is **neither** a font nor an image is refused outright. Every asset is stored and then served back from our own origin, so a zip must not be usable as a way to host arbitrary bytes there.
+
+**`GET /api/site_asset/<name>` uses `no-cache`, unlike `site_font_face`'s year-long cache.** A font *id* is immutable — a new upload is a new id — but an asset is addressed by NAME, so importing a different theme replaces `logo.png` in place. A held copy would be the previous studio's logo, which is the same failure the site_info cache produced in August; not one to repeat.
+
+**Three bugs found while building, worth keeping:**
+- **A null `const char*` into a `std::string` — segfault.** `Util::GetEnvWithFallback` returns **nullptr** when neither variable is set (its header says so), and the export endpoint fed that straight into `ThemeBundleExportOptions`. Every one of those vars is unset in a test environment, so this was not a rare edge — it was the default path, and it crashed the whole test binary rather than failing one test.
+- **`GetAssetBytes` threw on a missing row.** `RunSqlStatementReturningOneValue` throws on zero rows, so a URL slot outliving its asset — exactly what a theme import that replaced the asset set produces — would have surfaced as a 500 on a public page instead of a missing image.
+- **libzip's `zip_source_stat` after `zip_close` is not a reliable size.** Sizing the read buffer from it is how you get a wrong-length read; replaced with libzip's documented read-until-zero loop.
+
+**A design property worth stating, because a test initially got it wrong:** the exporter is registry-driven, so it *physically cannot* emit an unknown or non-`site_` key. Unknown keys can only ever arrive from a file written elsewhere, which is why the strictness tests inject into the JSON rather than into the struct. The credential guard (a non-`site_` key is refused under **both** strictness modes) is tested on that incoming path.
+
+**Not yet done in this slice:** the `page_content` section (9.8) is unregistered, so a bundle currently carries theme + fonts only and reports `page_content` as skipped. That is the seam working as designed, but it means an exported theme does not yet include home sections.
 
 ### 9.8 — `page_content` section *(app)*
 
