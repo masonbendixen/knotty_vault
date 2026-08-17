@@ -714,9 +714,9 @@ Two items, both app-side frontend, both cleanly separable:
 
 ## Phase 9 — Theme files: save a whole look, load it back
 
-> **Status: SCHEMA PROPOSAL, awaiting sign-off (8/17/2026).** Mason: *"I'd like to create a JSON schema for saving the settings from Site Theme, Fonts, and Page Content… images be filenames to a pathless image file… loaded from and saved to the same directory as the json… It's important that we capture all of the settings. This will be a nice way to be able to work on site themes and try various alternatives."*
+> **Status: SCHEMA SIGNED OFF 8/17/2026 — all four OQs answered. Implementation plan below is execution-ready; nothing is built yet.** Mason: *"I'd like to create a JSON schema for saving the settings from Site Theme, Fonts, and Page Content… images be filenames to a pathless image file… loaded from and saved to the same directory as the json… It's important that we capture all of the settings. This will be a nice way to be able to work on site themes and try various alternatives."*
 >
-> Nothing below is built. Settle the schema first, then the implementation plan, then the work.
+> **Answers (8/17/2026):** TF1 — download/upload in the **admin UI is first cut**, not a follow-on. TF2 — replace-by-default with `--merge` opt-in, confirmed. TF3 — **strictness is an OPTION, and the format supports schema migration.** TF4 — the logo **is** part of a theme.
 
 ### What this is for
 
@@ -751,7 +751,14 @@ Rules, so this stays unambiguous and safe to import from an untrusted bundle:
 - Filenames are **case-insensitively unique** within a bundle (macOS/Windows would otherwise collide on import).
 - Every file present must be referenced, and every reference must resolve. Both directions are validation errors, because a silent miss is exactly the bug that leaves you looking at the previous theme's logo.
 
-A **`.zip` of that directory** is the same thing for the admin UI, which cannot hand a browser a folder. Deferred to the implementation plan — the filesystem form is primary because it is what makes a theme git-reviewable.
+**A `.zip` of that directory is the same bundle (TF1 ✅ — in the first cut).** A browser cannot be handed a folder, so the admin UI downloads and uploads a zip whose entries are exactly the files above. Two transports, one format:
+
+| Transport | Who uses it | Why it exists |
+|---|---|---|
+| **Directory on disk** — `--export-theme <dir>` / `--import-theme <dir>` | the CLI helper, provisioning, git | a theme is reviewable as a text diff with its images beside it |
+| **`.zip`** — Download / Upload on the admin page | a studio, Ryan, you | no shell, no server access, works from a laptop |
+
+The zip is **flat** — no directories, matching the bundle layout. That is not cosmetic: refusing any entry whose name is not a bare filename is what closes zip-slip (`../../etc/passwd` as an entry name) without needing path-traversal logic at all. Entry count and total uncompressed size are capped, so a zip bomb is refused rather than expanded.
 
 ### Top-level shape
 
@@ -769,7 +776,7 @@ A **`.zip` of that directory** is the same thing for the admin UI, which cannot 
 }
 ```
 
-- `format` + `format_version` are the compatibility gate. An importer refuses an unknown `format` and refuses a `format_version` above what it knows. Bump the version only on a breaking change; additive fields do not.
+- `format` + `format_version` are the compatibility gate. An importer refuses an unknown `format`. A **lower** `format_version` is migrated forward (below); a **higher** one is refused, because a bundle from a newer build may mean things this one cannot honour.
 - `exported_from` is **provenance for a human**, never used to make decisions on import. A theme from another app must still import — that is the point.
 - `name` / `description` are what a future theme picker lists.
 - The three payload sections mirror the three editors exactly, so "where do I change this" has one answer.
@@ -945,6 +952,41 @@ A guard test asserts the exporter emits a key for every entry in `SiteThemeToken
 
 **Import is atomic.** Validate the whole bundle — JSON shape, every asset reference, every enum, every font's magic bytes — before writing anything, inside one transaction. A half-applied theme is worse than a refused one. Same discipline as the existing `PUT /api/manage/site_theme`.
 
+### Versioning: migrate forward, and let the caller choose how strict to be (TF3 ✅)
+
+Two mechanisms, deliberately separate — they answer different questions.
+
+**1. Schema migration** answers *"this bundle was written by an older build."* A registered, ordered chain of migrations rewrites the JSON from its `format_version` up to the current one before validation runs. Each migration is a pure `Json → Json` step with its own test and a one-line description of what it does.
+
+```
+Migration { from: 1, to: 2, "site_theme_brand → site_theme_primary" }
+Migration { from: 2, to: 3, "hero_image slot moved into home_sections" }
+```
+
+The chain runs oldest-first; a gap in it is a startup error, not a runtime surprise. This is where a **renamed token** is handled — which is the case that actually matters, because a rename would otherwise turn every older theme file into a pile of unknown keys overnight. Migration runs before strictness is evaluated, so a bundle that only *looks* unknown because it is old is repaired rather than rejected.
+
+**2. Strictness** answers *"this bundle has a key I still do not recognise after migrating."*
+
+| Mode | Behaviour | Where it is the right answer |
+|---|---|---|
+| `strict` **(default)** | refuse the import, naming every unknown key | a typo'd token silently doing nothing is the worst outcome; also keeps `mail_app_password` out of a "theme" |
+| `lenient` | apply what is understood, **report** every key skipped | recovering a hand-written or hand-edited bundle, or one from a build slightly ahead of this one |
+
+Exposed as `--strict` / `--lenient` on the CLI (default strict) and as a checkbox on the upload dialog (default off ⇒ strict). **`lenient` never means silent**: the skipped keys are part of the import report the UI shows and the CLI prints. A mode that hides what it dropped would be worse than either option.
+
+Both mechanisms feed the same **import report**, which is also what the dry-run endpoint returns:
+
+```json
+{
+  "ok": true,
+  "migrated_from": 1,
+  "migrations_applied": ["site_theme_brand → site_theme_primary"],
+  "unknown_keys": [],
+  "skipped_sections": ["page_content"],
+  "changes": { "content": 12, "tokens": 47, "font_families": 3, "assets": 5 }
+}
+```
+
 ### What deliberately does NOT travel
 
 This is the security-critical half of the design. `config_secrets` holds **live credentials** — Square tokens, the SMTP password, at-rest-encrypted values. The format is an **allow-list**, never "export the config_secrets table":
@@ -970,10 +1012,13 @@ Every ambiguity in this format shows up as a round-trip failure, which is why it
 ### Open questions for you
 
 - **OQ-TF1 — Delivery.** Filesystem via `knottyyoga_database_helper --export-theme <dir>` / `--import-theme <dir>` is what I have assumed (it matches "same directory as the json" and makes themes git-reviewable). Do you also want a **download/upload `.zip` in the admin UI** in the first cut, or is that a follow-on?
-	- Mason- I'd like a download / upload in the UI as a first 
+	- Mason- I'd like a download / upload in the admin UI as a first cut. 
 - **OQ-TF2 — Reset semantics.** I have made absent ⇒ reset-to-default the default, with `--merge` as opt-in. Confirm — it is the difference between "load a theme" and "apply a patch", and it is the one decision that changes what "try various alternatives" feels like.
+	- Mason- That sounds fine.
 - **OQ-TF3 — Unknown keys.** I refuse them. The alternative is to warn and skip, which is friendlier when a bundle came from a newer build. Refuse is safer; say if you would rather have skip-with-warning.
+	- Mason- Can we make "Refuse unknown keys" an option but also allow schema migration?
 - **OQ-TF4 — Does a theme carry the logo?** I have included `site_logo_url` as a bundled asset. A studio's logo is arguably identity rather than theme — but a theme without a logo cannot really be previewed, and Phase 7's fake-studio proof needs one. Included unless you say otherwise.
+	- Mason- Yes, the logo should be included.
 
 Once these four are settled I will write the implementation plan (framework seam, exporter, importer, validation, CLI, tests) as Phase 9's checklist.
 
