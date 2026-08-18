@@ -43,8 +43,11 @@ Please update the photo for each class accordingly.
 
 Up to this point, all of this stuff has been just the regular database creation (--recreate_database). The following should just be for --recreate_database_test.
 
-Please create an Event Session on the two following Saturdays after the tool is run with from 10am-11am with the Product Intro workshop. Allow booking
+Please create an Event Session on the two following Saturdays after the tool is run with from 10am-11am with the Product Intro workshop. Allow booking and show on home page 14 days in advance.
 
+Please create a Product called Aerial Series with the code aerial-series and the Description Introduction to aerial acrobatics on rope and fabric with the Kind being Class Series. Make the price for everyone $30 per session and $10 per session for Knotty Yoga Gold members. Then under Class Schedules, make a class series class schedule that is Tue / Thu 6-7pm from the time the tool is run through the end of the FOLLOWING month. Please make Caleb Ault the instructor for those sessions.
+
+For Caleb as a service provider, please 
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
