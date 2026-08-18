@@ -91,6 +91,16 @@ What already exists, so the plan says what CHANGES rather than restating the fil
 - **D4 — Seed images are copied into the tree, not referenced from `D:\`.** The absolute paths in the Overview are Mason's machine. The plan copies each file into the repo's seed-image directory under the given name, and the seeder refers to it by filename only — same as the existing home-page images.
 - **D5 — Photos attach by looking the row up by natural key, never by hardcoded id.** Existing code uses hardcoded ids (`kClassId = 1`, `kProductId = 10`) with a comment explaining the seed order. That is fragile and already load-bearing; new code looks up `classes` by name and `people` by email so inserting a row above does not silently repoint a photo.
 
+**Decisions from the answered open questions (8/18/2026):**
+
+- **D6 — The prerequisite is `predecessor_class_schedule_slot_id`, which already exists.** ⚠️ *I got this wrong in v0.1* — I looked at `class_requirement_group_literals` (permissions and skill levels) and concluded the model could not express it. The right mechanism is on the SLOT: `class_schedule_slots.predecessor_class_schedule_slot_id`, documented as "SL-11 same-day sequencing", already referenced by `calendar_helper`, `attendance_template_helper`, the `class_schedule_slots` table helper and `create_database.cpp` itself. Requirement *groups* are for standing eligibility (a permission or a skill level); the predecessor column is for "you must have been in the class that finishes immediately before this one". Handstands Mon 19:00 points at the Knotty Yoga Mon 18:00 slot. **Nothing new is needed.**
+- **D7 — Instructor photos are their own images.** `instructors` already has photo support and the admin "add new" flow takes a person reference, a bio and a photo. Seed `MasonInstructor.jpg` / `CalebInstructor.jpg` as separate files (same bytes as the profile photos for now). A person may reasonably want distinct profile / instructor / therapist pictures; service-provider photo support is a later change.
+- **D8 — All new class slots bind to the existing `class-dropin` product.** No new products for Handstands or Partner Acrobatics.
+- **D9 — Gold pricing keys on the `gold_member` permission (id 3, `pricingEligible = true`).** All three Gold membership products must grant it — today only some do, so this plan closes that gap.
+- **D10 — Seed data gets its own test target.** `create_database.cpp` is not currently compiled by any test; the plan adds seeder coverage so the seeded rows themselves are verified, not just the helpers they call.
+- **D11 — Pacific time for all absolute timestamps.** Hardcoded for seed data; making the studio timezone a config secret is a follow-up Mason is tracking separately.
+- **D12 — "The two following Saturdays" excludes today.** A Saturday run seeds the next two Saturdays, not today plus one.
+
 ---
 
 # Phase 1 — Foundations: dates, images, and the new flag
@@ -102,7 +112,9 @@ Everything later depends on these three. Lower layers first within the phase.
 - [ ] Tests: a Saturday run returns the NEXT Saturday not today; month-end rollover across December→January; DST boundaries; an empty range returns no occurrences.
 
 ### 1.2 Seed images into the tree
-- [ ] Copy the five source images into the repo seed-image directory as `Mason.jpg`, `Caleb.jpg`, `KnottyYoga.jpg`, `PartnerAcro.jpg`, `Handstand.jpg`. *(See **OQ-1** — one source is a `.png` to be stored as `.jpg`.)*
+- [ ] Copy into the repo seed-image directory: `Mason.jpg`, `Caleb.jpg`, `KnottyYoga.jpg`, `Handstand.jpg` (straight copies).
+- [ ] **Convert** the Partner Acrobatics source (`...20251028_054530759_iOS.png`) to real JPEG and store as `PartnerAcro.jpg` (D6/OQ-1) — the name and the bytes now agree.
+- [ ] Copy `Mason.jpg` → `MasonInstructor.jpg` and `Caleb.jpg` → `CalebInstructor.jpg` (D7: separate instructor images, same bytes for now).
 - [ ] Confirm the CMake copy step picks them up (it copies the whole directory today).
 
 ### 1.3 The `--recreate_database_test` flag *(database_helper)*
@@ -119,11 +131,13 @@ Everything later depends on these three. Lower layers first within the phase.
 - [ ] Verify `people` is in `photo_support_tables` (`PopulatePhotoSupportTables`); add it if not.
 
 ### 2.2 Instructors
-- [ ] `PopulateInstructors()`: add `instructors` rows for Mason and Caleb.
-- [ ] Attach the same photo to each instructor row *(see **OQ-2** — whether `instructors` is photo-supported or the profile photo is reused)*.
+- [ ] `PopulateInstructors()`: add `instructors` rows for Mason and Caleb, each with a short bio.
+- [ ] Attach `MasonInstructor.jpg` / `CalebInstructor.jpg` to the `instructors` rows (D7 — its own image, not the profile photo).
+- [ ] Confirm `instructors` is in `photo_support_tables`; add it if not.
 
 ### 2.3 Service providers
 - [ ] `PopulateProviderTypeAssignments()`: assign both to the existing `massage_therapist` provider type with `is_accepting_bookings = true`.
+- [ ] *(Noted, not built: service-provider photo support is a later change — D7.)*
 
 ### 2.4 Class photos
 - [ ] Attach `KnottyYoga.jpg`, `PartnerAcro.jpg`, `Handstand.jpg` to the `classes` rows found by name.
@@ -133,16 +147,18 @@ Everything later depends on these three. Lower layers first within the phase.
 - [ ] Set `instructor_person_id` on the seeded Mon 18:00 slot to Mason, and the Wed 18:00 slot to Caleb.
 
 ### 2.6 New class slots
-- [ ] **Handstands, Mon 19:00–20:00**, instructor Mason. Needs its own `class_instances` + `class_schedules` + slot for the Handstands class *(see **OQ-3** — which product it binds to)*.
-- [ ] **Partner Acrobatics, Thu 18:00–19:00 and Sun 10:00–11:00**, instructor Mason. Same structure.
+- [ ] **Handstands, Mon 19:00–20:00**, instructor Mason: `class_instances` (perpetual) → `class_schedules` (default) → slot, bound to the existing **`class-dropin`** product (D8).
+- [ ] **Partner Acrobatics, Thu 18:00–19:00 and Sun 10:00–11:00**, instructor Mason. Same structure, also `class-dropin` — one instance/schedule with two slots.
+- [ ] Both in the seeded facility (1) / Main Gym (1), matching the existing slots.
 
-### 2.7 Handstands prerequisite
-- [ ] Add a `class_requirement_groups` row on Handstands with an inline description.
-- [ ] ⚠️ **Blocked on OQ-4.** `class_requirement_group_literals` expresses a requirement as a **permission** or a **skill level** — there is no "attended class X" literal. The Overview asks for "require the person to attend the Monday 6pm Knotty Yoga class", which the current model cannot express directly.
+### 2.7 Handstands prerequisite *(D6 — the mechanism already exists)*
+- [ ] Capture the id of the **Knotty Yoga Mon 18:00 slot** when 2.5 writes it, and set `predecessor_class_schedule_slot_id` on the Handstands Mon 19:00 slot to it.
+- [ ] Assert the sequencing is genuinely back-to-back: Knotty Yoga runs 18:00 + 60 min = 19:00, which is exactly when Handstands starts. A gap or overlap would make the predecessor meaningless.
+- [ ] *(No `class_requirement_groups` row — that table is for standing eligibility, not same-day sequencing.)*
 
 ### 2.8 Tests
-- [ ] Extend the seeder's own test coverage where it exists; add tests for any new **table-helper** methods introduced.
-- [ ] ⚠️ `create_database.cpp` itself has no test target — see **OQ-5**.
+- [ ] Add tests for any new **table-helper** methods introduced.
+- [ ] **New: build seed verification into `knotty_yoga_tests`** (D10/OQ-5) — a test that runs the base populate against a scratch database and asserts the seeded shape: both people have photos, both are instructors with their own photos, both are massage-therapist providers, six slots exist with the right instructors, the three class photos are attached, and the Handstands predecessor points at the Knotty Yoga Mon slot.
 
 ---
 
@@ -152,16 +168,17 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 
 ### 3.1 Intro Workshop event sessions
 - [ ] Create two `event_sessions` for the existing `intro-workshop` product on the **next two Saturdays**, 10:00–11:00, using the Phase 1.1 helper.
-- [ ] Set `show_on_home_page = true` and `home_page_visible_days_before = 14`. *(See **OQ-6** re: `show_on_upcoming`.)*
+- [ ] Set `show_on_home_page = true` and `home_page_visible_days_before = 14`; **leave `show_on_upcoming` and `upcoming_visible_days_before` unset** (OQ-6).
+- [ ] `status = scheduled` so the sessions are bookable; capacity from the product's `default_capacity` (20).
 
 ### 3.2 Aerial Series product
-- [ ] Add product `aerial-series` — "Aerial Series", description "Introduction to aerial acrobatics on rope and fabric", kind `class_series`.
-- [ ] `product_prices`: $30/session general (`permission_id` NULL) and $10/session for the Gold permission, both on the seeded 2026 price schedule. *(See **OQ-7** for the exact Gold permission and `price_kind`.)*
+- [ ] Add product `aerial-series` — "Aerial Series", description "Introduction to aerial acrobatics on rope and fabric", kind `class_series` (the constant already exists).
+- [ ] `product_prices` on the seeded 2026 price schedule: **$30/session** general (`permission_id` NULL) and **$10/session** keyed on the **`gold_member`** permission (id 3, already `pricingEligible`) — D9.
+- [ ] **Gap to close:** confirm all three Gold products (`gold-membership`, `gold-couples`, `gold-family`) grant `gold_member` via `product_entitlement_rules`; add the missing rules. `PopulateProductEntitlementRules` has a standing comment that the gold membership permission "would be added separately", so at least one is likely missing today.
 
 ### 3.3 Aerial Series class schedule
 - [ ] Create the `class_instances` → `class_series_instances` → `class_schedules` chain bound to the `aerial-series` product, valid from now through **end of the following month**.
-- [ ] Slots **Tue(2) and Thu(4) 18:00–19:00**, `instructor_person_id` = Caleb.
-- [ ] ⚠️ Thursday 18:00 now has **both** Partner Acrobatics (2.6) and Aerial Series — see **OQ-8**.
+- [ ] Slots **Tue(2) and Thu(4) 19:00–20:00**, `instructor_person_id` = Caleb — moved off 18:00 to clear the Partner Acrobatics Thursday slot (D/OQ-8).
 
 ### 3.4 Caleb's provider schedule
 - [ ] Create a `schedule_templates` row for Caleb, Mon–Fri, with five `schedule_template_entries` at 09:00–17:00 (540–1020 minutes).
@@ -170,6 +187,8 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 ### 3.5 Tests
 - [ ] Tests for every new business-logic helper (the date helper is the main one).
 - [ ] A test asserting `PopulateTestData` is **not** reachable from the plain `--recreate_database` path.
+- [ ] Seed verification for the test data (D10): two Saturday event sessions in the future with `home_page_visible_days_before = 14` and the upcoming pair unset; the `aerial-series` product with both prices and the Gold one keyed on permission 3; Tue/Thu 19:00 slots with Caleb; Caleb's template with five entries and generated availability rows.
+- [ ] A test that **no two slots collide** on (facility, room, day, time) after the full test seed — the Thursday clash in v0.1 of this plan is exactly what that catches.
 
 ---
 
@@ -185,7 +204,18 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 
 ---
 
-# Open questions
+# Follow-ups (recorded, not in scope)
+
+- [ ] **Studio timezone as configuration.** Seed data hardcodes Pacific (D11). Mason is tracking making this a config secret so a tenant in another zone gets correct absolute timestamps — this matters beyond seeding, since `event_sessions` and `provider_availability` both store absolute `*_us`.
+- [ ] **Photo support for service providers.** So a person can have distinct profile / instructor / massage-therapist images (D7).
+
+---
+
+# Open questions — ALL RESOLVED 8/18/2026
+
+*Mason's answers are inline below. The plan above has been updated; these are kept for the reasoning.*
+
+**Summary of what changed in the plan:** OQ-4 was wrong on my part and unblocked the phase (see D6) — I proposed extending the requirement model when the mechanism already existed. OQ-8 moved Aerial Series to 19:00–20:00. OQ-2 and OQ-5 each *added* work (separate instructor images; a seed-verification test target). OQ-7 surfaced a gap: all three Gold products must grant `gold_member`, and at least one probably does not today.
 
 **OQ-1 — One image is a PNG stored under a `.jpg` name.** The Partner Acrobatics source is `...20251028_054530759_iOS.png`, to be copied in as `PartnerAcro.jpg`. `AttachSeedPhoto` takes the image type as an explicit argument and the decoder goes by content, so a PNG named `.jpg` will work but is misleading. Do you want it (a) converted to real JPEG, (b) kept as PNG and named `PartnerAcro.png`, or (c) left exactly as written?
 - Mason- Let's convert to JPG
