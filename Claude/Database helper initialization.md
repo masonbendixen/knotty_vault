@@ -188,8 +188,10 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 # Open questions
 
 **OQ-1 — One image is a PNG stored under a `.jpg` name.** The Partner Acrobatics source is `...20251028_054530759_iOS.png`, to be copied in as `PartnerAcro.jpg`. `AttachSeedPhoto` takes the image type as an explicit argument and the decoder goes by content, so a PNG named `.jpg` will work but is misleading. Do you want it (a) converted to real JPEG, (b) kept as PNG and named `PartnerAcro.png`, or (c) left exactly as written?
+- Mason- Let's convert to JPG
 
 **OQ-2 — Instructor photo storage.** You asked for "the same photo as their instructor photo for now". Is the `instructors` row meant to carry its own photo (I would add `instructors` to `photo_support_tables` and attach a second copy of the bytes), or should the UI just fall back to the person's profile photo? The second stores the image once; the first lets an instructor headshot diverge from a profile picture later.
+- Mason- In instructors, when I do add new from the admin portal for Instructors, I auto complete to reference an existing person and add a bio and a photo. There is already photo support for instructors so please use that. I want these to be separate photos. In a later change, we will add photo support for service providers. I could easily see someone wanting a different personal photo as well as distinct instructor and massage therapist pictures. So copy the same photo for now but use mason
 
 **OQ-3 — Product binding for the new classes.** The existing Knotty Yoga slots bind to the `class-dropin` product. Should Handstands and Partner Acrobatics reuse `class-dropin`, or get their own products (which is what per-class pricing would eventually need)?
 
