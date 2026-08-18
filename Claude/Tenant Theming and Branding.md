@@ -1149,20 +1149,27 @@ ERROR: relation "site_assets" does not exist
 
 **The mock carries the bundle as JSON inside the Blob, not real zip bytes.** Local mode has no zip library, and what the editor's flow depends on is the report and the dry-run-before-apply ordering, not the container. A spec needing real zip bytes would be testing libzip.
 
-> ⚠️ **VERIFICATION OWED — do not treat 9.8/9.9 as done.** The Docker daemon wedged mid-slice (my fault: several `while docker ps` polling loops), and two checks never ran:
-> 1. **The full app C++ suite** — the 9.8 run built the whole `knotty_yoga_core`/`knotty_yoga_tests` target and passed its 11 tests, so everything compiles and links, but the ~4999-test suite has not passed in one run since these changes.
-> 2. **`knottyyoga_database_helper` has NOT been compiled since 9.8** added two `RegisterPageContentBundleSection()` call sites and an include to `main.cpp`. That target is not built by the standard gate — precisely the hole the `Logging::Log()` typo went through.
->
-> Both commands are in [[reference_linux_docker_build_clients]]; run them when Docker is healthy.
->
-> **Process note for next time:** never poll Docker in a `while` loop. The harness re-invokes on background completion; polling is what took the daemon down.
+**✅ VERIFICATION COMPLETE (8/18/2026).** The two checks that were owed after the Docker wedge have both run: the **full app C++ suite at 5002** (against the pinned SHA, so it also cleared the pin bump), and **`knottyyoga_database_helper` compiles and links** — the target the standard gate does not build, which is the hole the `Logging::Log()` typo went through. Angular **3148**, honuware **1726**, CommunityFinder **1747**.
 
-### 9.9 — Admin UI *(app — TF1's first cut)*
+*(Process note kept: never poll Docker in a `while` loop — the harness re-invokes on background completion, and the polling is what took the daemon down. Recorded in [[gotcha_never_poll_docker]].)*
 
-- [ ] ServerAccess: `downloadSiteThemeBundle()` (blob), `validateSiteThemeBundle(file, opts)`, `uploadSiteThemeBundle(file, opts)` — interface, network, proxy, **mock**, and mock specs.
-- [ ] A **Theme file** section on the Site Theme page (or its own small page if that tab gets crowded): **Download** writes the zip; **Upload** picks a file, runs the dry-run first, and shows the report — what will change, what was migrated, what is unknown — with Apply / Cancel. Strict is the default; lenient is a checkbox on the confirm step, where the consequence is visible, not buried in settings.
-- [ ] Reuse `applyTheme()` / `applyFonts()` after a successful apply so the page restyles immediately — the same lesson as the `--theme-primary` fix: a save that appears to do nothing reads as broken.
-- [ ] Component specs: download triggers, dry-run runs before apply, the report renders (including unknown keys and skipped sections), Cancel writes nothing, a rejected bundle shows the server's message verbatim.
+### Three bugs found AFTER 9.8/9.9 were called done (8/18/2026)
+
+All three were found by Mason using the feature, not by the suite. Worth reading together — each one is a different way "green tests" failed to mean "works".
+
+**1. The migration (see the section above).** Registered-but-unmigrated `site_assets`. The suite could not catch it: the harness pre-creates every table.
+
+**2. A dangling pointer that only MSVC saw — and it looked like ~20 unrelated failures.** `framework_migrations_test.cpp` kept a `const Migration*` into the vector returned by `BuildFrameworkMigrations()`, which a range-for lifetime-extends **only for the loop**. Reading it afterwards was fine on gcc (the full 1726-test Linux gate passed clean) and an **SEH 0xc0000005 access violation** on MSVC. Because SEH does not unwind C++ destructors, the harness's transaction was never closed, so every later test failed with `Started twice: transaction`, plus `bad allocation` / `string too long` from the corrupted heap across `TenantResources`, `TenantPhysicalIsolation`, `AdminAlerts`, `Provisioning`, `TenantResolver`.
+- **This is the exact mirror of [[gotcha_returned_lambda_captures_by_ref]]** (Windows-green / Linux-broken). **Linux-green is necessary, not sufficient** — which platform hides a lifetime bug is a coin flip.
+- **Debugging tell:** a cascade of `Started twice` across unrelated suites means ONE earlier test corrupted memory. Fix the first failure; ignore the rest. Recorded in [[gotcha_pointer_into_returned_container]].
+
+**3. The token applier was an accumulator, not an applier.** Mason: *"I saved the theme, changed a bunch of things, and then restored from the file. It reset the font but not the colors."*
+- `applyThemeTokens` only ever called `setProperty`, never `removeProperty`. So a token the restored theme no longer overrides kept its stale value painted inline on `<html>` until a hard reload. **The import was correct all along** — the database had the right colours.
+- The asymmetry in the symptom is what identified it: font state lives in **table rows plus an injected stylesheet** (both genuinely replaced, so fonts looked restored), while colours are **pure custom properties** (stuck). One import, two mechanisms.
+- Fixed with an `authoritative` flag: the boot path (`/api/site_info` is the tenant's *complete* override set) takes back any property it previously applied that is now absent; the editor's per-section save stays additive so saving Colours cannot wipe font roles. An **empty value now means remove**, and the editor sends cleared fields as `''` rather than skipping them — which also fixed a second, unreported instance: per-field **"reset to default"** in the editor did nothing visible until a reload.
+
+**Also required, app-side, when the first migration landed:** `AllMigrationsTest.IsEmptyPreFirstDeploy` and `FrameworkStreamEmptyPreDeploy` asserted the streams were empty and failed on the pinned build. Their own comments said to retire them on first failure. Replaced by `CarriesTheFrameworkStreamIntoTheComposedList` rather than deleted — every other test in that file iterates `BuildAllMigrations()`, so a composition root returning `{}` would leave them all passing **vacuously** while no migration ever ran. `AppStreamEmptyPreDeploy` stays; that stream is still genuinely empty.
+- ⚠️ **Only the PINNED build catches this class.** The co-dev gate compiles honuware from the local checkout, so an app-side test encoding an assumption about honuware's *contents* is not exercised until a full app suite runs against the new SHA.
 
 ### 9.10 — Proof
 
