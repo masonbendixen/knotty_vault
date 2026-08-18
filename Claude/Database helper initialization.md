@@ -103,23 +103,40 @@ What already exists, so the plan says what CHANGES rather than restating the fil
 
 ---
 
-# Phase 1 — Foundations: dates, images, and the new flag
+# Phase 1 — Foundations: dates, images, and the new flag ✅ **IMPLEMENTED 8/18/2026**
 
 Everything later depends on these three. Lower layers first within the phase.
 
-### 1.1 Date helper *(business_logic/scheduling — testable)*
-- [ ] Add `seed_date_util.h/cpp` in `business_logic/scheduling/`: `NextWeekdayOnOrAfter(nowUs, dayOfWeek, tz)`, `EndOfFollowingMonthUs(nowUs, tz)`, `WeekdayOccurrencesBetween(fromUs, toUs, dayOfWeek, startMinutes, durationMinutes, tz)`.
-- [ ] Tests: a Saturday run returns the NEXT Saturday not today; month-end rollover across December→January; DST boundaries; an empty range returns no occurrences.
+> ⚠️ **Phase 1 touches honuware** (`date_time_util`), which the plan did not anticipate — see 1.0. It needs a CI push and a pin bump in both consumers before Phase 2 builds cleanly.
+
+### 1.0 `DateTimeUtil::LocalWallClockToUs` *(honuware foundation — NEW, not in the original plan)*
+- [x] Add `LocalWallClockToUs(dayTimestampUs, minutesAfterMidnight, timezone)` to `components/foundation/util/date_time_util.h/cpp`.
+- [x] Tests: resolves a wall-clock time; independent of the time-of-day passed in; **correct on a spring-forward day**; correct on a fall-back day; agrees with `GetMidnightUs` at zero minutes; correct in a no-DST zone (Phoenix).
+
+**Why this was needed.** Converting "10:00 local on this day" to an absolute timestamp cannot be `GetMidnightUs(...) + minutes`. On a US spring-forward day the clock jumps 02:00 → 03:00, so that local day is 23 hours and wall-clock 10:00 is only NINE elapsed hours after midnight — the naive sum lands an hour late. Every seeded event session and every generated availability row is a wall-clock time stored as an absolute `*_us`, so this is load-bearing for Phase 3, not a nicety. It belongs in foundation beside `GetMidnightUs`/`GetDayOfWeek` (which already own the timezone machinery and its mutex), not copied into the app. A test pins the naive form as wrong by exactly one hour so the implementation cannot quietly regress to it.
+
+### 1.1 Date helper *(app — business_logic/scheduling, testable)*
+- [x] Add `seed_date_util.h/cpp` in `business_logic/scheduling/`: `NextWeekdayAfter`, `NextWeekdaysAfter`, `EndOfFollowingMonthUs`, `WeekdayOccurrencesBetween`, plus `kSeedTimezone` and the day-of-week constants.
+- [x] Tests (16): a Saturday run returns the NEXT Saturday not today; every weekday; results are local midnights; successive weeks hold their weekday **across a DST boundary**; month-end rollover December→January and January→February; stable across the source month; occurrences keep the same **local** wall clock across a DST transition; inverted range, no-matching-weekday, and start-inside-window cases.
+
+**Two implementation notes.** Day stepping re-derives local midnight each step instead of adding 24 h, because a DST day is 23 or 25 hours and accumulated 24 h steps drift onto the wrong calendar day — that is why "three successive Saturdays across 1 November" is a test. And `WeekdayOccurrencesBetween` bounds on the **start** of a session, so a class beginning just inside the window is kept rather than dropped for finishing outside it.
 
 ### 1.2 Seed images into the tree
-- [ ] Copy into the repo seed-image directory: `Mason.jpg`, `Caleb.jpg`, `KnottyYoga.jpg`, `Handstand.jpg` (straight copies).
-- [ ] **Convert** the Partner Acrobatics source (`...20251028_054530759_iOS.png`) to real JPEG and store as `PartnerAcro.jpg` (D6/OQ-1) — the name and the bytes now agree.
-- [ ] Copy `Mason.jpg` → `MasonInstructor.jpg` and `Caleb.jpg` → `CalebInstructor.jpg` (D7: separate instructor images, same bytes for now).
-- [ ] Confirm the CMake copy step picks them up (it copies the whole directory today).
+- [x] Copied into `src/database_helper/img/`: `Mason.jpg` (386 KB), `Caleb.jpg` (158 KB), `KnottyYoga.jpg` (1.2 MB), `Handstand.jpg` (697 KB).
+- [x] **Converted** the Partner Acrobatics source from PNG to real JPEG as `PartnerAcro.jpg` — 9.9 MB PNG → 767 KB JPEG, magic bytes verified `ff d8 ff` (OQ-1).
+- [x] `MasonInstructor.jpg` / `CalebInstructor.jpg` copied from the profile images (D7 — separate files, same bytes for now).
+- [x] The CMake step copies the whole `img/` directory, so no build change was needed.
+
+⚠️ **Trap worth recording:** `which convert` resolves to `C:\Windows\system32\convert` — the **FAT-to-NTFS filesystem converter**, not ImageMagick. Running it on an image path would have been a genuinely bad mistake. The conversion used `ffmpeg -q:v 3` instead.
+
+*(Note for Phase 2: these are full-resolution photos — the largest is 1.2 MB. The uploader stores the source and derives scaled copies on demand, so that is workable, but if seeding feels slow that is where the time goes.)*
 
 ### 1.3 The `--recreate_database_test` flag *(database_helper)*
-- [ ] Add `ABSL_FLAG(bool, recreate_database_test, ...)` in `database_helper/main.cpp`, add it to the mode count and the usage text, and route it to `RunRecreate(/*withTestData=*/true)`.
-- [ ] Thread a `bool includeTestData` through `CreateSchemaAndPopulate` → `PopulateTables`, ending in a single `if (includeTestData) PopulateTestData(...)` call at the end.
+- [x] `ABSL_FLAG(bool, recreate_database_test, ...)` added to `database_helper/main.cpp`, wired into the mode count and the usage text, routed to `RunRecreate(/*includeTestData=*/true)`.
+- [x] `RunRecreate` takes `includeTestData` and names its log events / error text after the mode that actually ran, so a failure says which flag produced it.
+- [x] **Both** flags keep the `EnsureDestructiveAllowed()` guard — `--recreate_database_test` also drops the database and is not the "safe" one.
+- [x] `bool includeTestData = false` threaded through `CreateAndPopulateDatabases` → `CreateSchemaAndPopulate`, ending in one `if (includeTestData) PopulateTestData(...)`. **The default is what keeps `Tenancy::ProvisionTenant` correct** — a real tenant must never be provisioned with sample sessions.
+- [x] `PopulateTestData` added as an empty, logged entry point so the plumbing lands and can be exercised before Phase 3 fills it.
 - [ ] ⚠️ Build `knottyyoga_database_helper` explicitly — the standard gate does **not** build this target.
 
 ---
