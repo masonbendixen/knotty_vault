@@ -1102,6 +1102,25 @@ Backend before frontend throughout. Every slice is Linux-docker-green before the
 
 **Not yet done in this slice:** the `page_content` section (9.8) is unregistered, so a bundle currently carries theme + fonts only and reports `page_content` as skipped. That is the seam working as designed, but it means an exported theme does not yet include home sections.
 
+### ⚠️ A new table needs a MIGRATION, not just a DDL registration — found in use 8/18/2026
+
+Mason imported a theme into his real database and got:
+
+```
+POST /api/manage/site_theme_bundle 500
+ERROR: relation "site_assets" does not exist
+```
+
+**The miss:** 9.4 added `site_assets` to `MakeFrameworkTables`, which builds it in a database created *from scratch* and does **nothing** for one that already exists. `BuildFrameworkMigrations()` was still returning `{}`. Every existing database — Mason's dev DB, and any deployed tenant — lacked the table.
+
+**Why the tests all passed:** the test harness pre-creates every table, so `site_assets` existed in every test and every path found it. The suite could not have caught this. The new test **drops the table first** to reproduce a real pre-Phase-9 database, applies the migration, then writes and reads a row — proving the table is *usable*, not merely present.
+
+**The failure mode was worse than a plain error.** `/validate` returned **200** and the apply returned **500**: the dry run returns before it touches `site_assets`, so it reported success and then the apply failed. That is precisely what the validate route exists to prevent, and it means a dry-run pass is not proof the apply will work. (The import is one transaction, so nothing was half-written.)
+
+**A second bug, found while writing the first fix — and the more interesting one.** A migration must be safe against a database in **any** state, not just the one it was written for. `--recreate_database` builds every table and records **nothing** in `schema_migrations`, so the next `--migrate` sees the whole chain as pending and runs it against a database that already has all of it — a plain `CREATE TABLE` there fails. The migration now checks `DbMeta::ListTables` and returns early if the table is present, with a test that runs the chain against the fresh-database state.
+
+**Rule for the rest of this plan:** adding a table means (1) `db_schema/` + `MakeFrameworkTables`, **and** (2) an idempotent entry in `BuildFrameworkMigrations()` / `BuildAppMigrations()`. Registration alone only ever serves brand-new databases.
+
 ### 9.8 — `page_content` section *(app)* ✅ **BUILT 8/17/2026**
 
 - [x] Register the `page_content` exporter/importer with the seam: `home_sections` (+ its photo asset per row) and `getting_started_steps`. Validate `kind` against the four kinds and `mat_icon` against the curated allow-list.
