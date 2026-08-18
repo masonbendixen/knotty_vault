@@ -200,6 +200,7 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 - Mason- You are sniffing glue. Each slot currently has a Requires Attending option that must be a class that wraps up right before this class finishes. The support is already there. So please look it up and use it.
 
 **OQ-5 — Testing the seeder.** `create_database.cpp` lives in `knottyyoga_database_helper`, which has **no test target**, so nothing in it is covered — this is how a `Logging::Log()` typo shipped past a green run before. Your instruction is to test everything testable. I have planned to push all logic into tested helpers (D3), leaving the seeder as flat data. Do you also want a **new test target for the seeder** (build it into `knotty_yoga_tests` and assert the seeded row counts/values against a scratch database)? That is the only way the seed data itself is ever verified automatically.
+- Mason- Sure, that sounds go
 
 **OQ-6 — Event visibility.** You specified "allow booking and show on home page 14 days in advance". `event_sessions` has a separate `show_on_upcoming` / `upcoming_visible_days_before` pair. Should those be set to 14 as well, or left off? Also — "allow booking" maps to `status`; I plan `scheduled`, confirm.
 
