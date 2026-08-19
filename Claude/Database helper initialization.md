@@ -162,37 +162,50 @@ Fixed by wrapping at the call site instead of restoring a two-argument overload 
 
 ---
 
-# Phase 2 — Base seed data (`--recreate_database`)
+# Phase 2 — Base seed data (`--recreate_database`) — 2.1–2.7 ✅ **8/18/2026**, 2.8 blocked
 
-### 2.1 People photos
-- [ ] Attach `Mason.jpg` to `masonbendixen@gmail.com` and `Caleb.jpg` to `mr.calebault@gmail.com` via `AttachSeedPhoto` on the `people` table, resolving `person_id` by email.
-- [ ] Verify `people` is in `photo_support_tables` (`PopulatePhotoSupportTables`); add it if not.
+### 2.9 Extract the seed functions so they can be tested *(prerequisite for 2.8 and Phase 3's tests)*
+- [ ] Move the app seed functions plus the shared `MakeAddRowLambda` / `AttachSeedPhoto` / `Lookup*` helpers into `database_helper/seed_app_data.h/cpp` with a public header; `create_database.cpp` keeps the bootstrap and calls them.
+- [ ] Link `knotty_yoga_database_helper` into `knotty_yoga_tests`.
+- [ ] Then complete 2.8: a harness test that seeds its own prerequisites, calls each seed function, and asserts the resulting rows.
 
-### 2.2 Instructors
-- [ ] `PopulateInstructors()`: add `instructors` rows for Mason and Caleb, each with a short bio.
-- [ ] Attach `MasonInstructor.jpg` / `CalebInstructor.jpg` to the `instructors` rows (D7 — its own image, not the profile photo).
-- [ ] Confirm `instructors` is in `photo_support_tables`; add it if not.
+**Why this is its own subsection rather than part of 2.8.** Phase 3's verification needs exactly the same seam, so doing the extraction now costs one refactor instead of two. It is listed after 2.8 because that is where the need was discovered, but it must be done FIRST.
 
-### 2.3 Service providers
-- [ ] `PopulateProviderTypeAssignments()`: assign both to the existing `massage_therapist` provider type with `is_accepting_bookings = true`.
-- [ ] *(Noted, not built: service-provider photo support is a later change — D7.)*
+> **Status:** 2.1–2.7 are **written and compile** (`knottyyoga_database_helper` builds and links). **Nothing has been RUN yet** — no `--recreate_database` against a real database, and 2.8's seed verification is blocked on the 2.9 refactor. So "implemented" here means the code exists and builds, not that the rows have ever been produced.
 
-### 2.4 Class photos
-- [ ] Attach `KnottyYoga.jpg`, `PartnerAcro.jpg`, `Handstand.jpg` to the `classes` rows found by name.
-- [ ] Verify `classes` is photo-supported.
+### 2.1 People photos ✅
+- [x] Attach `Mason.jpg` to `masonbendixen@gmail.com` and `Caleb.jpg` to `mr.calebault@gmail.com` via `AttachSeedPhoto` on the `people` table, resolving `person_id` by email (`PopulateSeedPhotos`).
+- [x] Verified `people` IS photo-supported — registered **framework-side** in honuware's `create_framework_tables.cpp`, not in the app's `PopulatePhotoSupportTables`. No change needed.
 
-### 2.5 Instructors on the existing slots
-- [ ] Set `instructor_person_id` on the seeded Mon 18:00 slot to Mason, and the Wed 18:00 slot to Caleb.
+### 2.2 Instructors ✅
+- [x] `PopulateInstructors()`: `instructors` rows for Mason and Caleb, each with a short bio.
+- [x] Attach `MasonInstructor.jpg` / `CalebInstructor.jpg` to the `instructors` rows (D7 — its own image, not the profile photo).
+- [x] Verified `instructors` is already in `PopulatePhotoSupportTables`. No change needed.
 
-### 2.6 New class slots
-- [ ] **Handstands, Mon 19:00–20:00**, instructor Mason: `class_instances` (perpetual) → `class_schedules` (default) → slot, bound to the existing **`class-dropin`** product (D8).
-- [ ] **Partner Acrobatics, Thu 18:00–19:00 and Sun 10:00–11:00**, instructor Mason. Same structure, also `class-dropin` — one instance/schedule with two slots.
-- [ ] Both in the seeded facility (1) / Main Gym (1), matching the existing slots.
+### 2.3 Service providers ✅
+- [x] `PopulateProviderTypeAssignments()`: both assigned to the existing `massage_therapist` provider type with `is_accepting_bookings = true`, the type id looked up by code.
+- [x] *(Noted, not built: service-provider photo support is a later change — D7.)*
 
-### 2.7 Handstands prerequisite *(D6 — the mechanism already exists)*
-- [ ] Capture the id of the **Knotty Yoga Mon 18:00 slot** when 2.5 writes it, and set `predecessor_class_schedule_slot_id` on the Handstands Mon 19:00 slot to it.
-- [ ] Assert the sequencing is genuinely back-to-back: Knotty Yoga runs 18:00 + 60 min = 19:00, which is exactly when Handstands starts. A gap or overlap would make the predecessor meaningless.
-- [ ] *(No `class_requirement_groups` row — that table is for standing eligibility, not same-day sequencing.)*
+### 2.4 Class photos ✅
+- [x] Attach `KnottyYoga.jpg`, `PartnerAcro.jpg`, `Handstand.jpg` to the `classes` rows found **by name** (`PopulateSeedPhotos`).
+- [x] Verified `classes` is already photo-supported.
+
+### 2.5 Instructors on the existing slots ✅
+- [x] `instructor_person_id` set to Mason on the Mon 18:00 slot and Caleb on the Wed 18:00 slot, both person ids looked up by email.
+
+### 2.6 New class slots ✅
+- [x] **Handstands, Mon 19:00–20:00**, instructor Mason: `class_instances` (perpetual) → `class_schedules` (default) → slot, bound to `class-dropin` (D8).
+- [x] **Partner Acrobatics, Thu 18:00–19:00 and Sun 10:00–11:00**, instructor Mason — one instance/schedule with two slots, also `class-dropin`.
+- [x] Both in the seeded facility (1) / Main Gym (1). A shared `AddPerpetualSchedule` lambda builds the instance+schedule pair so all three classes get the identical three-level shape.
+
+### 2.7 Handstands prerequisite ✅ *(D6 — the mechanism already existed)*
+- [x] `AddSlot` now RETURNS its id; the Knotty Yoga Monday slot id is captured and written to `predecessor_class_schedule_slot_id` on the Handstands Mon 19:00 slot.
+- [x] The sequencing is genuinely back-to-back: Knotty Yoga is 18:00 + 60 min = 19:00, exactly when Handstands starts. That adjacency is what makes the column mean "you must have been in the class that just finished".
+- [x] No `class_requirement_groups` row — that table is standing eligibility (permission / skill level), not same-day sequencing.
+
+### 2.x Also done, not on the original checklist
+- [x] **Replaced the hardcoded `kClassId = 1` and `kProductId = 10` with lookups** by class name and product code (D5). Those constants encoded seed ORDER, so appending a product above them would have silently rebound every class — and a photo on the wrong class is a bug nobody notices until a studio sees its home page.
+- [x] Added `LookupIdByColumn` / `LookupPersonIdByEmail` / `LookupClassIdByName` / `LookupProductIdByCode`, each logging and returning 0 rather than throwing, so one missing seed row cannot abort database creation.
 
 ### 2.8 Tests
 - [x] No new table-helper methods were needed — Phase 2 uses `DbCrud::GetRow`, `AddRowToTableFetchInt64PrimaryKey` and the existing `AttachSeedPhoto`, all already covered.
