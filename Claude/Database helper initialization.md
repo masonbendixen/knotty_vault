@@ -195,8 +195,12 @@ Fixed by wrapping at the call site instead of restoring a two-argument overload 
 - [ ] *(No `class_requirement_groups` row — that table is for standing eligibility, not same-day sequencing.)*
 
 ### 2.8 Tests
-- [ ] Add tests for any new **table-helper** methods introduced.
-- [ ] **New: build seed verification into `knotty_yoga_tests`** (D10/OQ-5) — a test that runs the base populate against a scratch database and asserts the seeded shape: both people have photos, both are instructors with their own photos, both are massage-therapist providers, six slots exist with the right instructors, the three class photos are attached, and the Handstands predecessor points at the Knotty Yoga Mon slot.
+- [x] No new table-helper methods were needed — Phase 2 uses `DbCrud::GetRow`, `AddRowToTableFetchInt64PrimaryKey` and the existing `AttachSeedPhoto`, all already covered.
+- [ ] ⚠️ **Seed verification (D10/OQ-5) is NOT done, and needs a refactor first.** Two obstacles found while attempting it:
+	1. **The seed functions are unreachable from a test.** Every `Populate*` lives in an anonymous namespace inside `create_database.cpp`, so nothing outside that translation unit can call one. There is a `knotty_yoga_database_helper` **library** target (separate from the executable) that a test could link, but it exposes only `CreateAndPopulateDatabases` / `CreateSchemaAndPopulate`.
+	2. **The whole-bootstrap entry points do not fit the test harness.** `CreateSchemaAndPopulate` opens its OWN transaction and creates tables, while the harness pre-creates tables and runs each test inside a transaction it aborts. `PopulateTables` also calls `Auth::EnsureSchedulerServiceAccount`, which throws unless `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` is set — so it cannot simply be invoked from a test either.
+
+	**Proposed shape (Phase 2.9, before Phase 3):** move the app seed functions and the shared `MakeAddRowLambda` / `AttachSeedPhoto` / lookup helpers into `database_helper/seed_app_data.h/cpp` with a public header, leaving `create_database.cpp` as the bootstrap that calls them. Each function then takes `(Transaction&, DatabaseHelper, DatabaseInfo)` and is callable from a harness test that seeds its own prerequisites — which is also what Phase 3's test-data verification will need. Doing it now costs one refactor; doing it after Phase 3 costs two.
 
 ---
 
