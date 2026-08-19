@@ -147,7 +147,18 @@ Blast radius: nothing else in honuware calls it; app-side the only production ca
 - [x] **Both** flags keep the `EnsureDestructiveAllowed()` guard — `--recreate_database_test` also drops the database and is not the "safe" one.
 - [x] `bool includeTestData = false` threaded through `CreateAndPopulateDatabases` → `CreateSchemaAndPopulate`, ending in one `if (includeTestData) PopulateTestData(...)`. **The default is what keeps `Tenancy::ProvisionTenant` correct** — a real tenant must never be provisioned with sample sessions.
 - [x] `PopulateTestData` added as an empty, logged entry point so the plumbing lands and can be exercised before Phase 3 fills it.
-- [ ] ⚠️ Build `knottyyoga_database_helper` explicitly — the standard gate does **not** build this target.
+- [x] ⚠️ Build `knottyyoga_database_helper` explicitly — the standard gate does **not** build this target. **It caught a real break.**
+
+**⚠️ The defaulted parameter broke `--create_tenant`, and every gate stayed green.** Adding `bool includeTestData = false` to `CreateSchemaAndPopulate` changed the function's **type**, and a default argument is not part of a function's type — so `&CreateSchemaAndPopulate`, passed to `Tenancy::ProvisionTenant` as a `std::function<void(DatabaseHelper, DatabaseInfo)>`, stopped converting:
+
+```
+error: invalid initialization of reference of type 'const Tenancy::CreatePopulateFn&'
+       from expression of type 'void (*)(DatabaseHelper, DbSchema::DatabaseInfo, bool)'
+```
+
+**Tenant provisioning would not compile while honuware (1733), knottyyoga (5025) and CommunityFinder (1754) were all green.** That is the same structural hole the `Logging::Log()` typo went through, and the third time this target has caught something the gate cannot see.
+
+Fixed by wrapping at the call site instead of restoring a two-argument overload — the lambda states the intent that the default only implied: *a provisioned tenant is a real studio and never gets sample data.*
 
 ---
 
