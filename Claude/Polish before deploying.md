@@ -44,7 +44,11 @@ Here are the items that we need to improve before being ready to ship:
 - Let’s change the About page from being just plain markdown to supporting alternating image / text blocks like the home page. And allow them to be reordered.
 - Add an instruction on the favorite support for instructors on the instructors page
 - What do preferences do in the Instructors portal?
-- 
+- Have Our Classes go to the Browse all classes (for non logged in users) on the current Our Classes page and then have a My Classes that takes you to the current Our Classes page. Let's keep things the same as now for logged in users.
+- On services, let’s add an image for each service and then show the image above each service in the Services page from main menu. Need to add image support to the database and then the Bookable Service panel in the product editor.
+- Events don’t have an image. Let’s add an image. Let’s also add this as another configurable thing that can be placed on the home page. The home page shows a truncated version of the event session whereas the upcoming events page shows more. Let’s have the home page match the Upcoming Events page. Let's show the description from the product page.
+- About / Our location with image / description. Have a button that triggers a map.
+- On the Memberships page, let's call the page Memberships, not Shop. Let's also make the prices 
 
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
