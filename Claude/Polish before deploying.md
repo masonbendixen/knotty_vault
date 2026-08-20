@@ -35,7 +35,8 @@ Here are the items that we need to improve before being ready to ship:
 	- I'd like an Image Carousels tab in the site theme admin portal editor that let's you order the carousels to be shown on the About / Gallery menu item page and have the ability to add / remove / reorder names carousel entries as well as choose whether the title and/or description is shown.
 	- All these stuff should be persisted in the JSON site theme file.
 - Membership, Upcoming Classes, and Upcoming Events should be different items that can be added to the home page and the position on the home page should be able to be ordered with the existing home page items. (Currently they just get added before or below all the configurable items). These will all be new types that can be chosen when adding an item in addition to carousel.
-- 
+- The upcoming classes on the home page background should be –theme-surface-tint but the individual cards should be --theme-background
+- Can the background image of banner / Come join the fun! be parallax scroll?
 - 
 
 
