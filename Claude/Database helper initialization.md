@@ -221,7 +221,7 @@ The move failed to compile with `call of overloaded 'DbPair(...)' is ambiguous` 
 
 ### 2.8 Tests ✅
 - [x] No new table-helper methods were needed — Phase 2 uses `DbCrud::GetRow`, `AddRowToTableFetchInt64PrimaryKey` and the existing `AttachSeedPhoto`, all already covered.
-- [x] **Seed verification (D10 / OQ-5) — `src/database_helper/seed_app_data_test.cpp`, 15 tests.** Each seeds its own prerequisites, calls the **real** seeder (not a copy), and asserts the rows:
+- [x] **Seed verification (D10 / OQ-5) — `src/database_helper/seed_app_data_test.cpp`, 18 tests, green on Linux (3.5 s).** Each seeds its own prerequisites, calls the **real** seeder (not a copy), and asserts the rows:
 
 | Area | What is pinned |
 |---|---|
@@ -241,6 +241,9 @@ The move failed to compile with `call of overloaded 'DbPair(...)' is ambiguous` 
 
 - [x] No fixtures (CLAUDE.md): a `SeedPrerequisites()` free function does the setup and each test calls it. Slots are found **by weekday**, never by array index.
 - [x] The `people` photo-support registration is framework-side (`create_framework_tables.cpp`) and the harness creates tables without running the framework seed, so the test inserts that one row itself — noted inline so it does not read as an oversight.
+- [x] The photo tests really do decode and store the full-resolution JPEGs (386 KB … 1.2 MB), which is where the suite's 3.5 s goes. Worth it: it is the only thing that proves the upload path works on the actual files, not on a stub.
+
+**The photos were never RUN before this.** Phase 2 shipped as "written and compiles". The first execution of `PopulateSeedPhotos` happened in this test run, and it is the first evidence any of the artwork decodes and stores — including `PartnerAcro.jpg`, the one converted from PNG in Phase 1.2. `--recreate_database` against a live database (Phase 4.1) is still outstanding, but the seed *logic* is now exercised.
 
 ---
 
