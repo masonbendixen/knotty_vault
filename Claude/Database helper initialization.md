@@ -162,16 +162,28 @@ Fixed by wrapping at the call site instead of restoring a two-argument overload 
 
 ---
 
-# Phase 2 — Base seed data (`--recreate_database`) — 2.1–2.7 ✅ **8/18/2026**, 2.8 blocked
+# Phase 2 — Base seed data (`--recreate_database`) ✅ **COMPLETE 8/20/2026**
 
-### 2.9 Extract the seed functions so they can be tested *(prerequisite for 2.8 and Phase 3's tests)*
-- [ ] Move the app seed functions plus the shared `MakeAddRowLambda` / `AttachSeedPhoto` / `Lookup*` helpers into `database_helper/seed_app_data.h/cpp` with a public header; `create_database.cpp` keeps the bootstrap and calls them.
-- [ ] Link `knotty_yoga_database_helper` into `knotty_yoga_tests`.
-- [ ] Then complete 2.8: a harness test that seeds its own prerequisites, calls each seed function, and asserts the resulting rows.
+### 2.9 Extract the seed functions so they can be tested ✅ *(prerequisite for 2.8 and Phase 3's tests)*
+- [x] Moved into `database_helper/seed_app_data.h/cpp` behind a public `namespace Seed`: the shared `MakeAddRowLambda` / `SeedImageDirectory` / `AttachSeedPhoto` / `Lookup*` helpers, the `kMasonEmail` / `kCalebEmail` constants, the **data** seeders (`PopulateClasses`, `PopulatePhotoSupportTables`, `PopulateProducts`, `PopulateFacilities`, `PopulateLocationRoomTypes`, `PopulateLocationRooms`, `PopulateProviderTypes`), all four Phase 2 seeders, and `PopulateTestData`.
+- [x] `create_database.cpp` keeps the **bootstrap** — `CreateTables`, `PopulateTables`'s ordering, `CreateSchemaAndPopulate`, `CreateAndPopulateDatabases` — plus the **admin-metadata** seeders, and calls the rest through the header. One `using namespace Seed;` inside its anonymous namespace keeps ~200 call sites spelled the same.
+- [x] `target_link_libraries(knotty_yoga_tests PUBLIC knotty_yoga_database_helper)`; `seed_app_data_test.cpp` registered into `knotty_yoga_tests`. `knotty_yoga_database_helper` stays OUT of the honuware DAG on purpose (comment updated in `cmake/honuware_layering.cmake`) — it sits above `knotty_yoga_core` with nothing below it that could link back up.
+- [x] CMake copies `src/database_helper/img/` next to **`knottyyoga_tests`** as well, so the photo assertions exercise the real upload path instead of asserting "no photo".
 
-**Why this is its own subsection rather than part of 2.8.** Phase 3's verification needs exactly the same seam, so doing the extraction now costs one refactor instead of two. It is listed after 2.8 because that is where the need was discovered, but it must be done FIRST.
+**What only moved as far as it had to.** `create_database.cpp` is ~3500 lines and roughly 2/3 of it is `PopulateAdminColumnDataInfo` / `PopulateAdminColumnFriendlyNames` / friendly names / display templates / enums — *admin UI metadata*, not studio data, and nothing in Phase 2 or Phase 3 verifies it. Moving that too would have been a 3000-line relocation buying nothing. The split is "data the studio has" vs "how the generic admin editor renders it", which is a boundary that means something rather than a line count.
 
-> **Status:** 2.1–2.7 are **written and compile** (`knottyyoga_database_helper` builds and links). **Nothing has been RUN yet** — no `--recreate_database` against a real database, and 2.8's seed verification is blocked on the 2.9 refactor. So "implemented" here means the code exists and builds, not that the rows have ever been produced.
+### ⚠️ 2.9 also closed the gate hole that motivated all of this
+`build_and_test.sh` builds only `knottyyoga_tests`, so **`create_database.cpp` was compiled by nothing in the gate** — the standing warning next to the `Logging::Log()` typo. Now that `knotty_yoga_tests` links `knotty_yoga_database_helper`, that file compiles on every gate run. The separate `knottyyoga_database_helper` build is still needed for `main.cpp` (the flags/`absl` layer), but the 3500-line file behind it is covered.
+
+### ⚠️ `DbPair` was a duplicate, and the anonymous namespace was hiding it
+The move failed to compile with `call of overloaded 'DbPair(...)' is ambiguous` at every call site. honuware already defines `DbPair(std::string_view, std::string_view)` at **global scope** in `sql_util/database_common.h`; `create_database.cpp` carried a byte-identical copy in its anonymous namespace. That copy *hid* honuware's — unqualified lookup stops at the innermost scope with a match — so the two coexisted invisibly for as long as the file has existed. Moving the copy into a named namespace and re-exposing it with a using-directive put both at the same scope, and every one of the ~200 call sites went ambiguous at once. Deleted the copy; honuware's is the one definition now.
+
+*The general shape is worth remembering: an anonymous namespace silently wins ties, so a duplicate inside one is invisible until the day it moves.*
+
+### 2.x Also done, and needed by the tests
+- [x] **`PopulateClassSchedules` now resolves the facility and room by natural key too** (`knotty-yoga-studio` / `Main Gym`), finishing what D5 started — `kFacilityId = 1` and `kRoomId = 1` were the last two seed-order constants in Phase 2 code.
+- [x] **`PopulateLocationRooms` likewise** — it hardcoded `facilityId = 1` and room-type ids 1/2/4. Both were correct *only in a virgin database*: in a harness transaction the sequences have long since moved, so the old code would have inserted rooms against a facility that does not exist and failed on the FK. That is the concrete reason the extraction alone was not enough to make these functions testable.
+- [x] Both now log and return when their prerequisite row is missing, rather than writing against id 0.
 
 ### 2.1 People photos ✅
 - [x] Attach `Mason.jpg` to `masonbendixen@gmail.com` and `Caleb.jpg` to `mr.calebault@gmail.com` via `AttachSeedPhoto` on the `people` table, resolving `person_id` by email (`PopulateSeedPhotos`).
@@ -207,13 +219,28 @@ Fixed by wrapping at the call site instead of restoring a two-argument overload 
 - [x] **Replaced the hardcoded `kClassId = 1` and `kProductId = 10` with lookups** by class name and product code (D5). Those constants encoded seed ORDER, so appending a product above them would have silently rebound every class — and a photo on the wrong class is a bug nobody notices until a studio sees its home page.
 - [x] Added `LookupIdByColumn` / `LookupPersonIdByEmail` / `LookupClassIdByName` / `LookupProductIdByCode`, each logging and returning 0 rather than throwing, so one missing seed row cannot abort database creation.
 
-### 2.8 Tests
+### 2.8 Tests ✅
 - [x] No new table-helper methods were needed — Phase 2 uses `DbCrud::GetRow`, `AddRowToTableFetchInt64PrimaryKey` and the existing `AttachSeedPhoto`, all already covered.
-- [ ] ⚠️ **Seed verification (D10/OQ-5) is NOT done, and needs a refactor first.** Two obstacles found while attempting it:
-	1. **The seed functions are unreachable from a test.** Every `Populate*` lives in an anonymous namespace inside `create_database.cpp`, so nothing outside that translation unit can call one. There is a `knotty_yoga_database_helper` **library** target (separate from the executable) that a test could link, but it exposes only `CreateAndPopulateDatabases` / `CreateSchemaAndPopulate`.
-	2. **The whole-bootstrap entry points do not fit the test harness.** `CreateSchemaAndPopulate` opens its OWN transaction and creates tables, while the harness pre-creates tables and runs each test inside a transaction it aborts. `PopulateTables` also calls `Auth::EnsureSchedulerServiceAccount`, which throws unless `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` is set — so it cannot simply be invoked from a test either.
+- [x] **Seed verification (D10 / OQ-5) — `src/database_helper/seed_app_data_test.cpp`, 15 tests.** Each seeds its own prerequisites, calls the **real** seeder (not a copy), and asserts the rows:
 
-	**Proposed shape (Phase 2.9, before Phase 3):** move the app seed functions and the shared `MakeAddRowLambda` / `AttachSeedPhoto` / lookup helpers into `database_helper/seed_app_data.h/cpp` with a public header, leaving `create_database.cpp` as the bootstrap that calls them. Each function then takes `(Transaction&, DatabaseHelper, DatabaseInfo)` and is callable from a harness test that seeds its own prerequisites — which is also what Phase 3's test-data verification will need. Doing it now costs one refactor; doing it after Phase 3 costs two.
+| Area | What is pinned |
+|---|---|
+| Artwork | `SeedImageDirectory()` really is `<exe dir>/img` **and exists** — a guard, because every photo assertion below is vacuous otherwise, and "no photo attached" would send the reader hunting in the wrong place. A missing file logs and carries on rather than aborting the bootstrap. |
+| Lookups | All three `Lookup*` return 0 (not throw) on an absent row. |
+| Catalog | All six class names exist — the three that `PopulateSeedPhotos` / `PopulateClassSchedules` resolve by hand are load-bearing, so a rename breaks the test rather than the seed. `class-dropin` is kind `class`; `intro-workshop` is kind `event` with capacity 20 (Phase 3.1 reads that). |
+| Rooms | Main Gym binds to the facility found by **code** and the room type found by **code**; with no facility seeded, nothing is written. |
+| 2.1 / 2.4 | Both people and exactly the three named classes get pictures — **and Tumbling does not.** A photo on the wrong class is the bug D5 exists to prevent, so "the others stayed empty" is half the assertion. Class artwork still lands when the people are absent. |
+| 2.2 | An `instructors` row per person, non-empty bio, and its **own** photo on the instructors row (D7). |
+| 2.3 | Both assigned to `massage_therapist`, `is_accepting_bookings` true; nothing written when the provider type is missing. |
+| 2.5 | Knotty Yoga has exactly 2 slots — Mon 1080/60 Mason, Wed 1080/60 Caleb. |
+| 2.7 | Handstands Mon 1140 names the Knotty Yoga Monday slot as predecessor, **and** `predecessor.start + predecessor.duration == handstands.start`. The adjacency is what makes the column mean "the class that just ended"; asserting only the id would let a future edit move one of them and keep the test green. |
+| 2.6 | Partner Acrobatics Thu 1080 + Sun 600, both Mason. |
+| D5 | **Decoy row test.** A decoy class, product, facility, room type and room are inserted FIRST, so `kClassId = 1` / `kProductId = 10` / `kFacilityId = 1` / `kRoomId = 1` would each now name a decoy. Asserts the instance binds to the real drop-in product, the slot to the real facility + Main Gym, and that the decoy class got no schedule at all. |
+| Skip path | With no product/facility/room, `PopulateClassSchedules` writes **nothing** — a half-built three-level hierarchy is worse than none. |
+| Phase 3 seam | `PopulateTestData` is reachable and currently adds nothing, so the day it starts adding rows this test has to be updated deliberately. |
+
+- [x] No fixtures (CLAUDE.md): a `SeedPrerequisites()` free function does the setup and each test calls it. Slots are found **by weekday**, never by array index.
+- [x] The `people` photo-support registration is framework-side (`create_framework_tables.cpp`) and the harness creates tables without running the framework seed, so the test inserts that one row itself — noted inline so it does not read as an oversight.
 
 ---
 
