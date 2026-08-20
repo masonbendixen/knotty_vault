@@ -394,6 +394,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 > Answer inline with `- Mason-` bullets. Only OQ-1 blocks work (Phase 8.2/8.3); everything else has a chosen default I'll run with.
 
 - **OQ-1 — Figma access is gone.** Previous sessions read Ryan's file via the REST API with a personal-access token at `~/.figma_token`; that file no longer exists. To unblock the Get Started image and the footer tagline export, either recreate `C:\Users\mason\.figma_token` containing the token (one line), or export the two assets yourself into `server/knottyyoga_server/src/database_helper/img/` (PNG, 2× — `Icon/GetStarted` from Frame 127, and the tagline artwork) and I'll take it from there.
+	- Mason- Ryan is out of town. I'll get the token when he is back.
 - **OQ-2 — "Our Classes / My Classes" menu shape.** Your sentence supports two readings. **Chosen:** one auth-dependent item — signed out: **Our Classes** → All Classes catalog (`/classes/all`); signed in: **My Classes** → the weekly page (`/classes`, unchanged behavior). The All Classes page gains a "Weekly schedule" link so visitors can still reach the schedule advertisement. **Alternate:** show *both* items when signed in (Our Classes → catalog, My Classes → weekly). Say the word if you want the alternate.
 	- Mason- Yes, I want the first alternative.
 - **OQ-3 — Price color `--theme-on-accent`.** Implementing literally as asked. Flag: `on-accent` is the text-*on*-an-accent-fill token (white-ish for KY's amber accent) — on a white card it may be near-invisible. If the intent was "accent-colored prices," the token is `--theme-accent`. I'll implement `--theme-on-accent` and you can eyeball it; one word flips it.
@@ -403,9 +404,16 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 - **OQ-5 — Instructor class preferences.** They do nothing today (write-only notes; details in Phase 1.7). Options: **(a)** keep + label as "reference notes, not enforced" *(chosen default)*; **(b)** wire min/max into scheduling/capacity (real feature work — happy to scope); **(c)** delete the surface. Pick one.
 	- Mason- Let's delete
 - **OQ-6 — Announcement body.** Chosen: plain text (title + body + date window), styled as a notice banner, not dismissible. Alternates: markdown body, or per-user dismissal (needs storage). Speak up if wanted.
+	- Mason- That sounds good.
 - **OQ-7 — Video providers.** Chosen: YouTube only (privacy-enhanced nocookie embed). Vimeo or raw-URL `<video>` can be added later behind the same column.
+	- Mason- Let's do YouTube and raw video URL
 - **OQ-8 — About page markdown.** Chosen: the existing `site_about_markdown` renders as an intro above the new blocks when non-empty, so your current About copy survives. Clear the slot in Site Theme when you want blocks only. (Alternate: drop the markdown entirely.)
+	- Mason- I think we can drop markdown entirely.
 - **OQ-9 — "Triggers a map."** Chosen: an "Open in Google Maps" link-out built from the address (no API key, no third-party iframe/CSP surface). Alternate: an embedded map (iframe embed or Maps JS — needs a key + CSP allowance).
+	- Mason- Let's just do the link to Google maps
 - **OQ-10 — Carousel data migration touches your live DB.** Phase 4.2 moves your existing `home_page_photos` rows (ids preserved, photo associations re-pointed) into the new carousel tables as a "Home page photos" carousel, then drops the old table + endpoint. It's idempotent and tested against both DB states, but it is a one-way conversion of real data — flagging it rather than doing it silently.
+	- Mason- That's why we are doing this BEFORE I deploy.
 - **OQ-11 — Which "admin portal" to alphabetize.** Chosen: the Manage dashboard (31 tiles), Staff Portal, and the personal profile tiles. The `/admin` Manage Data page has no tiles (it's a table dropdown from `@honuware/ui`) — left alone as the debug surface.
+	- It would honestly be nice if the tables in Manage Data were also alphabetized.
 - **OQ-12 — Timezone scope.** `facilities.timezone` already exists and is consumed server-side; chosen scope is the editing surface + validation + the new Locations page (7.1), with the browser-local week-strip gap recorded as a follow-up. If you meant something more (e.g., rendering all class times in facility TZ on every page), say so and I'll scope it separately.
+	- Mason- Yes, let's just expose a way to set the existing timezone.
