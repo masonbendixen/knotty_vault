@@ -247,33 +247,68 @@ The move failed to compile with `call of overloaded 'DbPair(...)' is ambiguous` 
 
 ---
 
-# Phase 3 — Test-only seed data (`--recreate_database_test`)
+# Phase 3 — Test-only seed data (`--recreate_database_test`) ✅ **8/20/2026**
 
 All of this lives in `PopulateTestData()` and runs only under the new flag.
 
-### 3.1 Intro Workshop event sessions
-- [ ] Create two `event_sessions` for the existing `intro-workshop` product on the **next two Saturdays**, 10:00–11:00, using the Phase 1.1 helper.
-- [ ] Set `show_on_home_page = true` and `home_page_visible_days_before = 14`; **leave `show_on_upcoming` and `upcoming_visible_days_before` unset** (OQ-6).
-- [ ] `status = scheduled` so the sessions are bookable; capacity from the product's `default_capacity` (20).
+**Shape.** Four public functions in `seed_app_data.h`, each taking `(Transaction&, DatabaseHelper, DatabaseInfo, int64_t nowUs)`; `PopulateTestData` reads the clock ONCE and threads it through (D2). Passing `nowUs` in rather than reading it per function is what makes any of this testable — "the next two Saturdays" cannot be asserted against a clock the code reads for itself.
 
-### 3.2 Aerial Series product
-- [ ] Add product `aerial-series` — "Aerial Series", description "Introduction to aerial acrobatics on rope and fabric", kind `class_series` (the constant already exists).
-- [ ] `product_prices` on the seeded 2026 price schedule: **$30/session** general (`permission_id` NULL) and **$10/session** keyed on the **`gold_member`** permission (id 3, already `pricingEligible`) — D9.
-- [ ] **Gap to close:** confirm all three Gold products (`gold-membership`, `gold-couples`, `gold-family`) grant `gold_member` via `product_entitlement_rules`; add the missing rules. `PopulateProductEntitlementRules` has a standing comment that the gold membership permission "would be added separately", so at least one is likely missing today.
+### 3.1 Intro Workshop event sessions ✅
+- [x] Two `event_sessions` for `intro-workshop` on the **next two Saturdays**, via `NextWeekdaysAfter` + `LocalWallClockToUs`.
+- [x] `show_on_home_page = true`, `home_page_visible_days_before = 14`; `show_on_upcoming` / `upcoming_visible_days_before` left unset (OQ-6) — the flag defaults false, the days column stays NULL.
+- [x] `status = scheduled`; capacity read from the product's `default_capacity` rather than a literal 20, so the two cannot drift.
+- [x] **Both ends resolved as wall clock**, not `start + 60 min`. "10am–11am" is a statement about the clock on the wall; on a DST day the elapsed-time reading gives a different answer.
+- [x] *Beyond the checklist:* the sessions are placed in the seeded facility / Main Gym. An event session with no location is not a thing a studio creates, and there is exactly one room to choose.
 
-### 3.3 Aerial Series class schedule
-- [ ] Create the `class_instances` → `class_series_instances` → `class_schedules` chain bound to the `aerial-series` product, valid from now through **end of the following month**.
-- [ ] Slots **Tue(2) and Thu(4) 19:00–20:00**, `instructor_person_id` = Caleb — moved off 18:00 to clear the Partner Acrobatics Thursday slot (D/OQ-8).
+### 3.2 Aerial Series product ✅
+- [x] Product `aerial-series` — "Aerial Series", kind `class_series`.
+- [x] `product_prices`: **$30/session** public and **$10/session** on `gold_member`, both `price_kind = per_instance_base`.
+- [x] **Gap closed — and it was worse than the plan predicted.** See below.
 
-### 3.4 Caleb's provider schedule
-- [ ] Create a `schedule_templates` row for Caleb, Mon–Fri, with five `schedule_template_entries` at 09:00–17:00 (540–1020 minutes).
-- [ ] Call `ScheduleTemplateHelper::GenerateAvailability` for **today through end of the following month** to populate `provider_availability`.
+**`price_kind` was an open question (OQ-7) you didn't answer; I chose `per_instance_base`.** It is literally the schema's per-session price for a series, `ClassSeriesHelper` refuses to create a run whose product lacks one, and the whole-run total is derived as per-instance × occurrence count. `series_total` is left unset deliberately — the run's length depends on when the tool is run, so a fixed total would be wrong.
 
-### 3.5 Tests
-- [ ] Tests for every new business-logic helper (the date helper is the main one).
-- [ ] A test asserting `PopulateTestData` is **not** reachable from the plain `--recreate_database` path.
-- [ ] Seed verification for the test data (D10): two Saturday event sessions in the future with `home_page_visible_days_before = 14` and the upcoming pair unset; the `aerial-series` product with both prices and the Gold one keyed on permission 3; Tue/Thu 19:00 slots with Caleb; Caleb's template with five entries and generated availability rows.
-- [ ] A test that **no two slots collide** on (facility, room, day, time) after the full test seed — the Thursday clash in v0.1 of this plan is exactly what that catches.
+### ⚠️ 3.2's "gap" was a live bug: every Gold membership granted the WRONG permission
+`PopulateProductEntitlementRules` said `const int64_t kGoldMemberPermissionId = 3;  // "gold_member" permission`. That comment was true when it was written and stopped being true at the honuware split: framework permissions (`admin_portal`, `staff_access`) are now seeded FIRST, so the app's own permissions start at 3 — and **id 3 is `instructor`**.
+
+So all three Gold products were granting the instructor permission, and `gold_member` was granted to nobody. That also silently breaks D9's whole premise: the Gold PRICE tier keys on `gold_member`, so a paying Gold member could never match it and would have been charged the public price.
+
+Fixed by resolving both the permission and the product by natural key; the product ids were hardcoded 1–5 in the same function. Now covered by `GoldProductsGrantTheGoldMemberPermission`, which also asserts the Gold and instructor permission ids **differ** — so the test does not pass by coincidence if the numbering ever lines up again.
+
+### 3.3 Aerial Series class schedule ✅
+- [x] Built through **`ClassSeriesHelper::CreateSeriesInstance`**, not by hand. It is the tested path that enforces the run's invariants and creates instance + `class_series_instances` augmentation + implementation + slots as one unit. Hand-rolling the chain would have been a second, unverified definition of a valid run.
+- [x] Slots **Tue(2) + Thu(4) 19:00–20:00**, instructor Caleb, in the seeded facility / Main Gym.
+- [x] Window: now → end of the following month; `prorated_signups_allowed = true`.
+
+**A judgment call worth your review: this creates a new `kind='series'` CLASS named "Aerial Series".** The base seed's classes are all `kind='recurring'`, and `ClassSeriesHelper` rejects those outright — a series run has to hang off a series class. Binding the run to the existing "Aerial Fabric" recurring class was not possible without changing that class's kind, which would alter base-seed data. If you'd rather the run attach to "Aerial Fabric", that class needs to become `kind='series'` in `PopulateClasses` and stop being a weekly drop-in.
+
+### 3.4 Caleb's provider schedule ✅
+- [x] `schedule_templates` for Caleb, effective now → end of the following month, plus five `schedule_template_entries` at 540–1020.
+- [x] `ScheduleTemplateHelper::GenerateAvailability` from **today's local midnight** (not `nowUs`, so today is included) through the end of the following month. 30 days generated in the test run.
+
+### ⚠️ `schedule_template_entries.day_of_week` is ISO (Mon=1…**Sun=7**), not 0=Sun
+`GenerateAvailability` matches it against `date::weekday::iso_encoding()`, which is a *different convention from `class_schedule_slots.day_of_week`* in the same codebase. Mon–Fri is 1..5 under both, which is the only reason this seed is unambiguous — but a weekend entry would need 6/7, and a literal `0` would silently generate **nothing**. The seeder uses local `kIsoMonday`/`kIsoFriday` constants with a comment so nobody "tidies" them into `Scheduling::kMonday`, and `ProviderAvailabilityIsGeneratedOnWeekdaysOnly` fails loudly if the convention is ever mixed up.
+
+### 3.5 Tests ✅ — 30 in `seed_app_data_test.cpp` (18 from Phase 2 + 12 new), 19 in `seed_date_util_test.cpp`
+- [x] Entitlement rules: all three Gold products grant `gold_member` with the right seats/validity; non-membership products grant nothing.
+- [x] 3.1: the two sessions are strictly future, land on a **Saturday**, are at wall-clock 10:00/11:00, and are a week apart (bounded 6–8 days, so a DST week isn't brittle). Bookable + home-page-only + capacity 20 + facility/room. A separate test hands the seeder a `nowUs` 60 days out and asserts the sessions move — **proving the D2 parameter is load-bearing and not decorative**.
+- [x] 3.2: kind, description, both tiers `per_instance_base` on the one active schedule, public `permission_id` NULL @ 3000, Gold keyed on the real `gold_member` id @ 1000. Plus: skips cleanly with no price schedule.
+- [x] 3.3: class is `kind='series'`; instance window is exactly `[nowUs, EndOfFollowingMonthUs]`; the **augmentation row exists** (without it the run is a plain instance and every series reader skips it); Tue/Thu slots at 1140/60 with Caleb. Plus: with no product, **nothing** is written — no half-built class hierarchy.
+- [x] 3.4: template window + five ISO 1–5 entries at 540/1020; ≥20 availability rows, all Caleb, all `source=template`, all **weekdays**, each spanning 09:00–17:00 from its `date_us`.
+- [x] `OnlyPopulateTestDataAddsTheSampleData` — runs the **complete base seed**, asserts none of the four artifacts exist, then runs `PopulateTestData` and asserts all four appear. That is the testable half of "not reachable from `--recreate_database`"; the other half is the single `if (includeTestData)` in `CreateSchemaAndPopulate`.
+- [x] `NoTwoSlotsCollideInTheSameRoomAfterTheFullTestSeed` — all 7 slots, pairwise, on (facility, room, day) with half-open intervals so back-to-back classes are allowed (Handstands starting exactly when Knotty Yoga ends is the entire basis of the 2.7 predecessor link).
+
+### ⚠️ `EndOfFollowingMonthUs` was UTC, not local — found by reading the seeded values
+The Phase 1.1 helper computed the month boundary with `DateTimeUtil::EndOfContainingMonthUs`, and **every month function in `DateTimeUtil` works in UTC** — there is no timezone-aware one. So "the end of the following month" was `23:59:59.999999 UTC` = **16:59:59.999999 Pacific** on the final local day.
+
+The header comment said "in local time". The four Phase 1.1 tests asserted against `StartOfMonthUs(2026, 10)`, which is UTC — so the tests agreed with the code and both disagreed with the documented intent.
+
+**Why it matters here specifically:** the Aerial Series run is Tue/Thu at **19:00**. A window closing at 17:00 on the last day means that if the last day of the following month falls on a Tuesday or Thursday — roughly 2 runs in 7 — the final session falls outside the run and silently disappears, taking a session off the series total with it. Invisible today only because 30 September 2026 is a Wednesday.
+
+Rewritten to walk **local** days until the local month has changed twice. `DateTimeUtil` exposes no local year/month accessor, so the month is identified by formatting (`FormatDateFromMicroseconds(us, tz)` → "September|2026") and comparing for equality — never parsed. The four old tests were rewritten to assert the **local calendar date** of the boundary instead of an epoch literal, which is what the original assertions should have been, plus four new ones: an evening class on the last day is inside the window; a leap-year February; a window ending on the DST-transition day; and a UTC instant that is still the previous local day.
+
+Log evidence of the fix: the run's `through_us` moved `1790812799999999 → 1790837999999999`, exactly 25 200 s = 7 h = PDT's offset.
+
+*The Phase 1.0 write-up in this document says "a date test that never crosses a boundary proves very little." This is the same miss one layer up: the tests never crossed the UTC/local boundary.*
 
 ---
 
@@ -293,6 +328,10 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 
 - [ ] **Studio timezone as configuration.** Seed data hardcodes Pacific (D11). Mason is tracking making this a config secret so a tenant in another zone gets correct absolute timestamps — this matters beyond seeding, since `event_sessions` and `provider_availability` both store absolute `*_us`.
 - [ ] **Photo support for service providers.** So a person can have distinct profile / instructor / massage-therapist images (D7).
+- [ ] ⚠️ **`late-night-spa` is gated on a permission that does not exist.** `PopulateTables` sets `visibility_permission_id = (SELECT id FROM permissions WHERE name = 'gold_fitness')`. There is no `gold_fitness` permission — the seeded set has `gold_member` and `platinum_fitness`. The subquery returns NULL, so a product described as "for Knotty Yoga Gold members" is **visible to everyone**. Same root cause as the 3.2 bug (a permission referenced by something that no longer resolves), but I did NOT change it: `platinum_fitness` exists as a sibling, so `gold_fitness` may have been a planned tier rather than a typo for `gold_member`, and guessing would silently change a product's visibility. **Needs your call:** is it `gold_member`, or a tier that was never added?
+- [ ] **`ScheduleTemplateHelper::GenerateAvailability` steps in fixed 24-hour jumps** (`dayUs += kMicrosPerDay`) from `dateFromUs`. Across a DST transition the generated `date_us` values drift an hour off local midnight and eventually onto the wrong calendar day. Harmless for the current seed window (August → September has no transition) and it compares against local midnight so nothing is dropped, but a template generated across 1 November has the same class of bug `GetMidnightUs` had. Pre-existing; not touched here.
+- [ ] **Two day-of-week conventions coexist.** `class_schedule_slots.day_of_week` is 0=Sun..6=Sat; `schedule_template_entries.day_of_week` is ISO 1=Mon..7=Sun. Nothing in the schema or the column names says so. Worth unifying, or at least naming the columns differently.
+- [ ] **`PopulateProductVariants` / `PopulateProductPrices` / `PopulateProductBookingWindows` still hardcode product and variant ids 1–9.** Same failure mode as the entitlement-rules bug, still latent: they are correct only because products are seeded in a fixed order in a virgin database. They stayed in `create_database.cpp` and were not part of Phase 3's scope.
 
 ---
 
