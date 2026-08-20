@@ -315,12 +315,43 @@ Log evidence of the fix: the run's `through_us` moved `1790812799999999 → 1790
 # Phase 4 — Verification
 
 ### 4.1 Build and run
-- [x] Build `knotty_yoga_tests` **and** `knottyyoga_database_helper` — both green on Linux 8/20/2026. Full gate **5043 tests passed** (floor 3500), layer DAG validated. The helper EXECUTABLE still needs its own build (its `main.cpp` is the only part the gate misses now — see 2.9).
+- [x] Build `knotty_yoga_tests` **and** `knottyyoga_database_helper` — both green on Linux 8/20/2026. Full gate **5058 tests passed** (floor 3500), layer DAG validated. The helper EXECUTABLE is built separately (its `main.cpp` is the only part the gate misses now — see 2.9).
 - [ ] Run `--recreate_database` on a scratch database; confirm photos, instructors, providers and the six slots.
 - [ ] Run `--recreate_database_test`; confirm the events, series, prices and availability.
 
+**Still true after Phase 3: none of this has been RUN against a real database.** The seeders are now executed by 30 harness tests inside an aborted transaction, which is a large step up from "compiles" — the photos really decode, the series run really passes `ClassSeriesHelper`'s validation, availability really generates 30 days. What has NOT happened is a full `--recreate_database_test` against a live Postgres, i.e. the whole `PopulateTables` ordering end to end (including `EnsureSchedulerServiceAccount`, the admin-metadata seeders, and the spa `UPDATE`s no test touches).
+
 ### 4.2 Hand-testing steps
-- [ ] Write live-server steps per the precise-instructions rule: exact menu → submenu → dashboard item → field labels, for each thing seeded.
+
+Run `knottyyoga_database_helper --recreate_database_test` (needs `HONUWARE_ALLOW_DESTRUCTIVE=1` and `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`), then start the server and the Angular app. Log in as **masonbendixen@gmail.com** / **pass**.
+
+**Home page**
+1. Go to **Home**. The hero and the four feature bands render with photographs, not placeholders.
+2. Below them, an **Intro Workshop** card appears for the coming Saturday at **10:00 AM**. It is visible because the session is within 14 days; the second Saturday's session appears once it comes inside that window.
+
+**Classes**
+3. **Classes** in the top nav → the catalog lists **Knotty Yoga**, **Partner Acrobatics** and **Handstands** each with a photograph; **Therapeutic Knotty Yoga**, **Tumbling** and **Aerial Fabric** without one.
+4. Open **Knotty Yoga** → the schedule shows **Monday 6:00 PM – 7:00 PM** with instructor **Mason Bendixen** and **Wednesday 6:00 PM – 7:00 PM** with **Caleb Ault**.
+5. Open **Handstands** → **Monday 7:00 PM – 8:00 PM**, instructor **Mason Bendixen**, and the page states it requires attending the Knotty Yoga class immediately before it.
+6. Open **Partner Acrobatics** → **Thursday 6:00 PM – 7:00 PM** and **Sunday 10:00 AM – 11:00 AM**, both **Mason Bendixen**.
+7. Open **Aerial Series** → one run named **Current Run**, **Tuesday and Thursday 7:00 PM – 8:00 PM** with **Caleb Ault**, ending on the last day of next month. The price shows **$30.00 per session**.
+
+**Gold pricing (the 3.2 fix)**
+8. **Shop** → **Knotty Yoga Gold Membership** → buy it (Square sandbox).
+9. Return to **Aerial Series**. The per-session price now reads **$10.00**. *Before the fix this stayed at $30.00 — the purchase granted `instructor` instead of `gold_member`.*
+10. **Portal ▸ My Account ▸ Memberships** lists the Gold membership as active.
+
+**Instructors and providers**
+11. **Portal ▸ Admin ▸ Manage Data ▸ instructors** → two rows, Mason and Caleb, each with a bio and a photo that is *not* the same image as their profile picture.
+12. **Portal ▸ Admin ▸ Manage Data ▸ provider_type_assignments** → both assigned to **Massage Therapist** with **Is Accepting Bookings** checked.
+
+**Provider availability**
+13. **Portal ▸ Admin ▸ Manage Data ▸ schedule_templates** → one row, provider **Caleb Ault**, name **Weekdays 9-5**.
+14. **Portal ▸ Admin ▸ Manage Data ▸ provider_availability** → roughly 30 rows, weekdays only, each **9:00 AM – 5:00 PM**. No Saturday or Sunday rows.
+15. **Shop ▸ Massage** → book a session. The picker offers weekday slots inside Caleb's 9–5 window and no weekend slots.
+
+**The flag boundary**
+16. Re-run with plain **`--recreate_database`**. Repeat steps 2, 7, 13 and 14: there is **no** Intro Workshop card, **no** Aerial Series class or product, and **no** schedule template or availability rows. Steps 3–6, 11 and 12 are unchanged — that is the base seed.
 
 ---
 
