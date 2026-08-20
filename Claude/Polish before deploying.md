@@ -401,6 +401,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 - **OQ-4 — "the other three images."** Only **three** tier icons exist (`tier_icon_solo/couple/family.png`) — solo plus two others. If there's a fourth image you meant, name it.
 	- Mason- Just the three
 - **OQ-5 — Instructor class preferences.** They do nothing today (write-only notes; details in Phase 1.7). Options: **(a)** keep + label as "reference notes, not enforced" *(chosen default)*; **(b)** wire min/max into scheduling/capacity (real feature work — happy to scope); **(c)** delete the surface. Pick one.
+	- Mason- Let's delete
 - **OQ-6 — Announcement body.** Chosen: plain text (title + body + date window), styled as a notice banner, not dismissible. Alternates: markdown body, or per-user dismissal (needs storage). Speak up if wanted.
 - **OQ-7 — Video providers.** Chosen: YouTube only (privacy-enhanced nocookie embed). Vimeo or raw-URL `<video>` can be added later behind the same column.
 - **OQ-8 — About page markdown.** Chosen: the existing `site_about_markdown` renders as an intro above the new blocks when non-empty, so your current About copy survives. Clear the slot in Site Theme when you want blocks only. (Alternate: drop the markdown entirely.)
