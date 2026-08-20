@@ -60,6 +60,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 # Place plan here
 
 > Plan drafted 8/20/2026 from a full read of [[Tenant Theming and Branding]], [[Home page work and cleanup items]], [[Website Makeover]], [[Component Inventory for Designer]], and a four-way deep exploration of the codebase (home system, theme/fonts/site_info, portals/pages, backend data layer). Checkboxes get ticked as items land. Questions are collected in **Open Questions** at the bottom — please answer there.
+>
+> **Update 8/20/2026 — all twelve open questions answered and folded in; the plan is execution-ready.** Scope changes from the answers: instructor class preferences are **deleted end-to-end** (1.7, which now carries the first app migration — later migration ids renumbered), the video kind supports **raw video-file URLs** as well as YouTube (6.2), the About page drops markdown **entirely** (7.3, including the Site Theme editor's About tab), and the Manage Data table dropdown joins the alphabetize pass (1.3). OQ-1 (the Figma token) is ⏸ parked until Ryan is back — only Phases 8.2/8.3 wait on it.
 
 ## Grounding — what the exploration found (so the phases below are uncontroversial)
 
@@ -105,7 +107,7 @@ Facts that shaped the plan; each one changed what a naive reading of the item li
 | 13 | Footer tagline as image from Figma | F | 8.3 (blocked on OQ-1) |
 | 14 | About page → alternating image/text blocks | E | 7.3 |
 | 15 | Instructions for instructor favorites | A | 1.7 |
-| 16 | What do Instructors-portal preferences do? | A | answered in 1.7 |
+| 16 | What do Instructors-portal preferences do? | A | answered — surface deleted in 1.7 (OQ-5) |
 | 17 | Our Classes → browse-all for anon; My Classes | A | 1.8 (OQ-2) |
 | 18 | Service images (DB + product editor + Services page) | G | 5.1–5.3 |
 | 19 | Event images + richer home event cards + home item type | G + C | 5.2, 3.6 |
@@ -132,7 +134,7 @@ Facts that shaped the plan; each one changed what a naive reading of the item li
 
 ## Phase 1 — Live-refresh, fonts portal, and small polish fixes
 
-> The demo blockers and one-sitting fixes. Almost entirely frontend; 1.2 has a small [hw] half.
+> The demo blockers and one-sitting fixes. Mostly frontend; 1.2 and possibly 1.3's dropdown sort have small [hw] halves, and 1.7 now carries a C++ deletion plus the first app migration (OQ-5).
 
 ### 1.1 Footer (and everything else) refreshes when site content is saved
 The fix is structural, not a footer patch — five components snapshot `SiteConfigService.config` at construction.
@@ -152,6 +154,7 @@ Tiles are hardcoded `<mat-card>` blocks in three templates; converting to typed 
 - [ ] `manage-dashboard` (31 tiles), `staff-dashboard` (5 + 5 provider tiles — alphabetize within each group), `profile/user.component` (15 tiles): convert each to a typed tile array (icon, title, route/click), sorted alphabetically by title, rendered with `@for`.
 - [ ] Icon color: `mat-icon[mat-card-avatar]` (`--theme-info-strong`) and `.card-icon` (`--theme-text-muted`) both become `var(--theme-primary)`. While in there: the `.dashboard-card` rule is duplicated verbatim in manage + staff SCSS — hoist to one shared place.
 - [ ] Specs: each dashboard spec asserts the rendered titles are in alphabetical order and every tile navigates; a computed-style assertion pins the icon color to the token.
+- [ ] **Manage Data table dropdown too** (OQ-11): alphabetize the `/admin` table picker by its displayed friendly name. The list is produced by the framework admin-tables surface consumed by `@honuware/ui/crud` — sort at the source: server-side `ORDER BY` on the friendly name in the listing endpoint [hw]; if inspection shows the list is composed client-side, sort in the app wrapper before it reaches the library component. Test at whichever layer the sort lands.
 
 ### 1.4 Booking summary — reclaim the vertical space, highlight the day
 - [ ] `service-booking.component.html`: remove the `person` (provider name) and `location_on` (facility name) rows from the Booking Summary card. (Provider/facility remain visible earlier in the flow where the slot is chosen.)
@@ -160,26 +163,31 @@ Tiles are hardcoded `<mat-card>` blocks in three templates; converting to typed 
 
 ### 1.5 Memberships page: title + price color
 - [ ] `catalog.component.html` (`/shop`, what the Memberships menu item opens): `<h1>` "Shop" → **"Memberships"**.
-- [ ] Price color: the three per-component `.text-primary { color: var(--theme-info-strong) }` copies (catalog, membership-tier-cards, service-booking) currently paint prices **info-blue**. Change the price color to `var(--theme-on-accent)` per the ask — see **OQ-3** (contrast concern flagged; implementing literally unless overridden).
+- [ ] Price color: the three per-component `.text-primary { color: var(--theme-info-strong) }` copies (catalog, membership-tier-cards, service-booking) currently paint prices **info-blue**. Change the price color to `var(--theme-on-accent)` (OQ-3 ✅ — KY's on-accent resolves to `#1b0e00`, the near-black ink, which is the goal).
 - [ ] Specs: title text; computed price color pinned to the token in `membership-tier-cards.component.spec.ts` and `catalog.component.spec.ts`.
 
 ### 1.6 Upcoming-classes section colors on Home
 - [ ] The home section wrapper around `<app-upcoming-classes [embedded]="true">` gets `background: var(--theme-surface-tint)`; the embedded day/class cards get `background: var(--theme-background)` (embedded mode only — the standalone `/my/my-schedule` page keeps its current look).
 - [ ] Specs: computed backgrounds asserted in `home-page.component.spec.ts` / `upcoming-classes.component.spec.ts`.
 
-### 1.7 Instructors: favorites instruction + the "preferences" answer
+### 1.7 Instructors: favorites instruction + delete the unused class-preferences surface
 - [ ] Public `/instructors` page: add a `.hint` line under the `<h1>` — logged-in: "Tap the heart on an instructor to follow them — we'll email you when they're newly scheduled to teach a class."; logged-out variant: "Sign in to follow instructors and get an email when they're newly scheduled." Spec for both states.
-- [ ] **Answer to "what do preferences do?"** — today, *nothing*. `instructor_class_preferences` (per-class Min/Max attendees + Notes, edited in Manage → Instructors → edit panel) is stored and displayed back but **no scheduling, booking, capacity, or roster code reads it**; the min-attendee auto-cancel sweep that actually runs reads `class_series_instances.min_attendees` (set per series run) instead. It is write-only staff documentation.
-- [ ] Pending OQ-5: add an explanatory hint to the preferences panel ("Reference notes for schedulers — not currently enforced anywhere.") so the UI stops implying enforcement. (If OQ-5 says wire-it-in or delete-it, that replaces this item.)
 
-### 1.8 Menu: Our Classes / My Classes (interpretation — see OQ-2)
-Chosen reading: one auth-dependent menu item.
+**Answer to "what do preferences do?"** — today, *nothing*. `instructor_class_preferences` (per-class Min/Max attendees + Notes, edited in Manage → Instructors → edit panel) is stored and displayed back but **no scheduling, booking, capacity, or roster code reads it**; the min-attendee auto-cancel sweep that actually runs reads `class_series_instances.min_attendees` (set per series run) instead. Per **OQ-5 ✅ ("Let's delete")**, the whole surface goes — top-down so nothing is ever caller-less:
+- [ ] Pre-check: repo-wide search confirms the only consumers are the panel, the seam, the four endpoints, the helper, and their tests (that was the exploration finding — re-verify before deleting).
+- [ ] Frontend: delete `instructor-class-preferences.component.*` (+ spec) and its mount in `instructors-admin.component.html`; delete the four seam methods (list/create/update/delete instructor class preferences) across interface / network / proxy / mock, their `ServerAccess.mock.spec.ts` cases, and the related types.
+- [ ] Backend: delete `admin_instructor_preferences_list.cpp` + `admin_instructor_preference_create/update/delete.cpp`, their `web_app.cpp` anchors, `endpoints/CMakeLists.txt` entries, and endpoint tests; delete `TableHelpers::InstructorClassPreferences` + test + CMakeLists entries; delete `db_schema/instructor_class_preferences.{h,cpp}` + CMakeLists entry and its registrations in `make_app_tables.cpp` / `CreateTables()` / the admin metadata seeds (column info, friendly names, the "Debug view" table description).
+- [ ] Migration `app/0001_drop_instructor_class_preferences` — **the first real app migration** (retire `AppStreamEmptyPreDeploy` per its own comment): `DROP TABLE IF EXISTS instructor_class_preferences`. Test proves a DB carrying the table converts and an already-converted DB no-ops.
+- [ ] Gates: full C++ + Angular suites green with the surface gone; `instructors-admin` spec updated (no preferences panel).
+
+### 1.8 Menu: Our Classes / My Classes (OQ-2 ✅ — the first option confirmed)
+One auth-dependent menu item:
 - [ ] `mockHeaderResponse.ts`: **logged-out** → item labeled **Our Classes** targeting `/classes/all` (the All Classes catalog); **logged-in** → item labeled **My Classes** targeting `/classes` (the weekly page, unchanged behavior — it already defaults to eligible-only for members).
 - [ ] `class-info.component` (All Classes): add a "Weekly schedule" link → `/classes` so anonymous visitors can still reach the advertisement schedule (today's reverse link only goes to the calendar).
 - [ ] Specs: `mockHeaderResponse.spec.ts` per auth state; the new link in `class-info.component.spec.ts`.
 
 ### 1.9 Live hand-testing (Phase 1)
-- [ ] Steps written when the phase lands: fresh DB, change the contact email in Manage → Site Theme → Brand basics and watch the footer update **without reloading**; reopen Manage → Fonts and confirm Google stays selected on the Roboto/Barlow rows; walk the three portals for alphabetical order and red icons; book a service far enough to see the summary card and the highlighted day; open Memberships from the menu and read the title; check the home upcoming-classes band colors; read the instructors hint; check the menu in both auth states.
+- [ ] Steps written when the phase lands: fresh DB, change the contact email in Manage → Site Theme → Brand basics and watch the footer update **without reloading**; reopen Manage → Fonts and confirm Google stays selected on the Roboto/Barlow rows; walk the three portals for alphabetical order and red icons, and the Manage Data table dropdown for alphabetical friendly names; book a service far enough to see the summary card and the highlighted day; open Memberships from the menu and read the title; check the home upcoming-classes band colors; read the instructors hint; confirm Manage → Instructors → edit shows **no** Class preferences panel; check the menu in both auth states.
 
 ---
 
@@ -213,7 +221,7 @@ Chosen reading: one auth-dependent menu item.
 
 ### 3.1 [app] Schema + migration
 - [ ] `db_schema/home_sections`: new kind constants — `carousel`, `membership`, `upcoming_events`, `upcoming_classes`, `offerings`, `intro`, `get_started`, `video` (joining `hero|feature|banner|artwork`). New columns: `image_carousel_id` BIGINT nullable (FK added in Phase 4; plain nullable column now), `video_url` STRING nullable, `hidden_when_logged_in` BOOL default false, `hidden_when_member` BOOL default false.
-- [ ] Migration `app/0001_home_sections_functional_kinds` (the first app migration — retire `AppStreamEmptyPreDeploy` per its own comment): guarded `ALTER TABLE … ADD COLUMN IF NOT EXISTS` for the four columns, then **insert the functional rows if absent by kind** — existing databases (Mason's dev DB) must keep their membership/events/classes sections when the hardcoded islands are deleted. Seed ordinals reproduce today's exact order: carousel 2 · hero 5 (exists) · intro 6 · get_started 7 · upcoming_events 8 · offerings 9 · features 10/20/30 (exist) · banner 50 (exists) · membership 60 (`hidden_when_member = true` — this replaces the `showTiers` logic) · upcoming_classes 70.
+- [ ] Migration `app/0002_home_sections_functional_kinds` (the first *column* migration — establishes the `DbMeta::ListColumns` + `ALTER TABLE … ADD COLUMN IF NOT EXISTS` pattern): guarded `ALTER TABLE … ADD COLUMN IF NOT EXISTS` for the four columns, then **insert the functional rows if absent by kind** — existing databases (Mason's dev DB) must keep their membership/events/classes sections when the hardcoded islands are deleted. Seed ordinals reproduce today's exact order: carousel 2 · hero 5 (exists) · intro 6 · get_started 7 · upcoming_events 8 · offerings 9 · features 10/20/30 (exist) · banner 50 (exists) · membership 60 (`hidden_when_member = true` — this replaces the `showTiers` logic) · upcoming_classes 70.
 - [ ] `create_database.cpp` `PopulateHomeSections`: seed the same functional rows for fresh DBs.
 - [ ] Table helper: emit the new columns; tests for column round-trip and kind constants.
 - [ ] Admin metadata seeds: column labels/hints for the new columns.
@@ -256,7 +264,7 @@ Chosen reading: one auth-dependent menu item.
 - [ ] `db_schema/image_carousel_photos`: `image_carousel_photo_id` PK, `image_carousel_id` FK, `title` nullable, `description` nullable, `ordinal` INT default 0, timestamps. Photos attach via the photo association (register in `photo_support_tables` + the anonymous `PublicPhotoTables` list in `main.cpp` — without the latter, visitors see broken images).
 - [ ] Full new-table checklist ×2 (top-level `image_carousels`, nested `image_carousel_photos`), CMakeLists, friendly names, display template `{display_name}`.
 
-### 4.2 [app] Migration `app/0002_image_carousels`
+### 4.2 [app] Migration `app/0003_image_carousels`
 - [ ] Create both tables if absent; insert a **"home"** carousel (display_name "Home page photos") if absent; copy `home_page_photos` rows into `image_carousel_photos` **preserving ids** (then fix the sequence) so `UPDATE table_item_photos SET table_name = 'image_carousel_photos' WHERE table_name = 'home_page_photos'` re-points every photo without an id map; swap the `photo_support_tables` row; point the Phase-3 carousel home row's `image_carousel_id` at "home"; drop `home_page_photos`. Idempotent at every step; test drops/recreates to prove a pre-migration DB converts and a fresh DB no-ops. (This migrates Mason's live photos — see OQ-10.)
 - [ ] Delete the old surface end-to-end (no dead code): `home_page_photos` db_schema/helper/endpoint/`getHomePagePhotos` seam + mock + tests, admin metadata seeds, `PublicPhotoTables` entry.
 
@@ -292,7 +300,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 > One mechanism serves all three: `products` joins the photo system (one photo per product).
 
 ### 5.1 [app] Products join the photo system
-- [ ] `photo_support_tables` += `products` (seed + migration `app/0003_products_photo_support` inserting the row if absent); `PublicPhotoTables` += `products` (services/events/tiers render for visitors).
+- [ ] `photo_support_tables` += `products` (seed + migration `app/0004_products_photo_support` inserting the row if absent); `PublicPhotoTables` += `products` (services/events/tiers render for visitors).
 - [ ] Product editor (`product-detail.component`): a photo card with `hw-photo-upload` (table `products`) for every kind; product create keeps the save-then-attach flow.
 - [ ] `CatalogProduct` type + payload: expose `has_photo` (and confirm `product_id` reaches every consumer needing a URL — `visible_event_sessions` payload gains `product_id`/`has_photo` if absent). Backend tests for the payload additions.
 
@@ -305,7 +313,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 - [ ] Specs: with/without photo.
 
 ### 5.4 [app] Membership tier icons (item 12 — finishes theming Phase 3's leftover)
-- [ ] Seed: `Seed::PopulateSeedPhotos` attaches `img/tier_icon_solo.png` / `tier_icon_couple.png` / `tier_icon_family.png` to the three membership products (solo → Gold, couple → Couple's, family → Family). (Only three tier icons exist — see OQ-4.) Existing DBs: covered by 5.1's registration + a re-runnable seed step or manual upload through the new editor field — noted in hand-testing.
+- [ ] Seed: `Seed::PopulateSeedPhotos` attaches `img/tier_icon_solo.png` / `tier_icon_couple.png` / `tier_icon_family.png` to the three membership products (solo → Gold, couple → Couple's, family → Family) — exactly three icons, confirmed (OQ-4 ✅). Existing DBs: covered by 5.1's registration + a re-runnable seed step or manual upload through the new editor field — noted in hand-testing.
 - [ ] `membership-tier-cards`: render the product photo as the tier icon, falling back to today's `card_membership` Material icon.
 - [ ] Specs: icon renders from photo, fallback intact.
 
@@ -321,18 +329,21 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 ## Phase 6 — Announcements and video
 
 ### 6.1 Announcements (item 25)
-- [ ] [app] `db_schema/announcements`: `announcement_id` PK, `title`, `body` (plain text — OQ-6), `show_from_us` BIGINT, `show_until_us` BIGINT, `active` BOOL default true, `ordinal` INT default 0, timestamps. Full checklist + migration `app/0004_announcements`. **Deliberately NOT in the theme bundle** — announcements are timely content, not a look (stated here so the round-trip guard's exclusion is intentional).
+- [ ] [app] `db_schema/announcements`: `announcement_id` PK, `title`, `body` (plain text, non-dismissible notice banner — OQ-6 ✅), `show_from_us` BIGINT, `show_until_us` BIGINT, `active` BOOL default true, `ordinal` INT default 0, timestamps. Full checklist + migration `app/0005_announcements`. **Deliberately NOT in the theme bundle** — announcements are timely content, not a look (stated here so the round-trip guard's exclusion is intentional).
 - [ ] [app] Helper + `GET /api/announcements` (anonymous: `active` && server-now within `[show_from_us, show_until_us)`, ordered by `ordinal, id`). Endpoint tests: window edges, inactive filtered, anonymity.
 - [ ] [app] Editor: an "Announcements" tab in Manage → Page Content — title, body, **date pickers** for the from/until dates (per [[feedback_date_time_pickers]]), active toggle, reorder.
 - [ ] [app] Home: an announcements strip pinned **above everything** (top of the page, before the ordered sections) — one `.notice`-styled banner per current announcement. Seam + mock + specs (renders when current, absent otherwise, ordering).
 
-### 6.2 Video home item type (item 26)
-- [ ] [app] Uses Phase 3's `video_url` column. Accept YouTube forms (`watch?v=`, `youtu.be/`, `shorts/`, `embed/`) → normalized to a privacy-enhanced `youtube-nocookie.com/embed/<id>` iframe (16:9, `loading="lazy"`, `referrerpolicy`), URL validated client-side in the editor and on bundle import. YouTube only for now — OQ-7.
-- [ ] [app] `home-video-section` renders the iframe with the row's title above (optional); editor's `video` kind shows the URL field with validation feedback.
-- [ ] Specs: URL-form parsing table, invalid URL refused in the editor, section renders the embed; bundle round-trips `video_url`.
+### 6.2 Video home item type (item 26 — OQ-7 ✅: YouTube **and** raw video URLs)
+- [ ] [app] Uses Phase 3's `video_url` column. Two accepted shapes, detected from the URL:
+  - **YouTube** (`watch?v=`, `youtu.be/`, `shorts/`, `embed/`) → normalized to a privacy-enhanced `youtube-nocookie.com/embed/<id>` iframe (16:9, `loading="lazy"`, `referrerpolicy`).
+  - **Direct video file** (`https://…/name.mp4|.webm|.ogg`) → native `<video controls preload="metadata">`, full width, natural aspect.
+  - Anything else is refused in the editor and on bundle import.
+- [ ] [app] `home-video-section` renders whichever shape the row carries, with the row's title above (optional); the editor's `video` kind shows the URL field with validation feedback naming both accepted shapes.
+- [ ] Specs: URL-detection table across both shapes, invalid URL refused in the editor, iframe vs `<video>` element rendered per shape; bundle round-trips `video_url`.
 
 ### 6.3 Live hand-testing (Phase 6)
-- [ ] Steps: create an announcement spanning today and see it atop Home (signed in and out); set the window to end yesterday and see it vanish; add a video row with a real YouTube link positioned mid-page and play it.
+- [ ] Steps: create an announcement spanning today and see it atop Home (signed in and out); set the window to end yesterday and see it vanish; add a video row with a real YouTube link positioned mid-page and play it; swap the URL to a direct `.mp4` and confirm it plays through the native player.
 
 ---
 
@@ -341,21 +352,22 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 ### 7.1 Studio-location timezone (item 5) — expose what exists
 `facilities.timezone` already exists (IANA, default `America/Los_Angeles`) and drives booking emails/digests/reporting — recorded in [[Bookable Service Foundation]] (decision 10). The gap is surfacing:
 - [ ] [app] Manage → **Locations** page (new; locations are currently editable only through the debug Manage Data surface, violating the dedicated-UI rule): list + edit for `facilities` — name, code, full address (including the `address_line_2`/`country` fields the CRUD metadata omits), **timezone** as a searchable select of IANA zones (curated common-US list + free entry), active toggle. Modeled on `instructors-admin`. Dashboard tile (alphabetized per 1.3).
-- [ ] [app] `description` STRING nullable column on `facilities` (+ DSL + migration `app/0005_facilities_description`) and photo support (`photo_support_tables` += `facilities`, `PublicPhotoTables` += `facilities`, `hw-photo-upload` in the editor) — both feed 7.2.
+- [ ] [app] `description` STRING nullable column on `facilities` (+ DSL + migration `app/0006_facilities_description`) and photo support (`photo_support_tables` += `facilities`, `PublicPhotoTables` += `facilities`, `hw-photo-upload` in the editor) — both feed 7.2.
 - [ ] Recorded, not planned: the service-booking week strip builds days in **browser-local** time (`buildWeek()` uses `new Date()`; `setHours(0,…)`) — fine while all facilities are Pacific, wrong the day a second-timezone location exists. Noted here as the follow-up the timezone column exists to serve.
 - [ ] Specs: page CRUD, timezone select persists, description/photo round-trip.
 
 ### 7.2 About ▸ Our Location (item 20)
-- [ ] [app] Public `/location` page: each active facility — photo, name, description, full address, and an **"Open in Google Maps"** button (`https://www.google.com/maps/search/?api=1&query=<url-encoded address>`, new tab — link-out, not an embedded iframe; OQ-9). Menu: About ▸ **Our Location**.
+- [ ] [app] Public `/location` page: each active facility — photo, name, description, full address, and an **"Open in Google Maps"** button (`https://www.google.com/maps/search/?api=1&query=<url-encoded address>`, new tab — link-out confirmed, OQ-9 ✅). Menu: About ▸ **Our Location**.
 - [ ] Specs: renders active facilities, map href encodes the address, inactive hidden, menu entry.
 
-### 7.3 About page → alternating blocks (item 14)
-- [ ] [app] `db_schema/about_sections`: same shape as a feature row (`about_section_id`, `ordinal`, `title`, `body`, `link_route`, `link_label`, `active`, timestamps) + photo association (+ public allow-list). Full checklist + migration `app/0006_about_sections`.
+### 7.3 About page → alternating blocks (item 14 — OQ-8 ✅: markdown drops entirely)
+- [ ] [app] `db_schema/about_sections`: same shape as a feature row (`about_section_id`, `ordinal`, `title`, `body`, `link_route`, `link_label`, `active`, timestamps) + photo association (+ public allow-list). Full checklist + migration `app/0007_about_sections`. Seed one block from the current About copy so a fresh DB isn't empty.
 - [ ] [app] Helper + `GET /api/about_sections` (anonymous, ordered, active).
 - [ ] [app] Manage → Page Content gains an "About sections" list (same editor pattern; reorder/add/remove/photo).
-- [ ] [app] About page: heading, then `site_about_markdown` rendered as an intro **when non-empty** (keeps Mason's existing content — OQ-8), then the ordered blocks through the *same* `feature-section` component Phase 3 extracted (alternating sides). The `graySquare` placeholder dies.
+- [ ] [app] About page: heading + the ordered blocks through the *same* `feature-section` component Phase 3 extracted (alternating sides) — **no markdown**. Remove the `<markdown>` render, the route-scoped `provideMarkdown()` on `/about`, and the `graySquare` placeholder.
+- [ ] [app] Retire the markdown plumbing with it: the Site Theme editor's **About tab** (union / `sectionOrder` / `sectionKeys()` / the `mat-tab`) and the `aboutText` field in `SiteConfig` / `DEFAULT_SITE_CONFIG` / the merge. **[hw] note:** the `site_about_markdown` slot itself stays registered in honuware — CommunityFinder may consume it, and it travels harmlessly in bundles; revisit at extraction time.
 - [ ] [app] Theme bundle: `about_sections` joins the `page_content` section (rows + image assets, order = array position). Round-trip tests.
-- [ ] Specs: alternation, markdown-intro gating, reorder reflected, bundle round-trip.
+- [ ] Specs: alternation, reorder reflected, no markdown element on the page, editor tab set shrinks, bundle round-trip.
 
 ### 7.4 Live hand-testing (Phase 7)
 - [ ] Steps: Manage → Locations — set the studio's timezone and description, upload a photo; About → Our Location shows it and the button opens Maps on the address; add two About blocks in Page Content and see them alternate; export/import a theme and confirm About blocks survive.
@@ -364,7 +376,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 
 ## Phase 8 — Figma assets and the visual bands
 
-> 8.2 and 8.3 are **blocked on OQ-1** (restore `~/.figma_token`). 8.1 and 8.4 are not.
+> 8.2 and 8.3 are ⏸ **waiting on the Figma token** (OQ-1 — Ryan is out of town; Mason will supply `~/.figma_token` when he's back). 8.1 and 8.4 can land any time.
 
 ### 8.1 [app] Get Started band as a kind row (prep, unblocked)
 - [ ] Phase 3 made `get_started` a row; this restyles its component to Ryan's band: full-bleed, `--theme-inverse-surface` background + `--theme-on-inverse-surface` text (the "menu color scheme"), stacked and centered: image (the row's attached photo, when present) → copy (existing auth-variant text) → red CTA → `/start`. Renders image-less until 8.2 supplies the asset.
@@ -391,29 +403,41 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 
 # Open Questions
 
-> Answer inline with `- Mason-` bullets. Only OQ-1 blocks work (Phase 8.2/8.3); everything else has a chosen default I'll run with.
+> ✅ **All twelve answered by Mason 8/20/2026 and folded into the phases the same day.** OQ-1 is the one ⏸ item — the Figma token arrives when Ryan is back, and only Phases 8.2/8.3 wait on it. The dialog is kept below for the record.
 
 - **OQ-1 — Figma access is gone.** Previous sessions read Ryan's file via the REST API with a personal-access token at `~/.figma_token`; that file no longer exists. To unblock the Get Started image and the footer tagline export, either recreate `C:\Users\mason\.figma_token` containing the token (one line), or export the two assets yourself into `server/knottyyoga_server/src/database_helper/img/` (PNG, 2× — `Icon/GetStarted` from Frame 127, and the tagline artwork) and I'll take it from there.
 	- Mason- Ryan is out of town. I'll get the token when he is back.
+	- Claude- ⏸ Parked. Phases 8.2/8.3 wait for the token; 8.1 (the band restyle, image-optional) and 8.4 (parallax) proceed without it, as does everything else. When Ryan's back: `C:\Users\mason\.figma_token`, one line containing the personal-access token.
 - **OQ-2 — "Our Classes / My Classes" menu shape.** Your sentence supports two readings. **Chosen:** one auth-dependent item — signed out: **Our Classes** → All Classes catalog (`/classes/all`); signed in: **My Classes** → the weekly page (`/classes`, unchanged behavior). The All Classes page gains a "Weekly schedule" link so visitors can still reach the schedule advertisement. **Alternate:** show *both* items when signed in (Our Classes → catalog, My Classes → weekly). Say the word if you want the alternate.
 	- Mason- Yes, I want the first alternative.
+	- Claude- ✅ RESOLVED — reading "the first alternative" as the **first option listed** (the chosen default): **one** auth-dependent item — signed out, **Our Classes** → `/classes/all` (All Classes catalog); signed in, **My Classes** → `/classes` (the weekly page, behavior unchanged), plus the "Weekly schedule" link on All Classes for visitors. Folded into 1.8. *(Stating it concretely on purpose: if you actually meant the show-both-items-when-signed-in variant, say so and 1.8 flips.)*
 - **OQ-3 — Price color `--theme-on-accent`.** Implementing literally as asked. Flag: `on-accent` is the text-*on*-an-accent-fill token (white-ish for KY's amber accent) — on a white card it may be near-invisible. If the intent was "accent-colored prices," the token is `--theme-accent`. I'll implement `--theme-on-accent` and you can eyeball it; one word flips it.
 	- Mason- --theme-on-accent is actually #1b0e00 which is nearly black (which is the goal)
+	- Claude- ✅ RESOLVED — my contrast flag was wrong: KY's on-accent is the near-black ink, so the literal implementation is also the readable one. 1.5 proceeds exactly as asked.
 - **OQ-4 — "the other three images."** Only **three** tier icons exist (`tier_icon_solo/couple/family.png`) — solo plus two others. If there's a fourth image you meant, name it.
 	- Mason- Just the three
+	- Claude- ✅ RESOLVED — solo/couple/family map to the three membership products in 5.4.
 - **OQ-5 — Instructor class preferences.** They do nothing today (write-only notes; details in Phase 1.7). Options: **(a)** keep + label as "reference notes, not enforced" *(chosen default)*; **(b)** wire min/max into scheduling/capacity (real feature work — happy to scope); **(c)** delete the surface. Pick one.
 	- Mason- Let's delete
+	- Claude- ✅ RESOLVED — (c). 1.7 is rewritten as a full top-down removal: the panel + its mount, the four seam methods, the four endpoints, the table helper, and the schema registrations, plus `app/0001_drop_instructor_class_preferences` — now the **first** app migration (later migration ids renumbered 0002–0007 across Phases 3–7).
 - **OQ-6 — Announcement body.** Chosen: plain text (title + body + date window), styled as a notice banner, not dismissible. Alternates: markdown body, or per-user dismissal (needs storage). Speak up if wanted.
 	- Mason- That sounds good.
+	- Claude- ✅ Confirmed — plain text, notice banner, no dismissal. 6.1 as written.
 - **OQ-7 — Video providers.** Chosen: YouTube only (privacy-enhanced nocookie embed). Vimeo or raw-URL `<video>` can be added later behind the same column.
 	- Mason- Let's do YouTube and raw video URL
+	- Claude- ✅ RESOLVED — both shapes: YouTube forms → the nocookie iframe embed, and direct `https://…/*.mp4|.webm|.ogg` file URLs → a native `<video controls>` player. 6.2 rewritten with shape detection + validation for both.
 - **OQ-8 — About page markdown.** Chosen: the existing `site_about_markdown` renders as an intro above the new blocks when non-empty, so your current About copy survives. Clear the slot in Site Theme when you want blocks only. (Alternate: drop the markdown entirely.)
 	- Mason- I think we can drop markdown entirely.
+	- Claude- ✅ RESOLVED — About renders heading + blocks only. 7.3 rewritten: the `<markdown>` render, the route-scoped `provideMarkdown()`, the Site Theme editor's **About tab**, and the `aboutText` config field all go (app-side); a seed block carries your current About copy so nothing is lost on a fresh DB. The `site_about_markdown` slot stays registered in honuware (CommunityFinder may consume it) — revisit at extraction.
 - **OQ-9 — "Triggers a map."** Chosen: an "Open in Google Maps" link-out built from the address (no API key, no third-party iframe/CSP surface). Alternate: an embedded map (iframe embed or Maps JS — needs a key + CSP allowance).
 	- Mason- Let's just do the link to Google maps
+	- Claude- ✅ Confirmed — link-out, no embed. 7.2 as written.
 - **OQ-10 — Carousel data migration touches your live DB.** Phase 4.2 moves your existing `home_page_photos` rows (ids preserved, photo associations re-pointed) into the new carousel tables as a "Home page photos" carousel, then drops the old table + endpoint. It's idempotent and tested against both DB states, but it is a one-way conversion of real data — flagging it rather than doing it silently.
 	- Mason- That's why we are doing this BEFORE I deploy.
+	- Claude- ✅ Confirmed — the migration ships pre-deploy as planned (4.2), with the both-states idempotence tests.
 - **OQ-11 — Which "admin portal" to alphabetize.** Chosen: the Manage dashboard (31 tiles), Staff Portal, and the personal profile tiles. The `/admin` Manage Data page has no tiles (it's a table dropdown from `@honuware/ui`) — left alone as the debug surface.
-	- It would honestly be nice if the tables in Manage Data were also alphabetized.
+	- Mason- It would honestly be nice if the tables in Manage Data were also alphabetized.
+	- Claude- ✅ RESOLVED — scope grew: the Manage Data table dropdown gets alphabetized by its displayed friendly name, sorted at the source (added to 1.3 — [hw] if the list is server-produced, app-side wrapper sort otherwise).
 - **OQ-12 — Timezone scope.** `facilities.timezone` already exists and is consumed server-side; chosen scope is the editing surface + validation + the new Locations page (7.1), with the browser-local week-strip gap recorded as a follow-up. If you meant something more (e.g., rendering all class times in facility TZ on every page), say so and I'll scope it separately.
 	- Mason- Yes, let's just expose a way to set the existing timezone.
+	- Claude- ✅ Confirmed — 7.1 as written (the Locations page is the vehicle); the browser-local week-strip gap stays a recorded follow-up, not in scope.

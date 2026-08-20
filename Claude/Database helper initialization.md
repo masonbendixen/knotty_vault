@@ -255,10 +255,31 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 
 ### 3.1 Intro Workshop event sessions ✅
 - [x] Two `event_sessions` for `intro-workshop` on the **next two Saturdays**, via `NextWeekdaysAfter` + `LocalWallClockToUs`.
-- [x] `show_on_home_page = true`, `home_page_visible_days_before = 14`; `show_on_upcoming` / `upcoming_visible_days_before` left unset (OQ-6) — the flag defaults false, the days column stays NULL.
+- [x] `show_on_home_page = true`, `home_page_visible_days_before = 14`.
+- [x] **`show_on_upcoming = true`, `upcoming_visible_days_before` NULL — this REVERSES OQ-6.** See below.
 - [x] `status = scheduled`; capacity read from the product's `default_capacity` rather than a literal 20, so the two cannot drift.
 - [x] **Both ends resolved as wall clock**, not `start + 60 min`. "10am–11am" is a statement about the clock on the wall; on a DST day the elapsed-time reading gives a different answer.
 - [x] *Beyond the checklist:* the sessions are placed in the seeded facility / Main Gym. An event session with no location is not a thing a studio creates, and there is exactly one room to choose.
+
+### ⚠️ OQ-6 reversed — "leave those two blank" made the workshop invisible on `/events`
+**Reported as "the two intro workshops aren't created" after the first live run.** They WERE created, correctly — both rows present, Aug 22 and Aug 29 2026 at 10:00 Pacific, capacity 20, `status = scheduled`, `show_on_home_page = t`, 14 days. Verified by querying the live database.
+
+`show_on_home_page` and `show_on_upcoming` are **not a primary flag and a redundant duplicate**. They are two independent `WHERE` clauses over two different queries in `EventSessionHelper` — `kSqlGetVisibleSessionsHomePage` and `kSqlGetVisibleSessionsUpcoming` — feeding two different pages. Running both against the live data:
+
+| Feed | Filter | Result |
+|---|---|---|
+| Home page band | `show_on_home_page = true` | **2 rows** ✅ |
+| `/events` "upcoming workshops" | `show_on_upcoming = true` | **0 rows** ❌ |
+
+So the workshop was on the home page and missing from the page whose entire job is listing workshops — the one the Getting Started step "See upcoming workshops" links to.
+
+**Changed to `show_on_upcoming = true` with `upcoming_visible_days_before` left NULL** (= no lead-time limit). An events *listing* should carry a workshop from the moment it is scheduled; the 14 days stays exactly what was asked for — the **home-page promotion window** that puts it on the front page in the final fortnight. Two switches, two jobs.
+
+**The test gap this exposed, which matters more than the flag.** The Phase 3.5 tests asserted the seeded *columns* matched the spec — including `EXPECT_EQ(show_on_upcoming, "f")`, which faithfully encoded the wrong answer and passed. Nothing asserted the *outcome*: that a visitor can see the thing. `IntroWorkshopSessionsAppearOnBothTheHomePageAndEventsFeeds` now calls the real `EventSessionHelper::GetVisibleEventSessions` for both placements as an anonymous visitor and expects 2 each. That test fails on the old seed.
+
+*A seed-verification test that only re-states the seeder's own column values proves the INSERT ran. It cannot tell you the data is any good. Wherever a reader exists, assert through the reader.*
+
+*(The feed also silently DROPS any session it cannot price, so the new test seeds the intro-workshop price too — another way a session can exist and be invisible.)*
 
 ### 3.2 Aerial Series product ✅
 - [x] Product `aerial-series` — "Aerial Series", kind `class_series`.
@@ -389,6 +410,7 @@ Run `knottyyoga_database_helper --recreate_database_test` (needs `HONUWARE_ALLOW
 
 **OQ-6 — Event visibility.** You specified "allow booking and show on home page 14 days in advance". `event_sessions` has a separate `show_on_upcoming` / `upcoming_visible_days_before` pair. Should those be set to 14 as well, or left off? Also — "allow booking" maps to `status`; I plan `scheduled`, confirm.
 - Mason- Let's leave those two blank.
+- ⚠️ **Reversed 8/20/2026 after the first live run.** I asked this badly: the two pairs read like a primary and a duplicate, and they are not — they drive two different pages through two different queries. Leaving `show_on_upcoming` blank hid the workshop from `/events`, which is where you went looking for it. Now `show_on_upcoming = true` with the lead-time column NULL; the 14 days stays as the home-page promotion window. See Phase 3.1.
 
 **OQ-7 — Gold pricing.** The $10 Gold price is a `product_prices` row keyed on `permission_id`. Which permission is "Knotty Yoga Gold" for pricing purposes? There are three Gold products (single/couple/family) and the memory note says class access is permission-based. Also: `price_kind` — is a class-series price `per_session`, and is the $30 likewise?
 - Mason- Please use the permission gold_member. All three memberships should grant that permission.
