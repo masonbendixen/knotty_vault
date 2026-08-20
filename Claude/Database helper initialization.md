@@ -280,7 +280,7 @@ All of this lives in `PopulateTestData()` and runs only under the new flag.
 # Phase 4 — Verification
 
 ### 4.1 Build and run
-- [ ] Build `knotty_yoga_tests` **and** `knottyyoga_database_helper` (the latter is not in the standard gate).
+- [x] Build `knotty_yoga_tests` **and** `knottyyoga_database_helper` — both green on Linux 8/20/2026. Full gate **5043 tests passed** (floor 3500), layer DAG validated. The helper EXECUTABLE still needs its own build (its `main.cpp` is the only part the gate misses now — see 2.9).
 - [ ] Run `--recreate_database` on a scratch database; confirm photos, instructors, providers and the six slots.
 - [ ] Run `--recreate_database_test`; confirm the events, series, prices and availability.
 
