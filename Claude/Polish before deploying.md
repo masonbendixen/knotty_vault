@@ -37,6 +37,13 @@ Here are the items that we need to improve before being ready to ship:
 - Membership, Upcoming Classes, and Upcoming Events should be different items that can be added to the home page and the position on the home page should be able to be ordered with the existing home page items. (Currently they just get added before or below all the configurable items). These will all be new types that can be chosen when adding an item in addition to carousel.
 - The upcoming classes on the home page background should be –theme-surface-tint but the individual cards should be --theme-background
 - Can the background image of banner / Come join the fun! be parallax scroll?
+- Do you still have the access to Ryan's figma? If so, in Ryan’s design for Get started, there is an image with a Get Started with a fire font. This image, the text, and the button should all be stacked on top of each other, centered, and use the menu color scheme and be the full width of the page. The image is at Icon / GetStarted in Frame 127
+- Can we get the icons for C:\Users\mason\source\repos\knottyyoga\server\knottyyoga_server\out\build\x64-Debug\src\database_helper\img tier_icon_solo.png and the other three images and use those as the icons for the Become a member on the home page and on the Memberships page
+	- Can you make the membership panel on the home page look like the items when you click the Memberships menu item and go to that page?
+- The That which doesn’t kill you makes you hotter on the footer should be an image and then get the image from Ryan's figma.
+- Let’s change the About page from being just plain markdown to supporting alternating image / text blocks like the home page. And allow them to be reordered.
+- Add an instruction on the favorite support for instructors on the instructors page
+- What do preferences do in the Instructors portal?
 - 
 
 
