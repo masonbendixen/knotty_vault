@@ -136,7 +136,9 @@ Facts that shaped the plan; each one changed what a naive reading of the item li
 
 > The demo blockers and one-sitting fixes. Mostly frontend; 1.2 and possibly 1.3's dropdown sort have small [hw] halves, and 1.7 now carries a C++ deletion plus the first app migration (OQ-5).
 
-> ✅ **Phase 1 implemented 8/20–8/21/2026.** Gates green: honuware **1733/1733**, knottyyoga C++ **5038/5038** (both Linux docker), `knottyyoga_database_helper` builds explicitly, Angular **3164/3164** + `tsc --noEmit` clean on both configs. Deviations from the plan text are noted inline per subsection. **⚠️ Pin bump owed:** honuware gained the `source_key` emission in `manage_site_fonts.cpp` (1.2) — push + re-pin both consumers before a non-co-dev build sees it.
+> ✅ **Phase 1 implemented 8/20–8/21/2026.** Gates green: honuware **1733/1733**, knottyyoga C++ **5038/5038** (both Linux docker), `knottyyoga_database_helper` builds explicitly, Angular **3164/3164** + `tsc --noEmit` clean on both configs. Deviations from the plan text are noted inline per subsection.
+>
+> **Pin bumped 8/21/2026** — honuware `17a818d` ("Phase 1 — Live-refresh, fonts portal, and small polish fixes") is pushed and CI-green; both consumers re-pinned and verified against the **pinned clone** (not the co-dev override): knottyyoga **5038/5038**, communityfinder **1754/1754**.
 
 ### 1.1 Footer (and everything else) refreshes when site content is saved
 The fix is structural, not a footer patch — five components snapshot `SiteConfigService.config` at construction.
