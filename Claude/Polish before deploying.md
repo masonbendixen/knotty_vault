@@ -213,7 +213,9 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > The "How text looks" upgrades. Backend first ([hw] — one pin bump covers 1.2 + all of Phase 2).
 
-> ✅ **Phase 2 implemented 8/21/2026.** Gates green: honuware **1735/1735**, knottyyoga C++ **5040/5040** (co-dev, both Linux docker), Angular **3171/3171** + `tsc --noEmit` clean ×2 + `ng build` clean + lint at its 262-problem pre-existing baseline. One deliberate deviation, noted in 2.1: the weight-role tokens live in the **TypeScale** group (not FontRole) so "How text looks" renders and live-previews them. **⚠️ Pin bump owed:** honuware gained the `pt` unit + the three weight-role registrations after the `17a818d` re-pin — push + re-pin both consumers when convenient (the earlier 1.2 `source_key` change is already in `17a818d`).
+> ✅ **Phase 2 implemented 8/21/2026.** Gates green: honuware **1735/1735**, knottyyoga C++ **5040/5040** (co-dev, both Linux docker), Angular **3171/3171** + `tsc --noEmit` clean ×2 + `ng build` clean + lint at its 262-problem pre-existing baseline. One deliberate deviation, noted in 2.1: the weight-role tokens live in the **TypeScale** group (not FontRole) so "How text looks" renders and live-previews them.
+>
+> **Pin bumped 8/21/2026** — honuware `bc206bf` ("Phase 2 — Theme typography: units and weight roles") is pushed and CI-green; both consumers re-pinned and verified against the **pinned clone**: knottyyoga **5040/5040**, communityfinder **1756/1756**.
 
 ### 2.1 [hw] Server-side groundwork
 - [x] `IsValidCssLength`: accept `pt` alongside `px|rem|em|%` (+ tests: `12pt`/`13.5pt` accepted, junk still refused — the old explicit `8pt`-is-refused assertion flipped to the accepted list).
