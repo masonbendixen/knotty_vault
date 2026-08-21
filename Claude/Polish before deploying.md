@@ -214,22 +214,31 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 > The "How text looks" upgrades. Backend first ([hw] — one pin bump covers 1.2 + all of Phase 2).
 
 ### 2.1 [hw] Server-side groundwork
-- [ ] `IsValidCssLength`: accept `pt` alongside `px|rem|em|%` (+ tests: `12pt` accepted, junk still refused).
-- [ ] Register three **role** weight tokens in `SiteThemeTokens()`: `site_theme_weight_menu` → `--weight-menu`, `site_theme_weight_heading` → `--weight-heading`, `site_theme_weight_display` → `--weight-display` (`ThemeTokenType::Weight`, FontRole group, plain-English descriptions: "Menu items", "Headings and bold text", "Display / condensed titles"). Tests: registry entries present, weight validation applies, `site_info` serves an override.
+- [x] `IsValidCssLength`: accept `pt` alongside `px|rem|em|%` (+ tests: `12pt`/`13.5pt` accepted, junk still refused — the old explicit `8pt`-is-refused assertion flipped to the accepted list).
+- [x] Register three **role** weight tokens in `SiteThemeTokens()`: `site_theme_weight_menu` → `--weight-menu`, `site_theme_weight_heading` → `--weight-heading`, `site_theme_weight_display` → `--weight-display` (`ThemeTokenType::Weight`, plain-English descriptions). **Deviation: they sit in the `TypeScale` group, not FontRole** — the editor renders that group in "How text looks", where `pendingStyle` previews them live on the specimen and they share the weight control; FontRole's rows are family pickers. Tests: registry entries + descriptions, `pt` length validation, and a `LoadSiteTheme` case proving `site_theme_weight_menu = 300` + `site_theme_text_base = 12pt` serve as `--weight-menu`/`--text-base`. *(The theme bundle picks the three keys up automatically — the exporter is registry-driven and its coverage guard is dynamic.)*
 
 ### 2.2 [app] Unit toggle in "How text looks"
-- [ ] A `rem / px / pt` `mat-button-toggle` at the top of the section (default rem). Conversion at 1rem = 16px = 12pt. The six `--text-*` rows display their resolved value converted to the selected unit; typing in px/pt mode writes the value in that unit (all three are now server-valid); placeholders show the converted default.
-- [ ] Weight rows are unit-less — the toggle skips them (they get the 2.3 control instead).
-- [ ] Specs: display conversion for each unit; entering `18px`/`13.5pt` round-trips; rem mode unchanged from today.
+- [x] A `rem / px / pt` `mat-button-toggle` at the top of the section (default rem). Conversion at 1rem = 16px = 12pt. The six `--text-*` rows display their value converted to the selected unit as a number-plus-unit-suffix control; typing writes in the active unit; placeholders show the converted default (`1rem` / `16px` / `12pt`). *(Two as-built properties worth knowing: flipping the toggle converts only the **display** — the stored value keeps whatever unit it was typed in, so browsing units can never dirty a field; and a full CSS size typed against the active unit ("1.5rem" while in px mode) is stored verbatim rather than mangled.)*
+- [x] Weight rows are unit-less — the toggle skips them (they get the 2.3 control instead); radius tokens are untouched (the branch keys on `type_scale` lengths only).
+- [x] Specs: placeholder conversion per unit; typing `18` in px mode stores `18px` and displays `1.125`/`13.5` under rem/pt; `13.5pt` round-trips; rem mode unchanged; blank clears; verbatim passthrough.
 
 ### 2.3 [app] Named weight picker + role wiring
-- [ ] `_tokens.scss`: add `--weight-menu: var(--weight-semibold)`, `--weight-heading: var(--weight-semibold)`, `--weight-display: var(--weight-semibold)` defaults. Re-point the hardcodes: `.header-button` (`header.component.scss`) → `var(--weight-menu)`; `.din-bold` → `var(--weight-heading)`; `.din-condensed-bold` → `var(--weight-display)`. Nothing moves visually (defaults preserve semibold).
-- [ ] Site Theme editor: fields with `type === 'weight'` render a `mat-select` instead of the bare input — options 100–900 with names (reuse the existing `FACE_WEIGHTS` list: "100 — Thin" … "900 — Black") plus "Use the default (600 — Semi Bold)" resolved from the stylesheet, mirroring the font-role dropdown's naming of defaults. Applies to the three new role weights **and** the four existing scale weights.
-- [ ] Fix the specimen drift: the "How text looks" specimen uses `--weight-bold` where app chrome uses semibold — re-point the specimen at the role weights so the preview tells the truth.
-- [ ] Specs: weight fields render selects with named options; picking 300 for "Menu items" restyles a probe styled with `var(--weight-menu)`; `design-tokens.spec.ts` pins the three new role tokens and the re-pointed classes.
+- [x] `_tokens.scss`: `--weight-menu` / `--weight-heading` / `--weight-display`, all defaulting to `var(--weight-semibold)`. Re-pointed: `.header-button` → `var(--weight-menu)`; `.din-bold` → `var(--weight-heading)`; `.din-condensed-bold` → `var(--weight-display)`. Nothing moved visually.
+- [x] Site Theme editor: `type === 'weight'` fields render a `mat-select` — the nine named cuts ("100 — Thin" … "900 — Black", the `FACE_WEIGHTS` list **moved to `@shared/types/site-fonts.types`** so the font manager and the editor share one copy) plus "Use the default (600 — Semi Bold)" resolved from the stylesheet. Applies to the three role weights **and** the four scale weights.
+- [x] Specimen drift fixed: display/heading lines now ask for the weight **roles** (they overstated headings at `--weight-bold`), and the specimen gained a **menu line** ("Home · Classes · Memberships", uppercase, `var(--weight-menu)`) so the new role previews live as you pick.
+- [x] Specs: the weight select renders with the nine named options and the named default; picking 300 for the menu restyles the specimen menu line to computed weight 300; `design-tokens.spec.ts` pins the three role tokens (default = semibold), that a `--weight-menu` override reaches a consumer without moving `.din-bold`, and that `.din-bold` follows a `--weight-heading` override.
 
 ### 2.4 Live hand-testing (Phase 2)
-- [ ] Steps: Manage → Site Theme → Fonts → How text looks — flip the unit toggle and read `16px` / `12pt` for the base size; set "Menu items" to "300 — Light" and watch the top menu thin out immediately; export a theme file and confirm the weight keys are in `theme.json` (the registry-driven coverage guard makes this automatic — the step proves it end-to-end).
+- [x] Steps written (below) — awaiting your run against a live server.
+
+Fresh or existing database, server + Angular dev server running, signed in as the admin.
+
+1. **Unit toggle.** Admin ▸ **Manage Products** → **Site Theme** → **Fonts** tab → scroll to **How text looks**. A **rem / px / pt** toggle sits beside the heading, on **rem**. The `--text-base` row's placeholder reads **1rem**; click **px** and it reads **16px**; click **pt** and it reads **12pt**.
+2. **Enter a size in px.** With **px** selected, type **18** in the `--text-base` row and press **Save this section**. Body copy across the site (and the specimen's body line) grows; reopen the row — it shows **18** with the px suffix, and flipping to **rem** shows **1.125** without re-dirtying the field. Clear the row and save to go back to the default.
+3. **Named weights.** Still in **How text looks**: every `--weight-*` row is now a dropdown of named cuts, first option **"Use the default (600 — Semi Bold)"**.
+4. **Menu weight, live.** In the **--weight-menu** row ("Menu items in the top bar") pick **300 — Light**: the specimen's "Home · Classes · Memberships" line thins immediately, before saving. Press **Save this section** and look at the real top menu — it's Light now, while headings everywhere are still semibold. Pick **"Use the default (600 — Semi Bold)"** and save to restore.
+5. **Headings decoupled.** Set **--weight-heading** to **800 — Extra Bold** and save: section headings and buttons heavy up while the top menu (still on its own role) doesn't move. Reset to default.
+6. **Theme file carries it.** Site Theme → **Theme file** → **Download**: open the zip's `theme.json` — `site_theme_weight_menu` (and any pt size you saved) appears under `tokens` when set.
 
 ---
 
