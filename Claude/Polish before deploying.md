@@ -303,6 +303,8 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > *"I would like to add a Don't show for people who are not members option for the home page items. There are certain things that I think only make sense to show for people with memberships."*
 
+> ✅ **Implemented 8/21/2026.** Gates green: knottyyoga C++ **5045/5045** + `knottyyoga_database_helper` builds, Angular **3186/3186** (+7), `tsc --noEmit` clean ×2, `ng build` clean, lint at its 262 baseline. App-side only — no honuware change, no pin bump.
+
 3.4 shipped `hidden_when_member` (hide the upsell from people who already bought). This is its mirror: `hidden_when_not_member` hides a row from everyone **without** a membership, so a studio can put member-only content — a members' notice, a perks block, a private-session pitch — on the public home page without it leaking to visitors.
 
 **The rule, and why it is one line.** A row is hidden unless the viewer is a *confirmed* member (`hasMembership === true`). That single condition covers all three non-member states correctly and identically: an anonymous visitor (never a member — the page does not even fetch subscriptions for them), a signed-in non-member, and the window where a signed-in viewer's membership check is still **pending** — hidden while unknown, revealed once confirmed, so member-only content can never flash in front of a non-member. The same no-flash discipline as `hidden_when_member`, pointing the other way.
