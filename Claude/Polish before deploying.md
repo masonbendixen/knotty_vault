@@ -333,7 +333,7 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [ ] `db_schema/image_carousel_photos`: `image_carousel_photo_id` PK, `image_carousel_id` FK, `title` nullable, `description` nullable, `ordinal` INT default 0, timestamps. Photos attach via the photo association (register in `photo_support_tables` + the anonymous `PublicPhotoTables` list in `main.cpp` — without the latter, visitors see broken images).
 - [ ] Full new-table checklist ×2 (top-level `image_carousels`, nested `image_carousel_photos`), CMakeLists, friendly names, display template `{display_name}`.
 
-### 4.2 [app] Migration `app/0003_image_carousels`
+### 4.2 [app] Migration `app/0004_image_carousels`
 - [ ] Create both tables if absent; insert a **"home"** carousel (display_name "Home page photos") if absent; copy `home_page_photos` rows into `image_carousel_photos` **preserving ids** (then fix the sequence) so `UPDATE table_item_photos SET table_name = 'image_carousel_photos' WHERE table_name = 'home_page_photos'` re-points every photo without an id map; swap the `photo_support_tables` row; point the Phase-3 carousel home row's `image_carousel_id` at "home"; drop `home_page_photos`. Idempotent at every step; test drops/recreates to prove a pre-migration DB converts and a fresh DB no-ops. (This migrates Mason's live photos — see OQ-10.)
 - [ ] Delete the old surface end-to-end (no dead code): `home_page_photos` db_schema/helper/endpoint/`getHomePagePhotos` seam + mock + tests, admin metadata seeds, `PublicPhotoTables` entry.
 
@@ -369,7 +369,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 > One mechanism serves all three: `products` joins the photo system (one photo per product).
 
 ### 5.1 [app] Products join the photo system
-- [ ] `photo_support_tables` += `products` (seed + migration `app/0004_products_photo_support` inserting the row if absent); `PublicPhotoTables` += `products` (services/events/tiers render for visitors).
+- [ ] `photo_support_tables` += `products` (seed + migration `app/0005_products_photo_support` inserting the row if absent); `PublicPhotoTables` += `products` (services/events/tiers render for visitors).
 - [ ] Product editor (`product-detail.component`): a photo card with `hw-photo-upload` (table `products`) for every kind; product create keeps the save-then-attach flow.
 - [ ] `CatalogProduct` type + payload: expose `has_photo` (and confirm `product_id` reaches every consumer needing a URL — `visible_event_sessions` payload gains `product_id`/`has_photo` if absent). Backend tests for the payload additions.
 
@@ -398,7 +398,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 ## Phase 6 — Announcements and video
 
 ### 6.1 Announcements (item 25)
-- [ ] [app] `db_schema/announcements`: `announcement_id` PK, `title`, `body` (plain text, non-dismissible notice banner — OQ-6 ✅), `show_from_us` BIGINT, `show_until_us` BIGINT, `active` BOOL default true, `ordinal` INT default 0, timestamps. Full checklist + migration `app/0005_announcements`. **Deliberately NOT in the theme bundle** — announcements are timely content, not a look (stated here so the round-trip guard's exclusion is intentional).
+- [ ] [app] `db_schema/announcements`: `announcement_id` PK, `title`, `body` (plain text, non-dismissible notice banner — OQ-6 ✅), `show_from_us` BIGINT, `show_until_us` BIGINT, `active` BOOL default true, `ordinal` INT default 0, timestamps. Full checklist + migration `app/0006_announcements`. **Deliberately NOT in the theme bundle** — announcements are timely content, not a look (stated here so the round-trip guard's exclusion is intentional).
 - [ ] [app] Helper + `GET /api/announcements` (anonymous: `active` && server-now within `[show_from_us, show_until_us)`, ordered by `ordinal, id`). Endpoint tests: window edges, inactive filtered, anonymity.
 - [ ] [app] Editor: an "Announcements" tab in Manage → Page Content — title, body, **date pickers** for the from/until dates (per [[feedback_date_time_pickers]]), active toggle, reorder.
 - [ ] [app] Home: an announcements strip pinned **above everything** (top of the page, before the ordered sections) — one `.notice`-styled banner per current announcement. Seam + mock + specs (renders when current, absent otherwise, ordering).
@@ -421,7 +421,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 ### 7.1 Studio-location timezone (item 5) — expose what exists
 `facilities.timezone` already exists (IANA, default `America/Los_Angeles`) and drives booking emails/digests/reporting — recorded in [[Bookable Service Foundation]] (decision 10). The gap is surfacing:
 - [ ] [app] Manage → **Locations** page (new; locations are currently editable only through the debug Manage Data surface, violating the dedicated-UI rule): list + edit for `facilities` — name, code, full address (including the `address_line_2`/`country` fields the CRUD metadata omits), **timezone** as a searchable select of IANA zones (curated common-US list + free entry), active toggle. Modeled on `instructors-admin`. Dashboard tile (alphabetized per 1.3).
-- [ ] [app] `description` STRING nullable column on `facilities` (+ DSL + migration `app/0006_facilities_description`) and photo support (`photo_support_tables` += `facilities`, `PublicPhotoTables` += `facilities`, `hw-photo-upload` in the editor) — both feed 7.2.
+- [ ] [app] `description` STRING nullable column on `facilities` (+ DSL + migration `app/0007_facilities_description`) and photo support (`photo_support_tables` += `facilities`, `PublicPhotoTables` += `facilities`, `hw-photo-upload` in the editor) — both feed 7.2.
 - [ ] Recorded, not planned: the service-booking week strip builds days in **browser-local** time (`buildWeek()` uses `new Date()`; `setHours(0,…)`) — fine while all facilities are Pacific, wrong the day a second-timezone location exists. Noted here as the follow-up the timezone column exists to serve.
 - [ ] Specs: page CRUD, timezone select persists, description/photo round-trip.
 
@@ -430,7 +430,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 - [ ] Specs: renders active facilities, map href encodes the address, inactive hidden, menu entry.
 
 ### 7.3 About page → alternating blocks (item 14 — OQ-8 ✅: markdown drops entirely)
-- [ ] [app] `db_schema/about_sections`: same shape as a feature row (`about_section_id`, `ordinal`, `title`, `body`, `link_route`, `link_label`, `active`, timestamps) + photo association (+ public allow-list). Full checklist + migration `app/0007_about_sections`. Seed one block from the current About copy so a fresh DB isn't empty.
+- [ ] [app] `db_schema/about_sections`: same shape as a feature row (`about_section_id`, `ordinal`, `title`, `body`, `link_route`, `link_label`, `active`, timestamps) + photo association (+ public allow-list). Full checklist + migration `app/0008_about_sections`. Seed one block from the current About copy so a fresh DB isn't empty.
 - [ ] [app] Helper + `GET /api/about_sections` (anonymous, ordered, active).
 - [ ] [app] Manage → Page Content gains an "About sections" list (same editor pattern; reorder/add/remove/photo).
 - [ ] [app] About page: heading + the ordered blocks through the *same* `feature-section` component Phase 3 extracted (alternating sides) — **no markdown**. Remove the `<markdown>` render, the route-scoped `provideMarkdown()` on `/about`, and the `graySquare` placeholder.
@@ -488,7 +488,7 @@ Per item 7c it lives in `/manage/site-theme` (union + `sectionOrder` + `sectionK
 	- Claude- ✅ RESOLVED — solo/couple/family map to the three membership products in 5.4.
 - **OQ-5 — Instructor class preferences.** They do nothing today (write-only notes; details in Phase 1.7). Options: **(a)** keep + label as "reference notes, not enforced" *(chosen default)*; **(b)** wire min/max into scheduling/capacity (real feature work — happy to scope); **(c)** delete the surface. Pick one.
 	- Mason- Let's delete
-	- Claude- ✅ RESOLVED — (c). 1.7 is rewritten as a full top-down removal: the panel + its mount, the four seam methods, the four endpoints, the table helper, and the schema registrations, plus `app/0001_drop_instructor_class_preferences` — now the **first** app migration (later migration ids renumbered 0002–0007 across Phases 3–7).
+	- Claude- ✅ RESOLVED — (c). 1.7 is rewritten as a full top-down removal: the panel + its mount, the four seam methods, the four endpoints, the table helper, and the schema registrations, plus `app/0001_drop_instructor_class_preferences` — now the **first** app migration (later migration ids renumbered 0002–0008 across Phases 3–7 — 3.9 later claimed 0003, shifting Phases 4–7 up by one).
 - **OQ-6 — Announcement body.** Chosen: plain text (title + body + date window), styled as a notice banner, not dismissible. Alternates: markdown body, or per-user dismissal (needs storage). Speak up if wanted.
 	- Mason- That sounds good.
 	- Claude- ✅ Confirmed — plain text, notice banner, no dismissal. 6.1 as written.
