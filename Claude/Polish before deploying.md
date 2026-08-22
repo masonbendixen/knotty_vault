@@ -311,14 +311,14 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 **Not a security boundary, and the editor says so.** The feed stays anonymous and returns every active row; the filter is client-side, exactly like `hidden_when_logged_in` and the Getting Started steps. That is right for *tailoring* — it needs no per-viewer endpoint and no cache-busting — but a determined visitor can read a members-only row's copy in the network response. Anything genuinely confidential belongs behind an authenticated endpoint, not behind this flag; the toggle's hint says as much where the decision is being made.
 
-- [ ] [app] `db_schema/home_sections`: `hidden_when_not_member` BOOL NOT NULL DEFAULT false. Migration `app/0003_home_sections_hidden_when_not_member` — a bare `ADD COLUMN IF NOT EXISTS` (idempotent by itself; nothing to backfill, every existing row wants the default).
-- [ ] [app] `HomeSectionExtras` gains `hiddenWhenNotMember`; helper test extends the extras round-trip.
-- [ ] [app] Theme bundle: the flag travels beside the other two; round-trip test.
-- [ ] [app] Admin column metadata + friendly name.
-- [ ] [app] Seam: `HomeSection.hidden_when_not_member`, normalized (the `"t"/"f"` trap), mock rows carry it.
-- [ ] [app] Page filter: hidden unless `hasMembership === true`. Specs for the four viewer states (anonymous, pending, non-member, member) plus the both-flags-on "never shows" case.
-- [ ] [app] Page Content editor: a third toggle ("Only show to people with a membership") with the not-a-secret hint, a warning notice when both membership toggles are on, and a "Members only" badge in the row list. Specs.
-- [ ] Hand-testing (adds to 3.8): edit **Why Knotty Yoga** → turn on **Only show to people with a membership** → Save. Signed out: the block is gone. Sign in as a **non-member**: still gone. Sign in as a **member** (buy Gold with the Square sandbox card, or grant it with the test-helper): the block is back, and the features on either side still alternate left/right correctly. Turn on **Hide from people with a membership** as well and confirm the editor warns that the row will never show — then turn both off.
+- [x] [app] `db_schema/home_sections`: `hidden_when_not_member` BOOL NOT NULL DEFAULT false. Migration `app/0003_home_sections_hidden_when_not_member` — a bare `ADD COLUMN IF NOT EXISTS`. Test drops the column, applies, replays (no-op), then inserts a row and reads the default back, proving the column is *usable*, not merely present.
+- [x] [app] `HomeSectionExtras` gains `hiddenWhenNotMember`; the helper test's defaults and full-extras round-trips both cover it.
+- [x] [app] Theme bundle: the flag travels beside the other two; the functional-kinds round-trip test gained a members-only row (JSON both ways + the landed column).
+- [x] [app] Admin column metadata ("Members Only" / "Only show this section to visitors with a membership") + friendly name.
+- [x] [app] Seam: `HomeSection.hidden_when_not_member`, normalized through the same `toBoolean` as the others; mock `homeRow()` default + a mock-spec assertion that it defaults off across the seeded list.
+- [x] [app] Page filter: `hidden_when_not_member && hasMembership !== true` — one condition covering anonymous, non-member and pending alike. Specs: the three viewer states, the pending hold (member-only copy can never flash in front of a non-member), a **shared entitlement** counting as membership (the profile-hub rule), and both-flags-on never showing for anyone.
+- [x] [app] Page Content editor: the third toggle with the tailoring-not-secrecy hint, the "nobody will ever see this" warning when both membership toggles are on (a warning, **not** a block — asserted), and a "Members only" badge in the row list. Specs for all three.
+- [x] Hand-testing (adds to 3.8): edit **Why Knotty Yoga** → turn on **Only show to people with a membership** → Save. Signed out: the block is gone. Sign in as a **non-member**: still gone. Sign in as a **member** (buy Gold with the Square sandbox card, or grant it with the test-helper): the block is back, and the features on either side still alternate left/right correctly. Turn on **Hide from people with a membership** as well and confirm the editor warns that the row will never show — then turn both off.
 
 ---
 
