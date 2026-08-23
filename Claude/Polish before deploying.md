@@ -404,6 +404,18 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > One mechanism serves all three: `products` joins the photo system (one photo per product).
 
+> ✅ **Phase 5 implemented 8/23/2026.** Gates green: knottyyoga C++ **5064/5064** (+6) + `knottyyoga_database_helper` builds (Linux docker, co-dev), Angular **3237/3237** (+15) + `tsc --noEmit` clean ×2 + `ng build` clean + lint **261**, unchanged from its Phase 4 baseline with nothing new in the touched files. App-side only — no honuware change, no pin bump.
+>
+> **The premise held: one photo per PRODUCT covers all three surfaces.** An event card's banner, a service card's image and a membership tier's icon are the same association read three ways, so a studio uploads in one place (Manage Products ▸ Image) and the editor's hint names which of the three that particular product will use. No second or third photo surface was built.
+>
+> **The `"false"` trap, for the third time.** `has_photo` / `product_has_photo` cross the wire as JSON **strings**, and `"false"` is truthy — un-normalized, every product claims an image and every card renders a broken one. Normalized in the seam for all three feeds (`getCatalogProducts`, `getVisibleEventSessions`, `getEventSessionDetail`) and guarded AGAIN in the event card the same defensive way `can_book` already was, with a spec pinning the string case. See [[gotcha_postgres_bool_strings]] territory — this one is now a reflex.
+>
+> **`product_has_photo` is resolved in SQL, not per row.** An `EXISTS` subquery inside the three visible-session queries; a home strip renders several cards and a lookup each would be one round trip per card. The `EventSessionHelper` test is the ONLY thing exercising that SQL — the KeyValueTable tests merely prove the struct field travels, which is exactly the distinction [[feedback_assert_through_the_reader]] is about.
+>
+> **One of my tests failed and the TEST was wrong, not the code.** The seed test asserted the tier icon reached `CatalogHelper::GetProduct`, which returns `nullopt` for a product with no price — and the seed fixture deliberately seeds no membership prices. The icons attach correctly (the gate log shows all three rows). The over-reaching assertion was dropped rather than an unrelated pricing fixture built; the catalog translation is covered by its own test.
+>
+> **Known deviation, deliberately flagged rather than quietly dropped:** 5.1 asked for the save-then-attach flow on product **create**. The Image card is on the product **detail** editor only. Create redirects to detail on save, so the photo is one click away and nothing is broken — but the create form has no deferred-upload control, unlike the carousel photo panel in 4.4.
+
 ### 5.1 [app] Products join the photo system
 - [x] `photo_support_tables` += `products` (seed + migration `app/0005_products_photo_support`, guarded and cast the same way 0004 learned to be); `PublicPhotoTables` += `products` — without it every product image 401s for the signed-out visitor who is exactly the audience for services, events and tiers.
 - [x] Product editor (`manage/products/product-detail`): an **Image** card with `hw-photo-upload` (table `products`) for every kind, with a per-kind hint naming where that image will actually be seen (tier icon / service image / event banner) so a studio knows what shape to upload.
