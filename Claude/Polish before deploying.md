@@ -429,8 +429,9 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] Specs: the URL is built from the product (not the session id), no image when absent, no image for a missing flag, and no image for the string `"false"`.
 
 ### 5.3 [app] Service images (item 18)
-- [x] Services page (`service-catalog`): the product image spans the top of each service card (negative margins pull it out of `mat-card`'s padding to meet the border); graceful absence leaves the card starting at its title.
-- [x] Specs: only the service that has one gets an image, the URL is right, and the rest of the card is unaffected when absent.
+- [x] Services page (`service-catalog`): the product image spans the top of each service card; graceful absence leaves the card starting at its title.
+- [x] **Fixed 8/23 after Mason's first upload — the image hung off BOTH sides of its card.** The first version pulled it outward with `width: calc(100% + 2 * var(--space-4))` and negative side margins, on the assumption that it had to escape `mat-card`'s padding. **`mat-card` has no padding**: Material puts it on `.mat-mdc-card-header` / `mat-card-content` (this repo's own `_surfaces.scss` says so, and even patches the header's bottom padding for header-only cards). So the margins cancelled nothing and simply made the image 32px wider than its card. Now a plain `width: 100%`, with `overflow: hidden` on the card clipping the image's square top corners to the card radius.
+- [x] Specs: only the service that has one gets an image, the URL is right, the rest of the card is unaffected when absent — **and one GEOMETRIC assertion** (`photo.width <= card.width`, both edges inside the card's) that the broken CSS fails. The three attribute-level specs all passed while the layout was visibly wrong, which is exactly why they did not help.
 
 ### 5.4 [app] Membership tier icons (item 12 — finishes theming Phase 3's leftover)
 - [x] Seed: `Seed::PopulateSeedPhotos` attaches `tier_icon_solo.png` / `tier_icon_couple.png` / `tier_icon_family.png` to `gold-membership` / `gold-couples` / `gold-family` (PNG, not JPEG — flat artwork with transparency). It runs after `PopulateProducts`, which is what the lookup-by-code needs.
