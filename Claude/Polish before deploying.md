@@ -431,7 +431,16 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] Specs: subscriptions render through the shared card and NOT as generic anchors; non-subscription kinds are unaffected; a mixed catalog shows both; and the tier icon carries through.
 
 ### 5.6 Live hand-testing (Phase 5)
-- [ ] Steps: upload a photo to "Intro Workshop" in Manage → Products and see it on Upcoming Events + the home events section, signed out; upload to a massage service and check Services; fresh DB shows the three laurel tier icons on Home and Memberships, identically.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angular dev server running.
+
+1. **The tier icons are there out of the box.** Signed out, open **Home** and scroll to the membership band: the three tiers show the **laurel icons** (solo, couple, family) instead of the grey `card_membership` glyph. Open **Memberships** from the top menu — the same three cards, **identical** to the home band: same icon, name, description, price and Subscribe button. That is 5.5: one component, two places.
+2. **An event image, seen by a visitor.** Admin ▸ **Manage Products** → **Products** → **Intro Workshop**: the new **Image** card sits under Product Information, and its hint says the picture becomes this event's card banner. Upload a landscape photo. Sign out, open **Upcoming Events**: the Intro Workshop card now leads with that image. Open **Home**: the same image on the same card in the Upcoming events strip — one upload, both surfaces.
+3. **A service image.** Manage Products → a **bookable_service** product (e.g. a massage). Its Image hint says the Services page. Upload a photo, then visit **Services** signed out: the image spans the top of that service's card. The services you did *not* give a photo still look right — their cards simply start at the title, with no grey placeholder.
+4. **Replacing a tier icon is just another upload.** Manage Products → **Knotty Yoga Gold Membership** → Image → upload something different. Reload Home and Memberships: both show the new artwork. Delete the image on that card and reload: that tier falls back to the `card_membership` icon while the other two keep their laurels — a mixed row is fine.
+5. **Signed-out visibility is the point.** Do steps 2–4 in a private window with no session. Every product image must render; a broken picture there means `products` is missing from the anonymous allow-list.
+6. **Your real DB.** Run `knottyyoga_database_helper --migrate` against it: the report lists `app/0005_products_photo_support`. Then open Manage Products → any product: the **Image** card accepts an upload. (Before this migration the upload is refused with "Photos are not supported for this table" — that row is what the migration adds.) The three laurel icons are a fresh-DB seed, so on your existing database you upload them yourself through this field.
 
 ---
 
