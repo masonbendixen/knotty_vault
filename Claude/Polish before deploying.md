@@ -405,26 +405,30 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 > One mechanism serves all three: `products` joins the photo system (one photo per product).
 
 ### 5.1 [app] Products join the photo system
-- [ ] `photo_support_tables` += `products` (seed + migration `app/0005_products_photo_support` inserting the row if absent); `PublicPhotoTables` += `products` (services/events/tiers render for visitors).
-- [ ] Product editor (`product-detail.component`): a photo card with `hw-photo-upload` (table `products`) for every kind; product create keeps the save-then-attach flow.
-- [ ] `CatalogProduct` type + payload: expose `has_photo` (and confirm `product_id` reaches every consumer needing a URL — `visible_event_sessions` payload gains `product_id`/`has_photo` if absent). Backend tests for the payload additions.
+- [x] `photo_support_tables` += `products` (seed + migration `app/0005_products_photo_support`, guarded and cast the same way 0004 learned to be); `PublicPhotoTables` += `products` — without it every product image 401s for the signed-out visitor who is exactly the audience for services, events and tiers.
+- [x] Product editor (`manage/products/product-detail`): an **Image** card with `hw-photo-upload` (table `products`) for every kind, with a per-kind hint naming where that image will actually be seen (tier icon / service image / event banner) so a studio knows what shape to upload.
+- [x] `CatalogProduct` gains `has_photo`; `ProductInfo.hasPhoto` is set in `CatalogHelper` (both `GetCatalog` and `GetProduct`) via `TableItemPhotos::HasPhoto` — a lookup, not a column, so it cannot live in the `const` `ProductInfoFromKeyValueTable`. `visible_event_sessions` already carried `product_id`; it gains `product_has_photo`, resolved as an **EXISTS subquery inside the three visible-session queries** rather than a lookup per row (a home strip renders several cards).
+- [x] **The wire value is the STRING `"true"`/`"false"`, and `"false"` is truthy.** Normalized in the seam for both feeds (`getCatalogProducts`, `getVisibleEventSessions`, `getEventSessionDetail`) through the existing `toBoolean`, AND guarded again in the event card the same defensive way `can_book` already was. Un-normalized, every product would claim an image and every card would show a broken one.
+- [x] Tests: KeyValueTable carries the flag both ways (payment + scheduling); `CatalogHelper` reports it through **both** readers; `EventSessionHelper` reports it through **both** placements — that last one is the only thing exercising the SQL, since the KVT tests only prove the struct field travels.
 
 ### 5.2 [app] Event images (item 19)
-- [ ] The shared public event card (3.6) renders the product photo above the copy (placeholder-free fallback when absent) — on `/events` and all home event strips.
-- [ ] Specs: card with/without photo on both surfaces.
+- [x] The shared public event card (3.6) renders the product photo as a banner above the copy — so `/events` and every home event strip get it from one change. Keyed on `product_id`, not the session: one image serves every session of the same product. **Placeholder-free** when absent: a studio that has not uploaded one keeps the card it has today rather than a grey box on every event.
+- [x] The card body switched from `height: 100%` to `flex: 1` — with the photo above it, the old rule added the image's height to a card already filling its grid cell.
+- [x] Specs: the URL is built from the product (not the session id), no image when absent, no image for a missing flag, and no image for the string `"false"`.
 
 ### 5.3 [app] Service images (item 18)
-- [ ] Services page (`service-catalog`): image above each service card from the product photo; graceful absence.
-- [ ] Specs: with/without photo.
+- [x] Services page (`service-catalog`): the product image spans the top of each service card (negative margins pull it out of `mat-card`'s padding to meet the border); graceful absence leaves the card starting at its title.
+- [x] Specs: only the service that has one gets an image, the URL is right, and the rest of the card is unaffected when absent.
 
 ### 5.4 [app] Membership tier icons (item 12 — finishes theming Phase 3's leftover)
-- [ ] Seed: `Seed::PopulateSeedPhotos` attaches `img/tier_icon_solo.png` / `tier_icon_couple.png` / `tier_icon_family.png` to the three membership products (solo → Gold, couple → Couple's, family → Family) — exactly three icons, confirmed (OQ-4 ✅). Existing DBs: covered by 5.1's registration + a re-runnable seed step or manual upload through the new editor field — noted in hand-testing.
-- [ ] `membership-tier-cards`: render the product photo as the tier icon, falling back to today's `card_membership` Material icon.
-- [ ] Specs: icon renders from photo, fallback intact.
+- [x] Seed: `Seed::PopulateSeedPhotos` attaches `tier_icon_solo.png` / `tier_icon_couple.png` / `tier_icon_family.png` to `gold-membership` / `gold-couples` / `gold-family` (PNG, not JPEG — flat artwork with transparency). It runs after `PopulateProducts`, which is what the lookup-by-code needs.
+- [x] `membership-tier-cards`: the product photo IS the tier icon, falling back to today's `card_membership` Material icon. Because it is the same product-photo mechanism, a studio replaces an icon by uploading an image in Manage Products — no separate surface.
+- [x] Specs: icon renders from the photo (and the Material icon steps aside rather than stacking), the fallback is intact, and a row can mix iconed and un-iconed tiers. Seed spec: exactly the three membership products get icons, and the Intro Workshop does **not** — an icon on the wrong product is the failure worth guarding.
+- [x] **Existing DBs:** 5.1's migration registers `products` for photos; the icons themselves are a fresh-DB seed, so an existing site uploads them through the new editor field (in the hand-testing steps).
 
 ### 5.5 [app] Home membership panel = Memberships page (item 12a)
-- [ ] Upgrade the **shared** `membership-tier-cards` (icon image, name, description, price in the 1.5 color, Subscribe) and consume it on `/shop` for subscription products — replacing the raw-Tailwind catalog cards for that kind (other kinds keep the generic card). Home and the Memberships page now render byte-identical tiers.
-- [ ] Specs: `/shop` renders subscriptions through the shared card; non-subscription kinds unaffected.
+- [x] `/shop` renders subscription products through the **shared** `membership-tier-cards` — the same component the home page's membership band uses — so the two surfaces cannot drift. Other kinds keep the generic catalog card below it.
+- [x] Specs: subscriptions render through the shared card and NOT as generic anchors; non-subscription kinds are unaffected; a mixed catalog shows both; and the tier icon carries through.
 
 ### 5.6 Live hand-testing (Phase 5)
 - [ ] Steps: upload a photo to "Intro Workshop" in Manage → Products and see it on Upcoming Events + the home events section, signed out; upload to a massage service and check Services; fresh DB shows the three laurel tier icons on Home and Memberships, identically.
