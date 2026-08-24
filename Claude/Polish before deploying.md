@@ -466,7 +466,9 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 ## Phase 6 — Announcements and video
 
-> ✅ **Phase 6 implemented 8/23/2026.** Gates green: knottyyoga C++ **5086/5086** (+18) + both executables build (Linux docker, co-dev), Angular **3308/3308** (+41) + `tsc --noEmit` clean ×2. App-side only — no honuware change, no pin bump.
+> ✅ **Phase 6 implemented 8/23/2026**, with 6.4 and 6.5 added the same day from Mason's live use. Final gates green: knottyyoga C++ **5089/5089** + both executables build (Linux docker, co-dev), Angular **3339/3339** + `tsc --noEmit` clean ×2 + `ng build` clean + lint **261** (baseline, nothing in the touched files). App-side only — no honuware change, no pin bump.
+>
+> **Three of the four rounds of feedback were on things the automated gates could not have caught** — a one-day announcement being impossible to express, the wrong alert colour and spacing, a date box rendering at twice the height of its neighbour, and lists that reset your scroll position. All shipped green. Where the fix was a layout or lifecycle bug, the new spec asserts the thing that actually broke (geometry, or "did this re-fetch?") rather than an attribute that was already passing.
 >
 > **The shape of 6.1 that matters:** the announcements strip is NOT a `home_sections` kind. It renders above the ordered list, so a studio cannot bury an urgent notice by reordering rows and does not need to add a row to post one. The visibility window is enforced SERVER-side in SQL against the database's own clock, which means the client has no date logic at all and structurally cannot render an expired notice — the strip's spec has no date tests because there is no date decision there to get wrong.
 >
@@ -505,6 +507,18 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] Specs: 6 on the embed-URL builder (nocookie host, what is and is not suppressed, autoplay↔mute always paired, captions omitted when off, id-only interpolation), 6 on the renderer across both shapes, 5 on the editor. Plus 2 C++ bundle tests (options round-trip and land as columns; non-video rows carry none) and a migration test proving the columns are usable and default to today's behaviour.
 - [x] **A spec needed updating, correctly:** 6.2's renderer test pinned the embed URL as an exact string with no query. The parameters are a real addition, so it now asserts the host and video id and leaves the query string to the dedicated parameter tests — narrowed to what that test is about rather than loosened into nothing.
 
+### 6.5 [app] Editing lists without losing your place (Mason, 8/23/2026)
+
+> *"clicking the up down on an item moves the item in the list but refreshes the page. If I have an item at the bottom and I want it near the top, I have to click up and then it resets me to the top of the page and I have to scroll down and then click up again. […] Clicking on edit makes an edit area at the top of the page but it isn't obvious and you have to scroll up to find it. I'd rather do this in place."*
+
+Two separate complaints, both about the editors being unusable on a list longer than a screen. Neither is specific to announcements — they applied to **every** reorderable list, so both fixes went in across all of them.
+
+- [x] **Reorder no longer reloads.** `move()` ended with `this.load()`, which re-fetched and re-rendered the whole list and threw the scroll position away. The swap is now applied to the local array immediately and the two ordinal writes go to the server in the background — the row moves under the cursor and nothing redraws. Applied to **four** lists: home sections, Getting Started steps, announcements, and both the gallery order and photo order in Image carousels.
+- [x] A FAILED write still reloads, deliberately: at that point the on-screen order and the stored order genuinely disagree and the stored one is the truth.
+- [x] **⚠️ The failure-path spec caught a real bug in the fix.** `load()` clears `this.error` as its first statement, so setting the message *before* calling it wiped the explanation — a failed reorder would have snapped the list back silently. The two lines are reversed in all four places, with a comment saying why the order matters.
+- [x] **Editing happens in place.** The form renders inside the row being edited, tinted and spanning the row's grid so it reads as nested rather than as the next item. ADDING still opens above the list, since there is no row for it to live in yet. The form is extracted into ONE `<ng-template>` rendered in whichever position applies, rather than duplicating ~200 lines of markup that would then drift.
+- [x] Specs (11): the reorder does not call `getTableRows`; two successive moves keep the ordinals strictly ordered so a later reload agrees with the screen; a failed move resyncs AND shows its message; the edit panel is `contains`-ed by the correct row element (not merely present somewhere on the page); adding is inside no row; and only one form is ever open at a time.
+
 ### 6.3 Live hand-testing (Phase 6)
 - [x] Steps written (below) — awaiting your run against a live server.
 
@@ -525,7 +539,10 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 13. **Autoplay, and what it costs.** Edit the video row → tick **Start playing automatically** → Save. Reload Home: the video starts on its own and is **muted** — that is not a bug, it is the only autoplay a browser permits. Untick it and the video waits for a click again.
 14. **Captions.** With a YouTube link, tick **Turn captions on** and reload: captions are burned on from the start. Untick and reload: they follow your own YouTube setting rather than being forced off. Now swap the URL to a direct `.mp4` — the captions checkbox greys out and explains that captions are a YouTube feature.
 15. **What YouTube branding survives.** On the YouTube row you will still see the title, the share and settings buttons and the watermark. Those cannot be removed — YouTube deleted the parameters that used to do it. If a clean frame matters for a particular video, host it as an `.mp4` and it renders through the browser's own player with none of that.
-16. **Your real DB.** Run `knottyyoga_database_helper --migrate` against it: the report lists `app/0006_announcements` and `app/0007_video_playback_options`. Open Page Content ▸ Announcements and add one; it appears on Home.
+17. **Reordering a long list (6.5).** Page Content ▸ **Home sections**, which is long enough to scroll. Scroll to the BOTTOM row and click ↑ repeatedly: the row walks up under your cursor and the page does not jump or redraw — you should be able to move it several positions without touching the scrollbar. Reload the page afterwards and confirm the new order is what the server actually stored.
+18. **Editing in place (6.5).** Click the pencil on a row near the bottom. The form opens **under that row**, tinted, not at the top of the page — you should not have to scroll to find it. Click the pencil on a different row: the form moves there rather than a second one opening. Press **Add** instead and the form opens above the list, since a new row has nowhere to nest yet.
+19. **Same everywhere.** Repeat 17 and 18 on **Getting Started steps**, on **Announcements**, and in Site Theme ▸ **Image carousels** (both the gallery order arrows and the photo order inside a carousel).
+20. **Your real DB.** Run `knottyyoga_database_helper --migrate` against it: the report lists `app/0006_announcements` and `app/0007_video_playback_options`. Open Page Content ▸ Announcements and add one; it appears on Home.
 
 ---
 
