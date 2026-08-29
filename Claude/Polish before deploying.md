@@ -607,28 +607,51 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 ## Phase 8 — Figma assets and the visual bands
 
-> 8.2 and 8.3 are ⏸ **waiting on the Figma token** (OQ-1 — Ryan is out of town; Mason will supply `~/.figma_token` when he's back). 8.1 and 8.4 can land any time.
+> ✅ **Unblocked 8/29/2026** — Ryan supplied the Figma token and both assets were exported through the REST API. The file key was as recorded (`IxWR3NfPQbJfYJ7oCPmaER`); the node ids were not — see 8.2.
 
 ### 8.1 [app] Get Started band as a kind row (prep, unblocked)
-- [ ] Phase 3 made `get_started` a row; this restyles its component to Ryan's band: full-bleed, `--theme-inverse-surface` background + `--theme-on-inverse-surface` text (the "menu color scheme"), stacked and centered: image (the row's attached photo, when present) → copy (existing auth-variant text) → red CTA → `/start`. Renders image-less until 8.2 supplies the asset.
-- [ ] Specs: band colors from tokens, stacking, CTA target, image-optional.
+- [x] Phase 3 made `get_started` a row; this restyles its component to Ryan's band: full-bleed, `--theme-inverse-surface` background + `--theme-on-inverse-surface` text (the "menu color scheme"), stacked and centered: image (the row's attached photo, when present) → copy (existing auth-variant text) → red CTA → `/start`. Renders image-less until 8.2 supplies the asset.
+- [x] **The row is passed to the component now.** It previously took no input at all (`<app-home-get-started-section>`), which was fine while it drew only text — but the artwork is the ROW's photo, so the band needs the row to build the URL from.
+- [x] **Full-bleed means the band sits OUTSIDE `page-container` and puts the container inside itself**, so the colour reaches both window edges while the content stays aligned with every other section.
+- [x] Specs (4): band colours resolve from the tokens (not hard-coded black), artwork replaces the heading, text heading when there is no photo, copy + CTA in both modes.
 
 ### 8.2 [app] The fire-font "Get Started" image (item 11)
-- [ ] Export `Icon/GetStarted` (Frame 127) from the Figma file via the REST API into `src/database_helper/img/`; seed it as the `get_started` row's photo (`AttachSeedPhoto`) — per-tenant replaceable through Page Content like every section image; existing DBs get it via the editor's photo upload (hand-testing step).
+- [x] Exported `Icon / GetStarted` from the Figma file via the REST API into `src/database_helper/img/get_started.png` (702×204, RGBA); seeded as the `get_started` row's photo through the existing `SeedSection.image` mechanism — per-tenant replaceable through Page Content like every section image.
+- [x] **⚠️ The node was NOT in "Frame 127".** No such frame exists in the file today; the component is `Icon / GetStarted` (`2236:7568`) on the **Foundations** page. Same artwork. The plan's coordinates were stale, not wrong-headed.
+- [x] **⚠️ The export looks broken and is not.** Three of its vectors are WHITE ("GET") and the rest red ("STARTED" + flames), on a transparent background — so in any image viewer the word GET is invisible and the PNG appears to be missing half its content. Verified by decoding the pixels: corner alpha 0, ~1131 opaque white pixels in the left half. It reads correctly on the black band, which is the only place it is ever drawn.
+- [x] Because the artwork already contains the words "GET STARTED", the band renders it **instead of** the text heading rather than above it.
 - [ ] Spec: seeded fresh-DB row carries a photo (seed test), band renders it.
 
 ### 8.3 [app] Footer tagline as an image (item 13)
-- [ ] [hw] New `url`-type content slot `site_tagline_image_url` in `SiteContentSlots()` (registry-driven: `site_info`, the editor, and the theme bundle pick it up automatically). Framework default `""`.
-- [ ] [app] Export the "That which doesn't kill you makes you hotter" artwork from Figma → seed into `site_assets` (`tagline.png`) + KY default value `/api/site_asset/tagline.png` in `app_secret_values.cpp`.
-- [ ] [app] Footer: when the slot is non-empty render the image (alt = the tagline text lines); else today's italic text. Editable in Site Theme → Brand basics.
-- [ ] Specs: both footer modes; slot round-trips in a theme bundle with its asset.
+- [x] [hw] New `url`-type content slot `site_tagline_image_url` in `SiteContentSlots()` (registry-driven: `site_info`, the editor, and the theme bundle pick it up automatically). Framework default `""`.
+- [x] [app] Exported the tagline artwork (Footer ▸ `Frame 43`, `2107:334` — the words drawn as outlined letterforms) → `src/database_helper/img/tagline.png` (624×150, RGBA) → seeded into `site_assets`.
+- [x] **⚠️ The plan's two bullets contradicted each other.** It asked for a framework default of `""` AND a KY default of `/api/site_asset/tagline.png` in `app_secret_values.cpp` — but `config_secrets.name` is UNIQUE, so defaulting a key on both sides collides during the seed (the reason `site_favicon_url` and `site_hero_image_url` are framework-only, as that file's own comment records). Resolved by keeping the framework default and having the KY **seed** write the value: `PopulateSiteAssets` runs after `PopulateConfigSecrets` and `ConfigSecrets::AddSecret` is delete-then-insert, so it upserts over the neutral default. Same end state, no collision, and CommunityFinder is not forced to declare a default for a slot it may not use.
+- [x] [app] Footer: when the slot is non-empty render the image, **alt = the tagline text lines**; else today's italic text. Editable in Site Theme → Brand basics, beside the other two image URLs.
+- [x] **Mason, 8/29/2026:** *"I'd like the option to either provide text and render it OR provide an image that replaces the text altogether."* — which is what the two slots do: image set ⇒ it replaces the text entirely; image empty ⇒ the text renders. The words survive as alt text so a screen reader (and a failed image load) still gets the tagline.
+- [x] Specs (3): artwork replaces the text, the written lines become its alt text, text treatment survives when there is no artwork.
 
 ### 8.4 [app] Parallax banner (item 10)
-- [ ] A `hwParallax` directive on the banner-section image: transform-based (`translateY` at a fraction of scroll), driven by the **app shell's scroll container** (the `overflow-y-scroll` div in `app.component.html` — window scroll never fires here; the container gets a template ref/service handle), `IntersectionObserver`-gated, inert under `prefers-reduced-motion`. Applied to the `banner` kind ("Come join the fun!"); no schema.
-- [ ] Specs: transform updates on container scroll, disabled under reduced motion.
+- [x] A `hwParallax` directive on the banner-section image: transform-only (`translate3d`, so it stays on the compositor and never forces layout), `IntersectionObserver`-gated, coalesced to one write per frame **outside Angular**, and inert under `prefers-reduced-motion`. Applied to the `banner` kind ("Come join the fun!"); no schema.
+- [x] **The directive finds its own scroll container** rather than being handed a template ref. The plan suggested wiring one through from `app.component.html`; walking up to the nearest ancestor whose computed `overflow-y` is `auto`/`scroll` achieves the same thing, keeps working if the shell's layout is rearranged, and can be tested against a plain scrolling div.
+- [x] **⚠️ The banner's crop had to change.** The image previously filled the band exactly (`aspect-ratio` on the `img`), so translating it would slide its edge into view and show a strip of background. The band now owns the aspect ratio and the image is absolutely positioned, 26% taller, offset −13%. **The bleed and the parallax factor are a matched pair** — the bleed must exceed `factor × (scroller height + band height) / 2`. The arithmetic is written into the SCSS so changing one without the other is visibly wrong rather than silently broken.
+- [x] Specs (6): observes the element, transforms on container scroll, vertical-only, nothing at all under reduced motion, detaches when scrolled out of view, clamps a mistyped factor into 0..1.
 
 ### 8.5 Live hand-testing (Phase 8)
-- [ ] Steps: fresh DB — the Get Started band is black with the fire-font image stacked over the copy and button, full width; the footer shows the tagline artwork; scrolling Home moves the join-the-fun photo slower than the page.
+- [x] Steps written (below) — awaiting your run against a live server.
+
+Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angular dev server running.
+
+1. **The Get Started band.** Home, signed out. Between the intro strip and the upcoming events, the band is now **full width, edge to edge, black** — no card, no border, no rounded corners. Centred inside it, in this order: the fire-font **GET STARTED** artwork, then the "New here?" sentence, then the red **Show me how** button. Click it: `/start`.
+2. **"GET" is white, and that is the point.** On the black band both words are legible — GET in white, STARTED in red with flames. If you open `src/database_helper/img/get_started.png` in Explorer it will look like the GET is missing; it is white on transparent. Nothing is wrong.
+3. **It follows the menu colours, not black specifically.** Manage Products ▸ **Site Theme** ▸ **Colors** ▸ *Header & footer*. Change the inverse-surface colour to something obvious (navy). Save, reload Home: the band, and the footer, are both navy. Put it back.
+4. **The artwork is the row's photo, like any other.** Manage Products ▸ **Page Content** ▸ **Home sections** ▸ pencil on **Get Started banner**. There is an Image control with the fire-font artwork in it. Replace it with any photo, save, reload Home — the band shows your photo. **Remove** the photo instead and reload: the band falls back to a plain "Get Started" heading, still black, still with the copy and the button. Restore the artwork by re-uploading `get_started.png`.
+5. **The footer tagline is artwork now.** Scroll to the bottom of any page. Where the two italic lines used to be, the stylized "That which doesn't kill you makes you hotter" image sits instead.
+6. **Text or image, your choice.** Site Theme ▸ **Brand basics** ▸ **Footer tagline image URL**. Clear it and Save. Reload: the footer is back to the two italic text lines from **Footer tagline** (on the Copy tab). Put `/api/site_asset/tagline.png` back and the artwork returns. That is the whole feature — one or the other, never both.
+7. **The words are still there for a screen reader.** With the artwork showing, right-click the tagline image → Inspect. Its `alt` is the text from the **Footer tagline** setting. Edit that text on the Copy tab, save, reload — the alt text follows, even though nothing visible changed.
+8. **The parallax.** Home, scrolled slowly down to the **Come join the fun!** band. The photograph drifts upward more slowly than the page while the heading and the button stay put over it. Look at the band's top and bottom edges as it passes — no gap or strip of background should ever appear.
+9. **Reduced motion turns it off completely.** Windows **Settings → Accessibility → Visual effects → Animation effects: Off** (or Chrome DevTools ▸ ⋮ ▸ More tools ▸ Rendering ▸ *Emulate CSS prefers-reduced-motion*). Reload Home and scroll: the banner photo is completely still — not slower, still. Turn it back on.
+10. **It costs nothing off screen.** With DevTools ▸ Performance recording, scroll from the top of Home to the bottom. There should be no scripting spike while the banner is off screen; the work only appears as it comes into view.
+11. **Theme file carries both.** Site Theme ▸ **Theme file** ▸ **Download**. Open the `.zip`: it contains the tagline image and a `home-…-get_started` PNG. Now clear the tagline image URL and delete the Get Started row's photo, confirm both are gone from the live site, then **Upload** the file back. Both return.
 
 ---
 
