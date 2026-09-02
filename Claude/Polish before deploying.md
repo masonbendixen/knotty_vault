@@ -669,7 +669,7 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] **Test pins a fixed UTC instant, not a machine-local one** — the spec's existing `base` is parsed without a `Z` and so cannot pin a wall clock. Verified non-vacuous by reverting the fix: the test fails with *"Expected '11:00 AM' to be '6:00 PM'"* and *"Expected '3:00 AM' to be '10:00 AM'"* — Mason's reported numbers exactly. Full suite: **3431 passing**.
 - [x] Why no existing test caught it: the scheduling tests pin their facilities to `"UTC"` (`attendance_template_helper_test.cpp:72`, `admin_class_schedule_preview.cpp:89`, the four slot CRUD tests). At a zero offset the buggy arithmetic is accidentally correct, so the suite was green by construction — the Pacific-only blind spot this item predicted.
 
-### 9.1a [server] Retire the "wall clock encoded as UTC" convention — IN PROGRESS
+### 9.1a [server] Retire the "wall clock encoded as UTC" convention — ✅ DONE
 > 9.1 fixed the reported defect the way the codebase is built. The convention underneath it is the real defect. Mason asked for it on 9/2.
 
 **Design decisions (settled before any code):**
@@ -682,13 +682,19 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - **D6 — no migration.** Mason has not deployed. Class `event_sessions` rows are materialised on demand, so `--recreate_database` regenerates them correctly. (Discriminator, if one is ever needed: `class_schedule_slot_id IS NOT NULL` marks exactly the rows `EnsureSessionExists` wrote.)
 
 **Execution order** (honuware first, since the app pins it):
-- [ ] 1. honuware: the two `DateTimeUtil` helpers + tests
-- [ ] 2. app: the three composition sites (`class_schedule_helper.cpp:456/602/870`) + the day framing
-- [ ] 3. server: delete the compensations — `ToFacilityWallClockUs`, `AT TIME ZONE 'UTC'` in `attendance_history_helper` / `reporting_helper` / `payment_helper`, the `floatingLocal` .ics flags, `signup_reminder_helper`'s hand-rolled re-derivation
-- [ ] 4. server tests: ~20 files
-- [ ] 5. UI: delete the ~12 `timeZone: 'UTC'` formatters and collapse `calendar-event-mapper`'s `itemDate` to `new Date(us/1000)`
-- [ ] 6. UI specs: `calendar-event-mapper.spec.ts`, `calendar.service.spec.ts` assert the compensation explicitly
-- [ ] 7. gate: Linux docker build for both repos, full Angular suite
+- [x] 1. honuware: `CalendarDateWallClockToUs` + `LocalDateTokenUs` + 7 tests (the load-bearing one pins that `LocalWallClockToUs` on a token answers with the PREVIOUS day)
+- [x] 2. app: the composition sites + the day framing. **There were FIVE, not three** — the trace missed `GetRoomOccupancy` (`class_schedule_helper.cpp:835`) and `ClassCheckinHelper::DoCheckIn` (`:222`). Both compared a freshly-composed wall clock against a now-real instant, and the room one is what made `AddSlotRejectsRoomOverCapacity` stop detecting an overlap.
+- [x] 3. server: deleted `ToFacilityWallClockUs` and all four of its call sites; `AT TIME ZONE 'UTC'` → `f.timezone` in `attendance_history_helper` and both `reporting_helper` queries (which needed a `LEFT JOIN facilities`); `payment_helper`'s `wallClockToInstantUs` lambda and its three-way `isClassSession` branch collapsed to one path; both `floatingLocal` flags gone; `signup_reminder_helper`'s three hand-rolled re-derivations now resolve through a new `ctx.facilityTimezone`.
+- [x] 4. server tests: **12 failed, not ~20.** Nine were fixtures composing `token + minutes`; three were the compensations themselves.
+- [x] 5. UI: 10 `timeZone: 'UTC'` formatters removed, `usToWallClockLocalDate` deleted, `itemDate` collapsed to `new Date(us/1000)`. **Seven `timeZone: 'UTC'` calls deliberately KEPT** — they format date tokens (run windows, `occurrence_date_us`, `week_start_us`, synthetic month names), which did not change.
+- [x] 6. UI specs: 8 failed. Rewrote their fixtures to build instants from LOCAL components (`new Date(y,m,d,h,0,0)`) rather than `Date.UTC(...)`, so the expected wall clock holds in any runner timezone.
+- [x] 7. gate: **honuware 1754 ✓ · app 5146 ✓ (both executables link) · Angular 3429 ✓**
+
+**Two design decisions that changed during execution:**
+- `GetDerivedSessionsForRange` now bounds on the resolved START INSTANT and pads its date walk ±1 day. The old code returned every slot on every UTC day the window touched and left callers to filter — which is exactly why several of them re-implemented a window check and got it wrong.
+- Added **`GetDerivedSessionsForDate(txn, classId, dateToken)`**, because `GetDerivedSessionsForRange(token, token + 24h)` is now a *trap*: a studio day is not the UTC day that starts at its token, so in Los Angeles that date's 6pm class (token + 25h) falls outside. `IsDerivableOccurrence` and `CancelSeriesOccurrence` both had this bug and now ask by date.
+
+**Not done, and deliberately:** these times now render in the **viewer's** zone, not the studio's. For a member at the studio those are the same; for one travelling they are not, and arguably a studio's schedule should always read in studio time. Doing that means adding `facility_timezone` to several endpoint payloads and routing them through the existing `formatSessionTimeRange(start, end, tz)`. Worth its own item if it matters.
 
 **What this fixes beyond the cosmetics** (all compare a wall-clock value against a real `now`): `upcoming_offerings_helper.cpp:128` "already started today" and `:149` signup window; `signup_reminder_helper.cpp:207/218/302` (`notifyAtUs` is **persisted** and drives the cron); `calendar_helper.cpp:211`; `class_series_helper.cpp:653`. And `formatBookedWhen` becomes correct for booked class sessions, not just workshops.
 - [ ] **The column means two different things.** `event_sessions.start_time_us` holds a **real instant** when written by the seed / a workshop, and a **wall-clock-as-UTC** value when written by `EnsureSessionExists` (`class_schedule_helper.cpp:456`, persisted at `:483`). Same column, two encodings, distinguishable only by provenance. This is the root problem; everything below is a symptom.
