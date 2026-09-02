@@ -653,7 +653,139 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 10. **It costs nothing off screen.** With DevTools ▸ Performance recording, scroll from the top of Home to the bottom. There should be no scripting spike while the banner is off screen; the work only appears as it comes into view.
 11. **Theme file carries both.** Site Theme ▸ **Theme file** ▸ **Download**. Open the `.zip`: it contains the tagline image and a `home-…-get_started` PNG. Now clear the tagline image URL and delete the Get Started row's photo, confirm both are gone from the live site, then **Upload** the file back. Both return.
 
+## Phase 9 — Corrections (9/2 items 1, 2, 3, 8)
+
+> Four unrelated defects grouped because each is small and none blocks the others. 9.1 is the only one that is not obviously scoped — it is an investigation with a concrete first step, not a fix waiting to be typed.
+
+### 9.1 [app] "The times seem to be off with the new timezone change" — diagnose first
+- [ ] **Ruled out already:** the seeded facility timezone is correct — `SELECT timezone FROM facilities` on the live DB returns `America/Los_Angeles`. So this is NOT a stale value left behind by 7.4's hand-testing steps (step 4 has you set it to Denver, step 6 sets it back), and NOT the Locations editor writing something wrong.
+- [ ] **What actually changed in 7.1:** nothing that CONSUMES a timezone. 7.1 added a `description` column and an editing surface. So if times moved, either they were already wrong and the new page made the setting visible enough to notice, or something else in Phases 6–8 shifted a render path.
+- [ ] Reproduce precisely before touching code: **which** times, on **which** page, off by **how much**, and for **whom** (signed in vs out). "Off by 7–8 hours" means UTC is leaking; "off by 1 hour" means a DST boundary; "off by 3 hours" means a hard-coded zone.
+- [ ] Two known, already-recorded gaps are the prime suspects, both pre-dating Phase 7:
+	- The service-booking **week strip builds days in browser-local time** (`buildWeek()` uses `new Date()` / `setHours(0,…)`) — recorded as a follow-up in 7.1 and never fixed. Correct while the viewer and the studio share a zone; wrong otherwise.
+	- **`DateTimeUtil` month functions take no timezone** and work in UTC, so a "local" month end closes at ~17:00 local and drops evening classes on the last day.
+- [ ] Whatever it turns out to be, the fix ships with a test that pins the rendered time for a FIXED instant in a NON-Pacific zone — the class of bug that only appears away from `America/Los_Angeles` is exactly the one a Pacific-only test cannot see.
+
+### 9.2 [app] Get Started: drop the redundant final step
+- [ ] The last seeded step ("Stay in the loop" → *see upcoming workshops*) repeats the workshops step already at the top. Remove the redundant call to action.
+- [ ] Seed change + a migration for existing databases, since the steps are `getting_started_steps` rows a studio may have edited. **The migration must not delete a row the studio has since reworded** — match on the seeded title, and skip if it no longer matches.
+- [ ] Spec: the seeded step list has no duplicate link target.
+
+### 9.3 [app] About heading: editable, and not forced to caps
+- [ ] The About page heading is hardcoded (`What Makes {displayName} an Amazing Studio?`) and `about.component.scss` forces `text-transform: uppercase`, so a studio can change neither the words nor the shouting.
+- [ ] [hw] New `line`-type content slot `site_about_heading` in `SiteContentSlots()`; framework default `""`.
+- [ ] [app] The page renders the slot when set, else today's sentence with the tenant's name interpolated — so an existing site is unchanged until someone edits it. Drop the `uppercase` rule; if the caps are wanted, they belong in the typed value.
+- [ ] Editable in Site Theme ▸ **Copy** (it is copy, not a brand asset).
+- [ ] Specs: default heading, overridden heading, no forced text-transform.
+
+### 9.4 [app] My Schedule: the requirement icon is clipped
+- [ ] "Requires attending Knotty Yoga" clips its icon. Almost certainly the `icons.size()` mixin's three values disagreeing with a container, or an `overflow: hidden` ancestor — the shared mixin exists precisely because `font-size` draws the glyph while `width`/`height` reserve the box.
+- [ ] Spec: assert the rendered icon's `getBoundingClientRect()` is not smaller than its declared box. A presence-only assertion passes while the glyph is visibly cut, which is the trap this project has hit before.
+
+### 9.5 Live hand-testing (Phase 9)
+- [ ] Steps once 9.1's cause is known.
+
+---
+
+## Phase 10 — Home page arrangement and membership-aware visibility (9/2 items 6, 7, 16)
+
+> All three are about WHAT a given viewer sees on the home page, and they share one mechanism — the per-row visibility flags Phase 3 introduced plus the seeded ordinals. One phase, one migration.
+
+### 10.1 [app] Photo carousel moves under the Intro strip
+- [ ] Seeded ordinals today: carousel 2, hero 5, intro 6. Move the carousel below the intro strip by default.
+- [ ] Seed change + migration. **The migration must only move a row still sitting at its seeded ordinal** — a studio who has already reordered their page must not have it rearranged underneath them.
+
+### 10.2 [app] Upcoming classes to the top, and hidden from signed-out visitors
+- [ ] Move the `upcoming_classes` row to the top of the page and hide it from visitors who are not signed in.
+- [ ] ⚠️ **This needs a NEW visibility flag.** The three that exist are `hidden_when_logged_in`, `hidden_when_member` and `hidden_when_not_member`. "Hide from people who are NOT signed in" is the complement of the first and cannot be expressed by any combination of them — `hidden_when_not_member` is close but wrong: a signed-in non-member would still be hidden, and the ask is about being signed in, not about paying.
+- [ ] Full checklist for `hidden_when_logged_out`: `db_schema/home_sections` column, an idempotent migration, `PopulateAdminColumnDataInfo` + friendly name, the Page Content toggle, the home page filter, the theme-bundle export/import, and the seed.
+- [ ] The position is only visible to signed-in viewers (it is hidden otherwise), so "top" means top of the list as a member sees it.
+- [ ] Specs: the flag hides the row for anonymous viewers and shows it for signed-in ones; it round-trips in a bundle; the editor writes it.
+
+### 10.3 [app] Members do not need the sales pitch
+- [ ] For viewers with a membership, hide: **Get started**, **Why Knotty Yoga**, **Types of classes**, **Come join the fun**.
+- [ ] No new mechanism — `hidden_when_member` already exists and the membership row already uses it. This is four seeded rows gaining a flag, plus a migration for existing databases.
+- [ ] The migration matches rows by their seeded titles/kinds and skips any a studio has reworded, for the same reason as 10.1.
+- [ ] ⚠️ Worth stating in the editor's hint, not just here: these flags are **tailoring, not secrecy** — the home feed is anonymous and carries every active row, so a determined visitor can still read the text. The existing members-only hint already says this; the same caveat now applies to four more rows.
+- [ ] Specs: a member sees neither the four sections nor the membership tiers; a signed-in non-member sees all of them.
+
+### 10.4 Live hand-testing (Phase 10)
+- [ ] Steps: fresh DB, then the same page as a visitor, a signed-in non-member, and a member — three distinctly different pages from one row list.
+
+---
+
+## Phase 11 — SVG support (9/2 item 5)
+
+> Its own phase because it is not a feature so much as a second KIND of image running through every part of the photo system, and the interesting decisions are all about what does NOT apply to a vector.
+
+### 11.1 [hw] Accept SVG through the upload path
+- [ ] `ImageTypeFromMagicBytes` decides what a file IS from its content, and SVG has no magic number — it is XML. Detection has to sniff for an `<svg` root element, which is a different KIND of check from every other format here and needs to be written as one deliberately, not bolted onto the byte comparison.
+- [ ] ⚠️ **SVG is executable content.** An `.svg` can carry `<script>`, `<foreignObject>`, external references and `on*` handlers, and it is served back **from our own origin** — the exact property that makes the existing magic-bytes rule load-bearing. Accepting SVG without sanitising it is a stored-XSS hole in every consumer that renders it inline or via `<object>`. Two viable positions, and this needs deciding before any code: **(a)** accept SVG but only ever render it through `<img src>`, which browsers already treat as a passive, script-free context; **(b)** sanitise on upload (strip script/handlers/external refs) and allow inline embedding. **(a)** is far cheaper and covers the stated need — see OQ-13.
+- [ ] Size cap still applies; a vector is small but not bounded.
+
+### 11.2 [hw] A vector has no scaled derivatives
+- [ ] `GetOrCreateScaledPhoto` resizes raster images into `scaled_photos`. For an SVG there is nothing to resize — it scales inherently — so the scaled path must SHORT-CIRCUIT and serve the source bytes with the requested box ignored.
+- [ ] That keeps every existing caller working unchanged: `/api/get_scaled_photo/<table>/<id>/<w>/<h>` stays the one URL every component builds, and the server decides whether the numbers mean anything. No consumer needs to know it is holding a vector.
+- [ ] ⚠️ The image-resize library must never be handed an SVG — the PNG-alpha bug (Phase 5) was exactly this shape: a format reaching a code path written for a different one.
+- [ ] Specs: uploading an SVG stores it; requesting any box returns the source bytes with `image/svg+xml`; no `scaled_photos` row is created.
+
+### 11.3 [app] Consumers
+- [ ] Everything already renders `<img src="/api/get_scaled_photo/…">`, so if 11.2 holds, most surfaces need no change at all. Audit rather than assume: anything that reads intrinsic dimensions, or that assumes a raster (the Page Content thumbnail's "944 × 598" line, `has_photo`'s width/height) needs a sensible answer for a vector.
+- [ ] The photo-upload control's `accept` attribute and its error copy.
+
+### 11.4 Live hand-testing (Phase 11)
+- [ ] Steps: upload an SVG logo, a section image and an instructor headshot; confirm each renders crisply at several window sizes and that a raster upload still behaves exactly as before.
+
+---
+
+## Phase 12 — About and Location additions (9/2 items 4, 11)
+
+### 12.1 [app] An embedded map on the Location page, alongside the link
+- [ ] ⚠️ **This revisits OQ-9**, which chose a link-out specifically to avoid a key and a third-party frame. The ask is "in addition to the link", so the button stays and the map joins it.
+- [ ] Cheapest route with no API key: an `<iframe src="https://www.google.com/maps?q=<url-encoded address>&output=embed">`. **It needs a CSP `frame-src` allowance** for `https://www.google.com` — a deliberate widening of the policy the security review set, and the reason this is a decision rather than a snippet. The Maps Embed API is the supported alternative and needs a key plus billing.
+- [ ] Lazy-loaded (`loading="lazy"`) and only rendered for a location with a usable address, so a half-filled location does not embed a map of nowhere.
+- [ ] Specs: the iframe src encodes the same address the button uses; no iframe when the address is empty.
+
+### 12.2 [app] A service providers page under About
+- [ ] `/providers/:personId` already exists (`ProviderBioComponent`); there is no list. Add one, linked from About ▸ **Our Providers**.
+- [ ] "Only show up if there are service providers" — ⚠️ the header menu is built from `authData` alone with no server call, so a conditional item needs either a fetch in the header (a new dependency on every page) or a different rule. **Proposed:** always list the menu item and let the page carry an honest empty state, matching how Gallery and Our Location already behave. See OQ-14.
+- [ ] Specs: lists active providers with photo, name and bio snippet; empty state; menu entry.
+
+### 12.3 Live hand-testing (Phase 12)
+- [ ] Steps: the map shows the studio and the button still opens Maps in a new tab; the providers page lists Mason and Caleb.
+
+---
+
+## Phase 13 — Mobile (9/2 items 9, 10, 12, 13, 14)
+
+> The largest and least specified of the five phases. Everything here is "looks bad on a phone", which cannot be tested by assertion alone — each item pairs a concrete layout change with a geometric spec, and the acceptance is your eyes on a device.
+>
+> ⚠️ **A presence-only spec passes while a layout is visibly broken.** This project has hit that twice (the Massage card, the mat-card padding). Every item below asserts `getBoundingClientRect()` geometry at a phone viewport, not merely that an element exists.
+
+### 13.1 [app] Calendar defaults to day view on mobile
+- [ ] Pick the default from the viewport at first render, not from a stored preference, and leave an explicit view choice alone once made.
+
+### 13.2 [app] Week view opens at the first thing on the day
+- [ ] Scroll the week view so the top of the screen is the first entry of a day's schedule, rather than at midnight with hours of empty grid above it.
+- [ ] Applies to whichever view is showing; the "first thing" is the earliest entry across the visible day(s), not a fixed hour.
+
+### 13.3 [app] Upcoming events and series on the home page
+- [ ] Called out as the worst offenders. Expect card grids that do not collapse to one column, and fixed widths that force a horizontal scroll.
+
+### 13.4 [app] The "I'll be there" button
+- [ ] Called out specifically. Likely a fixed width or a label that wraps inside a fixed-height control.
+
+### 13.5 [app] Our Classes
+- [ ] Called out as needing the most work. Scope this one properly after looking at it — it may be several items rather than one.
+
+### 13.6 Live hand-testing (Phase 13)
+- [ ] Steps at a real phone width for each item, plus a sweep for horizontal page scroll — the single most reliable smell that something has a fixed width.
+
+---
+
 # Mason - New work items 9/2
+
+> ✅ **Folded into Phases 9–13 on 9/2/2026.** The raw list is kept below for the record. Grouping: corrections (9), home-page arrangement (10), SVG (11), About/Location additions (12), mobile (13). Two items grew scope on inspection and are called out where they land — the signed-out visibility flag in 10.2, and the security question SVG raises in 11.1. Three new open questions (OQ-13/14/15) are at the end of this document.
 - The times seem to be off with the new timezone change
 - On getting started, the final see upcoming workshops is redundant since there is already a workshop step
 - The text at the top of the about knotty yoga page is in all caps and not something we can change through the UI. Let’s make this editable through the UI.
@@ -717,3 +849,9 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - **OQ-12 — Timezone scope.** `facilities.timezone` already exists and is consumed server-side; chosen scope is the editing surface + validation + the new Locations page (7.1), with the browser-local week-strip gap recorded as a follow-up. If you meant something more (e.g., rendering all class times in facility TZ on every page), say so and I'll scope it separately.
 	- Mason- Yes, let's just expose a way to set the existing timezone.
 	- Claude- ✅ Confirmed — 7.1 as written (the Locations page is the vehicle); the browser-local week-strip gap stays a recorded follow-up, not in scope.
+
+> ⏸ **OQ-13/14/15 raised 9/2/2026** from the new work items. None blocks starting — 9, 10 and 13 are unaffected — but 11 and 12 want an answer before their first line of code.
+
+- **OQ-13 — SVG is executable content, so where may it be rendered?** An `.svg` can carry `<script>`, `on*` handlers and external references, and we serve uploads back **from our own origin**. **Chosen default: (a) accept SVG, render it only through `<img src>`** — browsers treat that as a passive context where scripts do not run, it needs no sanitiser, and it covers everything you asked for ("embedded where there is an image"). **Alternate: (b)** sanitise on upload (strip script/handlers/external refs) and allow inline `<svg>`, which buys CSS-styleable, currentColor-aware icons at the cost of owning a sanitiser and its bypasses forever. Pick (b) only if you want icons that recolour with the theme.
+- **OQ-14 — How should the Providers menu item hide itself?** "Only show up if there are service providers" needs data the header does not have: the menu is built from `authData` with no server call, so a conditional item means fetching on every page. **Chosen default:** always show **About ▸ Our Providers** and give the page an honest empty state — the same shape Gallery and Our Location already have. **Alternate:** add a provider count to an existing boot payload (`/api/site_info` is the natural one) and gate the item on it — one extra field, no extra request.
+- **OQ-15 — An embedded map widens the CSP.** OQ-9 chose a link-out specifically to avoid a key and a third-party frame; 12.1 adds the map beside it, which means allowing `https://www.google.com` in `frame-src`. **Chosen default:** the keyless `?output=embed` iframe plus that allowance — no key, no billing, no JS. **Alternate:** the Maps Embed API (needs a key and billing) or a static map image (needs a key, but no frame at all). Say the word if widening the frame policy is not acceptable and I will use the static-image route instead.
