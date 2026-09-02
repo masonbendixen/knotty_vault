@@ -653,6 +653,8 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 10. **It costs nothing off screen.** With DevTools ▸ Performance recording, scroll from the top of Home to the bottom. There should be no scripting spike while the banner is off screen; the work only appears as it comes into view.
 11. **Theme file carries both.** Site Theme ▸ **Theme file** ▸ **Download**. Open the `.zip`: it contains the tagline image and a `home-…-get_started` PNG. Now clear the tagline image URL and delete the Get Started row's photo, confirm both are gone from the live site, then **Upload** the file back. Both return.
 
+# Mason - New work items 9
+
 ---
 
 # Open Questions
