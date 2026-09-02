@@ -653,7 +653,15 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 10. **It costs nothing off screen.** With DevTools ▸ Performance recording, scroll from the top of Home to the bottom. There should be no scripting spike while the banner is off screen; the work only appears as it comes into view.
 11. **Theme file carries both.** Site Theme ▸ **Theme file** ▸ **Download**. Open the `.zip`: it contains the tagline image and a `home-…-get_started` PNG. Now clear the tagline image URL and delete the Get Started row's photo, confirm both are gone from the live site, then **Upload** the file back. Both return.
 
-# Mason - New work items 9
+# Mason - New work items 9/2
+- The times seem to be off with the new timezone change
+- On getting started, the final see upcoming workshops is redundant since there is already a workshop step
+- The text at the top of the about knotty yoga page is in all caps and not something we can change through the UI. Let’s make this editable through the UI.
+- For location, could embed Google maps on the page in addition to the link.
+- Can we do SVG support for images? I'd like to allow the image upload to support SVG and allow an SVG or bitmap to be embedded where there is an image. Obviously, there is no scaled version for a vector graphic. It scales inherently.
+- Move photo carousel under Intro strip by default in database helper
+- Move upcoming classes to the top of the home page for signed in students (and don't show it for non signed in users). Do this by default in database helper.
+- 
 
 ---
 
