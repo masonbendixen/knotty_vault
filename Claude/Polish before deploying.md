@@ -661,6 +661,11 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - Can we do SVG support for images? I'd like to allow the image upload to support SVG and allow an SVG or bitmap to be embedded where there is an image. Obviously, there is no scaled version for a vector graphic. It scales inherently.
 - Move photo carousel under Intro strip by default in database helper
 - Move upcoming classes to the top of the home page for signed in students (and don't show it for non signed in users). Do this by default in database helper.
+- In My schedule, the requires attending knotty yoga clips the icon
+- For the week view, scroll down the page so that the top of the screen is the first thing on any day’s schedule
+- Probably should have a service provider page on the about page - it should only show up if there are service providers
+- Default to day view for mobile in the calendar
+- Upcoming events and series look the worst on mobile on the home page
 - 
 
 ---
