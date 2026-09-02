@@ -666,7 +666,14 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - Probably should have a service provider page on the about page - it should only show up if there are service providers
 - Default to day view for mobile in the calendar
 - Upcoming events and series look the worst on mobile on the home page
-- 
+- The I’ll be there button looks terrible on mobile
+- Our classes needs the most work for mobile
+- For people who have memberships, hide:
+	- Get started
+	- Why Knotty Yoga
+	- Types of classes
+	- Come join the fun
+
 
 ---
 
