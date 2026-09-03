@@ -778,17 +778,21 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > Its own phase because it is not a feature so much as a second KIND of image running through every part of the photo system, and the interesting decisions are all about what does NOT apply to a vector.
 
-### 11.1 [hw] Accept SVG through the upload path
-- [ ] `ImageTypeFromMagicBytes` decides what a file IS from its content, and SVG has no magic number — it is XML. Detection has to sniff for an `<svg` root element, which is a different KIND of check from every other format here and needs to be written as one deliberately, not bolted onto the byte comparison.
+### 11.1 [hw] Accept SVG through the upload path — ✅ DONE
+- [x] **`ImageTypeFromMagicBytes` already sniffed for `<svg`** — that was written when the theme-bundle asset path landed, and it already refuses HTML by looking only at the first 512 bytes for the root element. Nothing to do; the item assumed work that was done.
+- [x] The gap was elsewhere: **the PHOTO upload path**. `ImageTypeFromString` maps a type to an `ImageResize` enum and returns -1 for anything it cannot resize, and `UploadAndAssociatePhoto` rejected on that -1 — so an SVG was refused before it could be stored. Added `ImageHelper::IsVectorType`, and the upload now admits a vector explicitly rather than through the raster enum. `ImageTypeFromString` still returns -1 for SVG **deliberately**, with a comment saying so: that is what forces every caller branching on it to ask the vector question first.
+- [x] `EnforceMaxDimensions` is skipped for a vector — the max-DIMENSION cap is meaningless for it and enforcing it would mean decoding the file. Width/height are stored as **0**: an honest "no intrinsic raster size" rather than a number invented by parsing.
+- [x] **Found and fixed a bug the feature would have shipped with:** both serving endpoints built their header as `"image/" + type`, which yields `image/svg` — a type browsers will not render an SVG under. Every other stored format happens to have a subtype equal to its stored name, which is why the concatenation went unnoticed for years. Added `Images::ImageMimeType`, used by `get_photo` and `get_scaled_photo`.
+- [x] Both endpoints now also send `X-Content-Type-Options: nosniff` — the server's half of the passive-rendering bargain.
 - [x] ⚠️ **SVG is executable content, and OQ-13 ✅ settles how we live with that: we never parse it as a document.** An `.svg` can carry `<script>`, `<foreignObject>`, external references and `on*` handlers, and it is served back **from our own origin** — the property that makes the existing magic-bytes rule load-bearing. **No sanitiser is being written.** Every render path is passive: `<img src>` for pictures, a CSS `mask-image` for theme-tinted icons (11.3). Both are contexts where the browser runs nothing in the file.
-- [ ] **Nothing may render an uploaded SVG inline, via `<object>`, `<embed>`, or `innerHTML`.** That is the whole security argument, so it is a rule the code has to state rather than a habit — a comment at the serving endpoint and at the icon directive, both pointing here.
-- [ ] Size cap still applies; a vector is small but not bounded.
+- [x] **The no-inline-rendering rule is stated in the code**, in both places the item asked for: a long note at `get_scaled_photo.cpp` where the bytes leave the building, and the header comment of `theme-icon.directive.ts` where they are drawn. Both say why, not just what.
+- [x] Size cap: **already covered, no change needed.** `image_max_upload_bytes` (10MB) is enforced at `upload_photo.cpp` / `upload_user_photo.cpp` before the helper is ever called, so it applies to a vector exactly as to a raster. The cap that does NOT apply is the dimension one, which is the distinction that mattered.
 
-### 11.2 [hw] A vector has no scaled derivatives
-- [ ] `GetOrCreateScaledPhoto` resizes raster images into `scaled_photos`. For an SVG there is nothing to resize — it scales inherently — so the scaled path must SHORT-CIRCUIT and serve the source bytes with the requested box ignored.
-- [ ] That keeps every existing caller working unchanged: `/api/get_scaled_photo/<table>/<id>/<w>/<h>` stays the one URL every component builds, and the server decides whether the numbers mean anything. No consumer needs to know it is holding a vector.
-- [ ] ⚠️ The image-resize library must never be handed an SVG — the PNG-alpha bug (Phase 5) was exactly this shape: a format reaching a code path written for a different one.
-- [ ] Specs: uploading an SVG stores it; requesting any box returns the source bytes with `image/svg+xml`; no `scaled_photos` row is created.
+### 11.2 [hw] A vector has no scaled derivatives — ✅ DONE
+- [x] `GetOrCreateScaledPhoto` short-circuits for a vector and returns the source bytes with the requested box ignored. The check sits **before** `ImageTypeFromString` and before anything touches `ImageResize`, so the resize library is never handed an SVG — the PNG-alpha shape the item warned about.
+- [x] **No `scaled_photos` row is written.** There is no derivative to cache, and caching one per requested box would fill the table with identical copies of the same file.
+- [x] Every caller works unchanged: `/api/get_scaled_photo/<table>/<id>/<w>/<h>` is still the one URL every component builds, and the server decides whether the numbers mean anything.
+- [x] Specs (honuware, 4 new): every spelling of the type is a vector and no raster type is; the MIME mapper returns `image/svg+xml`; an upload is stored **byte-for-byte** with 0×0 dimensions; and **two different boxes** both return the identical source bytes while the scaled-photo count stays 0.
 
 ### 11.3 [app] Consumers, and theme-recolouring icons
 - [ ] Everything already renders `<img src="/api/get_scaled_photo/…">`, so if 11.2 holds, most surfaces need no change at all. Audit rather than assume: anything that reads intrinsic dimensions, or that assumes a raster (the Page Content thumbnail's "944 × 598" line, `has_photo`'s width/height) needs a sensible answer for a vector.
