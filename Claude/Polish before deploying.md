@@ -778,6 +778,11 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > Its own phase because it is not a feature so much as a second KIND of image running through every part of the photo system, and the interesting decisions are all about what does NOT apply to a vector.
 
+### 11.0 ⛔ Replace Ryan's PNG exports with native SVG — BLOCKED on a Figma token
+> Mason asked for this alongside the phase on 9/3. Phase 8 exported two pieces of Ryan's vector artwork as PNG because that was all the photo system could store: `get_started.png` (Figma node `2236:7568`) and `tagline.png` (node `2107:334`), both from file `IxWR3NfPQbJfYJ7oCPmaER`. With 11.1/11.2 landed they should be SVG.
+- [ ] **The token in `C:\Users\mason\.figma_token` has expired** — the export API answers `{"err": "Token expired"}`. Nothing else blocks this: the request is the same `/v1/images/…?format=svg` call Phase 8 used, and the two node ids are recorded above.
+- [ ] Once a fresh token is in that file: re-export both nodes as SVG, replace `src/database_helper/img/get_started.png` and `tagline.png`, point the seed's `imageType` at `"svg"`, and update `site_tagline_image_url`'s seeded asset name. Then re-run the seed test that asserts the Get Started row carries a photo.
+
 ### 11.1 [hw] Accept SVG through the upload path — ✅ DONE
 - [x] **`ImageTypeFromMagicBytes` already sniffed for `<svg`** — that was written when the theme-bundle asset path landed, and it already refuses HTML by looking only at the first 512 bytes for the root element. Nothing to do; the item assumed work that was done.
 - [x] The gap was elsewhere: **the PHOTO upload path**. `ImageTypeFromString` maps a type to an `ImageResize` enum and returns -1 for anything it cannot resize, and `UploadAndAssociatePhoto` rejected on that -1 — so an SVG was refused before it could be stored. Added `ImageHelper::IsVectorType`, and the upload now admits a vector explicitly rather than through the raster enum. `ImageTypeFromString` still returns -1 for SVG **deliberately**, with a comment saying so: that is what forces every caller branching on it to ask the vector question first.
@@ -794,15 +799,24 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] Every caller works unchanged: `/api/get_scaled_photo/<table>/<id>/<w>/<h>` is still the one URL every component builds, and the server decides whether the numbers mean anything.
 - [x] Specs (honuware, 4 new): every spelling of the type is a vector and no raster type is; the MIME mapper returns `image/svg+xml`; an upload is stored **byte-for-byte** with 0×0 dimensions; and **two different boxes** both return the identical source bytes while the scaled-photo count stays 0.
 
-### 11.3 [app] Consumers, and theme-recolouring icons
-- [ ] Everything already renders `<img src="/api/get_scaled_photo/…">`, so if 11.2 holds, most surfaces need no change at all. Audit rather than assume: anything that reads intrinsic dimensions, or that assumes a raster (the Page Content thumbnail's "944 × 598" line, `has_photo`'s width/height) needs a sensible answer for a vector.
-- [ ] The photo-upload control's `accept` attribute and its error copy.
-- [ ] **Theme-recolouring icons (OQ-13), without a sanitiser.** A small directive renders an image as a CSS mask — `mask-image: url(…)`, `background-color: currentColor` — so the shape takes whatever colour the theme gives it and the file is never parsed as a document. The obvious first consumer is the three membership tier laurels, which are single-colour today and currently ship as PNGs.
-- [ ] ⚠️ **A mask is monochrome by definition** — every shape in the file takes one colour. That is what "recolours with the theme" means for an icon, but it is the wrong renderer for a multi-colour logo, which stays an `<img>`. The choice belongs to the CONSUMER (this surface wants a tinted icon), not to the uploader, so nothing about the upload changes.
-- [ ] Specs: the masked element takes its colour from the token, falls back to `<img>` rendering where no mask is asked for, and a raster works in both paths.
+### 11.3 [app] Consumers, and theme-recolouring icons — ⚠️ MOSTLY DONE (two items blocked)
+- [x] **Audit result: no consumer needed changing.** Every surface builds `/api/get_scaled_photo/…` and hands it to an `<img>`, so 11.2 holding is genuinely enough. The one exception was the dimensions line.
+- [x] Page Content's dimensions line reads **"Vector"** rather than falling through to a blank. Blank is what that line shows for a row with NO image, and a studio should not have to guess which of the two they are looking at. A stored photo with no pixel size can only be a vector, so no new field was needed to detect one.
+- [x] **`ThemeIconDirective` (`hwThemeIcon`)** — renders an image as a CSS mask filled with `currentColor`. Colour comes from the element, not a hard-coded token, so one directive serves every surface without knowing any of their palettes. `-webkit-` prefixes included; Safari shows nothing without them.
+- [x] Specs (5): the mask carries the url and the fill is `currentColor`; the colour follows the cascade when the host's colour changes; the mask scales rather than tiles; clearing the url clears **the fill as well** (a leftover `background-color` paints a solid block of theme colour where the icon was); and the url reaches **only a CSS property, never markup** — the regression that would mean someone had "improved" it into `innerHTML`.
+- [ ] ⛔ **BLOCKED — the photo-upload control's `accept` attribute and error copy.** `hw-photo-upload` is in the published `@honuware/ui` package, whose source lives in the `honuware-web-components` repo. That repo is not a working directory here, and the component exposes no input for accepted types (it also has its own client-side `MAX_IMAGE_DIMENSION` logic that needs the same vector exemption). **Until this lands, an SVG can be uploaded through the generic admin CRUD but the drag-and-drop control will not offer it in its file picker.**
+- [ ] ⛔ **BLOCKED — the membership tier laurels as first consumer.** Deliberately not wired: they ship as PNGs today, and tinting a PNG laurel with the theme colour is a visible design change with none of the benefit, since the point is to have vector artwork that also recolours. This wants the SVG assets first (see below) and then Ryan's eye on the result.
 
 ### 11.4 Live hand-testing (Phase 11)
-- [ ] Steps: upload an SVG logo, a section image and an instructor headshot; confirm each renders crisply at several window sizes and that a raster upload still behaves exactly as before.
+
+> Blank database, `--recreate_database`, then the live server.
+
+1. **A vector uploads and renders.** Manage ▸ **Page Content** ▸ Home. Pick any section row and upload an `.svg`. It renders in the row thumbnail and on the home page.
+2. **It stays crisp.** Zoom the browser to 200% and resize the window. The SVG stays sharp at every size — a PNG in the same slot visibly softens.
+3. **The metadata line says what it is.** That row's dimensions line reads **Vector**, not a pixel size and not a blank.
+4. **Rasters are untouched.** Replace it with a `.jpg` and confirm the row shows real dimensions again and the page renders exactly as before.
+5. **Nothing executes.** Upload an SVG containing a `<script>` block. It draws as a picture; the script does not run — every render path is an `<img>` or a CSS mask, neither of which parses the file as a document.
+6. ⚠️ **Known gap until the blocked item above lands:** the drag-and-drop photo control's file picker will not list `.svg`. Use the generic admin CRUD to attach one, or select "All files" in the picker.
 
 ---
 
