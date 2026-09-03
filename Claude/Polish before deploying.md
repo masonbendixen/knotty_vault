@@ -741,26 +741,36 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > All three are about WHAT a given viewer sees on the home page, and they share one mechanism — the per-row visibility flags Phase 3 introduced plus the seeded ordinals. One phase, one migration.
 
-### 10.1 [app] Photo carousel moves under the Intro strip
-- [ ] Seeded ordinals today: carousel 2, hero 5, intro 6. Move the carousel below the intro strip by default.
-- [ ] Seed change + migration. **The migration must only move a row still sitting at its seeded ordinal** — a studio who has already reordered their page must not have it rearranged underneath them.
+> **No migrations in this phase.** The plan called for one per item, with careful "only move a row still at its seeded ordinal" matching so a studio's own arrangement survives. That protection is for DEPLOYED databases, and there are none — `--recreate_database` produces the new page directly. The nuance is preserved here in case that changes: match on the seeded ordinal AND title, and skip any row that no longer matches.
 
-### 10.2 [app] Upcoming classes to the top, and hidden from signed-out visitors
-- [ ] Move the `upcoming_classes` row to the top of the page and hide it from visitors who are not signed in.
-- [ ] ⚠️ **This needs a NEW visibility flag.** The three that exist are `hidden_when_logged_in`, `hidden_when_member` and `hidden_when_not_member`. "Hide from people who are NOT signed in" is the complement of the first and cannot be expressed by any combination of them — `hidden_when_not_member` is close but wrong: a signed-in non-member would still be hidden, and the ask is about being signed in, not about paying.
-- [ ] Full checklist for `hidden_when_logged_out`: `db_schema/home_sections` column, an idempotent migration, `PopulateAdminColumnDataInfo` + friendly name, the Page Content toggle, the home page filter, the theme-bundle export/import, and the seed.
-- [ ] The position is only visible to signed-in viewers (it is hidden otherwise), so "top" means top of the list as a member sees it.
-- [ ] Specs: the flag hides the row for anonymous viewers and shows it for signed-in ones; it round-trips in a bundle; the editor writes it.
+### 10.1 [app] Photo carousel moves under the Intro strip — ✅ DONE
+- [x] The whole list was **renumbered in tens** rather than the carousel alone. The old ordinals (2, 5, 6, 7, 8, 9, 10, 20, 30, 50, 60, 70) left no room to put the carousel between intro (6) and get_started (7) — an ordinal is an integer, so "just move one row" was not expressible. Tens also give a studio room to insert their own rows without renumbering.
+- [x] New order: upcoming classes 10, hero 20, intro 30, **carousel 40**, get started 50, upcoming events 60, series & workshops 70, Why Knotty Yoga 80, Types of classes 90, Additional health services 100, Come join the fun 110, membership 120.
 
-### 10.3 [app] Members do not need the sales pitch
-- [ ] For viewers with a membership, hide: **Get started**, **Why Knotty Yoga**, **Types of classes**, **Come join the fun**.
-- [ ] No new mechanism — `hidden_when_member` already exists and the membership row already uses it. This is four seeded rows gaining a flag, plus a migration for existing databases.
-- [ ] The migration matches rows by their seeded titles/kinds and skips any a studio has reworded, for the same reason as 10.1.
-- [ ] ⚠️ Worth stating in the editor's hint, not just here: these flags are **tailoring, not secrecy** — the home feed is anonymous and carries every active row, so a determined visitor can still read the text. The existing members-only hint already says this; the same caveat now applies to four more rows.
-- [ ] Specs: a member sees neither the four sections nor the membership tiers; a signed-in non-member sees all of them.
+### 10.2 [app] Upcoming classes to the top, and hidden from signed-out visitors — ✅ DONE
+- [x] `upcoming_classes` is now ordinal 10 — the first row on the page — and carries the new flag, so a visitor who is not signed in never sees it and their page still opens on the hero.
+- [x] `hidden_when_logged_out` shipped through the full checklist: `db_schema/home_sections` (constant + column), `HomeSectionExtras`, the table helper's write, `PopulateAdminColumnDataInfo` ("Signed-In Only") + friendly name, the theme-bundle export **and** import (defaulting false so a pre-10.2 bundle still imports), the seed, `ServerAccessNetwork`'s row mapper, the `HomeSection` type, the home page filter, the Page Content toggle and list badge, and the local-mode mock. No migration — see the phase note.
+- [x] The filter keys on `isLoggedIn` **alone**, deliberately unlike the membership checks: there is no pending window to sit out, so a member's own classes appear as soon as the session is known rather than after the subscriptions round trip. Holding it would blank the top of the page for the length of that request.
+- [x] The editor's "nobody would see this" warning now covers a **second** impossible pair. `hidden_when_logged_in` + `hidden_when_logged_out` leaves no viewer at all — and unlike the membership pair, which has a third (pending) state, signed-in/signed-out genuinely partitions everyone.
+- [x] Specs: hidden for anonymous, shown for a signed-in **non-member** (the case that proves `hidden_when_not_member` could not have been reused), shown without waiting on the membership answer, round-trips in a bundle **set alone** so no other flag can carry it, editor writes it, list badges it, and both never-shows pairs warn.
+
+### 10.3 [app] Members do not need the sales pitch — ✅ DONE
+- [x] Four seeded rows gained `hidden_when_member`: **Get Started banner**, **Why Knotty Yoga**, **Types of classes**, **Come join the fun!** — joining **Membership tiers**, which already had it. No new mechanism.
+- [x] **Additional health services deliberately stays visible to members.** It was not on the list and it should not be: massage and bodywork are something a member can still buy, not a pitch to join. Worth stating because it is the one row in that stretch of the page that a reasonable person might have swept up with the others.
+- [x] The "tailoring, not secrecy" hint already sits beside these toggles in the editor; the caveat now covers four more rows.
+- [x] Specs assert the members-hidden set **by exact title in both directions**, so neither adding a row to the pitch nor dropping one from it can pass silently — server-side against the seed, and again against the mock.
 
 ### 10.4 Live hand-testing (Phase 10)
-- [ ] Steps: fresh DB, then the same page as a visitor, a signed-in non-member, and a member — three distinctly different pages from one row list.
+
+> Blank database, `--recreate_database`, then the live server. The point of these steps is that ONE row list produces three visibly different pages.
+
+1. **As a visitor (signed out).** The home page opens on the **hero** band. There is no "Upcoming classes" strip anywhere on the page. Scrolling down: intro strip, then the **photo carousel** (it used to be the first thing on the page, above the hero), then Get Started, upcoming events, series & workshops, Why Knotty Yoga, Types of classes, Additional health services, Come join the fun, and the membership tiers.
+2. **As a signed-in non-member.** Sign in with an account that has no membership. **Upcoming classes is now the first thing on the page**, above the hero. Everything the visitor saw is still there — including the membership tiers and all four pitch sections. This is the case that matters most: it is what "signed in" means as distinct from "paying".
+3. **As a member.** Sign in with an account that has an active membership. Upcoming classes still leads. **Get Started, Why Knotty Yoga, Types of classes, Come join the fun and the membership tiers are all gone.** **Additional health services is still there** — a member can still book massage and bodywork.
+4. **The editor agrees with the page.** Manage ▸ **Page Content** ▸ Home. The list order matches what you just scrolled. The Upcoming classes row carries a **Signed-in only** badge; the four pitch rows and the membership row carry **Hidden for members**.
+5. **The new toggle round-trips.** Edit any row, turn on **Only show to people who are signed in**, save, reopen it — the toggle is still on and the row shows the badge. Turn it back off and save.
+6. **The impossible combination warns.** On one row, turn on both **Hide from people who are signed in** and **Only show to people who are signed in**. A warning appears saying nobody would see it. It is a warning, not a block — the save button still works. Turn both off without saving.
+7. **A theme file carries the arrangement.** Site Theme ▸ **Theme file** ▸ **Download**. Reorder a couple of rows in Page Content and clear the Upcoming classes row's signed-in-only toggle, then **Upload** the file back: the original order and the toggle both return.
 
 ---
 
