@@ -699,10 +699,24 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 **What this fixes beyond the cosmetics** (all compare a wall-clock value against a real `now`): `upcoming_offerings_helper.cpp:128` "already started today" and `:149` signup window; `signup_reminder_helper.cpp:207/218/302` (`notifyAtUs` is **persisted** and drives the cron); `calendar_helper.cpp:211`; `class_series_helper.cpp:653`. And `formatBookedWhen` becomes correct for booked class sessions, not just workshops.
 **Verified in the running app** (Mason, 9/2): built knottyyoga, tests pass, dates and times check out by hand.
 
-### 9.2 [app] Get Started: drop the redundant final step
-- [ ] The last seeded step ("Stay in the loop" → *see upcoming workshops*) repeats the workshops step already at the top. Remove the redundant call to action.
-- [ ] Seed change + a migration for existing databases, since the steps are `getting_started_steps` rows a studio may have edited. **The migration must not delete a row the studio has since reworded** — match on the seeded title, and skip if it no longer matches.
-- [ ] Spec: the seeded step list has no duplicate link target.
+### 9.2 [app] Get Started: drop the redundant final step — ✅ DONE
+- [x] **This was not a seed change at all, and this item described the wrong thing.** It guessed the culprit was seeded step 70 ("Stay in the loop"), which actually links to `/my/notification-preferences` and duplicates nothing. The real duplicate was the page's **footer CTA** (`getting-started.component.html:43`): a "See upcoming workshops" button pointing at `/events` — the same route **and** the same label as step 1's CTA. That is Mason's "the final see upcoming workshops".
+- [x] Removed the button; kept the closing note ("Still not sure where to start? …"), which is useful copy and not a duplicate. `.footer-note` switched from `layout.between` to `layout.stack` since there is no longer a pair to push apart.
+- [x] No seed change and therefore no migration — the `getting_started_steps` rows were never the problem.
+- [x] Specs: the page asks for each destination exactly once (asserted over **every** anchor, not just `[data-test="step-cta"]` — a step-only assertion is precisely what let a footer button hide here), and the note renders with no button while step 1 keeps `/events`.
+
+### 9.3 [app] About heading: editable, and not forced to caps — ✅ DONE
+- [x] [hw] New `line` slot `site_about_heading` in `SiteContentSlots()`, framework-defaulted to `""`. It is the only **copy** slot the framework defaults, and it earns that exception the way the asset URLs do: empty does not mean "no heading", it means "the SPA writes it", because the fallback interpolates the tenant's own name and no fixed string in honuware can do that.
+- [x] [app] `AboutComponent.heading` returns the slot when set, else `What Makes {displayName} an Amazing Studio?`. `about.component.scss` no longer forces `text-transform: uppercase` — a transform makes the editor lie about what the page will say.
+- [x] `SiteConfig.aboutHeading` follows the URL-slot contract (`?? ''`, not `if (value)`), so a cleared heading restores the computed sentence instead of sticking.
+- [x] Editable in Site Theme ▸ **Copy** as "About page heading", with a hint naming the fallback.
+- [x] Specs: default heading with the tenant name, override used verbatim, and `getComputedStyle(...).textTransform === 'none'` — asserting the computed style, not the stylesheet, so a transform reintroduced from any matching selector is caught.
+- [x] **Found a second bug while doing it.** Site Theme picks its fields from two hand-maintained key lists (`BRAND_KEYS` / `COPY_KEYS`); a slot in neither is silently **uneditable** while still rendering on the live site and travelling in theme bundles. `site_about_heading` shipped that way until the spec caught it. Added `NOT_EDITABLE_HERE` (only `site_about_markdown`, deliberately, since 7.3 moved the About body to `about_sections`) and a coverage guard asserting every served slot is editable or explicitly excluded — and, in the other direction, that the lists name no key the server does not send.
+
+### 9.4 [app] My Schedule: the requirement icon is clipped — ✅ DONE
+- [x] Cause: `.requires-icon` carried **no size rule at all**, so it kept Material's 24px default inside a `--text-xs` (12px) row and overflowed its line box. Fixed with the shared `icons.size()` mixin, which sets `font-size`, `width` and `height` together — the trio the mixin exists to keep in agreement — plus `flex: none` so the flex row cannot shrink the box out from under the glyph.
+- [x] **The same defect existed in `upcoming-classes`** (`.row-requires`, identical markup, also unsized) one step less visible because that row is `--text-sm`. Fixed both; sized to each row's own text.
+- [x] Spec asserts GEOMETRY: `font-size === width === height`, the size is not Material's unstyled 24px, and the laid-out `getBoundingClientRect()` is not smaller than the declared box. The pre-existing presence-only test passes with the glyph visibly cut, which is the trap this item called out.
 
 ### 9.3 [app] About heading: editable, and not forced to caps
 - [ ] The About page heading is hardcoded (`What Makes {displayName} an Amazing Studio?`) and `about.component.scss` forces `text-transform: uppercase`, so a studio can change neither the words nor the shouting.
@@ -716,7 +730,19 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [ ] Spec: assert the rendered icon's `getBoundingClientRect()` is not smaller than its declared box. A presence-only assertion passes while the glyph is visibly cut, which is the trap this project has hit before.
 
 ### 9.5 Live hand-testing (Phase 9)
-- [ ] Steps once 9.1's cause is known.
+
+> Blank database, `--recreate_database`, then the live server. Sign in as the seeded admin unless a step says otherwise.
+
+1. **The reported bug is gone.** Home page ▸ **Upcoming classes**. The Wednesday Knotty Yoga class reads **6:00 PM**, the Thursday Partner Acrobatics class reads its scheduled evening time, and the Sunday Partner Acrobatics class reads **10:00 AM**. None of them reads 11:00 AM or 3:00 AM.
+2. **The pages that were already right still are.** **Calendar** and **Our Classes** show those same three classes at those same times. This is the half that could have broken: both used to correct for the old encoding, and both corrections were removed.
+3. **The workshop did not move.** The intro workshop still reads **10:00 AM** everywhere it appears — home page, **Events**, and the calendar.
+4. **The other embed of the same strip.** **My Schedule ▸ Upcoming** tab. Same times as step 1 — it renders the same component and was silently wrong before.
+5. **Booking keeps the time.** Book a class occurrence, then open **My Schedule ▸ Upcoming** and read the booked session's time. Booking materialises the occurrence, so this proves the stored row agrees with the derived one; a mismatch here is the two composition paths disagreeing.
+6. **Check-in opens when the class does.** Staff ▸ **Class check-in** for today. A class's check-in window opens an hour before it starts, in studio time — not seven hours out.
+7. **Get Started asks once.** **Get Started** page. Step 1 has a **See upcoming workshops** button; scroll to the bottom — the closing note "Still not sure where to start? …" is there with **no button under it**. There is exactly one "See upcoming workshops" on the page.
+8. **About heading, default.** **About**. The heading reads **What Makes Knotty Yoga an Amazing Studio?** in normal sentence case — *not* in all capitals.
+9. **About heading, edited.** Manage ▸ **Site Theme** ▸ **Copy** ▸ **About page heading**. Type `Why people keep coming back` and **Save this section**. Reload **About**: the heading reads exactly that, in the case you typed. Then clear the field, save, and confirm the heading returns to the sentence in step 8 — a cleared value must restore the default, not stick as blank.
+10. **The requirement icon is whole.** **My Schedule**. Find the slot showing **Requires attending Knotty Yoga** — the small calendar icon to the left of that text is fully drawn, not cut off at the top or bottom. Check the same note on the home page's **Upcoming classes** strip, which had the identical defect.
 
 ---
 
