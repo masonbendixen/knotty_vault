@@ -720,17 +720,6 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] **The same defect existed in `upcoming-classes`** (`.row-requires`, identical markup, also unsized) one step less visible because that row is `--text-sm`. Fixed both; sized to each row's own text.
 - [x] Spec asserts GEOMETRY: `font-size === width === height`, the size is not Material's unstyled 24px, and the laid-out `getBoundingClientRect()` is not smaller than the declared box. The pre-existing presence-only test passes with the glyph visibly cut, which is the trap this item called out.
 
-### 9.3 [app] About heading: editable, and not forced to caps
-- [ ] The About page heading is hardcoded (`What Makes {displayName} an Amazing Studio?`) and `about.component.scss` forces `text-transform: uppercase`, so a studio can change neither the words nor the shouting.
-- [ ] [hw] New `line`-type content slot `site_about_heading` in `SiteContentSlots()`; framework default `""`.
-- [ ] [app] The page renders the slot when set, else today's sentence with the tenant's name interpolated — so an existing site is unchanged until someone edits it. Drop the `uppercase` rule; if the caps are wanted, they belong in the typed value.
-- [ ] Editable in Site Theme ▸ **Copy** (it is copy, not a brand asset).
-- [ ] Specs: default heading, overridden heading, no forced text-transform.
-
-### 9.4 [app] My Schedule: the requirement icon is clipped
-- [ ] "Requires attending Knotty Yoga" clips its icon. Almost certainly the `icons.size()` mixin's three values disagreeing with a container, or an `overflow: hidden` ancestor — the shared mixin exists precisely because `font-size` draws the glyph while `width`/`height` reserve the box.
-- [ ] Spec: assert the rendered icon's `getBoundingClientRect()` is not smaller than its declared box. A presence-only assertion passes while the glyph is visibly cut, which is the trap this project has hit before.
-
 ### 9.5 Live hand-testing (Phase 9)
 
 > Blank database, `--recreate_database`, then the live server. Sign in as the seeded admin unless a step says otherwise.
