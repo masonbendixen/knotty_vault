@@ -827,24 +827,40 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 ## Phase 12 — About and Location additions (9/2 items 4, 11)
 
-### 12.1 [app] An embedded map on the Location page, alongside the link
-- [ ] ⚠️ **This revisits OQ-9**, which chose a link-out specifically to avoid a key and a third-party frame. The ask is "in addition to the link", so the button stays and the map joins it.
+### 12.1 [app] An embedded map on the Location page, alongside the link — ✅ DONE
+- [x] The button stays; the map joins it BELOW it. The address and the way to get directions are what someone came for, and the frame is the slowest thing on the page.
 - [x] **OQ-15 ✅ — the keyless embed**: `<iframe src="https://www.google.com/maps?q=<url-encoded address>&output=embed">`. No key, no billing, no JS.
-- [ ] ⚠️ **It needs a CSP `frame-src` allowance** for `https://www.google.com` — unavoidable for any iframe embed, and a deliberate widening of the policy the security review set. [hw], since the CSP lives in the framework's security-headers middleware.
-- [ ] ⚠️ `output=embed` is **not** part of the documented Maps Embed API. It has worked for years and is widely used, but Google does not promise it. If it breaks, the fallbacks are the Embed API (key + billing) or a static map image (key, no frame) — recorded here so the failure is recognisable rather than mysterious.
-- [ ] Lazy-loaded (`loading="lazy"`) and only rendered for a location with a usable address, so a half-filled location does not embed a map of nowhere.
-- [ ] Specs: the iframe src encodes the same address the button uses; no iframe when the address is empty.
+- [x] [hw] CSP `frame-src https://www.google.com` added to the security-headers middleware. ⚠️ **`frame-src` and `frame-ancestors` point OPPOSITE ways** and are easy to confuse: `frame-src` is who WE may embed, `frame-ancestors 'none'` is who may embed US. The second is untouched, and the test asserts both together so a future edit cannot quietly make the site clickjackable while "fixing the map".
+- [x] ⚠️ `output=embed` remains undocumented — recorded at `googleMapsEmbedUrl` so a site-wide blank map is recognisable rather than mysterious. Fallbacks if it ever breaks: the Embed API (key + billing) or a static map image (key, no frame).
+- [x] `loading="lazy"`, a real `title` (otherwise a screen reader announces "iframe"), and an `aspect-ratio` box that holds the space so a lazily-loaded frame does not shove the page around under the reader.
+- [x] **Rendered only for a `hasMappableAddress` location** — a street line PLUS a city or postal code. The link-out still renders for anything: a link someone chooses to follow can land approximately, but a map presented AS the studio's location cannot. A city alone maps to the town centre.
+- [x] ⚠️ **Two Angular traps, both handled.** The iframe `src` must go through `bypassSecurityTrustResourceUrl` — and that returns a NEW object per call, so building it in a template getter hands the iframe a different value every change-detection pass and the map reloads continuously. It is resolved ONCE per location when the feed arrives, and a spec pins that the object is stable across passes.
+- [x] Specs (6): the frame and the button encode the same `formatAddress` output (compared against each other, so they cannot drift apart); lazy + titled; stable src object; no frame for a city-only address while the button survives; no frame for no address; and a street + postal code with no city still embeds.
 
-### 12.2 [app] A service providers page under About
-- [ ] `/providers/:personId` already exists (`ProviderBioComponent`); there is no list. Add one, linked from About ▸ **Our Providers**.
+### 12.2 [app] A service providers page under About — ✅ DONE
+- [x] `/providers` lists everyone currently accepting bookings — photo, name, their types, an optional bio, and a link to `/providers/:personId`. ⚠️ Note that bio page is still the **"coming soon" stub** it has always been; making it real was not part of this item, and the list now makes that stub reachable where before nothing linked to it. Worth its own item.
+- [x] A provider is a `provider_type_assignments` row that is accepting bookings — the **same definition booking uses**, so the directory can never advertise somebody a visitor cannot then book.
+- [x] **One row per PERSON, not per assignment.** Somebody who is both a massage therapist and a physiotherapist is one human being on an About page; `string_agg` gives their types as one readable list. A spec pins it.
+- [x] ⚠️ **The bio comes from `instructors`.** Despite the name, that table is (id, person_id, bio) — the only per-PERSON public profile bio this schema has. LEFT JOIN, so a bodyworker who does not teach is still listed, just without a bio. *Limitation worth knowing: such a person has nowhere to write one.* Giving providers their own profile text is a separate change.
 - [x] **OQ-14 ✅ — the item hides itself when the tenant has no providers**, because a studio with no massage or bodywork should not carry an empty "Our Providers" page. Not the always-show-with-an-empty-state default I proposed.
-- [ ] The flag rides an EXISTING boot payload so no page pays for an extra request, and the header can read it synchronously from `SiteConfigService` (the header is constructed once at boot, outside the router outlet).
-- [ ] ⚠️ **Needs a seam, not a hardcoded field.** `/api/site_info` is framework-owned and "service provider" is an APP concept — dropping an app count into a framework payload is the kind of edge the componentization work exists to prevent. Either an app-contributed block on `site_info` (the shape the theme-bundle section registry already uses) or an app boot call the header reads. [hw] either way; decide at implementation.
-- [ ] The page still carries an empty state — the menu item and the page can disagree for a moment after a studio removes their last provider.
-- [ ] Specs: lists active providers with photo, name and bio snippet; empty state; menu entry.
+- [x] **Seam decision: an app-contributed block on `site_info`** — `Branding::RegisterSiteInfoBlock`, deliberately mirroring `RegisterThemeBundleSection` (same registration shape, same idempotent-by-name rule, same test-clearing hook) so there is ONE pattern for "the app contributes to a framework surface". App JSON lands under a top-level `app` key, so which fields are whose is legible from the payload alone. honuware stays free of the word "provider".
+	- The block gets a `Transaction` **and** a `DatabaseHelper`: `Transaction` exposes no helper, and a captured one would give a startup-registered lambda per-request state.
+	- Only the BOOLEAN rides the boot payload; the directory is its own endpoint. Every page load pays for `site_info`, and no page but one needs the list.
+- [x] `SiteConfigService.hasProviders` reads it with `=== true`, not a truthiness check — untrusted network data, and a stray string must not read as yes. `HeaderService` injects the config and reads it synchronously; it is an `APP_INITIALIZER`, so the flag is resolved before anything renders and the item never appears a beat late.
+- [x] The page carries its own empty state, because the flag and the list come from **different requests** and can disagree for a moment after a studio removes their last provider — and the route stays reachable by URL regardless of the menu.
+- [x] Specs (17 across both halves): server-side — surname order, one card for a two-type person, somebody not accepting is omitted from BOTH the list and the flag, a bio is carried when present, the flag is false for an empty studio; endpoint — empty list, anonymous access, and no `email` in the public payload; client — card contents, profile link, a card with neither bio nor photo, feed order preserved, empty state, dead feed; header — hidden by default AND when explicitly false, shown when true, shown to signed-in visitors too; config — every degenerate `app` shape lands on false.
 
 ### 12.3 Live hand-testing (Phase 12)
-- [ ] Steps: the map shows the studio and the button still opens Maps in a new tab; the providers page lists Mason and Caleb.
+
+> Blank database, `--recreate_database_test` (the test extras are what seed the providers), then the live server. ⚠️ The CSP only fires in **prod mode**, so the map renders in dev regardless — step 3 is the one that proves the `frame-src` allowance is right, and it is the only way to catch a typo in it.
+
+1. **The map is there, and so is the button.** About ▸ **Our Location**. The studio's card shows the address, an **Open in Google Maps** button, and below it an embedded map with a pin on 2545 152nd Ave NE. The button still opens Maps in a new tab.
+2. **The pin matches the address.** The map is showing the same place the address line reads — not a town centre, not a different Redmond.
+3. **In prod mode the frame still loads.** Restart with prod-mode headers and reload the page. The map still renders. If it is blank, the `frame-src` allowance is wrong — that is what this step exists to catch, and nothing in dev will tell you.
+4. **A half-filled location gets no map.** Manage ▸ Manage Data ▸ `facilities`: blank the street line on the studio row, reload Our Location. The **button remains** and the **map is gone**. Put the street back.
+5. **The providers page lists them.** About ▸ **Our Providers** — the item is in the About dropdown. The page lists **Mason** and **Caleb**, each with their provider type; whoever has a bio shows it, and whoever has no photo gets a placeholder rather than a broken frame.
+6. **A card leads to the profile.** Click **View profile**. ⚠️ Expect the "coming soon" stub — that page was never built, and the list is what finally makes it reachable.
+7. **The menu item hides itself.** Manage ▸ Manage Data ▸ `provider_type_assignments`: set `is_accepting_bookings` to false on every row. Reload the site. **"Our Providers" is gone from the About menu.** Navigate to `/providers` by URL anyway: the page loads with its empty state rather than a blank screen — the two come from different requests and must each stand alone. Set them back to true.
 
 ---
 
