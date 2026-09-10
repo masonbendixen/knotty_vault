@@ -186,11 +186,23 @@ These are the values that **must** be overridden before booting the server in pr
 | `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | Default is `smtp.gmail.com` |
 | `mail_server_port` | `587` (STARTTLS) | Default is `465` (SSL) — SES supports both, 587 is the AWS-recommended path |
 | `mail_server_method` | `login` | Default OK (already `login`) |
-| `mail_app_password` | SES SMTP password (created in IAM, NOT your console password) | Default is the Gmail app password |
+| `mail_app_password` | SES SMTP password (created in IAM, NOT your console password) | **Default is now EMPTY** (honuware Phase 9.2 — see the rotation note below); in dev it is seeded from `HONUWARE_MAIL_APP_PASSWORD` |
 | `Knotty Yoga and Spa` (sender name) | (use default) | Default OK |
 | `knottyyogaandspa@gmail.com` (sender address) | `noreply@knottyyoga.com` (or whatever `kMailSenderAddress` is set to) | Defaults to the Gmail address; SES requires the From address match a verified domain identity |
 
 The full list of secrets and their defaults lives in `src/util/secrets/secret_values.cpp`. Phase 4.8 (Secret bootstrap ordering) describes the operator workflow: provision DB → run `database_helper --migrate` to populate the `config_secrets` table from defaults → run `database_helper --seed-secrets-from-file secrets.json` (or `knottyyoga_test_helper`) to override the values above → start the server.
+
+#### AT DEPLOY: rotate the Gmail app password and give knottyyoga its own
+
+**Knotty Yoga and CommunityFinder currently share one Gmail mailbox and therefore one app password.** Both seed `knottyyogaandspa@gmail.com` as `kMailSenderAddress`, and as of 2026-09-10 both read the same `HONUWARE_MAIL_APP_PASSWORD` to seed `config_secrets.mail_app_password`. This was accepted deliberately as a temporary state so both apps can send mail during development — it is **not** the intended end state.
+
+Background, because it explains why the shared credential exists at all: honuware's `secret_values.cpp` used to ship a real Gmail app password as a *framework default*, committed to the public `server_components` repo. Every app inherited it silently — knottyyoga had no mail-password seeding of its own. That literal was removed and the credential rotated in honuware Phase 9.2, and knottyyoga gained its own env-var seeding at the same time (`create_database.cpp` → `PopulateConfigSecrets`).
+
+- [ ] **Mint a knottyyoga-specific app password** at https://myaccount.google.com/apppasswords, named identifiably (e.g. `knottyyoga-smtp-prod`). Separate credentials are independently revocable — a leak on one app does not force rotation on the other, which is the whole reason app passwords are cheap and disposable.
+- [ ] **Store it in a password manager**, not a text file. A plaintext file under `Documents` is the pattern being retired here; note that `C:\Users\mason\Documents` and `C:\Users\mason\OneDrive\Documents` are *different* folders and only the second syncs to Microsoft's cloud — a distinction too subtle to be filing credentials against.
+- [ ] **Rotate the currently shared credential** once both apps have their own, so the shared one stops being valid anywhere.
+- [ ] **Decide the sender identity per app.** If knottyyoga moves to SES with `noreply@knottyyoga.com` (rows above), its Gmail app password becomes dev-only and the production credential is an SES SMTP password from IAM. CommunityFinder then keeps the Gmail mailbox and needs its own sender address regardless. Remember the coupling: **mailio authenticates using the sender address as the SMTP username**, so the password must belong to whatever `kMailSenderAddress` resolves to — a mismatch surfaces as "Mail sender rejection", which reads like an address problem rather than a credential one.
+- [ ] Update the `mail_app_password` row above once the production value is an SES password rather than a Gmail one.
 
 ## 1.6 Reverse-proxy awareness in the C++ server
 
