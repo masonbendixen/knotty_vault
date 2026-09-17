@@ -620,7 +620,6 @@ The default VPC plus two security groups is all we need. The default VPC already
 	openssl rand -base64 24
 	```
 	Save it to your password manager. It plugs into the `CREATE ROLE` statement below **and** becomes `KNOTTYYOGA_DB_PASSWORD` in `server.env`.
-	- LynKL2JHmSpo+u1QJ8q0SX0LhCmVvExb
 - [x] **Create the application role and database.** From the EC2 (the only host that can reach RDS, thanks to the SG rule): ✅ 2026-05-15
 	```bash
 	PGPASSWORD='My84dSDdpIBwXgIKb4yi1doef2JoJA+T' psql \
@@ -863,7 +862,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		```
 		`s3:GetObject` only — CloudFront reads objects, it never lists or writes. The `SourceArn` condition is what makes the grant safe with Block Public Access still ON: the service principal is shared by every CloudFront distribution in the world, and the condition narrows it to yours.
 	- Without this policy, CloudFront gets `403 Forbidden` from S3 on every request — which, once the SPA fallback (below) is in place, shows up as `index.html` for every URL *including the bundle's own JS*, i.e. a blank page rather than an obvious error. Test with a direct object URL (`https://dv1tgxa9ok30f.cloudfront.net/index.html`) before adding the fallback so a 403 is still visible as a 403.
-- [ ] **Add the API origin for `/api/*`.**
+- [x] **Add the API origin for `/api/*`.** ✅ 2026-09-17
 	- CloudFront → your distribution → **Origins** tab → **Create origin**.
 	- **Origin domain: `ec2-34-215-204-200.us-west-2.compute.amazonaws.com`** — the EC2's **Public IPv4 DNS** (EC2 → Instances → `knottyyoga-server` → Details). **CloudFront refuses a bare IP** ("Origin domain cannot be an IP address" — an earlier draft of this step said to type the IP; it was wrong). Every Elastic IP gets this AWS-assigned name — the IP with dashes plus the region — and it resolves to `34.215.204.200` for as long as the EIP stays associated, which is the same lifetime the IP itself has. (The alternative is a Route 53 record such as `origin.knottyyoga.com → A 34.215.204.200`; not needed, and it would put an A record in the production zone before go-live.)
 	- **Protocol:** **HTTP only**
