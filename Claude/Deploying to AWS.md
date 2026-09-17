@@ -836,9 +836,33 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- **Response headers policy:** `Managed-SecurityHeadersPolicy` (HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.).
 		- **Compress objects automatically:** Yes.
 		- The "recommended S3 cache settings" picked at creation should already match most of this — verify, don't assume.
-- [ ] **Paste the OAC bucket policy into S3.**
-	- S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy → Edit** → paste the JSON CloudFront gave you → **Save changes**.
-	- Without this step, CloudFront gets `403 Forbidden` from S3 on every request.
+- [ ] **Verify (or paste) the OAC bucket policy in S3.**
+	- **Where "the JSON CloudFront gave you" comes from — this step was written for the OLD wizard.** The old create-distribution flow ended with a yellow banner, *"The S3 bucket policy needs to be updated"*, with a **Copy policy** button; that banner is the JSON this step meant. The redesigned wizard you used ("Allow private S3 bucket access to CloudFront", above) applies the policy itself, so there may be nothing to paste. Check first, then fall back:
+	1. **Check whether it is already there.** S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy**. If there is a statement with `"Principal": { "Service": "cloudfront.amazonaws.com" }` and an `AWS:SourceArn` condition naming your distribution, the wizard did it — tick this step and move on.
+	2. **If the policy box is empty, the Copy button lives on the ORIGIN, not the distribution.** CloudFront → `knottyyoga-prod` → **Origins** tab → select the S3 origin → **Edit** → scroll to **Origin access** (Origin access control settings) → **Copy policy**. Then S3 → bucket → Permissions → **Bucket policy → Edit** → paste → **Save changes**.
+	3. **Or write it by hand** — it is a fixed shape with two blanks, and the account ID is the one from the console login URL (line ~409). The Distribution ID is the `E…` value in the **ID** column of the CloudFront distribution list (the doc recorded the domain `dv1tgxa9ok30f.cloudfront.net` but not the ID — note it beside the domain once you have it):
+		```json
+		{
+		  "Version": "2008-10-17",
+		  "Id": "PolicyForCloudFrontPrivateContent",
+		  "Statement": [
+		    {
+		      "Sid": "AllowCloudFrontServicePrincipal",
+		      "Effect": "Allow",
+		      "Principal": { "Service": "cloudfront.amazonaws.com" },
+		      "Action": "s3:GetObject",
+		      "Resource": "arn:aws:s3:::knottyyoga-ui-prod/*",
+		      "Condition": {
+		        "StringEquals": {
+		          "AWS:SourceArn": "arn:aws:cloudfront::957014951609:distribution/<DISTRIBUTION_ID>"
+		        }
+		      }
+		    }
+		  ]
+		}
+		```
+		`s3:GetObject` only — CloudFront reads objects, it never lists or writes. The `SourceArn` condition is what makes the grant safe with Block Public Access still ON: the service principal is shared by every CloudFront distribution in the world, and the condition narrows it to yours.
+	- Without this policy, CloudFront gets `403 Forbidden` from S3 on every request — which, once the SPA fallback (below) is in place, shows up as `index.html` for every URL *including the bundle's own JS*, i.e. a blank page rather than an obvious error. Test with a direct object URL (`https://dv1tgxa9ok30f.cloudfront.net/index.html`) before adding the fallback so a 403 is still visible as a 403.
 - [ ] **Add the API origin for `/api/*`.**
 	- CloudFront → your distribution → **Origins** tab → **Create origin**.
 	- **Origin domain:** the EC2 Elastic IP (just the bare IP, no `http://`, e.g., `54.123.45.67`)
