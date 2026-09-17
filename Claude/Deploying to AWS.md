@@ -836,7 +836,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- **Response headers policy:** `Managed-SecurityHeadersPolicy` (HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.).
 		- **Compress objects automatically:** Yes.
 		- The "recommended S3 cache settings" picked at creation should already match most of this — verify, don't assume.
-- [ ] **Verify (or paste) the OAC bucket policy in S3.**
+- [x] **Verify (or paste) the OAC bucket policy in S3.** ✅ 2026-09-17
 	- **Where "the JSON CloudFront gave you" comes from — this step was written for the OLD wizard.** The old create-distribution flow ended with a yellow banner, *"The S3 bucket policy needs to be updated"*, with a **Copy policy** button; that banner is the JSON this step meant. The redesigned wizard you used ("Allow private S3 bucket access to CloudFront", above) applies the policy itself, so there may be nothing to paste. Check first, then fall back:
 	1. **Check whether it is already there.** S3 console → `knottyyoga-ui-prod` → **Permissions** tab → **Bucket policy**. If there is a statement with `"Principal": { "Service": "cloudfront.amazonaws.com" }` and an `AWS:SourceArn` condition naming your distribution, the wizard did it — tick this step and move on.
 	2. **If the policy box is empty, the Copy button lives on the ORIGIN, not the distribution.** CloudFront → `knottyyoga-prod` → **Origins** tab → select the S3 origin → **Edit** → scroll to **Origin access** (Origin access control settings) → **Copy policy**. Then S3 → bucket → Permissions → **Bucket policy → Edit** → paste → **Save changes**.
