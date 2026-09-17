@@ -882,6 +882,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Cache policy:** `Managed-CachingDisabled` (every API response is dynamic; never cache).
 	- **Origin request policy:** `Managed-AllViewerExceptHostHeader`. Forwards all viewer cookies, query strings, and headers — except `Host`, which is stripped so the EC2 sees its own Host (avoids collisions with the origin guard / Crow routing).
 	- **Response headers policy:** `Managed-SecurityHeadersPolicy` (consistent with the default behavior; adds HSTS/`X-Content-Type-Options`/etc. to API JSON responses too).
+	- **Compress objects automatically: Yes** (the default) — but it is inert here: CloudFront only compresses when the cache policy has Gzip/Brotli support on, and `Managed-CachingDisabled` has both off. Leaving it Yes is harmless, matches the default behavior, and starts working if a custom TTL-0 policy with encodings ever replaces CachingDisabled. If API compression ever matters, do it at the origin (Crow), not here.
 	- **Create behavior**.
 - [ ] **Add SPA fallback error responses.** Without this, refreshing on `/calendar` or any deep link returns 403/404 from S3 (the bucket doesn't actually contain `/calendar/index.html`).
 	- CloudFront → your distribution → **Error pages** tab → **Create custom error response**.
