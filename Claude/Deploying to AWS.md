@@ -818,6 +818,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Create distribution.**
 	- Wait ~5–10 minutes for status `Deployed`. Note the distribution's domain name (`dXXXXXX.cloudfront.net`) and its **Distribution ID** (e.g., `E1234567890ABC`) — you'll need the ID for cache invalidations.
 		- dv1tgxa9ok30f.cloudfront.net
+		- Distribution ID: `E23TY4IAUHGM6H` (recorded 9/17 — the `DISTRIBUTION_ID` for `deploy_ui.sh`)
 - [x] **Post-creation settings (the redesigned wizard defers all of these — apply them now via the distribution's tabs).** ✅ 2026-05-21
 	- **Distribution → Settings → Edit:**
 		- **Default root object: `index.html`** ← **CRITICAL and easy to miss.** The streamlined wizard does NOT set this; without it, the distribution root returns S3 XML/error instead of the Angular app.
@@ -931,10 +932,10 @@ The default VPC plus two security groups is all we need. The default VPC already
 		It runs `npm ci` (reinstalls `node_modules` from the lockfile — a minute or two) and `ng build --configuration=production` (another minute or two), then stages the result at `ui/release/stage/` with `index.html` at its root and writes `ui/release/knottyyoga-ui-<git-sha>.tar.gz`. The last lines say `wrote …tar.gz` and its size. `ui/release/` is gitignored (added 9/17). The Angular budget warnings it prints are pre-existing and not a failure. **Verified on this machine in Git Bash, 9/17** — it needed one fix (the cleanup trap failed on Windows because Git Bash's `ln -s` copies a directory instead of linking it, and the script reported exit 1 after doing all its work). A `-dirty` suffix on the version means uncommitted changes in the tree. **You can skip this script if you prefer** — the consumer accepts any directory with `index.html` at its root, so `cd ui && npx ng build --configuration=production` followed by pointing step 6 at `ui/dist/ui/browser` also works; you just lose the `VERSION` file and the tarball to keep for rollback.
 	6. **Run the consumer, dry first** (upload + invalidate). Same window (so `AWS_PROFILE` is still set):
 		```bash
-		export MSYS_NO_PATHCONV=1      # Git Bash otherwise rewrites /index.html into C:\Program Files\Git\index.html
-		export DISTRIBUTION_ID=E…      # from step 4
+		export DISTRIBUTION_ID=E23TY4IAUHGM6H
 		DRY_RUN=1 ./ui/package/deploy_ui.sh
 		```
+		(An earlier draft of this step said to `export MSYS_NO_PATHCONV=1` first. **Do not** — that was wrong, and it produced `The user-provided path /c/Users/… does not exist` on the first real run: it stops Git Bash mangling `/index.html`, but it equally stops Git Bash translating `/c/Users/…` into the `C:\Users\…` that `aws.exe` needs. The script now handles both halves itself — conversion off, local paths handed over via `cygpath -m` — verified 9/17 against the real CLI with the `ci-deploy` key.)
 		It prints every `aws` command it *would* run and runs none. Read them: three `s3 sync`/`cp` passes into `s3://knottyyoga-ui-prod/`, then one `create-invalidation` on your distribution. If that looks right:
 		```bash
 		WAIT=1 ./ui/package/deploy_ui.sh
