@@ -752,7 +752,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Default encryption:** SSE-S3 (default, free).
 	- **Create bucket**.
 - [x] **Confirm static website hosting is OFF.** Bucket → **Properties** tab → "Static website hosting" should say **Disabled**. CloudFront serves the content, not S3's website endpoint. ✅ 2026-05-18
-- [ ] **Create the `ci-deploy` IAM user (for GitLab CI to push builds).**
+- [x] **Create the `ci-deploy` IAM user (for GitLab CI to push builds).** ✅ 2026-09-17
 	- Top search → **IAM** → IAM console → left sidebar → **Users → Create user**.
 	- **User name:** `ci-deploy`
 	- **Provide user access to the AWS Management Console:** **No** (programmatic-only).
