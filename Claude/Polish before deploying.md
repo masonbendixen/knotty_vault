@@ -65,6 +65,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 > **Update 9/2/2026 — nothing is parked any more.** OQ-1 cleared 8/29 when Ryan supplied the token; both Figma assets were exported and Phase 8 shipped green. Mason's 9/2 work items became Phases 9–13, and the three questions they raised (OQ-13/14/15) were answered the same day. Every phase is execution-ready; the only open-ended item is 9.1, which is deliberately written as an investigation because the timezone symptom has not been reproduced yet.
 
+> **Update 9/17/2026 — Phase 11 is complete bar one design call.** Ryan's fresh token unblocked 11.0: the Get Started artwork, the footer tagline **and the three tier laurels** now ship as native SVG (the laurels were pulled forward because the 11.3 tint item was waiting on exactly those assets and tokens expire). `@honuware/ui` 0.1.2 is installed. The only open item in the phase is whether the laurels should follow a theme colour at all — parked for Ryan under 11.3. Phase 13 (mobile) is the remaining unstarted work.
+
 ## Grounding — what the exploration found (so the phases below are uncontroversial)
 
 Facts that shaped the plan; each one changed what a naive reading of the item list would have built:
@@ -622,7 +624,7 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] **⚠️ The node was NOT in "Frame 127".** No such frame exists in the file today; the component is `Icon / GetStarted` (`2236:7568`) on the **Foundations** page. Same artwork. The plan's coordinates were stale, not wrong-headed.
 - [x] **⚠️ The export looks broken and is not.** Three of its vectors are WHITE ("GET") and the rest red ("STARTED" + flames), on a transparent background — so in any image viewer the word GET is invisible and the PNG appears to be missing half its content. Verified by decoding the pixels: corner alpha 0, ~1131 opaque white pixels in the left half. It reads correctly on the black band, which is the only place it is ever drawn.
 - [x] Because the artwork already contains the words "GET STARTED", the band renders it **instead of** the text heading rather than above it.
-- [ ] Spec: seeded fresh-DB row carries a photo (seed test), band renders it.
+- [x] Spec: seeded fresh-DB row carries a photo (seed test), band renders it. *Band-renders-it landed with 8.1's specs; the seed half was written on 9/17 under 11.0 (`SeededGetStartedBannerCarriesTheArtworkAsAVector`), when the artwork became a vector.*
 
 ### 8.3 [app] Footer tagline as an image (item 13)
 - [x] [hw] New `url`-type content slot `site_tagline_image_url` in `SiteContentSlots()` (registry-driven: `site_info`, the editor, and the theme bundle pick it up automatically). Framework default `""`.
@@ -640,6 +642,8 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 ### 8.5 Live hand-testing (Phase 8)
 - [x] Steps written (below) — awaiting your run against a live server.
+
+> ⚠️ Written for the PNG exports. Since 11.0 (9/17) the seeded files are `get_started.svg` and `tagline.svg` and the slot value is `/api/site_asset/tagline.svg` — read the file names below accordingly. Steps 1–11 are otherwise unchanged.
 
 Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angular dev server running.
 
@@ -778,10 +782,15 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 
 > Its own phase because it is not a feature so much as a second KIND of image running through every part of the photo system, and the interesting decisions are all about what does NOT apply to a vector.
 
-### 11.0 ⛔ Replace Ryan's PNG exports with native SVG — BLOCKED on a Figma token
+### 11.0 Replace Ryan's PNG exports with native SVG — ✅ DONE (9/17)
 > Mason asked for this alongside the phase on 9/3. Phase 8 exported two pieces of Ryan's vector artwork as PNG because that was all the photo system could store: `get_started.png` (Figma node `2236:7568`) and `tagline.png` (node `2107:334`), both from file `IxWR3NfPQbJfYJ7oCPmaER`. With 11.1/11.2 landed they should be SVG.
-- [ ] **The token in `C:\Users\mason\.figma_token` has expired** — the export API answers `{"err": "Token expired"}`. Nothing else blocks this: the request is the same `/v1/images/…?format=svg` call Phase 8 used, and the two node ids are recorded above.
-- [ ] Once a fresh token is in that file: re-export both nodes as SVG, replace `src/database_helper/img/get_started.png` and `tagline.png`, point the seed's `imageType` at `"svg"`, and update `site_tagline_image_url`'s seeded asset name. Then re-run the seed test that asserts the Get Started row carries a photo.
+- [x] **Unblocked 9/17** — Ryan supplied a fresh token; `C:\Users\mason\.figma_token` works again. Same `/v1/images/…?format=svg` call Phase 8 used.
+- [x] Re-exported both nodes as SVG. `get_started.svg` (351×102 viewBox, 8.6KB — GET in white, STARTED and the flames in `#E92128`, all `<path>`s) and `tagline.svg` (312×75, 14.6KB, outlined letterforms in white). The PNGs were exactly 2× these boxes, so the artwork is identical; both `img/*.png` are gone. **Inspected before storing:** no `<script>`, `<foreignObject>`, `<image>`, `href` or `on*` in either — pure paths. (11.1 stores whatever it is handed; the check is for the seed, which nobody uploads through a picker.)
+- [x] Seed: the Get Started row's `SeedSection` is `"get_started.svg", "svg"`; `PopulateSiteAssets` stores `tagline.svg` under type `"svg"` and points `site_tagline_image_url` at `/api/site_asset/tagline.svg`. The local-mode mock mirrors the new URL.
+- [x] **The three tier laurels came along.** The 11.3 laurel item was blocked on "the SVG assets first", and the token that makes that possible does not last — so while it was live: `Member_solo 1` (`2240:9505`), `Member_couple 1` (`2108:575`), `Member_family 1` (`2240:9495`), all inside the `Membership Tier Card` component set on Foundations. Each is single-colour gold (`#E2B700`) path artwork — exactly the shape a `currentColor` mask wants. `tier_icon_{solo,couple,family}.svg` replace the PNGs (which were 2× rasters of the same paths), and `PopulateSeedPhotos` attaches them as `"svg"`. **The theme tint is NOT wired** — that is the half that wants Ryan's eye, and it is still parked under 11.3.
+- [x] **Nothing else had to change, which is what 11.1–11.3 were for.** `UploadAndAssociatePhoto` admits the vector, `GetScaledPhotoForItem` hands back the source bytes for any box, `/api/site_asset/` and `/api/get_scaled_photo/` both already map `svg` → `image/svg+xml`, the bundle exporter names the file `.svg` and the importer sniffs `<svg`. Checked each rather than assumed.
+- [x] **Sizing was already right, by luck worth recording.** Every consumer constrains the `<img>` — `.start-band__art` and `.tagline-art` to a max width, `.card-icon-image` to a 4rem box with `object-fit: contain` — so a vector's intrinsic `width`/`height` attributes never decide anything. Had any of them relied on the server's resize to pick the size, the swap would have drawn the artwork at its viewBox size instead. The two SCSS comments that explained the max width as "the export is 2x" now say what is actually true: the seeded vector is drawn at that width and a studio's own raster upload is held to it.
+- [x] Specs: `CreateDatabaseTest.SeededGetStartedBannerCarriesTheArtworkAsAVector` (**the 8.2 seed test that was never written**) reads the seeded row through `GetScaledPhotoForItem` — the same reader `/api/get_scaled_photo` uses for the band's `<img>` — and asserts type `svg`, 0×0, and `<svg` in the bytes; it would fail if the seed stored the SVG under a raster type because the resize library would be handed it. The tagline test now asserts the stored **type** as well as the bytes and URL (a vector stored under "png" would serve as `image/png` and break with perfectly good bytes). The tier-icon test reads each laurel back the same way.
 
 ### 11.1 [hw] Accept SVG through the upload path — ✅ DONE
 - [x] **`ImageTypeFromMagicBytes` already sniffed for `<svg`** — that was written when the theme-bundle asset path landed, and it already refuses HTML by looking only at the first 512 bytes for the root element. Nothing to do; the item assumed work that was done.
@@ -799,7 +808,7 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 - [x] Every caller works unchanged: `/api/get_scaled_photo/<table>/<id>/<w>/<h>` is still the one URL every component builds, and the server decides whether the numbers mean anything.
 - [x] Specs (honuware, 4 new): every spelling of the type is a vector and no raster type is; the MIME mapper returns `image/svg+xml`; an upload is stored **byte-for-byte** with 0×0 dimensions; and **two different boxes** both return the identical source bytes while the scaled-photo count stays 0.
 
-### 11.3 [app] Consumers, and theme-recolouring icons — ⚠️ MOSTLY DONE (two items blocked)
+### 11.3 [app] Consumers, and theme-recolouring icons — ⚠️ MOSTLY DONE (one item parked for Ryan)
 - [x] **Audit result: no consumer needed changing.** Every surface builds `/api/get_scaled_photo/…` and hands it to an `<img>`, so 11.2 holding is genuinely enough. The one exception was the dimensions line.
 - [x] Page Content's dimensions line reads **"Vector"** rather than falling through to a blank. Blank is what that line shows for a row with NO image, and a studio should not have to guess which of the two they are looking at. A stored photo with no pixel size can only be a vector, so no new field was needed to detect one.
 - [x] **`ThemeIconDirective` (`hwThemeIcon`)** — renders an image as a CSS mask filled with `currentColor`. Colour comes from the element, not a hard-coded token, so one directive serves every surface without knowing any of their palettes. `-webkit-` prefixes included; Safari shows nothing without them.
@@ -809,19 +818,22 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 	- Fixed with the same shape as the server: `isVector(file)` short-circuits to `file.arrayBuffer()` with `imageType: 'svg'`, before anything touches the canvas. Matches on MIME type OR the `.svg` extension, because a file dragged from some file managers arrives with an empty `type` — and that is exactly the case that would otherwise fall through.
 	- `accept` now names `.svg` explicitly anyway, for the same empty-MIME reason. Error copy mentions SVG.
 	- Specs (3): the SVG uploads **byte-for-byte** (asserting the decoded bytes, not just the type), a `.svg` with no MIME type is still a vector, and a raster still goes through the canvas. Verified non-vacuous — all three fail with the branch removed. **honuware-ui: 469 passing, lint clean.**
-	- ⚠️ **Not live in the app yet.** `@honuware/ui` publishes only on a `vX.Y.Z` tag push. I bumped `projects/honuware-ui/package.json` to **0.1.2**; the release still needs commit → push → `git tag v0.1.2` → push tag, then `npm install @honuware/ui@0.1.2 --save-exact` in `ui/`. The app is exact-pinned at 0.1.1, so nothing changes for it until then.
-- [ ] ⛔ **BLOCKED — the membership tier laurels as first consumer.** Deliberately not wired: they ship as PNGs today, and tinting a PNG laurel with the theme colour is a visible design change with none of the benefit, since the point is to have vector artwork that also recolours. This wants the SVG assets first (see below) and then Ryan's eye on the result.
+	- ✅ **Live in the app as of 9/17** — `@honuware/ui` **0.1.2** is what `ui/package.json` pins and what `node_modules` holds, so the drag-and-drop control keeps a vector a vector. (The earlier note here said the release still needed tag → push → install; that has happened.)
+- [ ] ⏸ **PARKED for Ryan — the membership tier laurels as first consumer of `hwThemeIcon`.** The asset half is done: as of 9/17 (11.0) the three laurels ship as single-colour SVGs, so a `currentColor` mask would recolour clean paths rather than tint a raster. What is left is the design decision — the laurels are gold (`#E2B700`) in Ryan's file, and drawing them in `--theme-primary` (red, for Knotty Yoga) is a visible change he should see before it ships. Wiring is a one-line swap in `membership-tier-cards.component.html` (`<img>` → an element with `hwThemeIcon`) once he says which colour role, if any, they should follow.
 
 ### 11.4 Live hand-testing (Phase 11)
 
 > Blank database, `--recreate_database`, then the live server.
 
-1. **A vector uploads and renders.** Manage ▸ **Page Content** ▸ Home. Pick any section row and upload an `.svg`. It renders in the row thumbnail and on the home page.
-2. **It stays crisp.** Zoom the browser to 200% and resize the window. The SVG stays sharp at every size — a PNG in the same slot visibly softens.
-3. **The metadata line says what it is.** That row's dimensions line reads **Vector**, not a pixel size and not a blank.
-4. **Rasters are untouched.** Replace it with a `.jpg` and confirm the row shows real dimensions again and the page renders exactly as before.
-5. **Nothing executes.** Upload an SVG containing a `<script>` block. It draws as a picture; the script does not run — every render path is an `<img>` or a CSS mask, neither of which parses the file as a document.
-6. **The drag-and-drop control keeps the vector.** Drag an `.svg` onto a photo control (not the file picker — drag it, so it arrives with whatever MIME type the file manager gives it). It uploads as a vector, not as a JPEG. ⚠️ Needs `@honuware/ui` 0.1.2 installed first; on 0.1.1 the control silently rasterises it and step 2 will show a soft, fixed-size image instead.
+1. **The seeded artwork is already vector (11.0).** Signed out, Home: the **GET STARTED** fire-font band and, at the bottom of every page, the footer tagline look exactly as they did — same size, same place. Now zoom the browser to 300%. Both stay razor-sharp; the photographs around them soften. Same check on the three **laurel icons** in the membership band and on the **Memberships** page. Right-click the tagline → Inspect: the `src` ends in `tagline.svg`, and the response's `Content-Type` is `image/svg+xml`.
+2. **The seed rows say so.** Manage ▸ **Page Content** ▸ Home ▸ the **Get Started banner** row: its dimensions line reads **Vector**. Manage Products ▸ **Knotty Yoga Gold Membership** ▸ Image: the laurel is there. (The tagline is a site asset, not a row — step 1's Inspect is its check.)
+3. **A vector uploads and renders.** Manage ▸ **Page Content** ▸ Home. Pick any *other* section row and upload an `.svg`. It renders in the row thumbnail and on the home page.
+4. **It stays crisp.** Zoom the browser to 200% and resize the window. The SVG stays sharp at every size — a PNG in the same slot visibly softens.
+5. **The metadata line says what it is.** That row's dimensions line reads **Vector**, not a pixel size and not a blank.
+6. **Rasters are untouched.** Replace it with a `.jpg` and confirm the row shows real dimensions again and the page renders exactly as before.
+7. **Nothing executes.** Upload an SVG containing a `<script>` block. It draws as a picture; the script does not run — every render path is an `<img>` or a CSS mask, neither of which parses the file as a document.
+8. **The drag-and-drop control keeps the vector.** Drag an `.svg` onto a photo control (not the file picker — drag it, so it arrives with whatever MIME type the file manager gives it). It uploads as a vector, not as a JPEG. `@honuware/ui` 0.1.2 is installed, so this is live.
+9. **A theme file carries the vectors.** Site Theme ▸ **Theme file** ▸ **Download**. Open the `.zip`: `tagline.svg` and a `home-…-get_started.svg` are in it — `.svg`, not `.png`. Delete the Get Started row's photo and clear the tagline image URL, confirm both are gone from the live site, then **Upload** the file back: both return, still vector (zoom again).
 
 ---
 
