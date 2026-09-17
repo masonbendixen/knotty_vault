@@ -865,12 +865,12 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- Without this policy, CloudFront gets `403 Forbidden` from S3 on every request — which, once the SPA fallback (below) is in place, shows up as `index.html` for every URL *including the bundle's own JS*, i.e. a blank page rather than an obvious error. Test with a direct object URL (`https://dv1tgxa9ok30f.cloudfront.net/index.html`) before adding the fallback so a 403 is still visible as a 403.
 - [ ] **Add the API origin for `/api/*`.**
 	- CloudFront → your distribution → **Origins** tab → **Create origin**.
-	- **Origin domain:** the EC2 Elastic IP (just the bare IP, no `http://`, e.g., `54.123.45.67`)
+	- **Origin domain: `ec2-34-215-204-200.us-west-2.compute.amazonaws.com`** — the EC2's **Public IPv4 DNS** (EC2 → Instances → `knottyyoga-server` → Details). **CloudFront refuses a bare IP** ("Origin domain cannot be an IP address" — an earlier draft of this step said to type the IP; it was wrong). Every Elastic IP gets this AWS-assigned name — the IP with dashes plus the region — and it resolves to `34.215.204.200` for as long as the EIP stays associated, which is the same lifetime the IP itself has. (The alternative is a Route 53 record such as `origin.knottyyoga.com → A 34.215.204.200`; not needed, and it would put an A record in the production zone before go-live.)
 	- **Protocol:** **HTTP only**
 	- **HTTP port:** 80
 	- **Add custom header:**
 		- Header name: `X-Origin-Secret`
-		- Value: the `KNOTTYYOGA_ORIGIN_SECRET` value you put in `/etc/knottyyoga/server.env`. **Must match exactly** — the Crow middleware (Phase 1.7) compares this header on every API request and 403s without it.
+		- Value: the origin secret you generated in Phase 4.3 (`openssl rand -base64 32`, saved to the password manager as "AWS Secrets") and wrote into `/etc/knottyyoga/server.env` at the end of Phase 4.4 — it is the `KNOTTYYOGA_ORIGIN_SECRET=…` line in that block (line ~647 of this document; the file on the EC2 uses that legacy spelling, which the server honours as a fallback for `HONUWARE_ORIGIN_SECRET`). Paste everything after the `=`, trailing `=` of the base64 included. To confirm against the live file: `sudo grep ORIGIN_SECRET /etc/knottyyoga/server.env` on the EC2. **Must match exactly** — the Crow middleware (Phase 1.7) compares this header on every API request and 403s without it.
 	- **Create origin**.
 	- Why a header instead of SG-by-IP-prefix? CloudFront's egress IP ranges churn; chasing them in security groups is operational pain. The shared-secret header is the pragmatic answer — no nginx needed.
 - [ ] **Add the `/api/*` behavior.**
