@@ -872,7 +872,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Value: the origin secret you generated in Phase 4.3 (`openssl rand -base64 32`, saved to the password manager as "AWS Secrets") and wrote into `/etc/knottyyoga/server.env` at the end of Phase 4.4 — it is the `KNOTTYYOGA_ORIGIN_SECRET=…` line in that block (line ~647 of this document; the file on the EC2 uses that legacy spelling, which the server honours as a fallback for `HONUWARE_ORIGIN_SECRET`). Paste everything after the `=`, trailing `=` of the base64 included. To confirm against the live file: `sudo grep ORIGIN_SECRET /etc/knottyyoga/server.env` on the EC2. **Must match exactly** — the Crow middleware (Phase 1.7) compares this header on every API request and 403s without it.
 	- **Create origin**.
 	- Why a header instead of SG-by-IP-prefix? CloudFront's egress IP ranges churn; chasing them in security groups is operational pain. The shared-secret header is the pragmatic answer — no nginx needed.
-- [ ] **Add the `/api/*` behavior.**
+- [x] **Add the `/api/*` behavior.** ✅ 2026-09-17
 	- CloudFront → your distribution → **Behaviors** tab → **Create behavior**.
 	- **Path pattern:** `api/*`
 	- **Origin and origin groups:** the API origin you just created
@@ -884,7 +884,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **Response headers policy:** `Managed-SecurityHeadersPolicy` (consistent with the default behavior; adds HSTS/`X-Content-Type-Options`/etc. to API JSON responses too).
 	- **Compress objects automatically: Yes** (the default) — but it is inert here: CloudFront only compresses when the cache policy has Gzip/Brotli support on, and `Managed-CachingDisabled` has both off. Leaving it Yes is harmless, matches the default behavior, and starts working if a custom TTL-0 policy with encodings ever replaces CachingDisabled. If API compression ever matters, do it at the origin (Crow), not here.
 	- **Create behavior**.
-- [ ] **Add SPA fallback error responses.** Without this, refreshing on `/calendar` or any deep link returns 403/404 from S3 (the bucket doesn't actually contain `/calendar/index.html`).
+- [x] **Add SPA fallback error responses.** Without this, refreshing on `/calendar` or any deep link returns 403/404 from S3 (the bucket doesn't actually contain `/calendar/index.html`). ✅ 2026-09-17
 	- CloudFront → your distribution → **Error pages** tab → **Create custom error response**.
 	- Response 1:
 		- HTTP error code: **403: Forbidden**
