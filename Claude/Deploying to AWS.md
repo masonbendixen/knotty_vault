@@ -959,12 +959,20 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 	- Region: **us-west-2** (pick one region and stick with it — the `config_secrets` SMTP host is region-specific).
 	- Top search → **Amazon Simple Email Service** → SES console.
 	- Left sidebar → **Configuration → Identities** → **Create identity**. *(The console renamed this in 2026; it used to be a top-level "Verified identities" entry. The other new sidebar groups — "Pricing plan", "Email validation", "Mail Manager", "Virtual Deliverability Manager" — are separate products or plans; nothing in this plan needs them. New accounts sit on the Essentials pricing plan by default, which is fine for the soft launch.)*
-	- **Identity type:** Domain
-	- **Domain:** `knottyyoga.com`
-	- **Use a custom MAIL FROM domain:** leave off for now (can add later)
-	- **Advanced DKIM settings:** Easy DKIM (default; recommended)
-		- DKIM signing key length: `RSA_2048_BIT`
-	- **Publish DNS records to Route 53:** **Yes** (auto-creates three `CNAME` records in your hosted zone)
+	- The **Create identity** page, field by field in the order it shows them (2026 console):
+	- **Identity details**
+		- **Identity type:** **Domain**. Not "Email address" — a verified domain covers every address under it (`noreply@`, `info@`, whatever `kMailSenderAddress` ends up being); a verified address covers one.
+		- **Domain:** `knottyyoga.com` — the bare apex. No `www.`, no `mail.`; subdomains inherit from the apex.
+		- **Assign a default configuration set:** **leave unchecked.** Configuration sets are the hook for publishing send/bounce/complaint *events* to SNS or CloudWatch. Bounce handling for v1 is SES's account-level suppression list, which is on by default and needs no set. A set can be attached to the identity later without re-verifying.
+		- **Assign to a tenant:** **leave unchecked.** SES "tenants" are its own multi-sender reputation-isolation feature — nothing to do with this app's tenancy model. One studio, one identity.
+		- **Use a custom MAIL FROM domain:** **leave unchecked** (as before). Without it the envelope sender is `amazonses.com`, so SPF alignment fails DMARC but DKIM alignment passes, and one aligned method is all DMARC needs. Add `mail.knottyyoga.com` later (one MX + one TXT record) if a receiver ever complains.
+	- **Verifying your domain**
+		- The blue box says it: the hosted zone is in Route 53 in this account, so SES will write the DNS records itself. Nothing to do here except expand **Advanced DKIM settings** and confirm the three choices below.
+		- **Identity type (under Advanced DKIM settings):** **Easy DKIM**. The radio is NOT preselected on this page — pick it, or the form will not submit. Not "Deterministic Easy DKIM" (for cloning an identity into a second region using a parent region's keys — one region here) and not BYODKIM (your own key pair; nothing gained).
+		- **DKIM signatures:** **Enabled** (the default — leave it; the page itself says disabling is not recommended).
+		- **DKIM signing key length:** `RSA_2048_BIT`.
+		- **Publish DNS records to Route53:** **checked** (default when the zone is in this account — verify it is; this is what auto-creates the three `CNAME`s).
+	- **Tags:** skip.
 	- **Create identity**.
 	- Wait ~5 minutes; the identity's **Verification status** flips to **Verified** and **DKIM status** to **Successful**. If it stays pending >10 min, double-check the Route 53 CNAMEs were actually created (Route 53 → Hosted zones → `knottyyoga.com` → look for three `*._domainkey.knottyyoga.com` records).
 - [ ] **Request production access (sandbox → production).** Until you do this, SES will only deliver to addresses you've added to **Verified identities** — useless for real users.
