@@ -238,7 +238,7 @@ Since we're dropping nginx, Crow needs to enforce the CloudFront-origin secret i
   - Active guard, secret-protected path: rejects no-header / wrong-header / empty-header (all → 403 with right body + `Content-Type: application/json` + `is_completed`); accepts correct-header (pass-through, `is_completed` false).
   - Health allow-list: `/api/health` and `/api/health/db` pass through without header; `/api/login` and `/` are rejected; `/api/healthz` is documented as currently allowed (canary test that pins the simple-prefix-match decision so a future tightening is deliberate).
   - `after_handle` is a no-op (preserves response body + code).
-- [ ] **Operator wiring** (Phase 4.6): set `KNOTTYYOGA_ORIGIN_SECRET=<random>` in `/etc/knottyyoga/server.env` and the matching `X-Origin-Secret` value as a CloudFront "Origin custom header" on the `/api/*` behavior. Document rotation in `RUNBOOK.md`: generate new random → update CloudFront first → update env file + `systemctl restart knottyyoga-server` → expect ~30s outage during the cut-over (overlap window with two valid headers skipped for v1).
+- [x] **Operator wiring** (Phase 4.6): set `KNOTTYYOGA_ORIGIN_SECRET=<random>` in `/etc/knottyyoga/server.env` and the matching `X-Origin-Secret` value as a CloudFront "Origin custom header" on the `/api/*` behavior. ✅ both halves done (4.4 env file, 4.6 origin header, 9/17). Rotation is written up in `RUNBOOK.md` §5 (CloudFront first, then env file + restart, ~30s of 403s; overlap window skipped for v1).
 
 ---
 
@@ -389,7 +389,7 @@ You asked about saving copies of `db_schema/`. My take: **don't copy the directo
 
 - [ ] Rolling back a code-only release: redeploy previous tarball, restart systemd unit. Near-zero downtime.
 - [ ] Rolling back a code + schema release: redeploy previous binaries but **do not** roll back the migration. Old code must be forward-compatible with the new schema (which is why Expand/Migrate/Contract matters).
-- [ ] Disaster recovery: restore from an RDS snapshot or point-in-time. Write this procedure down in a `RUNBOOK.md` in this repo once Phase 4 is complete.
+- [ ] Disaster recovery: restore from an RDS snapshot or point-in-time. Write this procedure down in a `RUNBOOK.md` in this repo once Phase 4 is complete. *Written 9/17 as `RUNBOOK.md` §6 (restore to a NEW instance, repoint `server.env`, verify, then retire the old one) — marked **unverified** until the Phase 5.1 PITR drill runs it for real; the box stays open until then.*
 
 ---
 
@@ -658,6 +658,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	sudo chmod 600 /etc/knottyyoga/server.env
 	sudo chown root:root /etc/knottyyoga/server.env
 	```
+	- [ ] ⚠️ **Found 9/17 while writing the runbook: the block above has no `HONUWARE_SECRET_KEY`.** It is the at-rest encryption key for `config_secrets` (honuware Phase 8.1). `MakeSecretsAtRest` uses the env var whenever it is set, falls back to a hard-coded dev key when it is not in non-prod mode, and **throws in prod mode** — `ValidateProdEnvironment` lists it among the required vars, so flipping `production_mode_on` (§1.5) with the file as written refuses to boot. **It must go in before the first `--migrate` (5.1):** rows encrypted under the dev key are unreadable under a real key added afterwards, which would mean redoing every `set_secret`. Generate with `openssl rand -base64 32`, password manager, then append `HONUWARE_SECRET_KEY=<value>` to the file. `RUNBOOK.md` §4 carries the same warning in the bootstrap order.
 - [ ] **Verify PITR (Point-in-Time Recovery) once — DEFER TO PHASE 5.1. Do NOT run during 4.4.** At this point in 4.4 the `knottyyoga` database is empty (no schema, no data), so a restore proves nothing. This is a Phase 5.1 smoke-test task: run it only *after* the app is deployed and has real data. RDS gives 7-day PITR automatically; this just proves the restore mechanism works and the data is actually in the backups before you ever need it for real.
 
 	When you do it (Phase 5.1), step by step:
@@ -948,7 +949,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **`/api/health` returns 504 — expected.** CloudFront's API origin is wired (a wrong `X-Origin-Secret` would be a 403, not a 504); the 504 is an origin timeout because **nothing is listening on the EC2's port 80 yet**. That is Phase 5.1, the server's first deploy. Nothing in 4.6 is wrong.
 	- *(Script polish from the run: `VERSION` and `MANIFEST.txt` are now uploaded as `text/plain` — extensionless, so the CLI guessed `binary/octet-stream` and a browser downloaded `/VERSION` instead of showing it. Takes effect on the next deploy.)*
 	- **The upload log showed `assets/styles/*.scss` going to the bucket** — the app's SCSS sources, because `angular.json` listed `src/assets` wholesale and the shared stylesheets live under it (they are the Sass `includePaths` root, so they cannot move). Not harmful, but source on a public URL for no reason. Fixed 9/17: the `assets` entry in both the `build` and `test` targets is now the glob form with `ignore: ["styles/**", ".gitkeep"]`; a production build confirms `assets/` is just `fonts/` + `svg/`, and Karma is unaffected. The 21 files already in the bucket disappear on the next `PRUNE=1` deploy — safe to prune immediately in this one case, since no browser ever referenced them.
-- [ ] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy_ui.sh`) run independently of backend deploys — no EC2 work needed.
+- [x] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy_ui.sh`) run independently of backend deploys — no EC2 work needed. ✅ 9/17 — **`RUNBOOK.md` now exists at the repo root** (the plan said "in this repo" at 3.5, and an operator document belongs with the code and must carry no secrets — unlike this vault, which holds the `server.env` block verbatim). §2 is the frontend deploy, prune and rollback. It also carries the other five things this plan promised it: the origin-secret rotation (1.7), the DR outline (3.5, marked unverified until the PITR drill), the secret bootstrap order (4.8, corrected — `--seed-secrets-from-file` does not exist, `set_secret` is the mechanism), the test-helper safe/unsafe command split (5.2), and Session Manager on/offboarding (5.2, marked not yet set up). Sections whose system half is undeployed are marked ⏳ rather than written as if live.
 
 ## 4.7 Email via SES
 
@@ -992,7 +993,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 
 Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull from `config_secrets` — but the DB connection needs to work first.
 
-- [ ] Document this sequence in `RUNBOOK.md`:
+- [x] Document this sequence in `RUNBOOK.md`: ✅ 9/17, §4 — with two corrections to the list below: step 4's `--seed-secrets-from-file` was never built and `knottyyoga_test_helper --command=set_secret` is the mechanism; and step 2 must also include `HONUWARE_SECRET_KEY` (see the ⚠️ under the `server.env` step in 4.4 — it is missing from the file today and has to be there before step 3).
   1. Provision DB; create app user.
   2. Write `/etc/knottyyoga/server.env` with `KNOTTYYOGA_DB_*` vars **and** `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`. The migrate step below fails fast if the scheduler password isn't set, so it must be present before step 3.
   3. Run `knottyyoga_database_helper --migrate` (creates schema + `config_secrets` table empty + **provisions the `scheduler@knottyyoga.local` row in `people` with the env-var password hashed in**). The provision step is idempotent — a second run with the same password is a no-op; rotating the password means deleting the row and re-running.
@@ -1026,14 +1027,14 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 - [ ] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`).
 - [ ] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP.
-- [ ] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't.
+- [x] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't. ✅ 9/17, §7: every registered command sorted into read-only / deliberate-write / never (fabricates state or runs a scheduler job by hand), plus the two defaults that bite — it auto-logs-in as Mason, and **`--send_real_email` is ON by default**, so prod runs pass `--nosend_real_email`.
 
 ### Session Manager (for additional operators, e.g., your retired friend)
 
 - [ ] Attach the AWS-managed `AmazonSSMManagedInstanceCore` IAM policy to the EC2's instance profile. Install the `amazon-ssm-agent` package (already preinstalled on Ubuntu 24.04 AMIs, just needs to be `enabled` and `started`).
 - [ ] Verify by running `aws ssm start-session --target i-xxxxxxxx` from your own machine — you should land in a shell on the EC2 without any SSH key involved.
 - [ ] Create an IAM user for each additional operator (e.g., `friend-of-mason`). Attach a policy that grants `ssm:StartSession` on this specific instance ARN, plus `ssm:TerminateSession` and `ssm:DescribeSessions` for their own sessions. They generate their own access keys and `aws ssm start-session --target i-xxxxxxxx`.
-- [ ] Document the onboarding/offboarding procedure in `RUNBOOK.md`: granting a new operator is "create IAM user + attach policy", revoking is "delete the IAM user". No rebooting, no editing files on the EC2.
+- [ ] Document the onboarding/offboarding procedure in `RUNBOOK.md`: granting a new operator is "create IAM user + attach policy", revoking is "delete the IAM user". No rebooting, no editing files on the EC2. *Drafted 9/17 as `RUNBOOK.md` §8, marked ⏳ not yet set up — the box closes when Session Manager is actually enabled on the instance and the procedure has been run once.*
 - [ ] Audit trail: SSM session activity is logged in CloudTrail automatically. Optionally, enable session logging to S3 or CloudWatch Logs to capture every keystroke (worth it for prod with multiple operators).
 
 ### Why no shared SSH keys
