@@ -976,7 +976,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 	- **Tags:** skip.
 	- **Create identity**.
 	- Wait ~5 minutes; the identity's **Verification status** flips to **Verified** and **DKIM status** to **Successful**. If it stays pending >10 min, double-check the Route 53 CNAMEs were actually created (Route 53 → Hosted zones → `knottyyoga.com` → look for three `*._domainkey.knottyyoga.com` records).
-- [ ] **Request production access (sandbox → production).** Until you do this, SES will only deliver to addresses you've added to **Identities** — useless for real users.
+- [x] **Request production access (sandbox → production).** Until you do this, SES will only deliver to addresses you've added to **Identities** — useless for real users. ✅ 2026-09-17
 	- SES console → left sidebar → **Get set up** (the top item; the Account dashboard's sandbox banner also links there via *View Get set up page* — the dashboard itself no longer carries the button). It is a three-step checklist:
 		1. **Add an email address** — verify `masonbendixen@gmail.com` as an *Email address* identity (Identities → Create identity → Email address → click the link SES emails you). Needed even with the domain verified: it is the address SES sends its confirmations to and the one address the sandbox can deliver to, and step 3 stays greyed out without it.
 		2. **Add a sending domain** — already satisfied by the `knottyyoga.com` identity above.
