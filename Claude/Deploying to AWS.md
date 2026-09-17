@@ -774,12 +774,13 @@ The default VPC plus two security groups is all we need. The default VPC already
 		    {
 		      "Sid": "CloudFrontInvalidate",
 		      "Effect": "Allow",
-		      "Action": "cloudfront:CreateInvalidation",
+		      "Action": ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"],
 		      "Resource": "*"
 		    }
 		  ]
 		}
 		```
+		(`GetInvalidation` is what `deploy_ui.sh`'s `WAIT=1` polls; without it the upload and the invalidation still succeed but the wait fails with AccessDenied.)
 		Name the policy `knottyyoga-ci-deploy` → **Create policy**.
 	- Back in the user-creation tab → refresh the policy list → search `knottyyoga-ci-deploy` → check it → **Next → Create user**.
 	- Open the new user → **Security credentials** tab → **Create access key** → use case **Application running outside AWS** → **Next → Create access key**.
@@ -907,7 +908,40 @@ The default VPC plus two security groups is all we need. The default VPC already
 	- **No `--delete`.** The template above had it, first — which deletes the previous build's chunks while browsers holding the previous `index.html` can still lazy-load them, turning a routine deploy into mid-session 404s. `PRUNE=1` deletes objects absent from the current build as an explicit list diff (not `sync --delete`, which would also re-upload without the cache headers). Run it as part of a *later* deploy, once the previous build has been live long enough that nobody has its `index.html` open; with deploys days apart, "the next deploy" is fine.
 	- **Content types are stated, not guessed,** for `.js`/`.css`/`index.html`. The aws CLI infers them from Python's `mimetypes`, which on Windows reads the registry, and a stray editor install can map `.js` to `text/plain`. `Managed-SecurityHeadersPolicy` sends `X-Content-Type-Options: nosniff`, under which a script served as `text/plain` is **refused** — the symptom is a blank page with console errors, on a deploy that reported success. Fonts and images are not subject to nosniff, so their guessed types are fine.
 	- Verified by dry run against a fake staged tree (pass order, command shapes, and the three precondition failures: missing ID, domain-instead-of-ID, raw `dist/` instead of the staged tree).
-- [ ] **First real run.** Install AWS CLI v2, `aws configure` with the `knottyyoga-ci-deploy` access key, run the producer then the consumer with `DRY_RUN=1`, read the commands, drop `DRY_RUN`. Then `https://dv1tgxa9ok30f.cloudfront.net/VERSION` should read the build's version once the invalidation lands (~1–3 min; `WAIT=1` blocks until it does).
+- [ ] **First real run — step by step.** Two scripts, both bash, both run from **Git Bash** (Start menu → *Git Bash*; it is what ships with Git for Windows and it inherits Node and the aws CLI from the Windows PATH). Not PowerShell — the scripts will not run there. "Producer" and "consumer" just mean: the first script *produces* the built site on disk, the second *consumes* that directory and pushes it to AWS. You run one, then the other.
+	1. **Install the AWS CLI v2** (the `aws` command; it is not installed on this machine yet). Either, in PowerShell: `winget install --id Amazon.AWSCLI`, or download and run the MSI from https://awscli.amazonaws.com/AWSCLIV2.msi. **Close and reopen every terminal afterwards** — the PATH change is not picked up by open windows. Verify in a new Git Bash: `aws --version` → `aws-cli/2.x.x …`.
+	2. **Create the deploy key.** It does not exist yet — it is the still-unchecked **"Create the `ci-deploy` IAM user"** step at the top of this section (4.6, just after the bucket). Do that step now, in full: IAM user `ci-deploy` (no console access) → policy `knottyyoga-ci-deploy` from the JSON above (now includes `GetInvalidation`) → attach → **Security credentials → Create access key → "Application running outside AWS"**. You get an **Access key ID** (`AKIA…`, not secret) and a **Secret access key** (shown once). Save both to the password manager under *AWS Secrets*. GitLab CI variables can wait until Phase 6 — the key is what matters now.
+	3. **Give the CLI that key, as a named profile.** In Git Bash:
+		```bash
+		aws configure --profile knottyyoga-deploy
+		```
+		It asks four questions: *AWS Access Key ID* (paste), *AWS Secret Access Key* (paste), *Default region name* → `us-west-2`, *Default output format* → `json`. This writes `C:\Users\mason\.aws\credentials` and `.aws\config`. A named profile rather than the default so it cannot collide with any other AWS identity on the machine, and so a script run without the profile fails with "no credentials" rather than silently deploying as someone else. Then, in the same Git Bash window:
+		```bash
+		export AWS_PROFILE=knottyyoga-deploy
+		aws sts get-caller-identity        # → "Arn": "arn:aws:iam::957014951609:user/ci-deploy"
+		aws s3 ls s3://knottyyoga-ui-prod/ # empty output (bucket is empty) and NO AccessDenied — proves the policy attached
+		```
+		`export` lasts for that window only; re-run it in each new Git Bash, or the script stops with the "no credentials" error.
+	4. **Find and record the Distribution ID.** CloudFront console → *Distributions* → the row whose *Domain name* is `dv1tgxa9ok30f.cloudfront.net` → its **ID** column, `E` followed by 13 letters/digits. Write it here, beside the domain at line ~820, and keep it handy — it is the one value the deploy script cannot look up for you.
+	5. **Run the producer** (build the site). In Git Bash, from the repo root:
+		```bash
+		cd /c/Users/mason/source/repos/knottyyoga
+		./ui/package/build_ui_release.sh
+		```
+		It runs `npm ci` (reinstalls `node_modules` from the lockfile — a minute or two) and `ng build --configuration=production` (another minute or two), then stages the result at `ui/release/stage/` with `index.html` at its root and writes `ui/release/knottyyoga-ui-<git-sha>.tar.gz`. The last lines say `wrote …tar.gz` and its size. `ui/release/` is gitignored. **You can skip this script if you prefer** — the consumer accepts any directory with `index.html` at its root, so `cd ui && npx ng build --configuration=production` followed by pointing step 6 at `ui/dist/ui/browser` also works; you just lose the `VERSION` file and the tarball to keep for rollback.
+	6. **Run the consumer, dry first** (upload + invalidate). Same window (so `AWS_PROFILE` is still set):
+		```bash
+		export MSYS_NO_PATHCONV=1      # Git Bash otherwise rewrites /index.html into C:\Program Files\Git\index.html
+		export DISTRIBUTION_ID=E…      # from step 4
+		DRY_RUN=1 ./ui/package/deploy_ui.sh
+		```
+		It prints every `aws` command it *would* run and runs none. Read them: three `s3 sync`/`cp` passes into `s3://knottyyoga-ui-prod/`, then one `create-invalidation` on your distribution. If that looks right:
+		```bash
+		WAIT=1 ./ui/package/deploy_ui.sh
+		```
+		`WAIT=1` blocks until CloudFront reports the invalidation complete (1–3 minutes) so the check in step 7 is meaningful the moment the script returns. Expect `event=deploy_done version=<git-sha>` as the last line but one.
+	7. **Check.** In a browser: `https://dv1tgxa9ok30f.cloudfront.net/VERSION` shows the git sha the producer printed; `https://dv1tgxa9ok30f.cloudfront.net/` shows the site. If `/VERSION` is right but `/` is an S3 XML error, the **Default root object** (post-creation settings above) is not set. If everything 403s, the OAC bucket policy step above did not take.
+	8. **Every later deploy** is steps 5–6 again (three commands: `export`s, producer, consumer) — no AWS console work. Add `PRUNE=1` to the consumer every few deploys to clear the previous builds' chunks from the bucket.
 - [ ] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy_ui.sh`) run independently of backend deploys — no EC2 work needed.
 
 ## 4.7 Email via SES
