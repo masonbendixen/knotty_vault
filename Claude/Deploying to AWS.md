@@ -958,7 +958,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 - [ ] **Verify the sending domain.**
 	- Region: **us-west-2** (pick one region and stick with it — the `config_secrets` SMTP host is region-specific).
 	- Top search → **Amazon Simple Email Service** → SES console.
-	- Left sidebar → **Verified identities** → **Create identity**.
+	- Left sidebar → **Configuration → Identities** → **Create identity**. *(The console renamed this in 2026; it used to be a top-level "Verified identities" entry. The other new sidebar groups — "Pricing plan", "Email validation", "Mail Manager", "Virtual Deliverability Manager" — are separate products or plans; nothing in this plan needs them. New accounts sit on the Essentials pricing plan by default, which is fine for the soft launch.)*
 	- **Identity type:** Domain
 	- **Domain:** `knottyyoga.com`
 	- **Use a custom MAIL FROM domain:** leave off for now (can add later)
