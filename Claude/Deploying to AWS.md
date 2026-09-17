@@ -892,34 +892,23 @@ The default VPC plus two security groups is all we need. The default VPC already
 		- Response page path: `/index.html`
 		- HTTP response code: **200: OK**
 	- Repeat for **404: Not Found**.
-- [ ] **Cache invalidation hygiene.** Angular's hashed asset filenames mean only `index.html` needs to be invalidated on each deploy — the rest auto-busts via the URL change. The deploy script below handles this with `cloudfront:CreateInvalidation`.
+- [x] **Cache invalidation hygiene.** *Not a step — the rationale for what the deploy script below invalidates.* Angular content-hashes the root bundles (`main-XXXX.js`, `styles-XXXX.css`, `media/*`), so those never need invalidating: a new build has new names and the old ones stay valid for anyone still holding the old `index.html`. What is **not** hashed is everything copied verbatim from `src/assets` — the D-DIN fonts — plus `favicon.ico`, `index.html`, `VERSION` and `MANIFEST.txt`. Those keep their names across builds, so they get a short `Cache-Control` and a fixed invalidation list (`/index.html /favicon.ico /VERSION /MANIFEST.txt /assets/*` — five paths against the 1,000-path/month free tier; a wildcard counts as one). *(An earlier version of this bullet said "only `index.html`" — true for the bundles, wrong for `assets/`, and the template it pointed at would have marked the fonts immutable for a year.)*
 
 ### Frontend deploy script (for GitLab CI and for operators)
 
-- [ ] **Write `deploy/deploy-ui.sh`** (template — adjust paths to match the Angular 19 build output):
+- [x] **Written: `ui/package/deploy_ui.sh`** ✅ 2026-09-17 — beside its producer `ui/package/build_ui_release.sh` (Phase 2.3) rather than at a new `deploy/` root, because it consumes exactly what that script stages (`ui/release/stage/`, `index.html` at the root) and the two are one pipeline. **Not yet run against AWS** — the first real run needs the AWS CLI installed with the `knottyyoga-ci-deploy` key configured, and the Distribution ID (still not recorded in this doc — the `E…` value; note it beside `dv1tgxa9ok30f.cloudfront.net` above).
 	```bash
-	#!/usr/bin/env bash
-	set -euo pipefail
-	DIST_DIR="ui/dist/ui/browser"           # confirm with `ng build` output
-	BUCKET="knottyyoga-ui-prod"
-	DISTRIBUTION_ID="EXXXXXXXXXXXXX"        # paste your CF distribution ID
-
-	# Sync hashed assets — cacheable forever
-	aws s3 sync "$DIST_DIR/" "s3://$BUCKET/" \
-	  --delete \
-	  --cache-control 'public, max-age=31536000, immutable' \
-	  --exclude 'index.html'
-
-	# Upload index.html with no-cache headers (browser must always recheck)
-	aws s3 cp "$DIST_DIR/index.html" "s3://$BUCKET/index.html" \
-	  --cache-control 'public, max-age=0, must-revalidate'
-
-	# Invalidate only index.html
-	aws cloudfront create-invalidation \
-	  --distribution-id "$DISTRIBUTION_ID" \
-	  --paths /index.html
+	./ui/package/build_ui_release.sh                                   # producer: ng build → ui/release/stage
+	DISTRIBUTION_ID=E1234567890ABC ./ui/package/deploy_ui.sh           # consumer: upload + invalidate
+	DISTRIBUTION_ID=E1234567890ABC DRY_RUN=1 ./ui/package/deploy_ui.sh # prints every aws command, runs none
 	```
-- [ ] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy-ui.sh`) run independently of backend deploys — no EC2 work needed.
+	Env: `DISTRIBUTION_ID` (required, validated as `E…` so the cloudfront.net domain is refused with a message), `BUCKET` (default `knottyyoga-ui-prod`), `SOURCE_DIR` or first argument (default the staged tree), `PRUNE=1`, `WAIT=1`, `DRY_RUN=1`. From Git Bash on Windows set `MSYS_NO_PATHCONV=1` or `/index.html` gets rewritten into a Windows path before the aws CLI sees it.
+	- **Three passes, in an order that makes the deploy atomic for the browser:** (1) hashed `*.js`/`*.css`/`media/*` as `immutable, max-age=1y`; (2) everything unhashed except `index.html` as `max-age=86400`; (3) `index.html` last, `max-age=0, must-revalidate`. Until (3) lands every request still resolves against the previous build, whose files are all still present.
+	- **No `--delete`.** The template above had it, first — which deletes the previous build's chunks while browsers holding the previous `index.html` can still lazy-load them, turning a routine deploy into mid-session 404s. `PRUNE=1` deletes objects absent from the current build as an explicit list diff (not `sync --delete`, which would also re-upload without the cache headers). Run it as part of a *later* deploy, once the previous build has been live long enough that nobody has its `index.html` open; with deploys days apart, "the next deploy" is fine.
+	- **Content types are stated, not guessed,** for `.js`/`.css`/`index.html`. The aws CLI infers them from Python's `mimetypes`, which on Windows reads the registry, and a stray editor install can map `.js` to `text/plain`. `Managed-SecurityHeadersPolicy` sends `X-Content-Type-Options: nosniff`, under which a script served as `text/plain` is **refused** — the symptom is a blank page with console errors, on a deploy that reported success. Fonts and images are not subject to nosniff, so their guessed types are fine.
+	- Verified by dry run against a fake staged tree (pass order, command shapes, and the three precondition failures: missing ID, domain-instead-of-ID, raw `dist/` instead of the staged tree).
+- [ ] **First real run.** Install AWS CLI v2, `aws configure` with the `knottyyoga-ci-deploy` access key, run the producer then the consumer with `DRY_RUN=1`, read the commands, drop `DRY_RUN`. Then `https://dv1tgxa9ok30f.cloudfront.net/VERSION` should read the build's version once the invalidation lands (~1–3 min; `WAIT=1` blocks until it does).
+- [ ] **Document in `RUNBOOK.md`:** frontend-only deploys (`deploy_ui.sh`) run independently of backend deploys — no EC2 work needed.
 
 ## 4.7 Email via SES
 
