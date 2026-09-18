@@ -989,7 +989,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 		- How you'll handle bounces/complaints: mention SNS notifications + automated suppression
 		- Additional contacts: leave default
 	- **Submit**. AWS typically responds within 24 hours; on approval, your daily sending quota jumps from 200 → 50,000.
-- [ ] **Create SMTP credentials.**
+- [x] **Create SMTP credentials.** ✅ 2026-09-18
 	- SES console → left sidebar → **SMTP settings**.
 	- **Choose credential method: `IAM SMTP credentials`** — the right-hand option, NOT the "Recommended" one. *Mail Manager SMTP* routes sends through a Mail Manager **ingress endpoint** (that is what the `ingressendpoint-2026…` name field is for) with traffic policies and rule sets — it is the paid add-on that has been appearing all over the SES sidebar, and its own fine print says "Mail Manager processing charges apply". IAM SMTP credentials is the classic path: one IAM user with a send-only policy and an SMTP password derived from its secret key. Nothing beyond the per-send cost.
 	- **This page no longer shows the endpoint or ports at all** (with IAM SMTP credentials selected it is just two buttons, *Manage existing* and *Create IAM credentials*). They are fixed per region, so nothing needs looking up: endpoint **`email-smtp.us-west-2.amazonaws.com`**; **TLS Wrapper ports 465 / 2465** (what `mail_server_method = login` needs); STARTTLS ports 25 / 587 / 2587 (what `tls` would need). The port and the method are a matched pair — table below.
