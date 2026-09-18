@@ -184,8 +184,9 @@ These are the values that **must** be overridden before booting the server in pr
 | `square_access_token` | sandbox token from Square Developer Console | Release default is empty |
 | `square_environment` | `sandbox` | Release default is `production`; we're on the sandbox during soft launch |
 | `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | Default is `smtp.gmail.com` |
-| `mail_server_port` | `587` (STARTTLS) | Default is `465` (SSL) — SES supports both, 587 is the AWS-recommended path |
+| `mail_server_port` | `465` (TLS wrapper) | Default is already `465`. **Corrected 9/18:** this row said `587` while the next said `login` — in `mail_helper.cpp` `login` is implicit TLS (port 465) and `tls` is STARTTLS (port 587); the pair 587/`login` fails the handshake. Either `465`+`login` (no change) or `587`+`tls` — never mixed. |
 | `mail_server_method` | `login` | Default OK (already `login`) |
+| `mail_smtp_username` | SES SMTP **username** (the `AKIA…` string) | **New key, 9/18.** Empty by default = "log in as the sender address" (Gmail). SES's username is not an address, and before this key the helper had no way to send one — see 4.7. |
 | `mail_app_password` | SES SMTP password (created in IAM, NOT your console password) | **Default is now EMPTY** (honuware Phase 9.2 — see the rotation note below); in dev it is seeded from `HONUWARE_MAIL_APP_PASSWORD` |
 | `Knotty Yoga and Spa` (sender name) | (use default) | Default OK |
 | `knottyyogaandspa@gmail.com` (sender address) | `noreply@knottyyoga.com` (or whatever `kMailSenderAddress` is set to) | Defaults to the Gmail address; SES requires the From address match a verified domain identity |
@@ -990,16 +991,22 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 	- **Submit**. AWS typically responds within 24 hours; on approval, your daily sending quota jumps from 200 → 50,000.
 - [ ] **Create SMTP credentials.**
 	- SES console → left sidebar → **SMTP settings**.
-	- Note the **SMTP endpoint** (e.g., `email-smtp.us-west-2.amazonaws.com`) and ports (587 for STARTTLS, 465 for TLS-wrapped).
-	- **Create SMTP credentials** → IAM user name: `ses-smtp-knottyyoga` → **Create user**.
-	- This produces an **SMTP username** and **SMTP password** — these look different from regular IAM access keys (the password is derived from the IAM secret key via SES's signing algorithm — don't try to reuse a regular IAM secret here). Save both to your password manager; they aren't shown again.
-- [ ] **Load the SMTP credentials into `config_secrets` after first deploy.** Done via a one-time `knottyyoga_test_helper` run in Phase 4.8/5.1 against the running RDS. Required keys:
-	- `kMailHost` = `email-smtp.us-west-2.amazonaws.com`
-	- `kMailPort` = `587`
-	- `kMailUser` = the SES SMTP username
-	- `kMailPassword` = the SES SMTP password
-	- `kMailFromAddress` = `noreply@knottyyoga.com` (or similar from-address on the verified domain)
-- [ ] **Smoke test.** Once secrets are loaded and the server's running, trigger a verification email path (e.g., register a test user) and confirm delivery to a real inbox. If you're still in SES sandbox at this point, the test recipient address has to be added to **Verified identities** first.
+	- **Choose credential method: `IAM SMTP credentials`** — the right-hand option, NOT the "Recommended" one. *Mail Manager SMTP* routes sends through a Mail Manager **ingress endpoint** (that is what the `ingressendpoint-2026…` name field is for) with traffic policies and rule sets — it is the paid add-on that has been appearing all over the SES sidebar, and its own fine print says "Mail Manager processing charges apply". IAM SMTP credentials is the classic path: one IAM user with a send-only policy and an SMTP password derived from its secret key. Nothing beyond the per-send cost.
+	- **The ports appear only after you pick that option** — the Mail Manager view hides them because an ingress endpoint has its own hostname. With IAM SMTP credentials selected the page lists the **SMTP endpoint** `email-smtp.us-west-2.amazonaws.com`, the **STARTTLS ports** (25, 587, 2587) and the **TLS Wrapper ports** (465, 2465). Which port depends on `mail_server_method` — see the table below; the two are a matched pair.
+	- **Create SMTP credentials** → the IAM *Create user* flow opens with a generated name → change it to `ses-smtp-knottyyoga` → **Create user**.
+	- This produces an **SMTP username** (an IAM-derived `AKIA…` string) and **SMTP password** — these look different from regular IAM access keys (the password is derived from the IAM secret key via SES's signing algorithm — don't try to reuse a regular IAM secret here). **Download the `.csv`** / save both to your password manager; they aren't shown again.
+- [ ] **Load the SMTP settings into `config_secrets` after first deploy** — via `knottyyoga_test_helper --command=set_secret --key=<key> --value=<value>` (Phase 4.8/5.1, against the running RDS). The **real key names**, and the values for SES — an earlier draft of this list used names (`kMailHost`, `kMailUser`…) that do not exist:
+
+	| `config_secrets` key | Value for SES | Note |
+	|---|---|---|
+	| `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | |
+	| `mail_server_port` | `465` | **Pair with `mail_server_method = login`.** In `mail_helper.cpp`, `login` means implicit TLS from the first byte (`mailio::smtps` + `LOGIN`), which is SES's *TLS Wrapper* port 465; `tls` means STARTTLS, which is 587. `587` + `login` — what this doc used to say — fails the TLS handshake. 465/`login` needs no method change from the Gmail default; 587/`tls` is the equivalent alternative if you prefer AWS's documented port. |
+	| `mail_server_method` | `login` | (default — leave) |
+	| `mail_smtp_username` | the SES SMTP username (`AKIA…`) | **New key, 9/18 (honuware).** The helper used to log in with the *sender address* as the SMTP username, which is what Gmail wants and what SES cannot accept — so SES could not have worked at all. Empty (the default) keeps the old behaviour; set it and SES authenticates the IAM user while the From stays the studio's address. |
+	| `mail_app_password` | the SES SMTP password | the same row the Gmail app password occupied in dev |
+	| `mail_sender_address` | `noreply@knottyyoga.com` | **Must be an address under the verified domain identity** — SES refuses `554 Message rejected: Email address is not verified` for a From it has not verified, and the seeded default is the gmail address. Any local part works once the domain is verified; nothing needs to exist at that mailbox for sending. |
+	| `mail_sender_name` | (keep) | |
+- [ ] **Smoke test.** Once secrets are loaded and the server's running: `knottyyoga_test_helper --command=send_test_email` (real mail on) to an address you own, then a verification-email path (register a test user) and confirm delivery to a real inbox. If you're still in the SES sandbox at this point, the recipient address must be a verified **Identity** first — the gmail address from the *Get set up* step qualifies.
 
 ## 4.8 Secret bootstrap ordering
 
