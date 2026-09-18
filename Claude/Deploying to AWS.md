@@ -999,7 +999,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 		- **Create user**.
 	- The confirmation page shows the **SMTP user name** (an IAM-derived `AKIA…` string) and, behind *Show*, the **SMTP password** — **the only time it is displayed.** Click **Download .csv file** and save both to the password manager. The password is derived from the IAM secret key by SES's signing algorithm; it is not the secret key itself, and the page hands you the derived value, so never try to substitute a regular IAM secret. Back on SMTP settings, *Manage existing* now lists the user.
 	- Nothing goes into `config_secrets` today — that is the "load" step below, run once the server is up in 5.1. Keep the `.csv`.
-- [ ] **Load the SMTP settings into `config_secrets` after first deploy** — via `knottyyoga_test_helper --command=set_secret --key=<key> --value=<value>` (Phase 4.8/5.1, against the running RDS). The **real key names**, and the values for SES — an earlier draft of this list used names (`kMailHost`, `kMailUser`…) that do not exist. (Table sits outside the list on purpose: Obsidian does not render a table nested in a list item.)
+- **Reference — the values to load into `config_secrets`. Not a Phase 4 step: it is executed as 5.1 step 6**, once `--migrate` has created the table. Kept here because it is the SES knowledge; the checkbox lives in 5.1. The **real key names** — an earlier draft used names (`kMailHost`, `kMailUser`…) that do not exist. (Table sits outside the list on purpose: Obsidian does not render a table nested in a list item.)
 
 | `config_secrets` key | Value for SES | Note |
 |---|---|---|
@@ -1011,29 +1011,20 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 | `mail_sender_address` | `noreply@knottyyoga.com` | **Must be an address under the verified domain identity** — SES refuses `554 Message rejected: Email address is not verified` for a From it has not verified, and the seeded default is the gmail address. Any local part works once the domain is verified; nothing needs to exist at that mailbox for sending. |
 | `mail_sender_name` | (keep) | |
 
-- [ ] **Smoke test.** Once secrets are loaded and the server's running: `knottyyoga_test_helper --command=send_test_email` (real mail on) to an address you own, then a verification-email path (register a test user) and confirm delivery to a real inbox. If you're still in the SES sandbox at this point, the recipient address must be a verified **Identity** first — the gmail address from the *Get set up* step qualifies.
+- **Smoke test → 5.1 step 9.** Once the rows are loaded and the server is running: `knottyyoga_test_helper --command=send_test_email` (real mail on) to an address you own, then the registration path. While still in the SES sandbox the recipient must be a verified **Identity** — the gmail address from the *Get set up* step qualifies.
 
 ## 4.8 Secret bootstrap ordering
 
-> **Reference, not a task — nothing here is run during Phase 4.** This section exists to pin the *order* of operations that Phase 5.1 executes, because they depend on each other. To answer the obvious questions (9/18):
-> - **Which database:** the **production PostgreSQL on RDS** (`knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com`, created in 4.4 on 5/15 and empty ever since). Never the local Docker Postgres — that is dev only.
-> - **Where it runs:** **on the EC2, over SSH** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`), in a terminal — not the AWS web console. RDS's security group admits only the EC2, so the laptop cannot reach it directly. Each command is a binary inside the Docker image, invoked as `sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<tag> <binary> …` (see `package/systemd/README.md` and `RUNBOOK.md` §4/§7).
-> - **When:** as part of 5.1, and only once its first two boxes are done — the image has to be built and be on the EC2 before any of steps 3–6 can be typed. Steps 1–2 are already done (4.4), bar the missing `HONUWARE_SECRET_KEY`.
+> **Design note only — there is nothing to do here. The steps live in 5.1 (9/18).** This section used to hold the ordered list of first-deploy operations; that made it look like Phase 4 work, and it never was — none of it can run until the Docker image is on the EC2, which is 5.1's first two boxes. The list moved there verbatim (as 5.1 steps 3–8) and this section keeps only the *why*.
 
-Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull from `config_secrets` — but the DB connection needs to work first.
+**Why the order is fixed.** `MailHelper`, `SquareClient` and `ServerConfig` all read `config_secrets` — but that table does not exist until `--migrate` creates it, `--migrate` cannot run without `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` in `server.env`, the rows it writes are encrypted under `HONUWARE_SECRET_KEY` (so that key must be in the file *before* the first migrate — rows encrypted under the dev fallback key are unreadable under a real key added later), and the scheduler helper cannot log in until the server is up and the `people` row from the migrate exists. Hence: env file complete → migrate → `set_secret` rows → server → helper.
 
-- [x] Document this sequence in `RUNBOOK.md`: ✅ 9/17, §4 — with two corrections to the list below: step 4's `--seed-secrets-from-file` was never built and `knottyyoga_test_helper --command=set_secret` is the mechanism; and step 2 must also include `HONUWARE_SECRET_KEY` (see the ⚠️ under the `server.env` step in 4.4 — it is missing from the file today and has to be there before step 3).
-  1. **Provision the database server and create the application's login — DONE in 4.4 (5/15).** Two distinct things, and it helps to know which is which:
-     - *Provision:* the **RDS instance** `knottyyoga` — a managed PostgreSQL server (single-AZ `db.t3.micro`, gp3, 7-day backups, deletion protection, in the `knottyyoga-db` security group with *Public access: No*). Created in the RDS console; AWS gave it the endpoint `knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com` and one superuser login, `postgres`, whose password you generated (password manager).
-     - *Create the app user:* the server does not run as that superuser. From the EC2 (the only host the SG lets in), `psql` as `postgres` and run `CREATE ROLE knottyyoga LOGIN PASSWORD '…'`, `GRANT knottyyoga TO postgres`, `CREATE DATABASE knottyyoga OWNER knottyyoga`. That gives the app its own role (`knottyyoga`, with its own generated password — the one in `server.env`) and its own **empty** database of the same name, owned by that role. The `postgres` superuser is kept for maintenance only and is deliberately *not* in `server.env`.
-     - *What "empty" means for the next steps:* the `knottyyoga` database exists but has **no tables** — no `people`, no `config_secrets`, nothing. Step 3 is what creates the schema. If you connected today you would see zero relations. That is expected, not a problem.
-     - *Verify (from the EC2):* `PGPASSWORD='<app password>' psql "host=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com user=knottyyoga dbname=knottyyoga sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem" -c '\dt'` → `Did not find any relations.` — a successful connection *and* an empty database is exactly the right answer before step 3. (`rds-ca.pem` is the RDS CA bundle downloaded in 4.4; `verify-full` is what the server uses too.)
-  2. **Write `/etc/knottyyoga/server.env` — DONE in 4.4, with one gap.** On the EC2, the file the containers read: the `DB_*` connection settings (host = the endpoint above, user/db = `knottyyoga`, the app password, `sslmode=verify-full`, the CA path), `PORT=80`, `TRUST_PROXY=1`, the CloudFront origin secret, and **`SCHEDULER_SERVICE_ACCOUNT_PASSWORD`** — the migrate step below fails fast without it, so it must be present before step 3. **Still to add before step 3: `HONUWARE_SECRET_KEY`** (the ⚠️ under the `server.env` step in 4.4 — rows encrypted under the dev fallback key are unreadable under a real key added later).
-  3. **`knottyyoga_database_helper --migrate` — the first thing 5.1 runs.** On the EC2, inside the image: `sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<tag> knottyyoga_database_helper --migrate`. Creates every table, seeds `config_secrets` with the framework's *non-secret* defaults (mail host/port/method, link fragments — the real credentials stay empty), and **provisions the `scheduler@knottyyoga.local` row in `people` with the env-var password hashed in**. Idempotent — a second run with the same password is a no-op; rotating the password means deleting the row and re-running (`RUNBOOK.md` §5).
-  4. **Set the values that ship empty** — `knottyyoga_test_helper --command=set_secret --key=<key> --value=<value>`, same `docker run` shape. There is no `--seed-secrets-from-file`; this is the mechanism. The list is the §1.5 table plus the SES rows in 4.7: `production_mode_on`, `website_address`, `square_access_token` / `square_environment`, and the four mail rows (`mail_server_name`, `mail_server_port` 465, `mail_smtp_username`, `mail_app_password`) plus `mail_sender_address`. Each is encrypted at rest under the `HONUWARE_SECRET_KEY` from step 2.
-  5. **`sudo systemctl start knottyyoga-server`.** Boots, reads `config_secrets`, configures Square + Mail + CORS. `curl -sS http://localhost/api/health` on the EC2 → 200; through CloudFront the `/api/health` 504 turns into a 200.
-  6. **`sudo systemctl start knottyyoga-helper`.** Authenticates as the scheduler service account (the env-var password against the hash from step 3) and starts its timers. `sudo journalctl -u knottyyoga-helper -n 50` → `event=login_success` then `event=event_loop_starting`.
-- [ ] Add the `--seed-secrets-from-file` subcommand to `database_helper` + a test that validates ingestion.
+**What "the database" and "where" mean here, since the questions came up.** The database is the **production PostgreSQL on RDS** (`knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com`, created in 4.4 on 5/15 and empty — zero tables — ever since); never the local Docker Postgres, which is dev only. Every command runs **on the EC2 over SSH** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`, a terminal, not the AWS web console), because the `knottyyoga-db` security group admits only the EC2, and each command is a binary inside the Docker image: `sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<tag> <binary> …`.
+
+**"Provision DB; create app user", spelled out** (both done in 4.4): *provision* = the RDS instance, a managed PostgreSQL server with one superuser login (`postgres`); *create app user* = from the EC2, `psql` as `postgres` and `CREATE ROLE knottyyoga LOGIN PASSWORD '…'`, `GRANT knottyyoga TO postgres`, `CREATE DATABASE knottyyoga OWNER knottyyoga` — the app's own role and its own empty database, so the server never runs as the superuser. To see the state it is in today, from the EC2: `PGPASSWORD='<app password>' psql "host=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com user=knottyyoga dbname=knottyyoga sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem" -c '\dt'` → `Did not find any relations.` — a connection that works *and* an empty database is exactly right before 5.1 step 4.
+
+- [x] Document this sequence in `RUNBOOK.md` ✅ 9/17, §4 (corrected there and in 5.1: `--seed-secrets-from-file` was never built, `set_secret` is the mechanism).
+- ~~Add the `--seed-secrets-from-file` subcommand~~ — dropped 9/18. `set_secret` is one call per row and there are about eight rows, once; a file-ingest subcommand plus a test is more code than the problem.
 
 ---
 
@@ -1043,14 +1034,42 @@ Secrets chicken-and-egg: `MailHelper`, `SquareClient`, `ServerConfig` all pull f
 
 Purposely manual — gets you comfortable with the pieces before automating.
 
-- [ ] Build the Docker image locally: `docker build -t knottyyoga:v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server`.
-- [ ] Push to ECR (or `docker save | scp | docker load` for the first deploy before ECR is set up).
-- [ ] On the EC2, run `deploy/install.sh` which:
-  - Runs `docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<version> knottyyoga_database_helper --migrate` (creates schema, provisions the scheduler service account from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`).
-  - Updates the version tag in both systemd units and restarts in order: `systemctl restart knottyyoga-server` then `systemctl restart knottyyoga-helper`.
-- [ ] Smoke test: `curl https://knottyyoga.example/api/health`.
-- [ ] Smoke test the helper: `journalctl -u knottyyoga-helper -n 50` — expect to see `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=1` shortly after start, then `[scheduler] event=event_loop_starting`. If `event=login_failure` appears instead, the env-var password doesn't match the hash in the `people` row (most likely: env-var was added after the initial `--migrate`, so re-run migrate to update the hash or delete the row first).
-- [ ] Log in via the frontend, register a user, process a sandbox Square payment end-to-end.
+> **This is the one executable sequence, in order.** It absorbs two things Phase 4 described but could not run: the SES "load into `config_secrets`" step from 4.7 (step 6 here) and the whole of 4.8 (steps 3–8). Those sections are now references; the checkboxes are here. Restructured 9/18 — the earlier version referenced a `deploy/install.sh` that does not exist (the deploy script is Phase 7.4; `package/systemd/README.md` is the manual procedure this list follows).
+
+**On your machine** (Docker Desktop; the build git-clones the pinned honuware, so it needs network):
+- [ ] **1. Build the image.** From the repo root in Git Bash or PowerShell:
+	```
+	docker build -t knottyyoga:v1.0.0 --build-arg KNOTTYYOGA_VERSION=v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server
+	```
+	First build compiles every dependency and takes a while. The tag is what `version.env` will name.
+- [ ] **2. Get it onto the EC2.** No ECR yet, so the file route:
+	```
+	docker save knottyyoga:v1.0.0 | gzip > knottyyoga-v1.0.0.tar.gz
+	scp -i ~/.ssh/knottyyoga-ec2.pem knottyyoga-v1.0.0.tar.gz ubuntu@34.215.204.200:~
+	```
+
+**On the EC2** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`):
+- [ ] **3. Load the image and finish `server.env`.**
+	```bash
+	sudo docker load < ~/knottyyoga-v1.0.0.tar.gz
+	sudo docker images knottyyoga            # v1.0.0 listed
+	```
+	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
+- [ ] **4. Create the schema** — `--migrate` against the empty `knottyyoga` database from 4.4:
+	```bash
+	sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:v1.0.0 knottyyoga_database_helper --migrate
+	```
+	Creates every table, seeds `config_secrets` with the non-secret defaults, and provisions `scheduler@knottyyoga.local` from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` (fails fast if that is unset). Idempotent.
+- [ ] **5. Install the systemd units** — first-time install steps 1, 2, 4 in `server/knottyyoga_server/package/systemd/README.md` (copy the two `.service` files, write `version.env` with `KNOTTYYOGA_IMAGE_TAG=v1.0.0`, `daemon-reload`). The unit files ship in the release tarball's `systemd/` directory, or copy them from the repo.
+- [ ] **6. Set the secrets that ship empty** — `set_secret`, one row per call, same `docker run` shape:
+	```bash
+	sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:v1.0.0 knottyyoga_test_helper --nosend_real_email --command=set_secret --key=<key> --value='<value>'
+	```
+	The rows, all from tables already in this doc: the **SES five** from 4.7 (`mail_server_name`, `mail_server_port` = `465`, `mail_smtp_username`, `mail_app_password`, `mail_sender_address` = `noreply@knottyyoga.com`), and from §1.5 `square_access_token` + `square_environment` = `sandbox` for the soft launch. **Leave `production_mode_on` and `website_address` for step 9** — prod mode pins CORS and cookies to `knottyyoga.com`, which the `cloudfront.net` URL cannot satisfy, so flipping it before the DNS/cert work makes the site unusable to test.
+- [ ] **7. Start the server.** `sudo systemctl enable --now knottyyoga-server`, then `curl -sS http://localhost/api/health` → 200. From your machine, `https://dv1tgxa9ok30f.cloudfront.net/api/health` → the 504 from 4.6 becomes a 200. If it is a **403**, the `X-Origin-Secret` on the CloudFront origin does not match `server.env`.
+- [ ] **8. Start the helper.** `sudo systemctl enable --now knottyyoga-helper`, then `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` — expect `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=1` then `[scheduler] event=event_loop_starting`. `event=login_failure` means the env-var password does not match the hash in the `people` row — most likely the env var changed after step 4; `RUNBOOK.md` §5 has the reset.
+- [ ] **9. Smoke test through the real front door.** On `https://dv1tgxa9ok30f.cloudfront.net/`: register a user (the verification email proves SES end to end — while still in the SES sandbox the recipient must be a verified identity, so use the gmail address), log in, process a sandbox Square payment. Then, once the `us-east-1` cert and the alias records are in place (4.5's go-live step), `set_secret` `website_address` = `knottyyoga.com` and `production_mode_on` = `true`, restart the server, and repeat the smoke test on `https://knottyyoga.com`.
+- [ ] **10. PITR drill** — the restore procedure in `RUNBOOK.md` §6 run once against a real snapshot, now that there is data worth restoring. Deferred from 4.4.
 
 ## 5.2 SSH access hardening
 
