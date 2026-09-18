@@ -999,17 +999,18 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 		- **Create user**.
 	- The confirmation page shows the **SMTP user name** (an IAM-derived `AKIA…` string) and, behind *Show*, the **SMTP password** — **the only time it is displayed.** Click **Download .csv file** and save both to the password manager. The password is derived from the IAM secret key by SES's signing algorithm; it is not the secret key itself, and the page hands you the derived value, so never try to substitute a regular IAM secret. Back on SMTP settings, *Manage existing* now lists the user.
 	- Nothing goes into `config_secrets` today — that is the "load" step below, run once the server is up in 5.1. Keep the `.csv`.
-- [ ] **Load the SMTP settings into `config_secrets` after first deploy** — via `knottyyoga_test_helper --command=set_secret --key=<key> --value=<value>` (Phase 4.8/5.1, against the running RDS). The **real key names**, and the values for SES — an earlier draft of this list used names (`kMailHost`, `kMailUser`…) that do not exist:
+- [ ] **Load the SMTP settings into `config_secrets` after first deploy** — via `knottyyoga_test_helper --command=set_secret --key=<key> --value=<value>` (Phase 4.8/5.1, against the running RDS). The **real key names**, and the values for SES — an earlier draft of this list used names (`kMailHost`, `kMailUser`…) that do not exist. (Table sits outside the list on purpose: Obsidian does not render a table nested in a list item.)
 
-	| `config_secrets` key | Value for SES | Note |
-	|---|---|---|
-	| `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | |
-	| `mail_server_port` | `465` | **Pair with `mail_server_method = login`.** In `mail_helper.cpp`, `login` means implicit TLS from the first byte (`mailio::smtps` + `LOGIN`), which is SES's *TLS Wrapper* port 465; `tls` means STARTTLS, which is 587. `587` + `login` — what this doc used to say — fails the TLS handshake. 465/`login` needs no method change from the Gmail default; 587/`tls` is the equivalent alternative if you prefer AWS's documented port. |
-	| `mail_server_method` | `login` | (default — leave) |
-	| `mail_smtp_username` | the SES SMTP username (`AKIA…`) | **New key, 9/18 (honuware).** The helper used to log in with the *sender address* as the SMTP username, which is what Gmail wants and what SES cannot accept — so SES could not have worked at all. Empty (the default) keeps the old behaviour; set it and SES authenticates the IAM user while the From stays the studio's address. |
-	| `mail_app_password` | the SES SMTP password | the same row the Gmail app password occupied in dev |
-	| `mail_sender_address` | `noreply@knottyyoga.com` | **Must be an address under the verified domain identity** — SES refuses `554 Message rejected: Email address is not verified` for a From it has not verified, and the seeded default is the gmail address. Any local part works once the domain is verified; nothing needs to exist at that mailbox for sending. |
-	| `mail_sender_name` | (keep) | |
+| `config_secrets` key | Value for SES | Note |
+|---|---|---|
+| `mail_server_name` | `email-smtp.us-west-2.amazonaws.com` | |
+| `mail_server_port` | `465` | **Pair with `mail_server_method = login`.** In `mail_helper.cpp`, `login` means implicit TLS from the first byte (`mailio::smtps` + `LOGIN`), which is SES's *TLS Wrapper* port 465; `tls` means STARTTLS, which is 587. `587` + `login` — what this doc used to say — fails the TLS handshake. 465/`login` needs no method change from the Gmail default; 587/`tls` is the equivalent alternative if you prefer AWS's documented port. |
+| `mail_server_method` | `login` | (default — leave) |
+| `mail_smtp_username` | the SES SMTP username (`AKIA…`) | **New key, 9/18 (honuware).** The helper used to log in with the *sender address* as the SMTP username, which is what Gmail wants and what SES cannot accept — so SES could not have worked at all. Empty (the default) keeps the old behaviour; set it and SES authenticates the IAM user while the From stays the studio's address. |
+| `mail_app_password` | the SES SMTP password | the same row the Gmail app password occupied in dev |
+| `mail_sender_address` | `noreply@knottyyoga.com` | **Must be an address under the verified domain identity** — SES refuses `554 Message rejected: Email address is not verified` for a From it has not verified, and the seeded default is the gmail address. Any local part works once the domain is verified; nothing needs to exist at that mailbox for sending. |
+| `mail_sender_name` | (keep) | |
+
 - [ ] **Smoke test.** Once secrets are loaded and the server's running: `knottyyoga_test_helper --command=send_test_email` (real mail on) to an address you own, then a verification-email path (register a test user) and confirm delivery to a real inbox. If you're still in the SES sandbox at this point, the recipient address must be a verified **Identity** first — the gmail address from the *Get set up* step qualifies.
 
 ## 4.8 Secret bootstrap ordering
