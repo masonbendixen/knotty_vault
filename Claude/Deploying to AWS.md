@@ -271,7 +271,7 @@ knottyyoga:<version>
 
 - **Server container**: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env knottyyoga:<version>`
 - **Helper container** (scheduled jobs): same image, different entrypoint and `--network host` so it can hit the server on `localhost:80`: `docker run -d --name knottyyoga-helper --network host --env-file /etc/knottyyoga/server.env --entrypoint knottyyoga_helper knottyyoga:<version> --server_url=http://localhost:80 --service_account_email=scheduler@knottyyoga.local`
-- **DB migration** (one-shot at deploy): `docker run --rm --env-file ... knottyyoga:<version> knottyyoga_database_helper --migrate`. Reads `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from the env file to provision the scheduler service-account row (fails fast if unset).
+- **DB migration** (one-shot at deploy): `docker run --rm --env-file ... --entrypoint knottyyoga_database_helper knottyyoga:<version> --migrate` (`--entrypoint` is required — ENTRYPOINT is the server). Reads `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from the env file to provision the scheduler service-account row (fails fast if unset).
 - **Test helper** (ad-hoc via SSH): `docker exec -it knottyyoga-server knottyyoga_test_helper`
 
 - [x] Wrote `server/knottyyoga_server/package/Dockerfile` — multi-stage build:
@@ -1066,8 +1066,11 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
 - [ ] **4. Create the schema** — `--install_schema`, **not** `--migrate`:
 	```bash
-	sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:v1.0.0 knottyyoga_database_helper --install_schema
+	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
+	    --entrypoint knottyyoga_database_helper \
+	    knottyyoga:v1.0.1 --install_schema
 	```
+	⚠️ **`--entrypoint` is required.** The image's `ENTRYPOINT` is `knottyyoga_the_server`, so naming a helper *after* the image passes its name as an argument to the server and runs the wrong binary. The tell is an error mentioning `knottyyoga_the_server` when you asked for a helper. (This doc had the wrong form until 9/22.)
 	Creates every table in the empty `knottyyoga` database from 4.4, seeds `config_secrets` with the non-secret defaults, and provisions `scheduler@knottyyoga.local` from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` (fails fast if that is unset).
 	> ⚠️ **This step said `--migrate` until 9/22, and that does not work on a first deploy.** Verified by running it against a brand-new empty database: it fails immediately with `ERROR: relation "schema_migrations" does not exist`, exit 1. Migrations *evolve* a schema — every one of the ten is a guarded ALTER/INSERT against tables that must already exist — so there has to be a schema first. `--migrate` is the right command for **every deploy after this one**.
 	>
@@ -1079,7 +1082,9 @@ Purposely manual — gets you comfortable with the pieces before automating.
 - [ ] **5. Install the systemd units** — first-time install steps 1, 2, 4 in `server/knottyyoga_server/package/systemd/README.md` (copy the two `.service` files, write `version.env` with `KNOTTYYOGA_IMAGE_TAG=v1.0.0`, `daemon-reload`). The unit files ship in the release tarball's `systemd/` directory, or copy them from the repo.
 - [ ] **6. Set the secrets that ship empty** — `set_secret`, one row per call, same `docker run` shape:
 	```bash
-	sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:v1.0.0 knottyyoga_test_helper --nosend_real_email --command=set_secret --key=<key> --value='<value>'
+	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
+	    --entrypoint knottyyoga_test_helper \
+	    knottyyoga:v1.0.1 --nosend_real_email --command=set_secret --key=<key> --value='<value>'
 	```
 	The rows, all from tables already in this doc: the **SES five** from 4.7 (`mail_server_name`, `mail_server_port` = `465`, `mail_smtp_username`, `mail_app_password`, `mail_sender_address` = `noreply@knottyyoga.com`), and from §1.5 `square_access_token` + `square_environment` = `sandbox` for the soft launch. **Leave `production_mode_on` and `website_address` for step 9** — prod mode pins CORS and cookies to `knottyyoga.com`, which the `cloudfront.net` URL cannot satisfy, so flipping it before the DNS/cert work makes the site unusable to test.
 - [ ] **7. Start the server.** `sudo systemctl enable --now knottyyoga-server`, then `curl -sS http://localhost/api/health` → 200. From your machine, `https://dv1tgxa9ok30f.cloudfront.net/api/health` → the 504 from 4.6 becomes a 200. If it is a **403**, the `X-Origin-Secret` on the CloudFront origin does not match `server.env`.
