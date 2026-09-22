@@ -1044,11 +1044,18 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	docker build -t knottyyoga:v1.0.0 --build-arg KNOTTYYOGA_VERSION=v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server
 	```
 	First build compiles every dependency and takes a while. The tag is what `version.env` will name.
-- [ ] **2. Get it onto the EC2.** No ECR yet, so the file route:
-	```
-	docker save knottyyoga:v1.0.0 | gzip > knottyyoga-v1.0.0.tar.gz
+- [ ] **2. Get it onto the EC2.** No ECR yet, so the file route. ⚠️ **These are bash commands — run them in Git Bash, not PowerShell.** PowerShell has no `gzip`, and worse, its `>` is `Out-File`, which applies *text* encoding to binary and silently corrupts the archive — corruption that only surfaces later as a confusing `docker load` failure on the EC2. (Docker's "cowardly refusing to save to a terminal" is what stops the naive PowerShell version from producing a broken file at all.)
+	```bash
+	cd /c/Users/mason/source/repos/knottyyoga
+	docker save knottyyoga:v1.0.0 | gzip > knottyyoga-v1.0.0.tar.gz     # 176 MB -> 63 MB
 	scp -i ~/.ssh/knottyyoga-ec2.pem knottyyoga-v1.0.0.tar.gz ubuntu@34.215.204.200:~
 	```
+	**In PowerShell**, use `-o` so docker writes the file itself and no shell redirection is involved (uncompressed, 176 MB — fine to send as-is):
+	```powershell
+	docker save knottyyoga:v1.0.0 -o knottyyoga-v1.0.0.tar
+	scp -i $HOME\.ssh\knottyyoga-ec2.pem knottyyoga-v1.0.0.tar ubuntu@34.215.204.200:~
+	```
+	`docker load` accepts either form. Both sizes verified 9/22; the tarball lands in the repo root, which is gitignored for it.
 
 **On the EC2** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`):
 - [ ] **3. Load the image and finish `server.env`.**
