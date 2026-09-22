@@ -1041,34 +1041,38 @@ Purposely manual — gets you comfortable with the pieces before automating.
 **On your machine** (Docker Desktop; the build git-clones the pinned honuware, so it needs network):
 - [x] **1. Build the image.** From the repo root in Git Bash or PowerShell: ✅ 2026-09-22
 	```
-	docker build -t knottyyoga:v1.0.0 --build-arg KNOTTYYOGA_VERSION=v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server
+	docker build -t knottyyoga:v1.0.2 --build-arg KNOTTYYOGA_VERSION=v1.0.2 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server
 	```
-	First build compiles every dependency and takes a while. The tag is what `version.env` will name.
+	First build compiles every dependency and takes ~20 min; later builds reuse the layer cache unless the source changed. The tag is what `version.env` will name.
+	> ⚠️ **The release image had never been RUN before 9/22, and the first attempt found three bugs in it.** All three are fixed; the tag moved v1.0.0 → v1.0.2 as each was corrected. Worth recording, because each failed in a way that pointed somewhere other than its cause:
+	> 1. **Runtime base too old.** The builder `gcc:14.2.0` is Debian bookworm (**glibc 2.36**); the runtime stage was `ubuntu:22.04` (**glibc 2.35**). *Every* binary died at startup — `version 'GLIBC_2.36' not found`, naming both the executable and the bundled `libstdc++`. Fixed: the runtime is now `debian:bookworm-slim`, the exact release the builder derives from. Re-check this if the builder image is ever bumped.
+	> 2. **Helpers need `--entrypoint`.** `ENTRYPOINT` is `knottyyoga_the_server`, so `… knottyyoga:<tag> knottyyoga_database_helper --install_schema` runs **the server** with the helper's name as an argument. The tell is an error naming `knottyyoga_the_server` when you asked for a helper. The Dockerfile documented the broken form in its header and the correct one 100 lines below; both now agree.
+	> 3. **No seed artwork shipped.** `build_linux_release.sh` staged `bin/`, `lib/`, `certs/`, `VERSION` and `systemd/` — never `src/database_helper/img/`. Dev builds get it from a CMake POST_BUILD copy, so nobody noticed. A first deploy would have seeded a database with **no images at all** — no hero, no class photos, no tier icons, no instructor portraits, neither Figma SVG — and `AttachSeedPhoto` only *warns*, so the deploy would have reported success and the site would simply look bare. Fixed: the script stages `img/` next to the binaries (where `SeedImageDirectory()` looks, which also means the Dockerfile needed no change) and now fails the build if it is missing or empty.
 - [x] **2. Get it onto the EC2.** No ECR yet, so the file route. ⚠️ **These are bash commands — run them in Git Bash, not PowerShell.** PowerShell has no `gzip`, and worse, its `>` is `Out-File`, which applies *text* encoding to binary and silently corrupts the archive — corruption that only surfaces later as a confusing `docker load` failure on the EC2. (Docker's "cowardly refusing to save to a terminal" is what stops the naive PowerShell version from producing a broken file at all.) ✅ 2026-09-22
 	```bash
 	cd /c/Users/mason/source/repos/knottyyoga
-	docker save knottyyoga:v1.0.0 | gzip > knottyyoga-v1.0.0.tar.gz     # 176 MB -> 63 MB
-	scp -i ~/.ssh/knottyyoga-ec2.pem knottyyoga-v1.0.0.tar.gz ubuntu@34.215.204.200:~
+	docker save knottyyoga:v1.0.2 | gzip > knottyyoga-v1.0.2.tar.gz     # 176 MB -> 63 MB
+	scp -i ~/.ssh/knottyyoga-ec2.pem knottyyoga-v1.0.2.tar.gz ubuntu@34.215.204.200:~
 	```
 	**In PowerShell**, use `-o` so docker writes the file itself and no shell redirection is involved (uncompressed, 176 MB — fine to send as-is):
 	```powershell
-	docker save knottyyoga:v1.0.0 -o knottyyoga-v1.0.0.tar
-	scp -i $HOME\.ssh\knottyyoga-ec2.pem knottyyoga-v1.0.0.tar ubuntu@34.215.204.200:~
+	docker save knottyyoga:v1.0.2 -o knottyyoga-v1.0.2.tar
+	scp -i $HOME\.ssh\knottyyoga-ec2.pem knottyyoga-v1.0.2.tar ubuntu@34.215.204.200:~
 	```
 	`docker load` accepts either form. Both sizes verified 9/22; the tarball lands in the repo root, which is gitignored for it.
 
 **On the EC2** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`):
 - [x] **3. Load the image and finish `server.env`.** ✅ 2026-09-22
 	```bash
-	sudo docker load < ~/knottyyoga-v1.0.0.tar.gz
-	sudo docker images knottyyoga            # v1.0.0 listed
+	sudo docker load < ~/knottyyoga-v1.0.2.tar.gz
+	sudo docker images knottyyoga            # v1.0.2 listed
 	```
 	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
 - [ ] **4. Create the schema** — `--install_schema`, **not** `--migrate`:
 	```bash
 	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
 	    --entrypoint knottyyoga_database_helper \
-	    knottyyoga:v1.0.1 --install_schema
+	    knottyyoga:v1.0.2 --install_schema
 	```
 	⚠️ **`--entrypoint` is required.** The image's `ENTRYPOINT` is `knottyyoga_the_server`, so naming a helper *after* the image passes its name as an argument to the server and runs the wrong binary. The tell is an error mentioning `knottyyoga_the_server` when you asked for a helper. (This doc had the wrong form until 9/22.)
 	Creates every table in the empty `knottyyoga` database from 4.4, seeds `config_secrets` with the non-secret defaults, and provisions `scheduler@knottyyoga.local` from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` (fails fast if that is unset).
@@ -1079,12 +1083,12 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	> **`--install_schema` was added 9/22** to fill that gap — the managed-database first-deploy path (RDS, Cloud SQL). It never issues `DROP`/`CREATE DATABASE`, so it needs no `CREATEDB` and preserves the ownership set up in 4.4, and because it runs as the app's own role every object ends up owned by the role that will use it. It refuses a database that already has tables (pointing you at `--migrate`) unless `--force`, which additionally requires `HONUWARE_ALLOW_DESTRUCTIVE=1`.
 	>
 	> Verified end to end against a real empty PostgreSQL (9/22): installs **118 tables** — the same count as the dev database — with 5 people, 6 classes, 83 `config_secrets` rows and the scheduler account; a subsequent **`--migrate` then applies all 10 migrations cleanly** (`applied=10 skipped=0`), which is what makes step 4 and every later deploy compose; re-running `--install_schema` is refused; `--force` without the destructive guard is refused; `--force` with it succeeds.
-- [ ] **5. Install the systemd units** — first-time install steps 1, 2, 4 in `server/knottyyoga_server/package/systemd/README.md` (copy the two `.service` files, write `version.env` with `KNOTTYYOGA_IMAGE_TAG=v1.0.0`, `daemon-reload`). The unit files ship in the release tarball's `systemd/` directory, or copy them from the repo.
+- [ ] **5. Install the systemd units** — first-time install steps 1, 2, 4 in `server/knottyyoga_server/package/systemd/README.md` (copy the two `.service` files, write `version.env` with `KNOTTYYOGA_IMAGE_TAG=v1.0.2`, `daemon-reload`). The unit files ship in the release tarball's `systemd/` directory, or copy them from the repo.
 - [ ] **6. Set the secrets that ship empty** — `set_secret`, one row per call, same `docker run` shape:
 	```bash
 	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
 	    --entrypoint knottyyoga_test_helper \
-	    knottyyoga:v1.0.1 --nosend_real_email --command=set_secret --key=<key> --value='<value>'
+	    knottyyoga:v1.0.2 --nosend_real_email --command=set_secret --key=<key> --value='<value>'
 	```
 	The rows, all from tables already in this doc: the **SES five** from 4.7 (`mail_server_name`, `mail_server_port` = `465`, `mail_smtp_username`, `mail_app_password`, `mail_sender_address` = `noreply@knottyyoga.com`), and from §1.5 `square_access_token` + `square_environment` = `sandbox` for the soft launch. **Leave `production_mode_on` and `website_address` for step 9** — prod mode pins CORS and cookies to `knottyyoga.com`, which the `cloudfront.net` URL cannot satisfy, so flipping it before the DNS/cert work makes the site unusable to test.
 - [ ] **7. Start the server.** `sudo systemctl enable --now knottyyoga-server`, then `curl -sS http://localhost/api/health` → 200. From your machine, `https://dv1tgxa9ok30f.cloudfront.net/api/health` → the 504 from 4.6 becomes a 200. If it is a **403**, the `X-Origin-Secret` on the CloudFront origin does not match `server.env`.
