@@ -1039,7 +1039,7 @@ Purposely manual — gets you comfortable with the pieces before automating.
 > **This is the one executable sequence, in order.** It absorbs two things Phase 4 described but could not run: the SES "load into `config_secrets`" step from 4.7 (step 6 here) and the whole of 4.8 (steps 3–8). Those sections are now references; the checkboxes are here. Restructured 9/18 — the earlier version referenced a `deploy/install.sh` that does not exist (the deploy script is Phase 7.4; `package/systemd/README.md` is the manual procedure this list follows).
 
 **On your machine** (Docker Desktop; the build git-clones the pinned honuware, so it needs network):
-- [ ] **1. Build the image.** From the repo root in Git Bash or PowerShell:
+- [x] **1. Build the image.** From the repo root in Git Bash or PowerShell: ✅ 2026-09-22
 	```
 	docker build -t knottyyoga:v1.0.0 --build-arg KNOTTYYOGA_VERSION=v1.0.0 -f server/knottyyoga_server/package/Dockerfile server/knottyyoga_server
 	```
