@@ -1021,7 +1021,7 @@ SES has two trip wires: **(1) regional** — you verify the domain and request p
 
 ⚠️ **The schema step is `--install_schema`, not `--migrate`** (corrected 9/22, and `--install_schema` added the same day). Migrations evolve an existing schema and fail on an empty database; `--recreate_database` cannot run against RDS at all. The full reasoning, and the end-to-end verification, are in 5.1 step 4. `--migrate` is correct for every deploy *after* the first.
 
-**What "the database" and "where" mean here, since the questions came up.** The database is the **production PostgreSQL on RDS** (`knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com`, created in 4.4 on 5/15 and empty — zero tables — ever since); never the local Docker Postgres, which is dev only. Every command runs **on the EC2 over SSH** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`, a terminal, not the AWS web console), because the `knottyyoga-db` security group admits only the EC2, and each command is a binary inside the Docker image: `sudo docker run --rm --env-file /etc/knottyyoga/server.env knottyyoga:<tag> <binary> …`.
+**What "the database" and "where" mean here, since the questions came up.** The database is the **production PostgreSQL on RDS** (`knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com`, created in 4.4 on 5/15 and empty — zero tables — ever since); never the local Docker Postgres, which is dev only. Every command runs **on the EC2 over SSH** (`ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200`, a terminal, not the AWS web console), because the `knottyyoga-db` security group admits only the EC2, and each command is a binary inside the Docker image: `sudo docker run --rm -v /etc/knottyyoga:/etc/knottyyoga:ro --env-file /etc/knottyyoga/server.env --entrypoint <binary> knottyyoga:<tag> <args…>` — both the mount and `--entrypoint` are required; see 5.1 step 4.
 
 **"Provision DB; create app user", spelled out** (both done in 4.4): *provision* = the RDS instance, a managed PostgreSQL server with one superuser login (`postgres`); *create app user* = from the EC2, `psql` as `postgres` and `CREATE ROLE knottyyoga LOGIN PASSWORD '…'`, `GRANT knottyyoga TO postgres`, `CREATE DATABASE knottyyoga OWNER knottyyoga` — the app's own role and its own empty database, so the server never runs as the superuser. To see the state it is in today, from the EC2: `PGPASSWORD='<app password>' psql "host=knottyyoga.cjise0agyhh6.us-west-2.rds.amazonaws.com user=knottyyoga dbname=knottyyoga sslmode=verify-full sslrootcert=/etc/knottyyoga/rds-ca.pem" -c '\dt'` → `Did not find any relations.` — a connection that works *and* an empty database is exactly right before 5.1 step 4.
 
@@ -1089,7 +1089,9 @@ Purposely manual — gets you comfortable with the pieces before automating.
 - [ ] **5. Install the systemd units** — first-time install steps 1, 2, 4 in `server/knottyyoga_server/package/systemd/README.md` (copy the two `.service` files, write `version.env` with `KNOTTYYOGA_IMAGE_TAG=v1.0.2`, `daemon-reload`). The unit files ship in the release tarball's `systemd/` directory, or copy them from the repo.
 - [ ] **6. Set the secrets that ship empty** — `set_secret`, one row per call, same `docker run` shape:
 	```bash
-	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
+	sudo docker run --rm \
+	    -v /etc/knottyyoga:/etc/knottyyoga:ro \
+	    --env-file /etc/knottyyoga/server.env \
 	    --entrypoint knottyyoga_test_helper \
 	    knottyyoga:v1.0.2 --nosend_real_email --command=set_secret --key=<key> --value='<value>'
 	```
