@@ -1070,10 +1070,13 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
 - [ ] **4. Create the schema** — `--install_schema`, **not** `--migrate`:
 	```bash
-	sudo docker run --rm --env-file /etc/knottyyoga/server.env \
+	sudo docker run --rm \
+	    -v /etc/knottyyoga:/etc/knottyyoga:ro \
+	    --env-file /etc/knottyyoga/server.env \
 	    --entrypoint knottyyoga_database_helper \
 	    knottyyoga:v1.0.2 --install_schema
 	```
+	⚠️ **`-v /etc/knottyyoga:/etc/knottyyoga:ro` is required too.** `--env-file` is read by the docker *client on the host*, so the variables arrive without any mount — but a variable whose **value is a path** is resolved **inside** the container. `server.env` sets `HONUWARE_DB_SSLROOTCERT=/etc/knottyyoga/rds-ca.pem`, so without the mount the connection dies with `root certificate file "/etc/knottyyoga/rds-ca.pem" does not exist`. (Hit on the first real run, 9/22.) Read-only, and the directory rather than the single file, so rotating the CA bundle stays a host-side `curl`.
 	⚠️ **`--entrypoint` is required.** The image's `ENTRYPOINT` is `knottyyoga_the_server`, so naming a helper *after* the image passes its name as an argument to the server and runs the wrong binary. The tell is an error mentioning `knottyyoga_the_server` when you asked for a helper. (This doc had the wrong form until 9/22.)
 	Creates every table in the empty `knottyyoga` database from 4.4, seeds `config_secrets` with the non-secret defaults, and provisions `scheduler@knottyyoga.local` from `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` (fails fast if that is unset).
 	> ⚠️ **This step said `--migrate` until 9/22, and that does not work on a first deploy.** Verified by running it against a brand-new empty database: it fails immediately with `ERROR: relation "schema_migrations" does not exist`, exit 1. Migrations *evolve* a schema — every one of the ten is a guarded ALTER/INSERT against tables that must already exist — so there has to be a schema first. `--migrate` is the right command for **every deploy after this one**.
