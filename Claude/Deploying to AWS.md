@@ -659,7 +659,7 @@ The default VPC plus two security groups is all we need. The default VPC already
 	sudo chmod 600 /etc/knottyyoga/server.env
 	sudo chown root:root /etc/knottyyoga/server.env
 	```
-	- [ ] ⚠️ **Found 9/17 while writing the runbook: the block above has no `HONUWARE_SECRET_KEY`.** It is the at-rest encryption key for `config_secrets` (honuware Phase 8.1). `MakeSecretsAtRest` uses the env var whenever it is set, falls back to a hard-coded dev key when it is not in non-prod mode, and **throws in prod mode** — `ValidateProdEnvironment` lists it among the required vars, so flipping `production_mode_on` (§1.5) with the file as written refuses to boot. **It must go in before the first `--migrate` (5.1):** rows encrypted under the dev key are unreadable under a real key added afterwards, which would mean redoing every `set_secret`. Generate with `openssl rand -base64 32`, password manager, then append `HONUWARE_SECRET_KEY=<value>` to the file. `RUNBOOK.md` §4 carries the same warning in the bootstrap order.
+	- [ ] ⚠️ **Found 9/17 while writing the runbook: the block above has no `HONUWARE_SECRET_KEY`.** It is the at-rest encryption key for `config_secrets` (honuware Phase 8.1). `MakeSecretsAtRest` uses the env var whenever it is set, falls back to a hard-coded dev key when it is not in non-prod mode, and **throws in prod mode** — `ValidateProdEnvironment` lists it among the required vars, so flipping `production_mode_on` (§1.5) with the file as written refuses to boot. **It must go in before the first `--migrate` (5.1):** rows encrypted under the dev key are unreadable under a real key added afterwards, which would mean redoing every `set_secret`. Generate with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='` — **URL-safe and unpadded, not plain `openssl rand -base64 32`**; the decoder is libsodium's URLSAFE_NO_PADDING variant and refuses a standard key with a misleading "not valid base64" (verified 9/22). Password manager, then append `HONUWARE_SECRET_KEY=<value>` to the file. `RUNBOOK.md` §4 carries the same warning in the bootstrap order.
 - [ ] **Verify PITR (Point-in-Time Recovery) once — DEFER TO PHASE 5.1. Do NOT run during 4.4.** At this point in 4.4 the `knottyyoga` database is empty (no schema, no data), so a restore proves nothing. This is a Phase 5.1 smoke-test task: run it only *after* the app is deployed and has real data. RDS gives 7-day PITR automatically; this just proves the restore mechanism works and the data is actually in the backups before you ever need it for real.
 
 	When you do it (Phase 5.1), step by step:
@@ -1067,7 +1067,11 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	sudo docker load < ~/knottyyoga-v1.0.2.tar.gz
 	sudo docker images knottyyoga            # v1.0.2 listed
 	```
-	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
+	Then the one gap in the file written in 4.4 — `HONUWARE_SECRET_KEY`. ⚠️ **It must be URL-safe, unpadded base64. `openssl rand -base64 32` alone does NOT work**: the decoder is libsodium's `sodium_base64_VARIANT_URLSAFE_NO_PADDING`, which wants `-`/`_` instead of `+`/`/` and rejects the trailing `=`. A standard key is refused with *"HONUWARE_SECRET_KEY is set but not valid base64"* — a message that reads like your key is malformed when it is perfectly good base64, just the wrong flavour. Verified against the real binary on 9/22. Generate it this way:
+	```bash
+	openssl rand -base64 32 | tr '+/' '-_' | tr -d '='      # -> 43 chars, no '='
+	```
+	Save it to the password manager, then append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows written under the dev fallback key cannot be read under a real key added later. (The origin secret and scheduler password a few steps above are opaque strings, never base64-decoded, so plain `openssl rand -base64 32` is right for those.)
 - [x] **4. Create the schema** — `--install_schema`, **not** `--migrate`: ✅ 2026-09-23
 	```bash
 	sudo docker run --rm \
@@ -1096,15 +1100,35 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	```
 	Then on the EC2, **from `~`** (the `cp` commands in the README take bare file names, so the directory matters), follow first-time install steps **1 through 4** in `server/knottyyoga_server/package/systemd/README.md`: copy the two `.service` files to `/etc/systemd/system/`, write `/etc/knottyyoga/version.env` containing `KNOTTYYOGA_IMAGE_TAG=v1.0.2` (the shipped `.example` says `v1.0.0-sandbox.1` — a placeholder; leave it and both units look for an image that does not exist), **`chmod 600` both files (step 3 — do not skip it: `version.env` is world-readable until you do, and `server.env` holds the database password and the at-rest key)**, then `sudo systemctl daemon-reload`. Skip only its steps 5 and 5b — the schema and the secrets are this plan's steps 4 and 6.
 	> **If you copied the units before 9/23, re-copy them now.** Both gained `-v /etc/knottyyoga:/etc/knottyyoga:ro` that day; without it the server and helper fail at startup on the RDS CA path. `daemon-reload` after.
-- [ ] **6. Set the secrets that ship empty** — `set_secret`, one row per call, same `docker run` shape:
+- [ ] **6. Set the secrets that ship empty.** Seven rows. **Fill in the three values only you have, then paste the whole block once** — no re-typing the `docker run` per row. On the EC2:
 	```bash
-	sudo docker run --rm \
-	    -v /etc/knottyyoga:/etc/knottyyoga:ro \
-	    --env-file /etc/knottyyoga/server.env \
-	    --entrypoint knottyyoga_test_helper \
-	    knottyyoga:v1.0.2 --nosend_real_email --command=set_secret --key=<key> --value='<value>'
+	# --- the three from your password manager ------------------------------
+	SES_USER='AKIA…'                     # SES SMTP username, from the ses-smtp-knottyyoga .csv (4.7)
+	SES_PASS='…'                         # SES SMTP password, same .csv
+	SQUARE_TOKEN='…'                     # Square SANDBOX access token
+	# -----------------------------------------------------------------------
+	IMG=knottyyoga:v1.0.2
+	set_secret() {
+	  sudo docker run --rm \
+	      -v /etc/knottyyoga:/etc/knottyyoga:ro \
+	      --env-file /etc/knottyyoga/server.env \
+	      --entrypoint knottyyoga_test_helper "$IMG" \
+	      --nosend_real_email --command=set_secret --key="$1" --value="$2"
+	}
+
+	set_secret mail_server_name    email-smtp.us-west-2.amazonaws.com
+	set_secret mail_server_port    465
+	set_secret mail_smtp_username  "$SES_USER"
+	set_secret mail_app_password   "$SES_PASS"
+	set_secret mail_sender_address noreply@knottyyoga.com
+	set_secret square_access_token "$SQUARE_TOKEN"
+	set_secret square_environment  sandbox
+
+	unset SES_USER SES_PASS SQUARE_TOKEN   # keep them out of the rest of the session
 	```
-	The rows, all from tables already in this doc: the **SES five** from 4.7 (`mail_server_name`, `mail_server_port` = `465`, `mail_smtp_username`, `mail_app_password`, `mail_sender_address` = `noreply@knottyyoga.com`), and from §1.5 `square_access_token` + `square_environment` = `sandbox` for the soft launch. **Leave `production_mode_on` and `website_address` for step 9** — prod mode pins CORS and cookies to `knottyyoga.com`, which the `cloudfront.net` URL cannot satisfy, so flipping it before the DNS/cert work makes the site unusable to test.
+	Each call prints `Secret '<name>' set to '<value>'.`; seven successes and you are done. Tested end to end on 9/22, including a password containing `+`, `/`, `=` and a space — the quoting above holds. The five mail values come from 4.7's table, the two Square ones from §1.5.
+	**History note:** those three assignments land in `~/.bash_history`. Either prefix each with a space (bash's default `HISTCONTROL=ignorespace` then skips them) or `history -d` afterwards.
+	**Leave `production_mode_on` and `website_address` for step 9** — prod mode pins CORS and cookies to `knottyyoga.com`, which the `cloudfront.net` URL cannot satisfy, so flipping it now makes the site impossible to test.
 - [ ] **7. Start the server.** `sudo systemctl enable --now knottyyoga-server`, then `curl -sS http://localhost/api/health` → 200. From your machine, `https://dv1tgxa9ok30f.cloudfront.net/api/health` → the 504 from 4.6 becomes a 200. If it is a **403**, the `X-Origin-Secret` on the CloudFront origin does not match `server.env`.
 - [ ] **8. Start the helper.** `sudo systemctl enable --now knottyyoga-helper`, then `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` — expect `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=1` then `[scheduler] event=event_loop_starting`. `event=login_failure` means the env-var password does not match the hash in the `people` row — most likely the env var changed after step 4; `RUNBOOK.md` §5 has the reset.
 - [ ] **9. Smoke test through the real front door.** On `https://dv1tgxa9ok30f.cloudfront.net/`: register a user (the verification email proves SES end to end — while still in the SES sandbox the recipient must be a verified identity, so use the gmail address), log in, process a sandbox Square payment. Then, once the `us-east-1` cert and the alias records are in place (4.5's go-live step), `set_secret` `website_address` = `knottyyoga.com` and `production_mode_on` = `true`, restart the server, and repeat the smoke test on `https://knottyyoga.com`.
