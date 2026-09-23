@@ -1068,7 +1068,7 @@ Purposely manual — gets you comfortable with the pieces before automating.
 	sudo docker images knottyyoga            # v1.0.2 listed
 	```
 	Then the one gap in the file written in 4.4: generate `openssl rand -base64 32`, save it to the password manager, and append `HONUWARE_SECRET_KEY=<value>` to `/etc/knottyyoga/server.env`. **Before step 4, not after** — rows encrypted under the dev fallback key cannot be read under a real key added later.
-- [ ] **4. Create the schema** — `--install_schema`, **not** `--migrate`:
+- [x] **4. Create the schema** — `--install_schema`, **not** `--migrate`: ✅ 2026-09-23
 	```bash
 	sudo docker run --rm \
 	    -v /etc/knottyyoga:/etc/knottyyoga:ro \
