@@ -571,9 +571,9 @@ When ready for production:
 - [x] Copy **Sandbox Application ID** (starts with `sandbox-sq0idb-`) ✅ 2026-02-02
 	- AWS Secrets
 - [x] Copy **Sandbox Access Token** (starts with `EAAAl...`) ✅ 2026-02-02
-	- EAAAl3eaBCzTnAZR_BJTKsYz0gbNTXz3KP4iOPwCdoBgB7tOaLlEMG6Dpqb6pvNO
+	- AWS Secrets
 - [x] Copy **Sandbox Location ID** (from Locations tab) ✅ 2026-02-02
-	- NWLEQ37Z06H6JEC
+	- AWS Secrets
 - [x] Store credentials securely (NOT in version control) ✅ 2026-02-02
 
 **Milestone Complete When**: All three sandbox credentials are saved securely
