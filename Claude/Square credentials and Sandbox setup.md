@@ -565,12 +565,11 @@ When ready for production:
 ## Milestone 1: Square Developer Account Setup
 - [x] Create Square Developer account at developer.squareup.com ✅ 2026-02-02
 	- Username: knottyyoga@hotmail.com
-	- Password: G#-5qd?:T$8m/zf
 - [x] Create new application named "Knotty Yoga" ✅ 2026-02-02
 	- Done
 - [x] Switch to **Sandbox** mode in Developer Console ✅ 2026-02-02
 - [x] Copy **Sandbox Application ID** (starts with `sandbox-sq0idb-`) ✅ 2026-02-02
-	- sandbox-sq0idb-B1PoAtwzV7eEmN3u8FHLyQ
+	- AWS Secrets
 - [x] Copy **Sandbox Access Token** (starts with `EAAAl...`) ✅ 2026-02-02
 	- EAAAl3eaBCzTnAZR_BJTKsYz0gbNTXz3KP4iOPwCdoBgB7tOaLlEMG6Dpqb6pvNO
 - [x] Copy **Sandbox Location ID** (from Locations tab) ✅ 2026-02-02
