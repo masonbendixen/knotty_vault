@@ -1518,28 +1518,114 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 	- **Two first-ever-pipeline snags unrelated to this config:** GitLab requires **account validation (a card, not charged) before free shared-runner minutes** — the symptom is jobs stuck *pending* with no runner, and Settings → CI/CD → Runners says so. And `image:builder` needs a **privileged runner** for `docker:dind`; GitLab.com's shared runners provide it, a self-hosted runner needs `privileged = true`.
 	- **`CONAN_HOME` is relocated into the project directory** (`$CI_PROJECT_DIR/.conan2`) because **GitLab's cache can only carry paths inside `$CI_PROJECT_DIR`** — caching the image's default `/root/.conan2` silently caches nothing and every job pays a full dependency compile. The relocated home starts without a profile, so the job runs `conan profile detect --force` first. Cache key is `conan.lock`, so the cache invalidates exactly when dependencies change.
 
+> ⚠️ **6.1 fix found while writing 6.4.** `image:builder`'s `changes:` rule was
+> unconditionally TRUE on tag pipelines — `changes:` has no commit range to
+> diff against when the ref is a tag, so GitLab treats it as matched. Every tag
+> would therefore have rebuilt and re-pushed `builder:latest` ahead of the
+> package stage. Fixed by putting an `if: $CI_COMMIT_TAG` → `when: manual`
+> clause **first** in the rule list (first match wins).
+
 ## 6.2 Backend test job with Postgres sidecar
 
-- [ ] Job `test:backend` uses `services: [postgres:13.1-alpine]` with env vars `POSTGRES_USER=docker POSTGRES_PASSWORD=docker POSTGRES_DB=knottyyoga`.
-- [ ] Script: `conan install`, `cmake`, `make`, then `bin/knottyyoga_tests` with env vars pointing at `postgres` as the hostname.
-- [ ] The test support already supports running in a transaction that gets rolled back, so no cleanup is needed between tests.
-- [ ] Cache `~/.conan2/p` to speed up Conan.
+- [x] **Job `test:backend` with a Postgres sidecar.** ✅ 2026-09-25
+- [x] **The suite's transaction-per-test rollback means no inter-test cleanup.** Confirmed — nothing was added.
+- [x] **Conan cache.** `.conan2/p`, keyed on `server/knottyyoga_server/conan.lock`, `pull-push`. (`~/.conan2` as the spec wrote it cannot work: `CONAN_HOME` is relocated into `$CI_PROJECT_DIR` precisely because GitLab's cache cannot reach outside it — see 6.1.)
+
+#### It runs `build_and_test.sh`, not a hand-written build+run
+
+The spec said "`conan install`, `cmake`, `make`, then `bin/knottyyoga_tests`". Restating those four steps here would have thrown away the script's **`MIN_EXPECTED_TESTS` floor** (4800, against an actual 5173). That floor is the only thing separating a green pipeline from a suite that links cleanly while running a fraction of its tests — the static-archive dead-strip failure honuware 6.2 actually hit, where the exit code stayed 0. So the job exports `SRC_DIR`/`BUILD_DIR` and calls `bash server/docker/build_and_test.sh`: the exact script a developer runs.
+
+`build-test/test-output.txt` is published with `when: always`, because the run worth reading is the one that failed.
+
+#### ⚠️ Three things in the spec above were wrong
+
+- **`postgres:13.1`, not `postgres:13.1-alpine`.** The repo pins `postgres:13.1` in `server_components/database_server/docker-compose.yml`, and that README states CI pins the same version — which is what makes the gate and a workstation agree.
+- **`POSTGRES_DB=knottyyoga` breaks every connection.** `GlobalDatabaseTestSupport` drops and creates its own `test_knottyyoga_linux` through `MakeNoDatabaseHelper`, which **omits `dbname` from the connection string entirely** (it cannot name the database it is about to create — `database_helper.cpp`, and `database_helper_init.cpp`'s `GetConnectionString` documents the omission). libpq then defaults the database to the **user name**, so a database called `docker` must exist. The stock image creates one named after `POSTGRES_USER` *only while `POSTGRES_DB` is absent*; setting `POSTGRES_DB` replaces it and nothing can connect. The local compose file leaves it unset for exactly this reason and says so.
+- **`HONUWARE_DB_NAME` must stay unset.** It *overrides* the name every `DatabaseHelperInit` is built with, so setting it would redirect the suite's own test database — the tests would drop and recreate whatever it named.
+
+#### Two details the spec didn't cover
+
+- **Service alias is `postgresql`, not `postgres`.** That is the literal hostname the Linux build defaults to, so a connection that somehow loses `HONUWARE_DB_HOST` still lands on the sidecar instead of failing DNS. (`database_helper_init_test.cpp` carries a comment about that exact failure in CI.)
+- **`HONUWARE_DB_SSLMODE=disable`.** A Release build (`NDEBUG`) defaults `sslmode` to `prefer`, which *would* work — the sidecar has SSL off and `prefer` falls back to plaintext — but stating it skips a TLS handshake attempt on every one of the thousands of connections the suite opens.
 
 ## 6.3 Frontend test + build job
 
-- [ ] Job `test:frontend` runs `npm ci && ng test --watch=false --browsers=ChromeHeadlessCI` and `ng lint`.
-- [ ] Job `build:frontend` runs `ng build --configuration=production` and publishes `ui/dist/ui/` as a GitLab artifact.
+- [x] **Job `test:frontend`** — `npm ci` then `ng test --watch=false`. ✅ 2026-09-25
+- [x] **Job `build:frontend`** — `ng build --configuration=production`, artifact published. ✅ 2026-09-25
+- [x] **`ng lint` in CI** — as its own job, `allow_failure: true`. ✅ 2026-09-25
+- [ ] **Clear the lint backlog, then drop `allow_failure` from `lint:frontend`.** Measured 2026-09-25: **264 problems (250 errors, 14 warnings)**, overwhelmingly `@typescript-eslint/no-unused-vars` on type imports in `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccess.ts` and `ServerAccessNetwork.ts`, plus a handful of `no-explicit-any`. 6 errors and all 14 warnings are `--fix`-able.
+
+#### ⚠️ `--browsers=ChromeHeadlessCI` names a launcher that does not exist — and `ui/karma.conf.js` is dead config
+
+`angular.json`'s `test` target sets **no `karmaConfig` option**, so `@angular-devkit/build-angular:karma` uses its **built-in** config and never reads `ui/karma.conf.js` at all (`node_modules/@angular/build/src/builders/karma/karma-config.js`: `options.karmaConfig ? {} : getBuiltInKarmaConfig(...)`). A custom launcher added to that file would have been invisible — which is what a first attempt here did before checking.
+
+The built-in config already ships the right launcher:
+
+```js
+ChromeHeadlessNoSandbox: {
+    base: 'ChromeHeadless',
+    flags: ['--no-sandbox', '--headless', '--disable-gpu', '--disable-dev-shm-usage'],
+},
+```
+
+So CI uses `--browsers=ChromeHeadlessNoSandbox` and the repo needed no change. `ui/karma.conf.js` is an `ng new` leftover that nothing reads; deleting it is a separate tidy-up, not part of this phase.
+
+`CHROME_BIN=/usr/bin/chromium` **is** required — `karma-chrome-launcher` checks that variable before any of its platform guesses, none of which find Debian's `chromium`, and the failure otherwise reads as a Karma connect timeout rather than "no browser".
+
+#### ⚠️ The artifact path is `ui/dist/ui/browser`, not `ui/dist/ui/`
+
+`angular.json`'s `outputPath` is `dist/ui` and the builder is `@angular-devkit/build-angular:application`, which nests the servable tree under `browser/`. Publishing `ui/dist/ui/` would archive a directory whose only entry is one nobody expected. `build_ui_release.sh` auto-detects both layouts; an artifact path cannot, so it names the real one.
+
+**Node image is `node:22-bookworm`** — a floating minor on purpose. Angular 21 wants `^20.19 || ^22.12 || ^24`, and `ui/package.json` has no `engines` field, so pinning a patch here would claim a guarantee the project does not otherwise make.
 
 ## 6.4 Package job
 
-- [ ] Job `package` runs on `main` tags, builds release binaries, and uploads the server + UI tarballs as GitLab release artifacts (or S3).
+- [x] **Tag-gated packaging jobs producing both tarballs.** ✅ 2026-09-25 — `package:server`, `package:ui`.
+- [x] **`release:gitlab`** turns the tag into a GitLab Release whose asset links point at both tarballs, via the stable `/-/jobs/artifacts/<ref>/download?job=<name>` URL form (no job IDs to know). This is the "Release created in GitLab" that 7.4 assumes.
+- [x] **Gated on `$CI_COMMIT_TAG`**, which is where 7.1's "do not deploy untagged commits" is actually enforced rather than left to whoever clicks Play.
+
+#### One `docker build` produces both the image and the server tarball
+
+6.4 asks for tarballs; **6.5 needs a container image**, because both systemd units run `docker run`. Building the tarball with `build_linux_release.sh` in the CI builder image *and* separately building `package/Dockerfile` would compile this project from scratch twice per tag — and the Dockerfile's own builder stage **already runs `build_linux_release.sh`** and leaves the tarball at `/build/dist`. So `package:server` builds `--target builder` (tagged), then the full image (every layer cached), then lifts the tarball out with `docker create` + `docker cp`.
+
+That also means the shipped tarball comes from the **release** toolchain — the Dockerfile's pinned `gcc:14.2.0` and SHA-256-verified CMake — not from the CI builder image. Same argument the Dockerfile makes for itself: raising CI without raising the deploy image verifies a build nobody performs.
+
+⚠️ **Cost:** no Conan cache reaches inside `docker:dind`, so this is a full from-scratch dependency build on every tag. `timeout: 3h` (the GitLab.com shared-runner ceiling) covers it. Tags are rare; if this ever becomes painful the fix is a registry-backed BuildKit cache, not a second build path.
+
+Also fixed while here: **`docker:dind` over TLS needs all four variables** — `DOCKER_HOST`, `DOCKER_TLS_CERTDIR`, `DOCKER_TLS_VERIFY`, `DOCKER_CERT_PATH`. GitLab does not infer `DOCKER_HOST` from the service link, and without `DOCKER_CERT_PATH` the client talks plaintext to a daemon listening only on 2376 — surfacing as `Cannot connect to the Docker daemon`, not as a TLS error. They now live in one `.dind` fragment that `image:builder` and `package:server` both extend.
 
 ## 6.5 Deploy job
 
-- [ ] Job `deploy-manual` is a manual-trigger job (click Play in GitLab UI) that:
-  - SSHs to the EC2 using a deploy key stored in GitLab CI variables.
-  - Runs `/opt/knottyyoga/deploy/install.sh <artifact-url>`.
-- [ ] Start with **manual** deploys; go auto once you're confident. Auto-deploys on push-to-main for a payments-processing app are risky until CI coverage is strong.
+- [x] **`deploy-manual:ec2`** — manual (Play), tag-only, `allow_failure: false`. SSHes in with a deploy key from CI variables. ✅ 2026-09-25
+- [x] **`deploy-manual:ui`** — manual, tag-only. Unpacks the `package:ui` artifact and runs `ui/package/deploy_ui.sh` (S3 + CloudFront invalidation). ✅ 2026-09-25
+- [x] **Manual, not automatic**, per the original reasoning: auto-deploy on tag for a payments app is not appropriate until the suite is trusted further. Clicking Play *is* the gate.
+- [ ] **Set the CI/CD variables the two jobs need** (Settings → CI/CD → Variables). Nothing in the repo can create these:
+	- `EC2_SSH_KEY` — type **File**, **Protected**. Masking is unavailable for a multi-line PEM, so Protected + a protected `v*` tag pattern is what keeps it off ordinary refs. Mint a **CI-only** keypair; revoking it is then deleting one line from `~ubuntu/.ssh/authorized_keys`, with no effect on your laptop's key.
+	- `EC2_HOST` — **Protected**. The elastic IP.
+	- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — **Protected + Masked**, for the `ci-deploy` IAM user with the `knottyyoga-ci-deploy` policy from 4.6.
+	- `AWS_DEFAULT_REGION` — `us-west-2`.
+	- `CLOUDFRONT_DISTRIBUTION_ID` — the `E…` value, **not** the `dXXXX.cloudfront.net` domain.
+- [ ] **One-time on the EC2:** `sudo docker login registry.gitlab.com` with a project **deploy token** scoped `read_registry`. Without it the pull fails as `unauthorized`, which reads like a missing image.
+
+#### ⚠️ `/opt/knottyyoga/deploy/install.sh` does not exist, and never did
+
+The spec's `install.sh <artifact-url>` was aspirational. Rather than invent a host script this phase, the job performs **the update procedure already documented in `package/systemd/README.md` ("Updating to a new image tag"), step for step**: pull → `docker tag` to the bare `knottyyoga:<tag>` name both units expect → `--migrate` (never `--install_schema`, which is first-deploy only) → atomic `version.env` rewrite → restart helper, server, helper → health check. Automating the same sequence an operator follows by hand means the two cannot drift.
+
+Details worth knowing:
+
+- **`docker tag` is not redundant.** The units run the bare name `knottyyoga:${KNOTTYYOGA_IMAGE_TAG}`, not a registry path, so the pulled image needs the local alias.
+- **`-v /etc/knottyyoga:/etc/knottyyoga:ro` on the migrate run.** `HONUWARE_DB_SSLROOTCERT` is a *path*, resolved inside the container.
+- **Health check polls (15 × 2s) instead of `sleep && curl`.** `/api/health` is allow-listed by the CloudFront origin guard, so localhost needs no `X-Origin-Secret`; and it answers **503**, not 200, when the RDS probe fails — so `curl -f` failing here means the deploy is genuinely bad. On failure the job dumps `systemctl status` and the last 50 journal lines.
+- **The heredoc is quoted (`<<'REMOTE'`)** so the remote script is literal; only `TAG` and `IMAGE` are interpolated, via the assignment on the `ssh` command line. An unquoted heredoc would let the runner's shell eat every `$` meant for the remote bash.
+- **`StrictHostKeyChecking accept-new`** — trusts on first use but pins afterwards, so a later host-key change fails loudly. `no` would refuse the first deploy outright with nothing to fix it with.
+
+#### ⚠️ There is deliberately NO automatic rollback
+
+7.4 specifies one (health-check, then revert to the previous tag). It belongs with 7.4's deploy script: a half-written rollback is *worse* than none, because it can leave `version.env` and the running container disagreeing. These jobs fail loudly and leave the host where they got to; manual recovery is RUNBOOK.md §2.
+
+#### The UI half is an addition, not in the original 6.5
+
+6.5 described only the EC2, but a tag that updates the API and leaves the SPA on the previous build is half a deploy — and 4.6 already built both halves of the frontend pipeline. It is a **separate Play button** because the two can legitimately ship apart. `PRUNE` stays off: the previous build's lazy-loaded chunks must outlive this deploy or a browser mid-session 404s (`deploy_ui.sh`'s header has the rule). `WAIT` stays off too — it needs `cloudfront:GetInvalidation`, which the 4.6 policy did not grant.
 
 ---
 
