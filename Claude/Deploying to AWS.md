@@ -1147,7 +1147,32 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 - [x] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`). ✅ 2026-09-25
 - [x] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP. ✅ **both were already true — clarified 9/25.** *The key:* selecting a key pair at launch made AWS inject its **public** half into `/home/ubuntu/.ssh/authorized_keys` at first boot; the `.pem` is the **private** half, which is why `ssh -i` works at all. Verify: `ssh-keygen -lf ~/.ssh/authorized_keys`. *The SG:* Phase 4.2 created `knottyyoga-web` (`sg-0accf95c33945db08`) with SSH 22 → **My IP** on 5/14 — a single `/32`, still matching, since SSH works today. Confirm it reads `x.x.x.x/32` and not `0.0.0.0/0`.
-	- [ ] **Add a second key**, so a lost or corrupted `.pem` is not a permanent lockout: `ssh-keygen -t ed25519 -f ~/.ssh/knottyyoga-backup` on the laptop, then append its `.pub` to `authorized_keys` over the session you already have open.
+	- [ ] **Add a second key**, so a lost or corrupted `.pem` is not a permanent lockout. Generate it on the **Windows machine in Git Bash** (which has `ssh-keygen`, `ssh` and `scp`); only the **`.pub`** ever leaves the laptop.
+		1. **Generate.** Creates `knottyyoga-backup` (private) and `knottyyoga-backup.pub` (public):
+			```bash
+			ssh-keygen -t ed25519 -C "mason-backup" -f ~/.ssh/knottyyoga-backup
+			```
+			Set a passphrase at the prompt. It is a break-glass key you will rarely type, so the cost is near zero and the file alone stops being enough to get in.
+		2. **Append the public half**, authenticating with the key you already have:
+			```bash
+			cat ~/.ssh/knottyyoga-backup.pub | ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 \
+			  'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+			```
+			The `scp` equivalent is the same thing in two steps — `scp` copies, it cannot append — and leaves a stray copy in `~` unless you clean it up:
+			```bash
+			scp -i ~/.ssh/knottyyoga-ec2.pem ~/.ssh/knottyyoga-backup.pub ubuntu@34.215.204.200:~
+			ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 \
+			  'cat ~/knottyyoga-backup.pub >> ~/.ssh/authorized_keys && rm ~/knottyyoga-backup.pub'
+			```
+		3. **Verify in a NEW Git Bash window, leaving the current session open** — that open session is what lets you fix a mistake instead of being locked out:
+			```bash
+			ssh -i ~/.ssh/knottyyoga-backup ubuntu@34.215.204.200 'echo backup key works'
+			```
+			Then confirm both keys are trusted — expect two lines, the AWS key and `ED25519 … mason-backup`:
+			```bash
+			ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 'ssh-keygen -lf ~/.ssh/authorized_keys'
+			```
+		4. **Store the private file off this laptop** — password managers take file attachments. ⚠️ This is the step that decides whether the exercise was worth anything: `knottyyoga-backup` sitting beside `knottyyoga-ec2.pem` on the same disk protects against a corrupted file but not against losing the machine, which is the likelier failure.
 	- ⚠️ **When your ISP changes your IP, SSH stops working with no error that explains it** — the packets are just dropped, so it looks like the host is down. Fix: EC2 console → `knottyyoga-web` → *Edit inbound rules* → the port-22 rule → Source → **My IP** → Save. The console is always reachable, so this is never a true lockout — but it is exactly the annoyance Session Manager below removes.
 - [x] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't. ✅ 9/17, §7: every registered command sorted into read-only / deliberate-write / never (fabricates state or runs a scheduler job by hand), plus the two defaults that bite — it auto-logs-in as Mason, and **`--send_real_email` is ON by default**, so prod runs pass `--nosend_real_email`.
 
