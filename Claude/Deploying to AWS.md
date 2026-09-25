@@ -1368,7 +1368,12 @@ Querying both services at once, after the instance is gone, is the capability `j
 
 ### Health-check + alarming
 
-- [ ] Create an SNS topic `knottyyoga-alerts` and subscribe your email to it.
+- [ ] **Create an SNS topic `knottyyoga-alerts` and subscribe your email to it.** A *topic* is a named fan-out channel: alarms publish to it, every subscription gets a copy. Free here — the first 1,000 email notifications a month cost nothing.
+	- SNS console → **Topics** → *Create topic*. ⚠️ **Region: `us-west-2`.** Topics are regional and **an alarm can only target a topic in its own region** — every alarm in this section is us-west-2. The existing `billing-alerts` topic is in **us-east-1** precisely because billing metrics only exist there; that is why it stays a separate topic rather than this one.
+	- **Type: Standard** (FIFO does not support email subscriptions at all). **Name** `knottyyoga-alerts`. **Display name** `Knotty Yoga Alerts` — optional, but it becomes the sender name; blank makes the mail look like spam. Everything else default.
+	- Then on the topic → **Create subscription** → Protocol **Email** → Endpoint your address → Create.
+	- ⚠️ **Confirm the subscription — this is the step that silently breaks alerting.** AWS sends a *Subscription Confirmation* email; until you click its link the subscription stays **Pending confirmation** and every alarm publishes successfully to a topic that delivers to nobody. Nothing surfaces the problem: the alarm reads *In alarm*, the action reads *succeeded*, and no mail arrives. Confirm the topic shows **Confirmed** (check spam if it does not appear within a minute).
+	- **Prove it:** topic → **Publish message** → any subject/body → Publish. Mail should land in seconds. Do this now rather than discovering the plumbing was dead at the moment something is actually on fire.
 - [ ] CloudWatch alarm on **EC2 instance status check** — alarms when AWS itself thinks the VM is unhealthy. Action: notify SNS topic.
 - [ ] CloudWatch alarm on **EC2 system status check** — alarms on underlying-host issues (rare). Action: notify SNS topic.
 - [ ] CloudWatch alarm on **disk-free percentage < 20%** (requires CloudWatch Agent reporting disk metrics). Action: notify SNS topic.
