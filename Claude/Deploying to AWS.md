@@ -1393,7 +1393,7 @@ Create each the same way. CloudWatch → **Alarms** → *Create alarm* → **Sel
 - **Threshold type:** Static · **Whenever … is** Greater/Equal · **than** `1`
 - **Additional configuration → Datapoints to alarm:** `2` out of `2` — two consecutive failed minutes. One datapoint alarms on a transient blip; two is the usual compromise between noise and speed.
 - **Missing data treatment:** *Treat as missing* (the default). A stopped instance stops publishing, and you do not want "I deliberately stopped it" paging you.
-- **Next → Notification:** *In alarm* → **Send to an existing SNS topic** → `knottyyoga-alerts`.
+- **Next → Step 2 *Configure actions*.** ⚠️ **The SNS fields are collapsed — the page shows only an **Add notification** button** plus six optional panels (Lambda, Auto Scaling, EC2, Systems Manager, Investigation) you want none of. Click **Add notification**, then: *Alarm state trigger* **In alarm** → *Select an existing SNS topic* → dropdown **`knottyyoga-alerts`**.
 - **Next → Name:** `knottyyoga-ec2-instance-status` → Create.
 
 Repeat with **`StatusCheckFailed_System`**, named `knottyyoga-ec2-system-status`.
@@ -1439,7 +1439,11 @@ Note this is a **different agent** from the two already on the box: `amazon-ssm-
    sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
      -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
    ```
-5. **Alarm** (metrics appear after ~5–10 minutes): CloudWatch → Alarms → Create → Select metric → **CWAgent** → find `disk_used_percent` for this instance and `/` → Statistic `Maximum`, Period 5 minutes → Static, **Greater than `80`** (i.e. under 20% free) → Datapoints 2 of 2 → SNS `knottyyoga-alerts` → name `knottyyoga-disk-used`.
+5. **Alarm.** Metrics only appear *after the first publish* — the agent collects every 300s and staggers with up to ~60s of jitter, so allow ~6–10 minutes from `fetch-config` before `CWAgent` exists in the picker at all.
+		CloudWatch → Alarms → Create alarm → **Select metric** → **CWAgent**. ⚠️ **Clicking the namespace does not list metrics** — it lists *dimension groupings*, here a single card **`InstanceId, device, fstype, path`** with a `1` beside it. That card is the way through; the filter box only narrows cards, so searching for `disk_used_percent` there finds nothing. Click the card → one row appears → tick its checkbox (the graph draws ~23% and the bottom-right button un-greys).
+		Then the **Graphed metrics** tab → Statistic **Maximum**, Period **5 minutes** → **Select metric** → Static, **Greater than `80`** (the metric is *used* percent, so "under 20% free" is >80 used) → *Additional configuration* → Datapoints to alarm **2 of 2** (ten minutes over threshold before it pages — right for a slow metric).
+		**Next → Configure actions:** the SNS fields are **collapsed behind an "Add notification" button**. Click it → *In alarm* → *Select an existing SNS topic* → `knottyyoga-alerts`. Ignore the Lambda / Auto Scaling / EC2 / Systems Manager / Investigation panels.
+		**Next** → name `knottyyoga-disk-used` → **Next** → **Create alarm**. It sits in **Insufficient data** for the first ten minutes until two periods accumulate — normal; it settles to **OK**.
 
 **The likeliest thing to fill this disk is Docker images.** Each release is ~180 MB and `docker load` keeps every old tag — v1.0.0, v1.0.2 and v1.0.3 together are over half a gigabyte on an 18 GB volume that was 22.7% used at last look. Reclaim with `sudo docker image prune -a` (removes images no container is using) after confirming the running tag. Worth doing as part of each deploy; the alarm is the backstop, not the plan.
 
