@@ -1219,7 +1219,9 @@ This is the section that replaces the custom watchdog-of-watchdogs from `Schedul
 
 ### Logs
 
-- [ ] **Ship the two units' journals to CloudWatch Logs** so they survive the instance. Procedure below.
+- [x] **Ship the two units' journals to CloudWatch Logs** so they survive the instance. Procedure below. ✅ 2026-09-25 — fluent-bit v5.1.2 on the EC2, confirmed by `Created log stream journal-ky.knottyyoga-server.service` in its own journal; creating a stream requires `logs:CreateLogStream`, so that line also proves the `knottyyoga-app-logs` policy attached correctly.
+	- **One expected warning, not a fault:** `[warn] [aws_credentials] Failed to initialize profile provider: HOME, AWS_CONFIG_FILE, and AWS_SHARED_CREDENTIALS_FILE not set.` That is the `~/.aws/credentials` provider; fluent-bit runs as a systemd service with no `HOME`, so it logs this, walks on down the chain, and authenticates via the EC2 instance role. Successful output lines immediately after are the confirmation.
+	- **Only one stream appears at first.** `Read_From_Tail On` ships lines written *after* startup, so a unit that has been quiet since then has no stream yet — `sudo systemctl restart knottyyoga-helper` creates the second.
 - [ ] Set CloudWatch Logs retention to **1 month** on `/knottyyoga/ec2` — and on `/knottyyoga/ssm-sessions` if the RUNBOOK §8 session transcripts get enabled. The default is *Never expire*, which quietly accrues storage charges forever.
 
 #### Shipping the journals: fluent-bit
