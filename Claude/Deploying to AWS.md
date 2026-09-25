@@ -1147,7 +1147,7 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 - [x] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`). ✅ 2026-09-25
 - [x] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP. ✅ **both were already true — clarified 9/25.** *The key:* selecting a key pair at launch made AWS inject its **public** half into `/home/ubuntu/.ssh/authorized_keys` at first boot; the `.pem` is the **private** half, which is why `ssh -i` works at all. Verify: `ssh-keygen -lf ~/.ssh/authorized_keys`. *The SG:* Phase 4.2 created `knottyyoga-web` (`sg-0accf95c33945db08`) with SSH 22 → **My IP** on 5/14 — a single `/32`, still matching, since SSH works today. Confirm it reads `x.x.x.x/32` and not `0.0.0.0/0`.
-	- [ ] **Add a second key**, so a lost or corrupted `.pem` is not a permanent lockout. Generate it on the **Windows machine in Git Bash** (which has `ssh-keygen`, `ssh` and `scp`); only the **`.pub`** ever leaves the laptop.
+	- [x] **Add a second key**, so a lost or corrupted `.pem` is not a permanent lockout. Generate it on the **Windows machine in Git Bash** (which has `ssh-keygen`, `ssh` and `scp`); only the **`.pub`** ever leaves the laptop. ✅ 2026-09-25
 		1. **Generate.** Creates `knottyyoga-backup` (private) and `knottyyoga-backup.pub` (public):
 			```bash
 			ssh-keygen -t ed25519 -C "mason-backup" -f ~/.ssh/knottyyoga-backup
@@ -1182,7 +1182,20 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 ### Session Manager (for additional operators, e.g., your retired friend)
 
-- [ ] Attach the AWS-managed `AmazonSSMManagedInstanceCore` IAM policy to the EC2's instance profile. Install the `amazon-ssm-agent` package (already preinstalled on Ubuntu 24.04 AMIs, just needs to be `enabled` and `started`).
+- [ ] **Give the instance an AWS identity, then check the agent.** Two things, expanded 9/25 because the one-line version assumed the vocabulary.
+	- *Why an "instance profile":* Session Manager works by the **instance** calling the Systems Manager service, so the instance needs AWS permissions of its own — it has none today. An IAM **role** holds permissions; an **instance profile** is the wrapper that lets a role attach to an EC2 instance rather than to a person. The console creates the profile implicitly, so you only ever pick the role. `AmazonSSMManagedInstanceCore` is AWS-maintained and contains exactly what SSM needs; you do not author it.
+	- **Create the role:** IAM → **Roles** → *Create role* → trusted entity **AWS service** → use case **EC2** → Next → tick **`AmazonSSMManagedInstanceCore`** → Next → name `knottyyoga-ec2-ssm` → *Create role*.
+	- **Attach it:** EC2 → **Instances** → `knottyyoga-server` → **Actions → Security → Modify IAM role** → `knottyyoga-ec2-ssm` → *Update IAM role*. No restart; live within a minute or two.
+	- **The agent:** preinstalled on Ubuntu 24.04 AMIs, but **as a snap, not a deb** — so `systemctl status amazon-ssm-agent` finds nothing and it looks absent. On the EC2:
+		```bash
+		snap list amazon-ssm-agent
+		sudo snap start --enable amazon-ssm-agent
+		systemctl status snap.amazon-ssm-agent.amazon-ssm-agent --no-pager | head -5
+		```
+		Usually already running, in which case this just confirms it. Restart it (`sudo snap restart amazon-ssm-agent`) **after** attaching the role — it caches credential failures.
+	- **Verify in the console, no CLI needed:** Systems Manager → **Fleet Manager** (or Session Manager → *Start session*). The instance appears as a managed node within a couple of minutes; *Start session* gives a browser shell with no key and no port 22. If it never appears, the role is not attached or the agent is not running.
+	- ⚠️ **The `aws ssm start-session` check in the next bullet needs different credentials than your deploy profile.** `knottyyoga-deploy` is the `ci-deploy` user — S3 and CloudFront only, no `ssm:StartSession`. That verification needs a key for your own `masonbendixen` user; the console route above avoids the question.
+	- **Worth doing even though you are solo:** this is the way out of the port-22 lockout described in *Your own SSH* above. Session Manager is outbound-only from the instance, so a changed home IP cannot shut it off.
 - [ ] Verify by running `aws ssm start-session --target i-xxxxxxxx` from your own machine — you should land in a shell on the EC2 without any SSH key involved.
 - [ ] Create an IAM user for each additional operator (e.g., `friend-of-mason`). Attach a policy that grants `ssm:StartSession` on this specific instance ARN, plus `ssm:TerminateSession` and `ssm:DescribeSessions` for their own sessions. They generate their own access keys and `aws ssm start-session --target i-xxxxxxxx`.
 - [ ] Document the onboarding/offboarding procedure in `RUNBOOK.md`: granting a new operator is "create IAM user + attach policy", revoking is "delete the IAM user". No rebooting, no editing files on the EC2. *Drafted 9/17 as `RUNBOOK.md` §8, marked ⏳ not yet set up — the box closes when Session Manager is actually enabled on the instance and the procedure has been run once.*
