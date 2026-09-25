@@ -1253,33 +1253,42 @@ This is the section that replaces the custom watchdog-of-watchdogs from `Schedul
 			```
 			That script adds fluent-bit's official apt repository and installs from it. To avoid piping a remote script to a shell, do the same by hand — add their GPG key and repo per fluent-bit's Ubuntu install docs, then `sudo apt-get install fluent-bit`.
 		4. **Write the config** — on the EC2. Back up the default, then write the file in one command rather than editing it (the `<<'EOF'` … `EOF` pair means "everything between is the file content"; the closing `EOF` must sit alone at the start of its line):
-			```bash
-			sudo cp /etc/fluent-bit/fluent-bit.conf /etc/fluent-bit/fluent-bit.conf.orig
 
-			sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null <<'EOF'
-			[SERVICE]
-			    Flush        5
-			    Daemon       Off
-			    Log_Level    info
+> ⚠️ **Paste this block UNINDENTED.** It is deliberately at column 0 rather than
+> nested under the list item above: a `<<'EOF'` heredoc requires its closing
+> `EOF` to be the whole line with no leading whitespace, and fluent-bit will not
+> parse `[SECTION]` headers that are indented. Copying an indented version
+> leaves the shell sitting at a `>` continuation prompt forever — Ctrl+C out of
+> it and paste this instead. (The indentation *inside* each section is fine and
+> expected; only the `[...]` headers and the final `EOF` must start at column 0.)
 
-			[INPUT]
-			    Name            systemd
-			    Tag             ky.*
-			    Systemd_Filter  _SYSTEMD_UNIT=knottyyoga-server.service
-			    Systemd_Filter  _SYSTEMD_UNIT=knottyyoga-helper.service
-			    Read_From_Tail  On
+```bash
+sudo cp /etc/fluent-bit/fluent-bit.conf /etc/fluent-bit/fluent-bit.conf.orig
+sudo tee /etc/fluent-bit/fluent-bit.conf > /dev/null <<'EOF'
+[SERVICE]
+    Flush        5
+    Daemon       Off
+    Log_Level    info
 
-			[OUTPUT]
-			    Name               cloudwatch_logs
-			    Match              ky.*
-			    region             us-west-2
-			    log_group_name     /knottyyoga/ec2
-			    log_stream_prefix  journal-
-			    auto_create_group  false
-			EOF
+[INPUT]
+    Name            systemd
+    Tag             ky.*
+    Systemd_Filter  _SYSTEMD_UNIT=knottyyoga-server.service
+    Systemd_Filter  _SYSTEMD_UNIT=knottyyoga-helper.service
+    Read_From_Tail  On
 
-			cat /etc/fluent-bit/fluent-bit.conf
-			```
+[OUTPUT]
+    Name               cloudwatch_logs
+    Match              ky.*
+    region             us-west-2
+    log_group_name     /knottyyoga/ec2
+    log_stream_prefix  journal-
+    auto_create_group  false
+EOF
+
+cat /etc/fluent-bit/fluent-bit.conf    # the three [...] headers must be hard left
+```
+
 			- **`[SERVICE]`** — global settings; `Flush 5` batches every five seconds.
 			- **`[INPUT]`** — `Name systemd` reads the journal. The two `Systemd_Filter` lines restrict it to these units, so ssh logins and cron noise are not shipped. `Read_From_Tail On` starts from now instead of replaying the entire journal history on first start.
 			- **`[OUTPUT]`** — `Match ky.*` takes everything the input tagged; the rest names the log group from step 2.
