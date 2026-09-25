@@ -1322,6 +1322,37 @@ sudo systemctl restart knottyyoga-server      # generate some lines
 
 Within a minute, `/knottyyoga/ec2` should hold two streams. Nothing appearing → `sudo journalctl -u fluent-bit -n 30`; an IAM failure surfaces there as AccessDenied from the output plugin, which means step 1.
 
+**Step 6 — read them.** Each event arrives as a JSON record, and **the Crow/scheduler line is the `MESSAGE` field** — everything around it (`_SYSTEMD_UNIT`, `_PID`, `_CMDLINE`, …) is journal metadata fluent-bit carries along. A raw stream full of that envelope looks wrong the first time; it is not.
+
+Read it through **Logs → Log Insights** (or *Search all log streams* on the group page) against `/knottyyoga/ec2`:
+
+```
+fields @timestamp, MESSAGE
+| sort @timestamp desc
+| limit 100
+```
+
+```
+# one service only
+fields @timestamp, MESSAGE
+| filter _SYSTEMD_UNIT = "knottyyoga-server.service"
+| sort @timestamp desc
+
+# trouble, across both services at once
+fields @timestamp, _SYSTEMD_UNIT, MESSAGE
+| filter MESSAGE like /ERROR|error|failure|denied/
+| sort @timestamp desc
+
+# the scheduler's structured events
+fields @timestamp, MESSAGE
+| filter MESSAGE like /event=/
+| sort @timestamp desc
+```
+
+Querying both services at once, after the instance is gone, is the capability `journalctl` cannot offer — it is the reason this section exists.
+
+**Do not strip the metadata at the source** to save volume (a fluent-bit filter keeping only `MESSAGE` would): `_SYSTEMD_UNIT` is what tells a combined search *which* service logged a line, and the volume is far below the free tier anyway.
+
 #### Local journal hygiene
 
 - [ ] Cap journald to **500 MB** total disk via `/etc/systemd/journald.conf` (`SystemMaxUse=500M`) so a chatty service can't fill `/var/log`.
