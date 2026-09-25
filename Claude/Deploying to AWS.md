@@ -1368,16 +1368,91 @@ Querying both services at once, after the instance is gone, is the capability `j
 
 ### Health-check + alarming
 
-- [ ] **Create an SNS topic `knottyyoga-alerts` and subscribe your email to it.** A *topic* is a named fan-out channel: alarms publish to it, every subscription gets a copy. Free here — the first 1,000 email notifications a month cost nothing.
+- [x] **Create an SNS topic `knottyyoga-alerts` and subscribe your email to it.** A *topic* is a named fan-out channel: alarms publish to it, every subscription gets a copy. Free here — the first 1,000 email notifications a month cost nothing. ✅ 2026-09-25
 	- SNS console → **Topics** → *Create topic*. ⚠️ **Region: `us-west-2`.** Topics are regional and **an alarm can only target a topic in its own region** — every alarm in this section is us-west-2. The existing `billing-alerts` topic is in **us-east-1** precisely because billing metrics only exist there; that is why it stays a separate topic rather than this one.
 	- **Type: Standard** (FIFO does not support email subscriptions at all). **Name** `knottyyoga-alerts`. **Display name** `Knotty Yoga Alerts` — optional, but it becomes the sender name; blank makes the mail look like spam. Everything else default.
 	- Then on the topic → **Create subscription** → Protocol **Email** → Endpoint your address → Create.
 	- ⚠️ **Confirm the subscription — this is the step that silently breaks alerting.** AWS sends a *Subscription Confirmation* email; until you click its link the subscription stays **Pending confirmation** and every alarm publishes successfully to a topic that delivers to nobody. Nothing surfaces the problem: the alarm reads *In alarm*, the action reads *succeeded*, and no mail arrives. Confirm the topic shows **Confirmed** (check spam if it does not appear within a minute).
 	- **Prove it:** topic → **Publish message** → any subject/body → Publish. Mail should land in seconds. Do this now rather than discovering the plumbing was dead at the moment something is actually on fire.
-- [ ] CloudWatch alarm on **EC2 instance status check** — alarms when AWS itself thinks the VM is unhealthy. Action: notify SNS topic.
-- [ ] CloudWatch alarm on **EC2 system status check** — alarms on underlying-host issues (rare). Action: notify SNS topic.
-- [ ] CloudWatch alarm on **disk-free percentage < 20%** (requires CloudWatch Agent reporting disk metrics). Action: notify SNS topic.
-- [ ] **CloudWatch Synthetics canary** hitting `https://<your CloudFront domain>/api/health` every 5 minutes. Alarms after 2 consecutive failures. ~$0.0012/run = ~$10/mo for 5-minute interval. (Or skip Synthetics and use UptimeRobot's free tier — 5-minute interval, free for up to 50 monitors. Same coverage.)
+- [ ] CloudWatch alarm on **EC2 instance status check** — AWS itself reports the VM unhealthy. Free metric, no agent. Steps below.
+- [ ] CloudWatch alarm on **EC2 system status check** — underlying-host issues (rare). Free metric, no agent. Steps below.
+- [ ] CloudWatch alarm on **disk-free percentage < 20%**. ⚠️ Needs the **CloudWatch agent** — EC2 publishes no filesystem metric. Steps below.
+- [ ] **External uptime check** on `/api/health` every 5 minutes, alarming after 2 consecutive failures. **Use UptimeRobot's free tier, not CloudWatch Synthetics** (~$10/mo for the same coverage). Steps below.
+
+#### The two EC2 status-check alarms
+
+Both use **free, built-in** metrics — no agent, nothing installed. AWS runs two independent health checks on every instance every minute:
+
+- **Instance status check** (`StatusCheckFailed_Instance`) — *your* VM is wrong: kernel panic, exhausted memory, corrupted filesystem, misconfigured networking. A reboot usually fixes it.
+- **System status check** (`StatusCheckFailed_System`) — *AWS's* hardware or network under the VM is wrong. You cannot fix it; a stop/start migrates the instance to healthy hardware. Rare, but invisible without an alarm.
+
+Create each the same way. CloudWatch → **Alarms** → *Create alarm* → **Select metric** → **EC2** → **Per-Instance Metrics** → filter by `i-03dcc463764ac0d19` → tick **`StatusCheckFailed_Instance`** → *Select metric*.
+
+- **Statistic:** `Maximum` (the metric is 0 or 1; Average would dilute a single failure into a fraction)
+- **Period:** 1 minute
+- **Threshold type:** Static · **Whenever … is** Greater/Equal · **than** `1`
+- **Additional configuration → Datapoints to alarm:** `2` out of `2` — two consecutive failed minutes. One datapoint alarms on a transient blip; two is the usual compromise between noise and speed.
+- **Missing data treatment:** *Treat as missing* (the default). A stopped instance stops publishing, and you do not want "I deliberately stopped it" paging you.
+- **Next → Notification:** *In alarm* → **Send to an existing SNS topic** → `knottyyoga-alerts`.
+- **Next → Name:** `knottyyoga-ec2-instance-status` → Create.
+
+Repeat with **`StatusCheckFailed_System`**, named `knottyyoga-ec2-system-status`.
+
+**Worth adding on the system-check alarm: an EC2 action.** The same alarm wizard offers *EC2 action → Recover this instance*, which migrates to new hardware automatically instead of waiting for you to read the email. That is the standard remediation for a system-check failure and it is free. (Modern instance types also do this automatically by default — the explicit alarm makes it visible and notifies you either way.)
+
+#### Disk-free alarm
+
+⚠️ **This one has a prerequisite the line does not spell out: EC2 publishes no disk-space metric.** AWS can see the volume but not the filesystem inside it, so `disk_used_percent` only exists if the **CloudWatch agent** is installed. Phase 4.3 deliberately skipped that agent — and anticipated exactly this: *"install the agent later only when you actually want per-instance metrics beyond the EC2 defaults (memory, disk usage)."* This is that later. Installing it does not undo the earlier decision.
+
+Note this is a **different agent** from the two already on the box: `amazon-ssm-agent` (Session Manager) and `fluent-bit` (log shipping) do not collect metrics.
+
+1. **IAM** — instance role `knottyyoga-ec2-ssm` → Add permissions → Attach policies → **`CloudWatchAgentServerPolicy`** (AWS-managed).
+2. **Install** on the EC2:
+   ```bash
+   wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+   sudo dpkg -i amazon-cloudwatch-agent.deb
+   ```
+3. **Minimal config — disk only.** Paste unindented:
+   ```bash
+   sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null <<'EOF'
+   {
+     "metrics": {
+       "append_dimensions": { "InstanceId": "${aws:InstanceId}" },
+       "metrics_collected": {
+         "disk": {
+           "measurement": ["disk_used_percent"],
+           "resources": ["/"],
+           "metrics_collection_interval": 300
+         }
+       }
+     }
+   }
+   EOF
+   ```
+   Five-minute collection, root filesystem only. Deliberately no CPU/memory — those add cost and noise for no decision you would make differently.
+4. **Start:**
+   ```bash
+   sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+     -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+   ```
+5. **Alarm** (metrics appear after ~5–10 minutes): CloudWatch → Alarms → Create → Select metric → **CWAgent** → find `disk_used_percent` for this instance and `/` → Statistic `Maximum`, Period 5 minutes → Static, **Greater than `80`** (i.e. under 20% free) → Datapoints 2 of 2 → SNS `knottyyoga-alerts` → name `knottyyoga-disk-used`.
+
+**The likeliest thing to fill this disk is Docker images.** Each release is ~180 MB and `docker load` keeps every old tag — v1.0.0, v1.0.2 and v1.0.3 together are over half a gigabyte on an 18 GB volume that was 22.7% used at last look. Reclaim with `sudo docker image prune -a` (removes images no container is using) after confirming the running tag. Worth doing as part of each deploy; the alarm is the backstop, not the plan.
+
+#### Uptime check: use UptimeRobot, not Synthetics
+
+Both watch `https://dv1tgxa9ok30f.cloudfront.net/api/health` from outside and tell you the whole stack is reachable — the one check that covers CloudFront, the origin guard, the server and the database at once (`/api/health` returns `db:"ok"` only if the database answered).
+
+- **CloudWatch Synthetics:** ~$0.0012/run ⇒ **~$10/month** at a 5-minute interval.
+- **UptimeRobot free tier:** 5-minute interval, 50 monitors, **$0**.
+
+**Recommendation: UptimeRobot.** Same coverage, and $120/year is real money against a stack deliberately built on free tiers. Synthetics earns its price when you need multi-step browser scripts (log in, add to cart, check out) — worth revisiting if you ever want a canary that proves a booking can complete, which is a genuinely different thing from "the port answers".
+
+Setup: sign up → *Add New Monitor* → **HTTP(s)** → URL `https://dv1tgxa9ok30f.cloudfront.net/api/health` → interval **5 minutes** → alert contact = your email → Create.
+
+- **`/api/health` is allow-listed past the CloudFront origin guard**, so an external monitor reaches it with no secret. That is by design (Phase 1.7) and is what makes this possible at all.
+- Optionally set *Keyword monitoring* on the string `"status":"ok"` rather than plain HTTP 200 — then a server that answers 200 with a degraded body still alerts.
+- UptimeRobot alerts after 2 consecutive failures by default, matching the plan's intent.
 
 ### Process resiliency
 
