@@ -1374,10 +1374,10 @@ Querying both services at once, after the instance is gone, is the capability `j
 	- Then on the topic → **Create subscription** → Protocol **Email** → Endpoint your address → Create.
 	- ⚠️ **Confirm the subscription — this is the step that silently breaks alerting.** AWS sends a *Subscription Confirmation* email; until you click its link the subscription stays **Pending confirmation** and every alarm publishes successfully to a topic that delivers to nobody. Nothing surfaces the problem: the alarm reads *In alarm*, the action reads *succeeded*, and no mail arrives. Confirm the topic shows **Confirmed** (check spam if it does not appear within a minute).
 	- **Prove it:** topic → **Publish message** → any subject/body → Publish. Mail should land in seconds. Do this now rather than discovering the plumbing was dead at the moment something is actually on fire.
-- [ ] CloudWatch alarm on **EC2 instance status check** — AWS itself reports the VM unhealthy. Free metric, no agent. Steps below.
-- [ ] CloudWatch alarm on **EC2 system status check** — underlying-host issues (rare). Free metric, no agent. Steps below.
-- [ ] CloudWatch alarm on **disk-free percentage < 20%**. ⚠️ Needs the **CloudWatch agent** — EC2 publishes no filesystem metric. Steps below.
-- [ ] **External uptime check** on `/api/health` every 5 minutes, alarming after 2 consecutive failures. **Use UptimeRobot's free tier, not CloudWatch Synthetics** (~$10/mo for the same coverage). Steps below.
+- [x] CloudWatch alarm on **EC2 instance status check** — AWS itself reports the VM unhealthy. Free metric, no agent. Steps below. ✅ 2026-09-25
+- [x] CloudWatch alarm on **EC2 system status check** — underlying-host issues (rare). Free metric, no agent. Steps below. ✅ 2026-09-25
+- [x] CloudWatch alarm on **disk-free percentage < 20%**. ⚠️ Needs the **CloudWatch agent** — EC2 publishes no filesystem metric. Steps below. ✅ 2026-09-25
+- [x] **External uptime check** on `/api/health` every 5 minutes, alarming after 2 consecutive failures. **Use UptimeRobot's free tier, not CloudWatch Synthetics** (~$10/mo for the same coverage). Steps below. ✅ 2026-09-25
 
 #### The two EC2 status-check alarms
 
@@ -1480,7 +1480,9 @@ And because of the 503 behaviour, this single URL exercises **CloudFront → ori
 
 ### Process resiliency
 
-- [ ] systemd unit's `Restart=on-failure` covers process-level crashes (planned in Phase 2.2).
+- [x] **systemd's `Restart=on-failure` covers process-level crashes** — already in both units from Phase 2.2, nothing to configure. ✅ verification only: `systemctl show knottyyoga-server -p Restart -p RestartSec` (server `on-failure`/`5s`, helper `on-failure`/`10s`).
+	- **Test it once**, as with the SNS topic and the uptime monitor: `sudo docker kill knottyyoga-server` (SIGKILL → `docker run` exits 137 → non-zero → restart), wait ~8s, then `systemctl status` shows a fresh start time and `/api/health` answers. Use `docker kill`, **not** `docker stop` — stop exits 0, and `on-failure` ignores clean exits by design, which is what lets you stop a service without systemd fighting you.
+	- ⚠️ **It is rate-limited, and the checkbox never said so.** systemd defaults to **5 starts within 10 seconds**, then gives up and parks the unit in `failed` rather than looping. This is not hypothetical here: had the server been started before 5.1 step 6, it would abort instantly on the empty `mail_app_password`, burn the five retries in seconds, and sit `failed` — presenting as a service that looks like it never tried. After fixing the cause you must clear the latch: `sudo systemctl reset-failed knottyyoga-server` then `sudo systemctl start knottyyoga-server`.
 - [ ] **No custom watchdog process needed**. The custom `knottyyoga_helper` watchdog mode from `Scheduled Jobs.md` is dropped from scope. `knottyyoga_helper` retains only the scheduled-jobs runner (subscription billing, reminders).
 
 ### What this stack catches vs. misses
