@@ -1153,10 +1153,9 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 			ssh-keygen -t ed25519 -C "mason-backup" -f ~/.ssh/knottyyoga-backup
 			```
 			Set a passphrase at the prompt. It is a break-glass key you will rarely type, so the cost is near zero and the file alone stops being enough to get in.
-		2. **Append the public half**, authenticating with the key you already have:
+		2. **Append the public half**, authenticating with the key you already have. ⚠️ **One line — paste it whole.** The trailing `'…'` is what makes `ssh` *run a command* rather than open a shell; drop it (easy to do if a `\`-continued version is pasted a line at a time) and ssh feeds your public key to the remote bash as a command, which answers `-bash: line 1: ssh-ed25519: command not found`. Nothing is appended and nothing is harmed, but it looks alarming.
 			```bash
-			cat ~/.ssh/knottyyoga-backup.pub | ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 \
-			  'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+			cat ~/.ssh/knottyyoga-backup.pub | ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
 			```
 			The `scp` equivalent is the same thing in two steps — `scp` copies, it cannot append — and leaves a stray copy in `~` unless you clean it up:
 			```bash
