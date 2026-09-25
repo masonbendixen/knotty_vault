@@ -1145,8 +1145,10 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 ### Your own SSH (primary)
 
-- [ ] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`).
-- [ ] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP.
+- [x] Disable password auth in `/etc/ssh/sshd_config` (`PasswordAuthentication no`). ✅ 2026-09-25
+- [x] Use key-based auth only; your public key in `ubuntu`'s `~/.ssh/authorized_keys`. Lock the SG inbound 22 rule to your home IP. ✅ **both were already true — clarified 9/25.** *The key:* selecting a key pair at launch made AWS inject its **public** half into `/home/ubuntu/.ssh/authorized_keys` at first boot; the `.pem` is the **private** half, which is why `ssh -i` works at all. Verify: `ssh-keygen -lf ~/.ssh/authorized_keys`. *The SG:* Phase 4.2 created `knottyyoga-web` (`sg-0accf95c33945db08`) with SSH 22 → **My IP** on 5/14 — a single `/32`, still matching, since SSH works today. Confirm it reads `x.x.x.x/32` and not `0.0.0.0/0`.
+	- [ ] **Add a second key**, so a lost or corrupted `.pem` is not a permanent lockout: `ssh-keygen -t ed25519 -f ~/.ssh/knottyyoga-backup` on the laptop, then append its `.pub` to `authorized_keys` over the session you already have open.
+	- ⚠️ **When your ISP changes your IP, SSH stops working with no error that explains it** — the packets are just dropped, so it looks like the host is down. Fix: EC2 console → `knottyyoga-web` → *Edit inbound rules* → the port-22 rule → Source → **My IP** → Save. The console is always reachable, so this is never a true lockout — but it is exactly the annoyance Session Manager below removes.
 - [x] Add a `RUNBOOK.md` section describing how to run `knottyyoga_test_helper` via SSH — which commands are safe in prod, which ones aren't. ✅ 9/17, §7: every registered command sorted into read-only / deliberate-write / never (fabricates state or runs a scheduler job by hand), plus the two defaults that bite — it auto-logs-in as Mason, and **`--send_real_email` is ON by default**, so prod runs pass `--nosend_real_email`.
 
 ### Session Manager (for additional operators, e.g., your retired friend)
