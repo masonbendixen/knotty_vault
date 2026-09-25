@@ -1182,7 +1182,7 @@ Two access paths: raw SSH for you (simpler local tooling) and AWS Systems Manage
 
 ### Session Manager (for additional operators, e.g., your retired friend)
 
-- [ ] **Give the instance an AWS identity, then check the agent.** Two things, expanded 9/25 because the one-line version assumed the vocabulary.
+- [x] **Give the instance an AWS identity, then check the agent.** Two things, expanded 9/25 because the one-line version assumed the vocabulary. ✅ 2026-09-25
 	- *Why an "instance profile":* Session Manager works by the **instance** calling the Systems Manager service, so the instance needs AWS permissions of its own — it has none today. An IAM **role** holds permissions; an **instance profile** is the wrapper that lets a role attach to an EC2 instance rather than to a person. The console creates the profile implicitly, so you only ever pick the role. `AmazonSSMManagedInstanceCore` is AWS-maintained and contains exactly what SSM needs; you do not author it.
 	- **Create the role:** IAM → **Roles** → *Create role* → trusted entity **AWS service** → use case **EC2** → Next → tick **`AmazonSSMManagedInstanceCore`** → Next → name `knottyyoga-ec2-ssm` → *Create role*.
 	- **Attach it:** EC2 → **Instances** → `knottyyoga-server` → **Actions → Security → Modify IAM role** → `knottyyoga-ec2-ssm` → *Update IAM role*. No restart; live within a minute or two.
