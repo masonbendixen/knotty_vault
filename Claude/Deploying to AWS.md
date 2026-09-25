@@ -1219,8 +1219,16 @@ This is the section that replaces the custom watchdog-of-watchdogs from `Schedul
 
 ### Logs
 
-- [ ] Install the CloudWatch Logs agent on the EC2 (free tier covers 5 GB/mo of ingest). Configure it to tail the systemd journals for `knottyyoga-server.service` and `knottyyoga-helper.service`.
-- [ ] Set CloudWatch Logs retention to **30 days** for both log groups.
+- [ ] **Ship the two units' journals to CloudWatch Logs.** ⚠️ **Not with "the CloudWatch Logs agent" — that tool cannot do this** (established 9/25). The legacy `awslogs` agent is deprecated, and its replacement, the **unified CloudWatch agent**, has inputs for *files* and *Windows events* only — **no journald input**, so it cannot be pointed at `journalctl` at all. Two things that do work:
+	- **fluent-bit — the recommended path.** Native `systemd` input that filters by unit, `cloudwatch_logs` output, single binary, and if it dies it simply stops shipping rather than affecting the app.
+		1. **IAM first** — same trap as the SSM session transcripts: `AmazonSSMManagedInstanceCore` does **not** grant log writes. IAM → Roles → `knottyyoga-ec2-ssm` → *Create inline policy* `knottyyoga-app-logs`, allowing `logs:CreateLogStream` / `logs:PutLogEvents` / `logs:DescribeLogStreams` on `arn:aws:logs:us-west-2:957014951609:log-group:/knottyyoga/ec2:*`.
+		2. **Log group** `/knottyyoga/ec2`, retention **1 month** (next checkbox). Free tier covers 5 GB/mo ingest; this volume is nowhere near it.
+		3. `curl -fsSL https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh | sh`
+		4. `/etc/fluent-bit/fluent-bit.conf`: a `[INPUT] Name systemd` with `Tag ky.*` and two `Systemd_Filter _SYSTEMD_UNIT=` lines (server + helper), and a `[OUTPUT] Name cloudwatch_logs` with `region us-west-2`, `log_group_name /knottyyoga/ec2`, `log_stream_prefix journal-`, `auto_create_group false`. **The `*` in the tag is load-bearing** — fluent-bit appends the unit name, giving one stream per unit instead of one interleaved blob.
+		5. `sudo systemctl enable --now fluent-bit`, restart a unit to generate lines, confirm two streams appear. Nothing showing → `sudo journalctl -u fluent-bit -n 30`; an IAM failure surfaces there as AccessDenied from the output plugin.
+	- **Docker's `awslogs` log driver** on both units is the fewer-moving-parts alternative, but **a container refuses to start if the driver cannot reach CloudWatch** — that puts logging in the critical path of the server booting, which is a bad trade for a production API. Noted and rejected.
+	- **Why bother, with one instance:** not convenience — `journalctl` over SSH is fine day to day — but that **journal logs die with the instance**. Replace or lose the EC2 and every log explaining why goes with it. Reasonable to defer until after the soft launch settles; the reason it exists is the day you need it most.
+- [ ] Set CloudWatch Logs retention to **30 days** (1 month) on `/knottyyoga/ec2` — and on `/knottyyoga/ssm-sessions` if the §8 session transcripts get enabled. The default is *Never expire*, which quietly accrues storage charges forever.
 - [ ] Cap journald to **500 MB** total disk via `/etc/systemd/journald.conf` (`SystemMaxUse=500M`) so a chatty service can't fill `/var/log`.
 - [ ] (Optional) Enable CloudFront access logs → a dedicated S3 bucket. Free aside from S3 storage; skip until you actually want HTTP-level visibility.
 
