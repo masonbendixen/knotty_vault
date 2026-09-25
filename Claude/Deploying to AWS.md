@@ -1398,7 +1398,11 @@ Create each the same way. CloudWatch → **Alarms** → *Create alarm* → **Sel
 
 Repeat with **`StatusCheckFailed_System`**, named `knottyyoga-ec2-system-status`.
 
-**Worth adding on the system-check alarm: an EC2 action.** The same alarm wizard offers *EC2 action → Recover this instance*, which migrates to new hardware automatically instead of waiting for you to read the email. That is the standard remediation for a system-check failure and it is free. (Modern instance types also do this automatically by default — the explicit alarm makes it visible and notifies you either way.)
+**Do NOT add an EC2 recovery action to the system-check alarm** (corrected 9/25 — an earlier draft here recommended it). `t3.small` supports **simplified automatic recovery**, which AWS enables by default: the instance already migrates itself to healthy hardware on a system status-check failure, with no alarm involved. The alarm's remaining job is to *tell you it happened*, which the SNS action covers.
+
+The reason not to add it is not merely redundancy: AWS treats **alarm-based** recovery and **simplified automatic** recovery as alternatives, so configuring the EC2 action can *replace* the built-in behaviour rather than reinforcing it. That is a question worth not opening for zero gain.
+
+**Instead, verify the default is on** — EC2 → Instances → `knottyyoga-server` → **Details** tab → **Auto-recovery behavior** should read `default` (enabled). If it reads `disabled`, re-enable via Actions → Instance settings → Change auto-recovery behavior. Both status-check alarms then carry an SNS notification and nothing else.
 
 #### Disk-free alarm
 
