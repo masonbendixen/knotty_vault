@@ -1456,11 +1456,27 @@ Both watch `https://dv1tgxa9ok30f.cloudfront.net/api/health` from outside and te
 
 **Recommendation: UptimeRobot.** Same coverage, and $120/year is real money against a stack deliberately built on free tiers. Synthetics earns its price when you need multi-step browser scripts (log in, add to cart, check out) — worth revisiting if you ever want a canary that proves a booking can complete, which is a genuinely different thing from "the port answers".
 
-Setup: sign up → *Add New Monitor* → **HTTP(s)** → URL `https://dv1tgxa9ok30f.cloudfront.net/api/health` → interval **5 minutes** → alert contact = your email → Create.
+**Setup.**
 
-- **`/api/health` is allow-listed past the CloudFront origin guard**, so an external monitor reaches it with no secret. That is by design (Phase 1.7) and is what makes this possible at all.
-- Optionally set *Keyword monitoring* on the string `"status":"ok"` rather than plain HTTP 200 — then a server that answers 200 with a degraded body still alerts.
-- UptimeRobot alerts after 2 consecutive failures by default, matching the plan's intent.
+1. **Sign up** at `uptimerobot.com` → *Sign Up* → **Free** plan (no card). Use `masonbendixen@gmail.com` and confirm the verification email. The signup address is created as an **alert contact** automatically — that is why no separate "create a contact" step appears below.
+2. **Dashboard → + New monitor** (older UI: *Add New Monitor*):
+	- **Monitor type:** `HTTP(s)`
+	- **Friendly name:** `Knotty Yoga API` — this lands in the alert email's subject, so make it recognisable at 2am
+	- **URL:** `https://dv1tgxa9ok30f.cloudfront.net/api/health`
+	- **Monitoring interval:** `5 minutes` (the free tier's floor, and what this plan specified)
+	- **Alert contacts to notify:** tick your email address
+3. **Create monitor.** It goes green within a minute or two. UptimeRobot alerts after 2 consecutive failures by default, which matches the intent here.
+4. **Prove it alerts — do this once.** An untested monitor is a guess, and the failure being guarded against is *silently broken alerting* (the same reasoning as publishing a test message to the SNS topic). On the EC2:
+	```bash
+	sudo systemctl stop knottyyoga-server
+	```
+	Wait ~10 minutes for two failed checks, confirm the alert email arrives, then `sudo systemctl start knottyyoga-server` and confirm the "back up" email.
+
+**No keyword monitoring needed** (an earlier draft suggested it). `/api/health` already returns **HTTP 503** when the database probe fails — `health.cpp` sets `resp.code = dbOk ? 200 : 503` and the body reports `status`/`db` as `fail` — so a plain HTTP(s) check already catches a degraded server. Keyword matching would only matter if the endpoint answered 200 while unhealthy, which it does not.
+
+**What this covers that nothing else does: it observes from outside the infrastructure.** If CloudFront breaks, the EC2 loses its network, or the instance dies outright, the CloudWatch alarms may have no way to reach you — the thing that would report the problem is inside the thing that is broken. This is the only check in the stack that survives that.
+
+And because of the 503 behaviour, this single URL exercises **CloudFront → origin guard → Crow → RDS** in one request: a red monitor means something in that chain is down, which is the right granularity at this scale.
 
 ### Process resiliency
 
