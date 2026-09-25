@@ -1507,8 +1507,15 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 
 ## 6.1 Pipeline skeleton
 
-- [ ] Commit `.gitlab-ci.yml` at repo root with stages: `build`, `test`, `package`, `deploy-manual`.
-- [ ] Use a pinned custom builder image that has GCC 12.4, Conan 2, CMake 3.24+, libpqxx-dev, and Postgres client. Publish this image to GitLab Container Registry so builds are fast and reproducible.
+- [x] **Commit `.gitlab-ci.yml` at repo root** with stages `build`, `test`, `package`, `deploy-manual`. ✅ 2026-09-25 — written, YAML-validated, and the build job **executed for real inside the builder image** before committing (not just linted).
+	- **One deliberate deviation: an `image` stage precedes the four.** The builder image has to exist before anything can compile *in* it, so the publish job needs a stage of its own ahead of `build`.
+	- **CI reuses the local gate's recipe rather than restating it.** The jobs source `server/docker/build_common.sh` and call its `knotty_yoga_build` function with `SRC_DIR`/`BUILD_DIR` overridden — the same code path a developer runs, so CI and a workstation cannot drift. (`build_common.sh` already parameterises both, so no change was needed to it.)
+	- **`build:server` deliberately builds BOTH executables.** The local Linux gate builds only `knottyyoga_tests`, so neither `src/main.cpp` nor `src/database_helper/main.cpp` compiled until someone's Visual Studio build — which let a broken entry point ship past a green run twice (see CLAUDE.md's build-gate notes). CI closes that on every push.
+- [x] **Pinned builder image published to the GitLab Container Registry.** ✅ job `image:builder` builds `server/docker/Dockerfile` and pushes `$CI_REGISTRY_IMAGE/builder:latest` plus a `:$CI_COMMIT_SHORT_SHA` tag for traceability.
+	- ⚠️ **The spec above was stale in three ways** (corrected 9/25 against the actual `server/docker/Dockerfile`): it is **gcc 14.2.0**, not GCC 12.4 — the Dockerfile even carries a comment recording that migration; CMake is **pinned to an exact release verified by SHA256** (4.4.3 today), not "3.24+"; and there is **no `libpqxx-dev` or Postgres client apt package** — libpqxx arrives through Conan, and nothing in the build needs `psql`. The image's apt list is just `curl ca-certificates git python3-pip libkrb5-dev`. Reproducibility comes from those pins inside the Dockerfile, not from the registry tag.
+	- **Rebuild triggers:** automatically when `server/docker/Dockerfile` changes (otherwise every later job silently runs in a stale image); manual and `allow_failure: true` otherwise, so an un-played job never blocks a pipeline.
+	- ⚠️ **Bootstrap:** the very first pipeline finds no `:latest` to run `build:server` in. Play `image:builder` manually once to seed the registry.
+	- **`CONAN_HOME` is relocated into the project directory** (`$CI_PROJECT_DIR/.conan2`) because **GitLab's cache can only carry paths inside `$CI_PROJECT_DIR`** — caching the image's default `/root/.conan2` silently caches nothing and every job pays a full dependency compile. The relocated home starts without a profile, so the job runs `conan profile detect --force` first. Cache key is `conan.lock`, so the cache invalidates exactly when dependencies change.
 
 ## 6.2 Backend test job with Postgres sidecar
 
