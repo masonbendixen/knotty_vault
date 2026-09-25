@@ -1224,7 +1224,7 @@ This is the section that replaces the custom watchdog-of-watchdogs from `Schedul
 - [x] **Ship the two units' journals to CloudWatch Logs** so they survive the instance. Procedure below. ✅ 2026-09-25 — fluent-bit v5.1.2 on the EC2, confirmed by `Created log stream journal-ky.knottyyoga-server.service` in its own journal; creating a stream requires `logs:CreateLogStream`, so that line also proves the `knottyyoga-app-logs` policy attached correctly.
 	- **One expected warning, not a fault:** `[warn] [aws_credentials] Failed to initialize profile provider: HOME, AWS_CONFIG_FILE, and AWS_SHARED_CREDENTIALS_FILE not set.` That is the `~/.aws/credentials` provider; fluent-bit runs as a systemd service with no `HOME`, so it logs this, walks on down the chain, and authenticates via the EC2 instance role. Successful output lines immediately after are the confirmation.
 	- **Only one stream appears at first.** `Read_From_Tail On` ships lines written *after* startup, so a unit that has been quiet since then has no stream yet — `sudo systemctl restart knottyyoga-helper` creates the second.
-- [ ] Set CloudWatch Logs retention to **1 month** on `/knottyyoga/ec2` — and on `/knottyyoga/ssm-sessions` if the RUNBOOK §8 session transcripts get enabled. The default is *Never expire*, which quietly accrues storage charges forever.
+- [x] Set CloudWatch Logs retention to **1 month** on `/knottyyoga/ec2` — and on `/knottyyoga/ssm-sessions` if the RUNBOOK §8 session transcripts get enabled. The default is *Never expire*, which quietly accrues storage charges forever. ✅ 2026-09-25
 
 #### Shipping the journals: fluent-bit
 
@@ -1357,8 +1357,14 @@ Querying both services at once, after the instance is gone, is the capability `j
 
 #### Local journal hygiene
 
-- [ ] Cap journald to **500 MB** total disk via `/etc/systemd/journald.conf` (`SystemMaxUse=500M`) so a chatty service can't fill `/var/log`.
-- [ ] (Optional) Enable CloudFront access logs → a dedicated S3 bucket. Free aside from S3 storage; skip until you actually want HTTP-level visibility.
+- [x] Cap journald to **500 MB** total disk via `/etc/systemd/journald.conf` (`SystemMaxUse=500M`) so a chatty service can't fill `/var/log`. ✅ 2026-09-25
+- [x] **Free and already running: CloudFront metrics.** ✅ nothing to enable. CloudFront → the distribution → **Monitoring** tab graphs requests, bytes transferred and 4xx/5xx rates. If the question is "is anyone visiting, and is anything erroring", this answers it with no setup and no cost.
+- [ ] (Optional) **CloudFront access logs → a dedicated S3 bucket.** Still deferred, deliberately. *What they add over metrics:* per-request detail — URL, referer, user-agent, edge location, cache hit/miss. **The gap is specific and real: the EC2 never sees frontend traffic**, because S3-served pages and cached assets are answered at the edge, so the Crow logs in `/knottyyoga/ec2` only ever show `/api/*`. Today there is no way to tell how many people loaded the site. Enable when there is a question they would answer ("why is the cache hit ratio low", "what is hammering us"), not before. Procedure when that day comes:
+	1. **Bucket** `knottyyoga-cf-logs`, `us-west-2`, Block Public Access all on. ⚠️ **If the console offers "standard logging (legacy)", that mode needs Object Ownership → ACLs enabled (*Bucket owner preferred*)** — CloudFront writes each file with an ACL grant, and new buckets default to ACLs **disabled**, so it fails with a permissions error that never mentions ACLs. Prefer **standard logging v2** (delivery to S3 / CloudWatch Logs / Firehose) if offered: vended-log delivery, no ACL requirement.
+	2. **Lifecycle rule first, before enabling** — bucket → Management → Create lifecycle rule → all objects → *Expire current versions after 90 days*. Without it the files accumulate forever.
+	3. **Enable:** CloudFront → `E23TY4IAUHGM6H` → **Logging** tab (older consoles: General → Settings → Edit → *Standard logging*) → On → the bucket → prefix `cf/`.
+	4. **Delivery is batched** — first files appear in 10–60 minutes, not immediately. Do not conclude it is broken at five minutes.
+	- **The catch is reading them:** gzipped tab-separated files, one per batch. Fine for an occasional `aws s3 cp` + `zcat`, painful for anything regular. Querying them properly means Athena over the bucket, which is its own setup — another reason to wait for a real question first.
 
 ### Health-check + alarming
 
