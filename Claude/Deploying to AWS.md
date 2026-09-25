@@ -1505,6 +1505,24 @@ For a soft launch, that coverage is plenty. Multi-AZ EC2 / RDS is a Phase 8 upgr
 
 You asked whether you can run backend tests that need Postgres in GitLab CI. **Yes** — GitLab "services" let you spin up a Postgres sidecar per job. Works well.
 
+**What runs when** (as implemented, 2026-09-25):
+
+| Job | Stage | Branch push | Tag push (`vX.Y.Z`) |
+|---|---|---|---|
+| `image:builder` | image | auto **only** if `server/docker/Dockerfile` changed, else manual | manual |
+| `build:server` | build | ✅ auto | skipped — `package:server` compiles everything anyway |
+| `test:backend` | test | ✅ auto | ✅ auto |
+| `test:frontend` | test | ✅ auto | ✅ auto |
+| `lint:frontend` | test | ✅ auto, `allow_failure` | ✅ auto, `allow_failure` |
+| `build:frontend` | test | ✅ auto | skipped — `package:ui` builds the same thing |
+| `package:server` | package | — | ✅ auto (image + tarball) |
+| `package:ui` | package | — | ✅ auto (tarball) |
+| `release:gitlab` | package | — | ✅ auto (GitLab Release) |
+| `deploy-manual:ec2` | deploy-manual | — | ▶️ **manual** |
+| `deploy-manual:ui` | deploy-manual | — | ▶️ **manual** |
+
+Verified before commit: the YAML parses in strict mode, every `stage`/`extends`/`needs` target resolves, no `needs` points at a later stage, and every `$VAR` is either declared, GitLab-predefined, a documented CI/CD setting, or a shell local. `ng test` and `ng lint` were both **run locally** to see what CI would actually get — 3464 specs pass, and `ChromeHeadlessNoSandbox` is confirmed to be a real launcher name. `test:backend` and `package:server` are the two jobs whose only honest verification is a real pipeline run.
+
 ## 6.1 Pipeline skeleton
 
 - [x] **Commit `.gitlab-ci.yml` at repo root** with stages `build`, `test`, `package`, `deploy-manual`. ✅ 2026-09-25 — written, YAML-validated, and the build job **executed for real inside the builder image** before committing (not just linted).
@@ -1517,6 +1535,15 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 	- ⚠️ **Bootstrap — the first pipeline WILL fail, expectedly.** `image:builder` runs automatically only when `server/docker/Dockerfile` changes; on a push that does not touch it the job falls through to `when: manual` and is not played, so `build:server` cannot pull `$CI_REGISTRY_IMAGE/builder:latest` and dies before its first line with `failed to pull image … manifest unknown`. **One-time fix:** Build → Pipelines → open the pipeline → play **`image:builder`**, wait for the push, then retry `build:server`. Every later push then works untouched.
 	- **Two first-ever-pipeline snags unrelated to this config:** GitLab requires **account validation (a card, not charged) before free shared-runner minutes** — the symptom is jobs stuck *pending* with no runner, and Settings → CI/CD → Runners says so. And `image:builder` needs a **privileged runner** for `docker:dind`; GitLab.com's shared runners provide it, a self-hosted runner needs `privileged = true`.
 	- **`CONAN_HOME` is relocated into the project directory** (`$CI_PROJECT_DIR/.conan2`) because **GitLab's cache can only carry paths inside `$CI_PROJECT_DIR`** — caching the image's default `/root/.conan2` silently caches nothing and every job pays a full dependency compile. The relocated home starts without a profile, so the job runs `conan profile detect --force` first. Cache key is `conan.lock`, so the cache invalidates exactly when dependencies change.
+
+> 🛑 **Two files CI needs were excluded by `.gitignore` and had never been committed.** Found 2026-09-25; both `.gitignore` files are fixed, but **the two files still need `git add` + commit or every job below fails.**
+>
+> - **`server/knottyyoga_server/conan.lock`** — the root `.gitignore` carried a bare `conan.lock` (a Conan-1-era entry sitting with the genuinely-generated `conanbuildinfo.*`). But `build_common.sh` passes `--lockfile "$SRC_DIR/conan.lock"` to every `conan install`, and both CI cache keys hash the file. In a clean clone — *every* CI job — it does not exist, so `build:server` and `test:backend` would have died in `conan install`. Its own comment ("a lockfile that is merely committed does NOTHING") turned out to assume something that was not true: it was never committed at all.
+> - **`server/knottyyoga_server/package/build_linux_release.sh`** — the nested `server/knottyyoga_server/.gitignore` had a bare `*build*`, which matches **files** as well as directories. So the script the release `Dockerfile`'s builder stage runs (`RUN … ./package/build_linux_release.sh`) is not in the repo, and `docker build` against a clean clone could never have worked. It had only ever run from a working tree — which is a much better explanation than "unlucky" for the four separate *"the image had never been run"* bugs the first real deploy hit (glibc, `--entrypoint`, seed images, `/etc/knottyyoga` mount).
+>
+> Fixes applied: the bare `conan.lock` line is gone (with a comment saying why a Conan 2 lockfile is a committed artifact), and `*build*` became `*build*/` — trailing slash, directories only. Verified with `git status --porcelain`: exactly those two files became visible and nothing else was un-ignored.
+>
+> `communityfinder` has neither file tracked, but it has no `.gitlab-ci.yml` yet either, so there is nothing to break there today. `server_components` already tracks its root `conan.lock`, which is why its CI passes.
 
 > ⚠️ **6.1 fix found while writing 6.4.** `image:builder`'s `changes:` rule was
 > unconditionally TRUE on tag pipelines — `changes:` has no commit range to
