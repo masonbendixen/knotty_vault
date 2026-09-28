@@ -367,7 +367,7 @@ What you already have that's unusual: the C++ code *is* the schema source of tru
   - Strict equality: only the literal string `"1"` authorizes. `"0"`, unset, `"true"`, `"yes"`, `"TRUE"`, `"01"`, `" 1"`, etc. all block — anything that looks like a typo fails closed.
   - Error message names the env var and the required value so operators know what to fix without grep'ing the source.
   - 9 unit tests in `destructive_guard_test.cpp` covering each case (unset / "0" / empty / non-one strings / exactly-"1") for both `IsDestructiveAllowed` and `EnsureDestructiveAllowed`, plus a test that asserts the error message mentions the env-var name and `"1"`. Uses an RAII `DestructiveEnvScope` guard so individual tests don't leak env state.
-- [x] **`--migrate`** added. Calls `Migration::RunMigrateCommand` (the thin orchestration wrapper from below) with the project's migration list. Exit code is forwarded to the OS so `install.sh` can fail-fast on a bad migration.
+- [x] **`--migrate`** added. Calls `Migration::RunMigrateCommand` (the thin orchestration wrapper from below) with the project's migration list. Exit code is forwarded to the OS so the deploy script can fail-fast on a bad migration — which `package/deploy_update.sh` relies on, since it runs under `set -e` (6.5).
 - [x] **`business_logic/migration/migrate_command.{h,cpp}`** — `RunMigrateCommand(transactionProvider, databaseHelper, migrations) → int`. Pure orchestration on top of `MigrationRunner::ApplyPending`:
   - Returns 0 on success (zero or more migrations applied/skipped cleanly).
   - Returns 1 on `MigrationFailure` (a migration's apply() threw) — the per-migration failure was already logged by `ApplyPending`; this layer adds a single `[migrate] event=failure id=…` summary line for the operator.
@@ -1521,7 +1521,7 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 | `deploy-manual:ec2` | deploy-manual | — | ▶️ **manual** |
 | `deploy-manual:ui` | deploy-manual | — | ▶️ **manual** |
 
-Verified before commit: the YAML parses in strict mode, every `stage`/`extends`/`needs` target resolves, no `needs` points at a later stage, and every `$VAR` is either declared, GitLab-predefined, a documented CI/CD setting, or a shell local. `ng test` and `ng lint` were both **run locally** to see what CI would actually get — 3464 specs pass, and `ChromeHeadlessNoSandbox` is confirmed to be a real launcher name. `test:backend` and `package:server` are the two jobs whose only honest verification is a real pipeline run.
+Verified before commit: the YAML parses in strict mode, every `stage`/`extends`/`needs` target resolves, no `needs` points at a later stage, and every `$VAR` is either declared, GitLab-predefined, a documented CI/CD setting, or a shell local. `ng test` and `ng lint` were both **run locally** to see what CI would actually get — 3464 specs pass, and `ChromeHeadlessNoSandbox` is confirmed to be a real launcher name. `deploy-manual:ec2`'s payload builder was **executed with the `aws` CLI stubbed**, proving the request is valid JSON and the base64 round-trips byte-identical; `deploy_update.sh` passes `bash -n` and its guard paths were exercised. `test:backend` and `package:server` are the two jobs whose only honest verification is a real pipeline run.
 
 ## 6.1 Pipeline skeleton
 
@@ -1623,36 +1623,180 @@ Also fixed while here: **`docker:dind` over TLS needs all four variables** — `
 
 ## 6.5 Deploy job
 
-- [x] **`deploy-manual:ec2`** — manual (Play), tag-only, `allow_failure: false`. SSHes in with a deploy key from CI variables. ✅ 2026-09-25
+- [x] **`deploy-manual:ec2`** — manual (Play), tag-only, `allow_failure: false`. Runs over **AWS Systems Manager**, not SSH. ✅ 2026-09-28
 - [x] **`deploy-manual:ui`** — manual, tag-only. Unpacks the `package:ui` artifact and runs `ui/package/deploy_ui.sh` (S3 + CloudFront invalidation). ✅ 2026-09-25
 - [x] **Manual, not automatic**, per the original reasoning: auto-deploy on tag for a payments app is not appropriate until the suite is trusted further. Clicking Play *is* the gate.
-- [ ] **Set the CI/CD variables the two jobs need** (Settings → CI/CD → Variables). Nothing in the repo can create these:
-	- `EC2_SSH_KEY` — type **File**, **Protected**. Masking is unavailable for a multi-line PEM, so Protected + a protected `v*` tag pattern is what keeps it off ordinary refs. Mint a **CI-only** keypair; revoking it is then deleting one line from `~ubuntu/.ssh/authorized_keys`, with no effect on your laptop's key.
-	- `EC2_HOST` — **Protected**. The elastic IP.
-	- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — **Protected + Masked**, for the `ci-deploy` IAM user with the `knottyyoga-ci-deploy` policy from 4.6.
-	- `AWS_DEFAULT_REGION` — `us-west-2`.
-	- `CLOUDFRONT_DISTRIBUTION_ID` — the `E…` value, **not** the `dXXXX.cloudfront.net` domain.
-- [ ] **One-time on the EC2:** `sudo docker login registry.gitlab.com` with a project **deploy token** scoped `read_registry`. Without it the pull fails as `unauthorized`, which reads like a missing image.
+- [x] **`server/knottyyoga_server/package/deploy_update.sh`** — the one implementation of the update procedure, run by CI *and* by an operator. ✅ 2026-09-28
 
-#### ⚠️ `/opt/knottyyoga/deploy/install.sh` does not exist, and never did
+Then three pieces of setup, none of which the repo can do for you — §6.5a–c below.
 
-The spec's `install.sh <artifact-url>` was aspirational. Rather than invent a host script this phase, the job performs **the update procedure already documented in `package/systemd/README.md` ("Updating to a new image tag"), step for step**: pull → `docker tag` to the bare `knottyyoga:<tag>` name both units expect → `--migrate` (never `--install_schema`, which is first-deploy only) → atomic `version.env` rewrite → restart helper, server, helper → health check. Automating the same sequence an operator follows by hand means the two cannot drift.
+### ⚠️ Why Systems Manager and not SSH
 
-Details worth knowing:
+**An SSH deploy cannot work here without undoing Phase 5.2's hardening.** 5.2 locked `knottyyoga-web` (`sg-0accf95c33945db08`) inbound 22 to a single `/32` — the home IP. GitLab.com's shared runners have dynamic egress addresses and GitLab publishes no stable range for them, so the runner is simply dropped: the job hangs and fails with a connect timeout, the same no-explanation symptom 5.2 describes for an ISP IP change. Making it work means `0.0.0.0/0` on port 22.
 
-- **`docker tag` is not redundant.** The units run the bare name `knottyyoga:${KNOTTYYOGA_IMAGE_TAG}`, not a registry path, so the pulled image needs the local alias.
-- **`-v /etc/knottyyoga:/etc/knottyyoga:ro` on the migrate run.** `HONUWARE_DB_SSLROOTCERT` is a *path*, resolved inside the container.
-- **Health check polls (15 × 2s) instead of `sleep && curl`.** `/api/health` is allow-listed by the CloudFront origin guard, so localhost needs no `X-Origin-Secret`; and it answers **503**, not 200, when the RDS probe fails — so `curl -f` failing here means the deploy is genuinely bad. On failure the job dumps `systemctl status` and the last 50 journal lines.
-- **The heredoc is quoted (`<<'REMOTE'`)** so the remote script is literal; only `TAG` and `IMAGE` are interpolated, via the assignment on the `ssh` command line. An unquoted heredoc would let the runner's shell eat every `$` meant for the remote bash.
-- **`StrictHostKeyChecking accept-new`** — trusts on first use but pins afterwards, so a later host-key change fails loudly. `no` would refuse the first deploy outright with nothing to fix it with.
+Systems Manager is **outbound-only from the instance**, so the comparison is one-sided:
+
+| | SSH | Systems Manager |
+|---|---|---|
+| Inbound port 22 | must be open to the world | **none needed** |
+| Secret to hold in CI | a private key (unmaskable) | **none** — reuses the AWS keys `deploy-manual:ui` already needs |
+| Survives an ISP IP change | no | **yes** |
+| Audit trail | sshd logs on the box | **CloudTrail** (already set up in 5.3) |
+| Extra setup | key generation + `authorized_keys` + protected tags | one IAM policy |
+
+The groundwork is already done: `knottyyoga-ec2-ssm` is attached to the instance and a Session Manager shell was verified on 9/25. This reuses that identity for command execution instead of interactive shells.
+
+**The SSH variant is kept on record below (§6.5d)** — it becomes the right answer if the project ever moves to a self-hosted runner with a fixed IP.
+
+### 6.5a Grant `ci-deploy` permission to send the command
+
+The `ci-deploy` user is **S3 + CloudFront only** — that is precisely the gap that made `aws ssm start-session` fail with `AccessDeniedException` in 5.2. It needs two SSM actions added.
+
+- [ ] **Get your account ID.** IAM → **Users** → `ci-deploy` → the **ARN** at the top reads `arn:aws:iam::123456789012:user/ci-deploy`; the 12 digits are it. (Also in the console's top-right account menu.)
+- [ ] **IAM → Users → `ci-deploy` → Permissions tab → *Add permissions* ▾ → *Create inline policy* → the **JSON** tab.** Replace everything in the editor with the policy below, substituting your account ID in the instance ARN. Then *Next* → name it `knottyyoga-ci-ssm-deploy` → *Create policy*.
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "SendDeployScriptToTheOneInstance",
+            "Effect": "Allow",
+            "Action": "ssm:SendCommand",
+            "Resource": [
+                "arn:aws:ec2:us-west-2:123456789012:instance/i-03dcc463764ac0d19",
+                "arn:aws:ssm:us-west-2::document/AWS-RunShellScript"
+            ]
+        },
+        {
+            "Sid": "ReadBackTheResult",
+            "Effect": "Allow",
+            "Action": "ssm:GetCommandInvocation",
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+Three things about that policy that are easy to get wrong:
+
+- **`ssm:SendCommand` authorizes against *two* resource types at once** — the instance *and* the document. List only the instance and every call is denied, with a message that names the document and reads like the document is missing.
+- **The AWS-managed document ARN has an empty account field** — `arn:aws:ssm:us-west-2::document/AWS-RunShellScript`, with **two** colons. AWS owns the document, not you. Writing your account ID there denies everything.
+- **`ssm:GetCommandInvocation` takes no resource-level restriction**, so it must be `"*"`. It only reads back the output of commands, and `SendCommand` above is what is actually scoped to the one instance.
+
+Scoping `SendCommand` to that single instance ARN is the real control: this credential can run root commands on `knottyyoga-server` and on nothing else in the account.
+
+- [ ] **Verify the permission on its own, before involving CI.** This isolates "are the IAM permissions right" from "does the deploy work", which are otherwise one confusing failure. In Git Bash:
+	```bash
+	export AWS_PROFILE=knottyyoga-deploy
+	CMD=$(aws ssm send-command \
+	    --instance-ids i-03dcc463764ac0d19 \
+	    --document-name AWS-RunShellScript \
+	    --parameters 'commands=id,hostname' \
+	    --query 'Command.CommandId' --output text)
+	echo "$CMD"
+	```
+	Wait a few seconds, then read the result:
+	```bash
+	aws ssm get-command-invocation --command-id "$CMD" \
+	    --instance-id i-03dcc463764ac0d19 \
+	    --query '[Status,StandardOutputContent]' --output text
+	```
+	Expect `Success`, then `uid=0(root) …` and `ip-172-31-2-31`. **`uid=0` is the thing to notice** — Systems Manager runs commands as root, which is why `deploy_update.sh` needs no `sudo` under CI. No Session Manager plugin is needed for this: that plugin is only for interactive `start-session`, which is what tripped this up in 5.2.
+
+### 6.5b Set the CI/CD variables
+
+Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
+
+| Key | Value | Type | Flags |
+|---|---|---|---|
+| `EC2_INSTANCE_ID` | `i-03dcc463764ac0d19` | Variable | Protect ✓ |
+| `AWS_ACCESS_KEY_ID` | the `ci-deploy` key ID | Variable | Protect ✓, Mask ✓ |
+| `AWS_SECRET_ACCESS_KEY` | the `ci-deploy` secret | Variable | Protect ✓, Mask ✓ |
+| `AWS_DEFAULT_REGION` | `us-west-2` | Variable | Protect ✓ |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `E23TY4IAUHGM6H` | Variable | Protect ✓ |
+
+`EC2_SSH_KEY` and `EC2_HOST` are **not needed** — that is the payoff of the SSM route.
+
+- [ ] **Add the five variables above.**
+- [ ] **⚠️ Protect the tag pattern, or "Protect variable" silently hides them.** Settings → **Repository** → **Protected tags** → *Add tag* → `v*` → *Protect*. A protected variable is only exposed to jobs on protected branches **and protected tags**; skip this and the tag pipeline sees none of the five, so the job fails on an empty instance ID rather than on anything that names the cause.
+- **`CLOUDFRONT_DISTRIBUTION_ID` is the `E…` value**, not the `dXXXX.cloudfront.net` domain — `deploy_ui.sh` rejects anything that does not look like `E…`, which is the one error here that explains itself.
+
+### 6.5c One-time on the EC2: registry login as root
+
+- [ ] **`sudo docker login registry.gitlab.com`**, with a project **deploy token** (Settings → Repository → Deploy tokens) scoped **`read_registry`**. Username is the token's username, password is the token.
+- ⚠️ **It must be `sudo`.** Systems Manager runs as root, and so do both systemd units, so the credential has to land in `/root/.docker/config.json`. A login as `ubuntu` writes `/home/ubuntu/.docker/config.json`, the root-side pull then fails `unauthorized`, and that reads like a missing image or a bad tag.
+
+Verify without deploying anything:
+
+```bash
+sudo docker pull registry.gitlab.com/<namespace>/knottyyoga/knottyyoga:<some-existing-tag>
+```
+
+### How the job works
+
+`deploy-manual:ec2` runs in `amazon/aws-cli:2` and does three things:
+
+1. **base64-encodes `deploy_update.sh`** and builds an `ssm send-command` request as a JSON file. base64 is not decoration: it means nothing in the script has to survive two layers of shell quoting. And `--cli-input-json` rather than `--parameters` because the CLI's shorthand parser treats **a comma inside any command as a new list element** — one comma in the deploy script would silently truncate it.
+2. **Sends it**, wrapped as four commands: decode to `/tmp/knottyyoga_deploy.sh`, `bash` it with the tag and registry path, remove it.
+3. **Polls `get-command-invocation`** (up to 20 min), then prints the remote stdout and stderr into the job log and fails unless `Status` is exactly `Success`. `send-command` is asynchronous — it returns the moment SSM *accepts* the request, so without the poll the job would always pass.
+
+Two timeouts, and they are different things: `TimeoutSeconds` (600) is how long SSM waits for the agent to *accept* the command; `executionTimeout` (900, a document parameter) is how long the script may *run*. 900 is deliberately shorter than the 1200s poll ceiling so SSM always reaches a terminal state the job can report, instead of CI giving up on a command still in flight.
+
+⚠️ **`get-command-invocation` returns only the first 24,000 characters of output.** That is why `deploy_update.sh` pulls with `--quiet` — layer-by-layer progress is the one step noisy enough to push the health-check result off the end. If richer output is ever needed, `send-command` can also write to S3 or CloudWatch Logs.
+
+Verified before commit: the YAML parses strict; both script items pass `bash -n`; and the payload builder was **executed with the `aws` CLI stubbed** — the generated request is valid JSON, the comment is 33 of the 100 permitted characters, and the base64 round-trips byte-identical to the 9,262-byte script.
+
+### One script, two callers
+
+The spec's `/opt/knottyyoga/deploy/install.sh <artifact-url>` never existed. `package/systemd/README.md` instead carried the procedure as a block of copy-paste commands — a second copy to keep in sync, which is the same problem one step removed.
+
+Both are now `server/knottyyoga_server/package/deploy_update.sh`: CI ships it over SSM, an operator runs `sudo ./deploy_update.sh <tag> <registry-image>` from the tarball root, and the README documents what it does rather than restating it. `build_linux_release.sh` stages it into the tarball and **fails the build if it is missing**, for the same reason it does that for the seed images — a documented procedure pointing at a file the operator does not have is how the first deploy went wrong four times over.
+
+It takes `-` in place of the registry path to deploy an image already loaded on the host, which is the `docker save`/`docker load` route 5.1 uses.
+
+Inside, the sequence is unchanged from what 4.8/5.1 established: record the outgoing tag → pull + `docker tag` to the bare `knottyyoga:<tag>` name both units run → `--migrate` (never `--install_schema`) with `-v /etc/knottyyoga:…:ro` because `HONUWARE_DB_SSLROOTCERT` is a path resolved *inside* the container → atomic `version.env` rewrite under `umask 077` → restart helper/server/helper → poll `/api/health` 15 × 2s.
 
 #### ⚠️ There is deliberately NO automatic rollback
 
-7.4 specifies one (health-check, then revert to the previous tag). It belongs with 7.4's deploy script: a half-written rollback is *worse* than none, because it can leave `version.env` and the running container disagreeing. These jobs fail loudly and leave the host where they got to; manual recovery is RUNBOOK.md §2.
+7.4 specifies one (health-check, then revert to the previous tag). It belongs with 7.4: a half-written rollback is *worse* than none, because it can leave `version.env` and the running container disagreeing. What the script does instead is **print the tag it replaced and the exact command to go back**, which costs nothing and turns "how do I get back?" into one copy-paste — while leaving the judgement call (what to do about a migration the new build already applied) with the human, where it belongs. Recovery procedure: RUNBOOK.md §2.
 
 #### The UI half is an addition, not in the original 6.5
 
 6.5 described only the EC2, but a tag that updates the API and leaves the SPA on the previous build is half a deploy — and 4.6 already built both halves of the frontend pipeline. It is a **separate Play button** because the two can legitimately ship apart. `PRUNE` stays off: the previous build's lazy-loaded chunks must outlive this deploy or a browser mid-session 404s (`deploy_ui.sh`'s header has the rule). `WAIT` stays off too — it needs `cloudfront:GetInvalidation`, which the 4.6 policy did not grant.
+
+### 6.5d The SSH route, for the record
+
+Not in use, and not recommended while CI runs on GitLab.com's shared runners — it needs port 22 open to `0.0.0.0/0`. Worth having written down because it is the right answer behind a **self-hosted runner with a fixed IP** (which could also be the EC2 itself, making the deploy local and needing no remote access at all).
+
+`EC2_SSH_KEY` is the **contents of a private key file**, in a variable whose **Type is `File`**. That type is the whole trick: GitLab writes the value to a temp file and sets the variable to *that file's path*, which is why the job would do `install -m 600 "$EC2_SSH_KEY" ~/.ssh/id_deploy` — copying a file, not echoing a string.
+
+Use a **third** key, not either existing one. `knottyyoga-ec2.pem` is the key that works today and AWS keeps no copy (4.3), so it must never leave the laptop; `knottyyoga-backup` has a passphrase by design (5.2), and an unattended `ssh` cannot answer a passphrase prompt — the job would hang until it timed out.
+
+1. **Generate**, with an empty passphrase (`-N ""`), which is what makes it CI-only:
+	```bash
+	ssh-keygen -t ed25519 -C "gitlab-ci-deploy" -f ~/.ssh/knottyyoga-ci -N ""
+	```
+2. **Install the public half** — one line, same trap as 5.2 (drop the trailing `'…'` and ssh feeds your key to the remote bash as a command, answering `ssh-ed25519: command not found`):
+	```bash
+	cat ~/.ssh/knottyyoga-ci.pub | ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+	```
+3. **Verify** — expect three fingerprints: the AWS key, `mason-backup`, `gitlab-ci-deploy`:
+	```bash
+	ssh -i ~/.ssh/knottyyoga-ci ubuntu@34.215.204.200 'echo ci key works'
+	ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200 'ssh-keygen -lf ~/.ssh/authorized_keys'
+	```
+4. **Paste the private half** (`cat ~/.ssh/knottyyoga-ci | clip`) into a **File**-type, **Protected** variable.
+
+Three traps, each producing a misleading error:
+
+- **The value must end with a newline.** OpenSSH rejects a key file whose last line is unterminated: `Load key "…/id_deploy": invalid format`, which reads like a corrupted key. Press Enter once after pasting.
+- **Masking is impossible** — GitLab requires a single line with no whitespace, and a PEM is neither. Protected is the only control available.
+- **"Protect variable" does nothing until `v*` is a protected tag** (same as §6.5b).
+
+`EC2_HOST` would be the **Elastic IP, `34.215.204.200`** — recorded in 4.3, and confirmable at EC2 → **Instances** → `knottyyoga-server` → **Details** → *Public IPv4 address*, or **Network & Security → Elastic IPs** → *Allocated IPv4 address*. The Elastic IP specifically, because an auto-assigned public IP changes on every stop/start.
+
+Revocability was the one genuine advantage of this route: CI's access dies by deleting one line from `authorized_keys`, with no effect on your own keys. The SSM route beats it anyway, because there is no credential on the box at all.
 
 ---
 
@@ -1675,17 +1819,17 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 
 ## 7.4 Update procedure
 
-- [ ] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab.
-- [ ] Operator clicks `deploy-manual` in GitLab → artifact deploys to EC2.
-- [ ] EC2 `install.sh`:
-  1. Pulls image: `docker pull <ecr-repo>/knottyyoga:vX.Y.Z`.
-  2. Runs migrations: `docker run --rm --env-file /etc/knottyyoga/server.env <image> knottyyoga_database_helper --migrate`. (Idempotent for the scheduler service-account row — second-and-later runs are a no-op.)
-  3. Stops the helper first: `systemctl stop knottyyoga-helper`. SIGTERM-clean per Phase 11 of `Scheduled Jobs.md` — graceful shutdown takes <1s.
-  4. Stops the server: `docker stop knottyyoga-server`.
-  5. Starts the new server: `docker run -d --name knottyyoga-server -p 80:80 --env-file /etc/knottyyoga/server.env <image>`.
-  6. Health-check poll on `/api/health`; abort + rollback to previous image tag (both containers) if health fails within 30s.
-  7. Starts the new helper: `systemctl start knottyyoga-helper`. Verify in journalctl that it re-authenticates successfully.
-  8. Prune old images: `docker image prune -f`.
+- [ ] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab (`release:gitlab`, 6.4).
+- [ ] Operator clicks Play on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`** (6.5). Two buttons, because API and SPA can legitimately ship apart.
+
+⚠️ **Most of this section is now implemented, and the `install.sh` it described does not exist under that name.** 6.5 built `server/knottyyoga_server/package/deploy_update.sh`, which CI runs over Systems Manager and an operator runs by hand. Steps 1, 2, 6 and 7 below are done; 3–5 were superseded and 8 is the only genuinely open item.
+
+- [x] Pull the image, and `docker tag` it to the bare `knottyyoga:<tag>` name both units run.
+- [x] Run migrations — `--migrate`, idempotent for the scheduler service-account row. Carries `-v /etc/knottyyoga:…:ro`, which the sketch below omitted: `HONUWARE_DB_SSLROOTCERT` is a path resolved *inside* the container, and `--entrypoint` is required because the image's entrypoint is the server.
+- [x] ~~Stop the helper, `docker stop` the server, `docker run -d` the new one~~ — **superseded.** The units are `Type=simple` with a foreground `docker run` (see `package/systemd/README.md`, "Why these specific systemd directives"), so the deploy never runs containers by hand. It rewrites `version.env` atomically and issues `systemctl restart` helper → server → helper; `systemctl restart` re-reads `EnvironmentFile=` on its own.
+- [x] Health-check poll on `/api/health` — 15 × 2s. Fails the job loudly on timeout, dumping `systemctl status` and 50 journal lines.
+- [ ] **Rollback on health failure.** Still not implemented, deliberately — see 6.5's note. The script prints the outgoing tag and the exact command to return to it, but reverting also means deciding what to do about a migration the new build already applied, which is a human call. Doing this properly means deciding a policy for backward-compatible migrations first (7.2's checklist is where that lives).
+- [ ] **Prune old images.** Nothing prunes today, and each tag adds a few hundred MB to a small root volume — which the 5.3 disk alarm will eventually catch as a surprise. `docker image prune -f` removes only *dangling* images, so it will not touch a previous tag you might want to roll back to; deleting old tags needs an explicit retention rule (keep the last N). Worth doing before tags accumulate, not after the alarm fires.
 
 ---
 
