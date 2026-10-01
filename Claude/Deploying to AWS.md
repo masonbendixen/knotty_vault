@@ -1718,8 +1718,8 @@ Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
 
 `EC2_SSH_KEY` and `EC2_HOST` are **not needed** — that is the payoff of the SSM route.
 
-- [ ] **Add the five variables above.**
-- [ ] **⚠️ Protect the tag pattern, or "Protect variable" silently hides them.** Settings → **Repository** → **Protected tags** → *Add tag* → `v*` → *Protect*. A protected variable is only exposed to jobs on protected branches **and protected tags**; skip this and the tag pipeline sees none of the five, so the job fails on an empty instance ID rather than on anything that names the cause.
+- [x] **Add the five variables above.** ✅ 2026-10-01
+- [x] **⚠️ Protect the tag pattern, or "Protect variable" silently hides them.** Settings → **Repository** → **Protected tags** → *Add tag* → `v*` → *Protect*. A protected variable is only exposed to jobs on protected branches **and protected tags**; skip this and the tag pipeline sees none of the five, so the job fails on an empty instance ID rather than on anything that names the cause. ✅ 2026-10-01
 - **`CLOUDFRONT_DISTRIBUTION_ID` is the `E…` value**, not the `dXXXX.cloudfront.net` domain — `deploy_ui.sh` rejects anything that does not look like `E…`, which is the one error here that explains itself.
 
 ### 6.5c One-time on the EC2: registry login as root
