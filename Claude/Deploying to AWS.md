@@ -1724,14 +1724,28 @@ Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
 
 ### 6.5c One-time on the EC2: registry login as root
 
-- [ ] **`sudo docker login registry.gitlab.com`**, with a project **deploy token** (Settings → Repository → Deploy tokens) scoped **`read_registry`**. Username is the token's username, password is the token.
+- [ ] **Create the deploy token (GitLab, browser).** It is not tied to your personal account and can only pull this one project's images, so it is safe to leave on the server.
+	1. Open the **knottyyoga project** on gitlab.com → left sidebar **Settings → Repository** → expand **Deploy tokens** → **Add token**.
+	2. **Name:** `ec2-registry-pull`. **Expiration date:** blank (never expires). **Username:** blank — GitLab generates one like `gitlab+deploy-token-1234567`. **Scopes:** tick **only `read_registry`**.
+	3. **Create deploy token.** It shows the **username** (`gitlab+deploy-token-…`) and the **token** (a long string, often `gldt-…`). ⚠️ **The token is shown only once** — save both to the password manager now.
+- [ ] **Log in on the EC2 as root.** SSH in as usual (`ssh -i "$HOME\.ssh\knottyyoga-ec2.pem" ubuntu@34.215.204.200` from PowerShell, or the `~/.ssh/...` form from Git Bash), then:
+	```bash
+	sudo docker login registry.gitlab.com
+	```
+	```
+	Username: gitlab+deploy-token-1234567     ← the generated username
+	Password:                                 ← paste the token (nothing echoes; that's normal)
+	```
+	Expect `Login Succeeded`. A warning that the credential is stored unencrypted in `/root/.docker/config.json` is expected — that file is exactly where it needs to be.
 - ⚠️ **It must be `sudo`.** Systems Manager runs as root, and so do both systemd units, so the credential has to land in `/root/.docker/config.json`. A login as `ubuntu` writes `/home/ubuntu/.docker/config.json`, the root-side pull then fails `unauthorized`, and that reads like a missing image or a bad tag.
 
-Verify without deploying anything:
+Verify without deploying anything. Get the real image path and a tag from GitLab → project → **Deploy → Container registry** (click the image; it shows the full path and its tags):
 
 ```bash
 sudo docker pull registry.gitlab.com/<namespace>/knottyyoga/knottyyoga:<some-existing-tag>
 ```
+
+If the registry is still empty (no pipeline has pushed an image yet), this check can't run yet — do it after the first pipeline pushes.
 
 ### How the job works
 
