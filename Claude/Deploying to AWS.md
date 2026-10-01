@@ -1653,7 +1653,7 @@ The groundwork is already done: `knottyyoga-ec2-ssm` is attached to the instance
 The `ci-deploy` user is **S3 + CloudFront only** — that is precisely the gap that made `aws ssm start-session` fail with `AccessDeniedException` in 5.2. It needs two SSM actions added.
 
 - [x] **Get your account ID.** It's `957014951609` (already filled into the policy below).
-- [ ] **IAM → Users → `ci-deploy` → Permissions tab → *Add permissions* ▾ → *Create inline policy* → the **JSON** tab.** Replace everything in the editor with the policy below. It's ready to paste as is. Then *Next* → name it `knottyyoga-ci-ssm-deploy` → *Create policy*.
+- [x] **IAM → Users → `ci-deploy` → Permissions tab → *Add permissions* ▾ → *Create inline policy* → the **JSON** tab.** Replace everything in the editor with the policy below. It's ready to paste as is. Then *Next* → name it `knottyyoga-ci-ssm-deploy` → *Create policy*. ✅ 2026-10-01
 
 ```json
 {
@@ -1686,7 +1686,7 @@ Three things about that policy that are easy to get wrong:
 
 Scoping `SendCommand` to that single instance ARN is the real control: this credential can run root commands on `knottyyoga-server` and on nothing else in the account.
 
-- [ ] **Verify the permission on its own, before involving CI.** This isolates "are the IAM permissions right" from "does the deploy work", which are otherwise one confusing failure. In Git Bash:
+- [x] **Verify the permission on its own, before involving CI.** This isolates "are the IAM permissions right" from "does the deploy work", which are otherwise one confusing failure. In Git Bash: ✅ 2026-10-01
 	```bash
 	export AWS_PROFILE=knottyyoga-deploy
 	CMD=$(aws ssm send-command \
@@ -1708,13 +1708,13 @@ Scoping `SendCommand` to that single instance ARN is the real control: this cred
 
 Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
 
-| Key | Value | Type | Flags |
-|---|---|---|---|
-| `EC2_INSTANCE_ID` | `i-03dcc463764ac0d19` | Variable | Protect ✓ |
-| `AWS_ACCESS_KEY_ID` | the `ci-deploy` key ID | Variable | Protect ✓, Mask ✓ |
-| `AWS_SECRET_ACCESS_KEY` | the `ci-deploy` secret | Variable | Protect ✓, Mask ✓ |
-| `AWS_DEFAULT_REGION` | `us-west-2` | Variable | Protect ✓ |
-| `CLOUDFRONT_DISTRIBUTION_ID` | `E23TY4IAUHGM6H` | Variable | Protect ✓ |
+| Key                          | Value                  | Type     | Flags             |
+| ---------------------------- | ---------------------- | -------- | ----------------- |
+| `EC2_INSTANCE_ID`            | `i-03dcc463764ac0d19`  | Variable | Protect ✓         |
+| `AWS_ACCESS_KEY_ID`          | the `ci-deploy` key ID | Variable | Protect ✓, Mask ✓ |
+| `AWS_SECRET_ACCESS_KEY`      | the `ci-deploy` secret | Variable | Protect ✓, Mask ✓ |
+| `AWS_DEFAULT_REGION`         | `us-west-2`            | Variable | Protect ✓         |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `E23TY4IAUHGM6H`       | Variable | Protect ✓         |
 
 `EC2_SSH_KEY` and `EC2_HOST` are **not needed** — that is the payoff of the SSM route.
 
