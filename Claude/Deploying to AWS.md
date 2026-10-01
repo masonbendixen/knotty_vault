@@ -1652,8 +1652,8 @@ The groundwork is already done: `knottyyoga-ec2-ssm` is attached to the instance
 
 The `ci-deploy` user is **S3 + CloudFront only** — that is precisely the gap that made `aws ssm start-session` fail with `AccessDeniedException` in 5.2. It needs two SSM actions added.
 
-- [ ] **Get your account ID.** IAM → **Users** → `ci-deploy` → the **ARN** at the top reads `arn:aws:iam::123456789012:user/ci-deploy`; the 12 digits are it. (Also in the console's top-right account menu.)
-- [ ] **IAM → Users → `ci-deploy` → Permissions tab → *Add permissions* ▾ → *Create inline policy* → the **JSON** tab.** Replace everything in the editor with the policy below, substituting your account ID in the instance ARN. Then *Next* → name it `knottyyoga-ci-ssm-deploy` → *Create policy*.
+- [x] **Get your account ID.** It's `957014951609` (already filled into the policy below).
+- [ ] **IAM → Users → `ci-deploy` → Permissions tab → *Add permissions* ▾ → *Create inline policy* → the **JSON** tab.** Replace everything in the editor with the policy below. It's ready to paste as is. Then *Next* → name it `knottyyoga-ci-ssm-deploy` → *Create policy*.
 
 ```json
 {
@@ -1664,7 +1664,7 @@ The `ci-deploy` user is **S3 + CloudFront only** — that is precisely the gap t
             "Effect": "Allow",
             "Action": "ssm:SendCommand",
             "Resource": [
-                "arn:aws:ec2:us-west-2:123456789012:instance/i-03dcc463764ac0d19",
+                "arn:aws:ec2:us-west-2:957014951609:instance/i-03dcc463764ac0d19",
                 "arn:aws:ssm:us-west-2::document/AWS-RunShellScript"
             ]
         },
