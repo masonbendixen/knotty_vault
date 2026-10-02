@@ -1513,7 +1513,7 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 | `build:server` | build | ✅ auto | skipped — `package:server` compiles everything anyway |
 | `test:backend` | test | ✅ auto | ✅ auto |
 | `test:frontend` | test | ✅ auto | ✅ auto |
-| `lint:frontend` | test | ✅ auto, `allow_failure` | ✅ auto, `allow_failure` |
+| `lint:frontend` | test | ✅ auto (required since 10/2) | ✅ auto (required since 10/2) |
 | `build:frontend` | test | ✅ auto | skipped — `package:ui` builds the same thing |
 | `package:server` | package | — | ✅ auto (image + tarball) |
 | `package:ui` | package | — | ✅ auto (tarball) |
@@ -1597,7 +1597,13 @@ The spec said "`conan install`, `cmake`, `make`, then `bin/knottyyoga_tests`". R
 - [x] **Job `test:frontend`** — `npm ci` then `ng test --watch=false`. ✅ 2026-09-25
 - [x] **Job `build:frontend`** — `ng build --configuration=production`, artifact published. ✅ 2026-09-25
 - [x] **`ng lint` in CI** — as its own job, `allow_failure: true`. ✅ 2026-09-25
-- [ ] **Clear the lint backlog, then drop `allow_failure` from `lint:frontend`.** Measured 2026-09-25: **264 problems (250 errors, 14 warnings)**, overwhelmingly `@typescript-eslint/no-unused-vars` on type imports in `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccess.ts` and `ServerAccessNetwork.ts`, plus a handful of `no-explicit-any`. 6 errors and all 14 warnings are `--fix`-able.
+- [x] **Clear the lint backlog, then drop `allow_failure` from `lint:frontend`.** Measured 2026-09-25: **264 problems (250 errors, 14 warnings)**, overwhelmingly `@typescript-eslint/no-unused-vars` on type imports in `shared/types/ServerAccess.ts`, `shared/services/network/ServerAccess.ts` and `ServerAccessNetwork.ts`, plus a handful of `no-explicit-any`. 6 errors and all 14 warnings are `--fix`-able. ✅ 2026-10-02 — **0 problems**; `allow_failure` removed, so `lint:frontend` is now a required gate.
+	- Breakdown actually cleared (263 by then): 155 `no-explicit-any` (136 in specs — mostly `new ServerAccessProxy(serverAccessMock as any)`, which needs no cast at all since the mock implements `ServerAccess`), 85 `no-unused-vars`, 14 stale `eslint-disable` comments, plus `prefer-const`/`no-var`, one `no-loss-of-precision` (`9_999_999_999_999_999` → `Number.MAX_SAFE_INTEGER`) and two directive selectors.
+	- **One config change:** `no-unused-vars` now has `argsIgnorePattern: '^_'`. `ServerAccessMock` methods must keep their full parameter lists even when the mock ignores an argument — spies built from the mock are typed from its own signatures, so deleting a param breaks `toHaveBeenCalledWith(...)` type-checking (~35 places). Those params are `_`-prefixed instead.
+	- ⚠️ **Directive selectors renamed:** `[hwParallax]` → `[appParallax]`, `[hwThemeIcon]` → `[appThemeIcon]` (the app's own copies used the library's `hw-` prefix). All usages updated; nothing else references the old names.
+	- `NotificationPreferencesWire` added in `ServerAccessNetwork.ts` for the raw notification-preferences response (`"t"`/`"f"` bools, string numbers) that was typed `any`.
+	- Verified: `ng lint` clean, production `ng build` passes, `ng test` 3465 passed.
+	- **Test gaps noticed, not changed:** `coupon-management` "should create coupon successfully" never asserts the list reloads; `refund-effectiveness` "inclusive window" never ties `fromUs` to `fromDate`; `ServerAccessMock` ignores some arguments the real server uses (`getAvailableServiceSlots` range end + filters, `staffGetCustomerCards` person id, `adminBlockDates`/`adminUnblockDates` everything), so a caller passing the wrong value there can't be caught by a spec.
 
 #### ⚠️ `--browsers=ChromeHeadlessCI` names a launcher that does not exist — and `ui/karma.conf.js` is dead config
 
