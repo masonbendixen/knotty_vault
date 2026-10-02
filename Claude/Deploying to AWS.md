@@ -1575,6 +1575,23 @@ The spec said "`conan install`, `cmake`, `make`, then `bin/knottyyoga_tests`". R
 - **Service alias is `postgresql`, not `postgres`.** That is the literal hostname the Linux build defaults to, so a connection that somehow loses `HONUWARE_DB_HOST` still lands on the sidecar instead of failing DNS. (`database_helper_init_test.cpp` carries a comment about that exact failure in CI.)
 - **`HONUWARE_DB_SSLMODE=disable`.** A Release build (`NDEBUG`) defaults `sslmode` to `prefer`, which *would* work — the sidecar has SSL off and `prefer` falls back to plaintext — but stating it skips a TLS handshake attempt on every one of the thousands of connections the suite opens.
 
+#### First real pipeline run (10/1–10/2/2026)
+
+- [x] **Bootstrap: play `image:builder` once.** The first pipeline failed in ~3 seconds on `build:server` with `manifest for registry.gitlab.com/knotty-yoga/knottyyoga/builder:latest not found: manifest unknown`. That is the expected first-run state, not a fault: `builder:latest` is only built automatically when `server/docker/Dockerfile` changes, so on the first pipeline it does not exist yet. Fix: pipeline graph → **image** column → **▶ Play** on `image:builder` (≈2 min — toolchain only, nothing compiled), then **↻ Retry** `build:server`. Retrying `build:server` before `image:builder` is green just fails the same way. ✅ 2026-10-01
+	- The runner was GitLab.com's shared `saas-linux-small-amd64`; its `Using helper image … (overridden …)` log line is normal there, and dind works.
+- [x] **First `test:backend`: 5180 / 5181 — a real date-triggered bug, not a CI problem.** ✅ fixed 2026-10-02 — Windows 5184 passed, Linux 5184 passed.
+	- **Failing test:** `SeedAppDataTest.ProviderAvailabilityIsGeneratedOnWeekdaysOnly`. It started failing on **October 1** and would have failed on any machine: from then on the seed's "today through the end of next month" window crosses the **November 1 DST fall-back**.
+	- **Cause:** `ScheduleTemplateHelper::GenerateAvailability` stepped fixed 24h from `date_from_us` and read the weekday in **UTC**. Everything else treats `provider_availability.date_us` as the **instant of local midnight** (the admin availability screen writes it that way; the staff schedule page matches on it). The two agree only while no DST change is in range: after Nov 1 every generated "Monday" was 23:00 local Sunday, and the 9–5 shift became 8–4. This was a production bug for admin-generated schedules, not just the seed.
+	- **Fix:** it now walks **local days in the facility's timezone** (`facilities.timezone`, UTC fallback — the same rule as `ClassScheduleHelper::FacilityTimezone`), steps by re-reading the next local midnight, and places shifts with `DateTimeUtil::LocalWallClockToUs` (wall clock, so 10:00 on the spring-forward Sunday is 9 elapsed hours after midnight). Tests: the helper tests now use LA local midnights; three new ones (range across the fall-back, spring-forward Sunday — also the only ISO-7 Sunday entry, UTC facility); the seed test additionally asserts every `date_us` is a local midnight and checks wall-clock start/end.
+	- ⚠️ **A red `test:backend` *does* block a tag deploy.** It runs on tags too, and a failed `test`-stage job stops the `package` stage. It no longer matters now that it's fixed, but don't rely on "tests failing doesn't block packaging".
+- [x] **Frontend sibling fixed: the staff "My Schedule" week view** (`provider-schedule.component.ts`) built its 7 columns by adding `86400000` ms per day and bounded each day as `dateUs + 24h`. For the week containing Nov 1 every column after the change started at 23:00 the previous evening, stopped matching the server's local-midnight `date_us`, and that day's availability silently disappeared. It now steps by calendar day (`new Date(y, m, d + i)`) and carries a real `dayEndUs` (the next local midnight). New spec pins the clock to 10/29/2026 and checks every column is a local midnight, each `dayEndUs` is the next column's start, and Nov 3 availability + a booking land in the Nov 3 column. ✅ 2026-10-02
+- [ ] **Follow-up — two server endpoints have the same 24h-step loop** over a local-midnight start date, so a time-off/blocked range spanning a DST change writes the days after it at 23:00 / 01:00 and they stop matching:
+	- `endpoints/admin_block_dates.cpp:129`
+	- `endpoints/admin_review_time_off.cpp:160` (approving time off)
+
+	Fix the same way (facility-local day walk) and move the loop into business logic while there — a day-generating loop in an endpoint is itself a layering violation. Not deploy-blocking: it only bites a block/time-off range that straddles the second Sunday of March or the first Sunday of November.
+- [ ] **Follow-up (cosmetic):** `ProviderScheduleComponent.formatBlockTime` shows "All Day" only when a block is ≥ 24h, so an all-day block on the 23-hour spring-forward day shows times instead.
+
 ## 6.3 Frontend test + build job
 
 - [x] **Job `test:frontend`** — `npm ci` then `ng test --watch=false`. ✅ 2026-09-25
@@ -1745,7 +1762,14 @@ Verify without deploying anything. Get the real image path and a tag from GitLab
 sudo docker pull registry.gitlab.com/<namespace>/knottyyoga/knottyyoga:<some-existing-tag>
 ```
 
-If the registry is still empty (no pipeline has pushed an image yet), this check can't run yet — do it after the first pipeline pushes.
+The `knottyyoga` app image only appears after the first **tag** pipeline (`package:server`). Until then, test the login against the **builder** image instead — the deploy token can read every image in the project, and `builder` exists once `image:builder` has run (see 6.2 → *First real pipeline run*). It is ~2 GB, so check `df -h /` first and remove it afterwards:
+
+```bash
+sudo docker pull registry.gitlab.com/knotty-yoga/knottyyoga/builder:latest
+sudo docker rmi registry.gitlab.com/knotty-yoga/knottyyoga/builder:latest
+```
+
+Layers downloading = the root login works. `unauthorized` = the login did not land as root; redo it with `sudo`.
 
 ### How the job works
 
