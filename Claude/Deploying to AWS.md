@@ -1751,7 +1751,7 @@ Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
 	1. Open the **knottyyoga project** on gitlab.com → left sidebar **Settings → Repository** → expand **Deploy tokens** → **Add token**.
 	2. **Name:** `ec2-registry-pull`. **Expiration date:** blank (never expires). **Username:** blank — GitLab generates one like `gitlab+deploy-token-1234567`. **Scopes:** tick **only `read_registry`**.
 	3. **Create deploy token.** It shows the **username** (`gitlab+deploy-token-…`) and the **token** (a long string, often `gldt-…`). ⚠️ **The token is shown only once** — save both to the password manager now.
-- [ ] **Log in on the EC2 as root.** SSH in as usual (`ssh -i "$HOME\.ssh\knottyyoga-ec2.pem" ubuntu@34.215.204.200` from PowerShell, or the `~/.ssh/...` form from Git Bash), then:
+- [x] **Log in on the EC2 as root.** SSH in as usual (`ssh -i "$HOME\.ssh\knottyyoga-ec2.pem" ubuntu@34.215.204.200` from PowerShell, or the `~/.ssh/...` form from Git Bash), then: ✅ 2026-10-02
 	```bash
 	sudo docker login registry.gitlab.com
 	```
