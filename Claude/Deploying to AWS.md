@@ -1779,7 +1779,9 @@ Layers downloading = the root login works. `unauthorized` = the login did not la
 
 ### How the job works
 
-`deploy-manual:ec2` runs in `amazon/aws-cli:2` and does three things:
+`deploy-manual:ec2` runs in `amazon/aws-cli:2.37.9` (`$AWS_CLI_IMAGE`) and does three things:
+
+> ⚠️ **It was originally `amazon/aws-cli:2`, which does not exist** — the image publishes only exact versions plus `latest`, so the first tag deploy (10/3) died with `manifest for amazon/aws-cli:2 not found: manifest unknown` before running a line. Both deploy jobs now use the pinned `AWS_CLI_IMAGE` variable. The image has no `tar`/`gzip`; `deploy-manual:ui`'s `dnf` guard installs them (verified locally). Same tag pipeline also hit `package:server` → `./package/build_linux_release.sh: Permission denied`: Windows commits store every `.sh` as mode 100644, so the release `Dockerfile` now runs it as `bash ./package/build_linux_release.sh` (verified with a full local image build). That is why the first deployed tag is `v1.0.0-sandbox.3`, not `.1`.
 
 1. **base64-encodes `deploy_update.sh`** and builds an `ssm send-command` request as a JSON file. base64 is not decoration: it means nothing in the script has to survive two layers of shell quoting. And `--cli-input-json` rather than `--parameters` because the CLI's shorthand parser treats **a comma inside any command as a new list element** — one comma in the deploy script would silently truncate it.
 2. **Sends it**, wrapped as four commands: decode to `/tmp/knottyyoga_deploy.sh`, `bash` it with the tag and registry path, remove it.
