@@ -1747,7 +1747,7 @@ Settings → **CI/CD** → expand **Variables** → **Add variable**, once each:
 
 ### 6.5c One-time on the EC2: registry login as root
 
-- [ ] **Create the deploy token (GitLab, browser).** It is not tied to your personal account and can only pull this one project's images, so it is safe to leave on the server.
+- [x] **Create the deploy token (GitLab, browser).** It is not tied to your personal account and can only pull this one project's images, so it is safe to leave on the server. ✅ 2026-10-02
 	1. Open the **knottyyoga project** on gitlab.com → left sidebar **Settings → Repository** → expand **Deploy tokens** → **Add token**.
 	2. **Name:** `ec2-registry-pull`. **Expiration date:** blank (never expires). **Username:** blank — GitLab generates one like `gitlab+deploy-token-1234567`. **Scopes:** tick **only `read_registry`**.
 	3. **Create deploy token.** It shows the **username** (`gitlab+deploy-token-…`) and the **token** (a long string, often `gldt-…`). ⚠️ **The token is shown only once** — save both to the password manager now.
