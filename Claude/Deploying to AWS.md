@@ -384,8 +384,8 @@ What you already have that's unusual: the C++ code *is* the schema source of tru
 
 You asked about saving copies of `db_schema/`. My take: **don't copy the directory**. Git tags per release (e.g., `v2026.04.16`) achieve the same goal without duplicated files and without drift.
 
-- [ ] Adopt a release tag convention: `vYYYY.MM.DD` or `vMAJOR.MINOR.PATCH`. Recommendation: semver with prereleases (`v1.0.0-sandbox.1`).
-- [ ] Tag every deployed build in git; the tag is the snapshot. Migrations that ship with that tag are the ones applied up to that point.
+- [x] Adopt a release tag convention: `vYYYY.MM.DD` or `vMAJOR.MINOR.PATCH`. Recommendation: semver with prereleases (`v1.0.0-sandbox.1`). ✅ 2026-10-03 — semver prereleases adopted (see 7.1).
+- [x] Tag every deployed build in git; the tag is the snapshot. ✅ enforced by CI (6.4). Migrations that ship with that tag are the ones applied up to that point.
 - [ ] The deployment script records the deployed tag in the DB (a `deployments` audit table — simple: id, version, deployed_at, notes). Useful for debugging "which build is broken?".
 
 ## 3.5 Rollback strategy
@@ -1503,6 +1503,8 @@ For a soft launch, that coverage is plenty. Multi-AZ EC2 / RDS is a Phase 8 upgr
 
 # Phase 6 — GitLab CI/CD
 
+> ✅ **PHASE 6 COMPLETE — 2026-10-03.** First tag deployed end-to-end through CI: **`v1.0.0-sandbox.3`**. Tag pipeline green (test, lint, `package:server`, `package:ui`, `release:gitlab`), then ▶ `deploy-manual:ec2` and ▶ `deploy-manual:ui` both passed, and the site at https://dv1tgxa9ok30f.cloudfront.net was checked by hand: the UI loads and reads/writes the RDS database through the API. `.1` and `.2` were burned on two pipeline bugs only a real tag run could expose — see 6.5 *How the job works*. Open follow-ups that do **not** block Phase 6: the two DST loops in 6.2, and 7.4's rollback + image pruning.
+
 You asked whether you can run backend tests that need Postgres in GitLab CI. **Yes** — GitLab "services" let you spin up a Postgres sidecar per job. Works well.
 
 **What runs when** (as implemented, 2026-09-25):
@@ -1650,6 +1652,7 @@ Also fixed while here: **`docker:dind` over TLS needs all four variables** — `
 - [x] **`deploy-manual:ui`** — manual, tag-only. Unpacks the `package:ui` artifact and runs `ui/package/deploy_ui.sh` (S3 + CloudFront invalidation). ✅ 2026-09-25
 - [x] **Manual, not automatic**, per the original reasoning: auto-deploy on tag for a payments app is not appropriate until the suite is trusted further. Clicking Play *is* the gate.
 - [x] **`server/knottyyoga_server/package/deploy_update.sh`** — the one implementation of the update procedure, run by CI *and* by an operator. ✅ 2026-09-28
+- [x] **First real tag deploy through CI: `v1.0.0-sandbox.3`.** Both Play buttons passed; site verified by hand (UI loads, API reaches RDS). ✅ 2026-10-03
 
 Then three pieces of setup, none of which the repo can do for you — §6.5a–c below.
 
@@ -1850,8 +1853,9 @@ Revocability was the one genuine advantage of this route: CI's access dies by de
 
 ## 7.1 Release convention
 
-- [ ] Decide on semver with prerelease tags: `v1.0.0-sandbox.1`, `v1.0.0-sandbox.2`, ..., then `v1.0.0` when flipping to Square live.
-- [ ] One git tag per deployed build. Do not deploy untagged commits.
+- [x] Decide on semver with prerelease tags: `v1.0.0-sandbox.1`, `v1.0.0-sandbox.2`, ..., then `v1.0.0` when flipping to Square live. ✅ 2026-10-03 — adopted; first deployed tag `v1.0.0-sandbox.3`. Tags **must** start with `v`: only `v*` is a protected tag (6.5b), and only protected tags see the AWS variables.
+	- **Never move or reuse a pushed tag** — if a tag's pipeline fails, fix on `master` and cut the next number (that is how `.1` and `.2` were spent).
+- [x] One git tag per deployed build. Do not deploy untagged commits. ✅ enforced by CI — packaging and both deploy jobs exist only in tag pipelines (6.4).
 - [ ] Keep `CHANGELOG.md` updated with one section per tag — at minimum, the list of applied migrations (important!) and any secret/env changes.
 
 ## 7.2 Per-release schema changes
@@ -1865,8 +1869,9 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 
 ## 7.4 Update procedure
 
-- [ ] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab (`release:gitlab`, 6.4).
-- [ ] Operator clicks Play on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`** (6.5). Two buttons, because API and SPA can legitimately ship apart.
+- [x] `git tag -a vX.Y.Z -m "..."` → push tag → CI builds artifacts → Release created in GitLab (`release:gitlab`, 6.4). ✅ 2026-10-03 (`v1.0.0-sandbox.3`; GitLab → **Code → Tags → New tag** from `master` does the same thing)
+- [x] Operator clicks Play on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`** (6.5). Two buttons, because API and SPA can legitimately ship apart. ✅ 2026-10-03
+	- **The routine from now on:** push to `master` → green pipeline → new tag `v1.0.0-sandbox.N+1` → wait for `package:server` (the slow one, a from-scratch build) → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` → spot-check the site.
 
 ⚠️ **Most of this section is now implemented, and the `install.sh` it described does not exist under that name.** 6.5 built `server/knottyyoga_server/package/deploy_update.sh`, which CI runs over Systems Manager and an operator runs by hand. Steps 1, 2, 6 and 7 below are done; 3–5 were superseded and 8 is the only genuinely open item.
 
