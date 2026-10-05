@@ -170,24 +170,26 @@ Today component SCSS uses six different breakpoints (600, 639, 700, 767, 768, 90
 - [x] `ui/CLAUDE.md`: "Breakpoints" paragraph next to the layout mixins.
 
 ### 1.2 Global base rules
-- [ ] Inputs, selects and textareas at least 16px on phones.
-- [ ] Minimum tap-target size for Material buttons and icon buttons on touch devices.
-- [ ] Long unbroken strings (emails, URLs) wrap instead of pushing the page wide.
-- [ ] Specs at 375px for each rule.
+- [x] Inputs, selects and textareas at least 16px on phones. ✅ `_html-overrides.scss`, below `md`, `font-size: max(1rem, 1em)` on text inputs/textarea/select (not checkbox/radio/range/file/color). Element selectors so a component that sizes an input *larger* still wins.
+	- ⚠️ **The spec caught a real bug in the first version:** Tailwind's preflight (`font-size: 100%` on form controls) is emitted *after* our styles at the same specificity, so a bare `textarea`/`select` rule silently lost. Fixed with one attribute selector (`:not([hidden])`), commented as load-bearing.
+- [x] Minimum tap-target size for Material buttons and icon buttons on touch devices. ✅ **No CSS needed — and the audit was overcounting.** A probe of the real DOM showed Material draws buttons 36px tall but gives each an invisible **48px `.mat-mdc-button-touch-target`** (same for checkbox, radio, slide-toggle), and a `mat-select`'s trigger is its whole form field. The audit's tap-target check now measures that real tap area; the remaining warnings are app-made controls, fixed per page as they come up. Self-test case added (a 36px button with a 48px overlay is *not* reported).
+- [x] Long unbroken strings wrap. ✅ `overflow-wrap: break-word` on `body` — breaks only a word that can't fit at all. Deliberately not `anywhere`, which also shrinks min-content and would squeeze auto-layout table columns to a letter wide.
+- [x] Specs at 375px for each rule. ✅ In `design-tokens.spec.ts`, via an **iframe of exact width** (its own viewport, so media queries fire): inputs 16px at 375 / unchanged at 1280 / checkboxes untouched; a long email stays inside a 200px box.
 
 ### 1.3 Shared pattern classes (`_patterns.scss`, `_tables.scss`, `_layout.scss`)
-- [ ] `.portal-card` has a fixed `width: 300px` (`_patterns.scss:282`) — every staff and manage dashboard tile. Make it fluid: one column on phones, the grid on wider screens.
-- [ ] `.data-table-scroll`: exists, but **no page uses it** except the style guide. Add the sticky first column (Makeover OQ 18) and a visible hint that the table scrolls.
-- [ ] Check `.page-header`, `.filter-row`, `.filter-bar`, `.form-actions`, `.form-grid`, `.field-row` and the four page containers at 360px; fix what fails.
-- [ ] A reusable **card-list** pattern for the customer tables that collapse to cards (§3.4).
-- [ ] Style-guide additions for each, and geometry specs in `style-guide.component.spec.ts` at 375px.
+- [x] `.portal-card` fluid. ✅ New shared **`.portal-grid`** (`layout.grid`, auto-fill `minmax(17rem, 1fr)`) replaces the identical `.dashboard-cards` flex row copied into the manage and staff dashboards; the tile lost its `width: 300px`. One full-width column on a phone, as many ~272px columns as fit above. Geometry specs in `manage-dashboard.component.spec.ts` (container-driven, so a sized host works): 1 full-width column at 375, ≥ 2 columns spanning the row at 768.
+- [x] `.data-table-scroll` sticky first column. ✅ Works for `.data-table`, a plain `<table>` or a mat-table; the pinned cell gets an opaque fill so scrolled columns don't show through. Spec (iframe at 375): a 900px table stays inside the phone, really scrolls 300px, and the first column doesn't move.
+	- **Scroll hint dropped.** The pure-CSS "scroll shadow" trick needs transparent table cells (ours are filled), and a fade mask would stay visible after scrolling to the end without scroll-driven animations, which Safari lacks. The pinned first column already shows there is more to the right.
+- [ ] Check `.page-header`, `.filter-row`, `.filter-bar`, `.form-actions`, `.form-grid`, `.field-row` and the four page containers at 360px; fix what fails. → measured by §1.8's audit across every page that uses them.
+- [x] A reusable card-list pattern for the customer tables. ✅ **`.data-table--stack`**: below `md` each row is a card and each cell draws its column name from `data-label` beside the value; the header is visually hidden but stays in the DOM (screen readers keep real table semantics); a cell with no label (actions) spans the card. From `md` up it's an ordinary table. Spec (iframe at 375 and 1280).
+- [x] Style-guide additions. ✅ "Wide table — scrolls on a phone, first column pinned" and "Stacked table — rows become cards"; 2 specs in `style-guide.component.spec.ts` (sticky first column present; every data cell's `data-label` matches its header — the wiring a page copies).
 
 ### 1.4 Dialogs
 No dialog sets `maxWidth`, and several force a width or `min-width` wider than a phone: 780px (`class-schedule-manage.component.ts:540`), 460px and 420px (`today-classes`, `upcoming-classes`, `my-schedule`, `calendar-navigation.service`), `min-width: 360px` in three dialog stylesheets.
-- [ ] App-wide dialog defaults: never wider than the viewport minus a margin.
-- [ ] Below `md`: form dialogs (editors, booking, transfer requests) go full-screen; short confirm/info dialogs stay centered at full width with a margin. No bottom sheets (OQ-4, decided).
-- [ ] Remove the fixed widths and min-widths listed above.
-- [ ] Specs: each fixed dialog opens no wider than a 375px viewport.
+- [x] App-wide dialog defaults. ✅ **Correction to the survey: dialogs weren't overflowing — they were squeezed.** Material caps every dialog at `max-width: 80vw`, set *inline* on the pane, so the 420/460/780px dialogs became 300px-wide columns on a 375px phone. New `angular-material-overrides/_mat-dialog.scss`: below `md`, every dialog may use the full width minus 16px a side. `!important` is required to beat Material's inline style, and is confined to below-md so desktop dialogs are unchanged.
+- [x] Below `md`: form dialogs go full-screen; short confirm/info dialogs stay centred at full width. ✅ New `shared/dialog-config.ts` — **`formDialogConfig({ data })`** adds the `dialog--form` panel class (keeps any existing class and the width). Applied at all **15 form-dialog call sites**: class / instance ×2 / series-run / schedule ×2 / slot ×2 / specialty-cost ×2 / migrate-product / substitute-instructor / cancel-occurrence (class schedules); assign-skill (person skills); request-class-transfer (shift requests). Left as plain dialogs: confirm dialogs, prerequisite / skill-requirement / attendance (info), revoke-skill and exception-note (one short field). No dialog wraps its fields in a `<form>`, so `:has(form)` couldn't do this automatically.
+- [x] Remove the fixed widths and min-widths. ✅ The `width:` values stay — they are right on desktop, and the phone rules override them below `md`. The three `min-width: 360px` stay on desktop (they give those content-sized dialogs their width) and drop to `0` below `md`. Not `min(360px, 100%)`: a percentage min-width inside a content-sized dialog can resolve to 0 and shrink the **desktop** dialog.
+- [x] Specs. ✅ `dialog-config.spec.ts` (4 — incl. the class landing on the real overlay pane the stylesheet targets). And the first **Playwright layout spec**, `e2e/mobile-audit/layout/dialogs.spec.ts`, because this is a global media query Karma can't exercise: *Add class* opens full-screen at 360 and 375 and as a centred dialog at 1280; a delete confirm on `/blog-admin` stays 16px clear of both edges with its cap at viewport − 32px. Verified non-vacuous (weakening either rule fails 4 of 5).
 
 ### 1.5 Shared components (`src/app/shared/components`)
 Lower than any page, used by many:
