@@ -110,8 +110,43 @@ Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-
 - [x] Interaction states. ✅ `states.ts`: mobile menu open **with a submenu expanded** (phones/tablet below `md`; the page under the menu is excluded from that case), calendar **day / week / month**, cart **with two items** (one deliberately long). **Changed from the plan:** dialogs are *not* all added up front — each dialog gets a state when its page is worked on in Phases 2–5, so it is audited from then on. Doing ~40 dialogs blind now would mean driving each one without knowing yet what it needs. Checkout with the Square form is covered by the plain checkout route (it renders the card form on load).
 
 ### 0.6 Baseline run
-- [ ] Full audit at all seven sizes. Record per tier: pages, pages with overflow, worst offenders. Keep the desktop screenshots as the regression baseline for the rest of the plan.
-- [ ] Re-scope Phases 2–5 from what the baseline actually shows: add items for problems the code survey missed, drop ones that turn out fine.
+- [x] Full audit at all seven sizes. ✅ 10/5 — **823 cases** (117 route/state combinations × 7 sizes, 3 skipped by design: the menu-open state above `md`), all ran, **7.0 min**. Desktop screenshots + this summary saved to `e2e/mobile-audit/baseline/` (git-ignored) as the regression "before".
+
+**Pages with layout errors** (overflow, overlap, overlay overflow, input font) — cases with errors / cases:
+
+| Tier | 360 | 375 | 390 | 430 | tablet 768 | tablet 1024 | desktop 1280 |
+|---|---|---|---|---|---|---|---|
+| public | 3 / 24 | 3 / 24 | 3 / 24 | 4 / 24 | **23 / 23** | 1 / 23 | 1 / 23 |
+| auth | 0 / 3 | 0 / 3 | 0 / 3 | 0 / 3 | **3 / 3** | 0 / 3 | 0 / 3 |
+| account | 2 / 26 | 2 / 26 | 2 / 26 | 1 / 26 | **26 / 26** | 0 / 26 | 0 / 26 |
+| staff | 1 / 11 | 1 / 11 | 1 / 11 | 1 / 11 | **11 / 11** | **11 / 11** | 0 / 11 |
+| manage | 11 / 54 | 10 / 54 | 10 / 54 | 9 / 54 | **54 / 54** | **54 / 54** | 0 / 54 |
+
+**Findings on phones (all four sizes), by kind:** overflow 65 · overlap 28 · input-font 8 · overlay-overflow 0 · text-clipped 0 · cramped-text 166 (warning) · tap-target 1,798 (warning).
+
+**How to read it.**
+- **The tablet column is one bug, not 117.** At 768px the desktop menu bar doesn't fit: labels wrap to two lines, *Your Calendar* runs off the right edge, and **the logo is pushed out of view**. At 1024 the admin/staff menus (more items) still overflow; the customer menu just fits. → §1.7, and **OQ-11**.
+- **Phones look better than they are.** Most of what is wrong on a phone isn't *too wide* — it's **crushed** (cramped-text, 166) or **drawn over** (overlap, 28). The screenshots confirm it: the home page's series cards and Our Classes' class cards squeeze their text to a word per line, and on the series cards the Join/Book button sits on top of the dates. Neither shows up as overflow; both are what "looks terrible on mobile" means.
+- **Tap targets (1,798)** are almost all back-office icon buttons and table actions. §1.2's global minimum will remove most in one rule; the remainder are decided per page.
+
+**Spot-checked by eye** (375px slices): home (series cards crushed + overlapped — confirmed), Our Classes (class cards crushed; *This week* / *Next week* buttons wrap mid-label), manage dashboard at 768 (header broken as above; `.portal-card`'s fixed 300px leaves two columns and a dead strip).
+
+- [x] Re-scope Phases 2–5 from what the baseline shows. ✅ — what the audit added or sharpened, by where it lands:
+	- **§1.3:** `.portal-card` fixed width confirmed on the manage and staff dashboards.
+	- **§1.5:** `app-offering-highlight` is the **series/workshop card** used on home *and* `/events` — crushed text **and** a button over the dates. One shared fix, two pages. (Already listed; now known to be the biggest public offender.)
+	- **§1.7:** the header at tablet widths (above) — the single largest finding.
+	- **§2.4:** Our Classes: crushed class rows + wrapping week-nav buttons.
+	- **§2.5:** calendar: `app-calendar-home` overflows (the `min-w-[50rem]` week/month container), `app-month-view` draws day buttons over text, and on week view the header overlaps.
+	- **§2.6 / §2.7:** `/gallery` — `app-image-carousel` controls over the caption.
+	- **§3.2:** `/shop/service/4` overflows (service booking slot grid).
+	- **§3.4:** `/my/purchases/1` — `app-seat-assignment` overlaps text; `/my/purchases`, `/my/subscriptions`, `/my/upcoming-offerings` crushed.
+	- **§4.1:** `/staff/check-in` — overlap. `/staff/schedule` crushed (7-column week grid).
+	- **§5.1:** the library's `hw-table-view-control` overflows and crushes on `/admin` and `/admin/tables/…` → a library fix.
+	- **§5.2 / 5.3:** overflow on `/manage/instructor-load`, `/manage/events/create`, `/manage/subscriptions` and `/1`, `/manage/entitlements`, `/blog-admin`; overlap on `/manage/close-classes`; **input font under 16px on the blog editor** (`/blog-admin/new`, `/edit/:id`).
+	- **Nothing dropped yet.** The code survey's dialog hotspots (fixed 420/460/780px) don't appear because dialogs aren't open in a plain page load — they get states as each page is worked (§0.5), and §1.4 fixes the widths regardless.
+
+### 0.7 Phase 0 verification
+- [x] `ng test` — full suite (see below), `ng lint` clean, harness type-checks (`npm run audit:mobile:typecheck`), self-test 5/5.
 
 ---
 
@@ -159,6 +194,7 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 - [ ] Work against the library source via the `tsconfig.json` path block during development, then **one batched release per phase** (OQ-6, decided). Releasing needs your git commit/tag/push, so at the end of each phase with library changes I write the exact release steps here and pause on that one item.
 
 ### 1.7 App shell: header, mobile menu, footer
+- [ ] **Header at tablet widths (baseline's biggest finding):** the desktop menu bar does not fit at 768–1024 — labels wrap, the logo is pushed off-screen, the last item falls off the edge — on every page. Move the hamburger breakpoint per **OQ-11** (default: below 1280) and add a geometry spec at 768 and 1024 that the logo and the last menu item are both inside the viewport.
 - [ ] Header at 360px: logo, hamburger and anything else in the 55px bar fit without overlap.
 - [ ] **Mobile cart affordance** — the cart badge renders only on desktop today. A cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items (OQ-3, decided).
 - [ ] Mobile menu: every menu item reachable, expanded submenus scroll, tap targets ≥ 44px, closes on navigation.
@@ -300,7 +336,9 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 # Open questions
 
-> ✅ **All resolved 10/5/2026 — every default accepted.** Decisions are folded into the plan sections above (each cited as "OQ-n, decided"). New questions that come up during implementation get added below as OQ-11 onward, each with a default so work never stops on one.
+> ✅ **OQ-1 to OQ-10 resolved 10/5/2026 — every default accepted.** Decisions are folded into the plan sections above (each cited as "OQ-n, decided"). New questions that come up during implementation are added below from OQ-11, each with a default so work never stops on one.
+
+11. **OQ-11 (new, from the baseline) — where should the header switch to the hamburger?** Today it switches at 768px (`md`), but the desktop menu doesn't fit until about 1100px for a customer and wider for admin/staff, who have more items: at iPad portrait the logo disappears and *Your Calendar* falls off the edge, on **every page**. Options: (a) hamburger below 1280 — iPads in both orientations get the phone menu, which works; (b) hamburger below 1024 and shrink the desktop menu (smaller labels/gaps) so it fits from 1024 — tighter, and the admin menu may still not fit; (c) keep 768 and make the bar scroll or wrap. *Default: (a), hamburger below 1280. It's the only option that fits every persona's menu at every tablet size without redesigning the menu, and the mobile menu is already the one built for touch.*
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
 	- Mason- Sure. This sounds fine.
