@@ -204,7 +204,7 @@ Lower than any page, used by many:
 The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `@media` rules today. Its pages and components are used across every tier.
 - [x] Audit and fix in the library repo. ✅ 10/5 — re-measured with the corrected tap check, the library's only phone problems outside the CRUD tables (Phase 5, `hw-table-view-control`) are in the **auth pages**: the show/hide-password eye was **24×24** (login, register ×2 — fiddly, right next to the field you're typing in) and *Create an account* was 24px tall. Both now 44px (the eye's box grows but stays transparent — the icon looks identical). `hw-confirm-dialog` needed nothing of its own: it's a MatDialog, so §1.4's global rules cover it. `hw-photo-upload` and the form controls had no findings.
 - [x] Library specs. ✅ 3 new specs (login: eye 44×44, link 44px; register: both eyes 44×44). Library suite **472 passed**, lint clean, `ng build honuware-ui` passes. Verified non-vacuous: reverting the login sizes fails 2.
-- [ ] **Release `@honuware/ui` 0.1.3 — yours (OQ-6).** I've bumped `projects/honuware-ui/package.json` to `0.1.3`; nothing else to edit. In `C:\Users\mason\source\repos\honuware-web-components`:
+- [x] ✅ **Released 10/5 and pulled in:** `npm view @honuware/ui version` → `0.1.3`; app on `"@honuware/ui": "0.1.3"` (exact). `ng test` 3503 passed, production build passes, and the auth pages now have **zero findings at all four phone sizes** (were 6 tap-target warnings). **Release `@honuware/ui` 0.1.3 — yours (OQ-6).** I've bumped `projects/honuware-ui/package.json` to `0.1.3`; nothing else to edit. In `C:\Users\mason\source\repos\honuware-web-components`:
 	1. `git add -A && git commit -m "Release 0.1.3: 44px tap targets on the auth pages"`
 	2. `git push`
 	3. `git tag v0.1.3`  ← create the tag before pushing it
@@ -241,7 +241,7 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 
 **Phase 1 verification:** `ng test` **3503 passed**, `ng lint` clean, production `ng build` passes; Playwright layout specs **35 passed** (21 skipped by design — each spec runs at the sizes it is about); harness self-tests **9 passed**; harness type-checks. Library: 472 passed, lint clean, builds.
 
-**Phase 1 complete except the `@honuware/ui` 0.1.3 release (§1.6), which is yours.** Phase 2 does not depend on it.
+**Phase 1 complete** (incl. the `@honuware/ui` 0.1.3 release, 10/5). Next: Phase 2.
 
 ---
 
