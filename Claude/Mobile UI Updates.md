@@ -180,7 +180,7 @@ Today component SCSS uses six different breakpoints (600, 639, 700, 767, 768, 90
 - [x] `.portal-card` fluid. ✅ New shared **`.portal-grid`** (`layout.grid`, auto-fill `minmax(17rem, 1fr)`) replaces the identical `.dashboard-cards` flex row copied into the manage and staff dashboards; the tile lost its `width: 300px`. One full-width column on a phone, as many ~272px columns as fit above. Geometry specs in `manage-dashboard.component.spec.ts` (container-driven, so a sized host works): 1 full-width column at 375, ≥ 2 columns spanning the row at 768.
 - [x] `.data-table-scroll` sticky first column. ✅ Works for `.data-table`, a plain `<table>` or a mat-table; the pinned cell gets an opaque fill so scrolled columns don't show through. Spec (iframe at 375): a 900px table stays inside the phone, really scrolls 300px, and the first column doesn't move.
 	- **Scroll hint dropped.** The pure-CSS "scroll shadow" trick needs transparent table cells (ours are filled), and a fade mask would stay visible after scrolling to the end without scroll-driven animations, which Safari lacks. The pinned first column already shows there is more to the right.
-- [ ] Check `.page-header`, `.filter-row`, `.filter-bar`, `.form-actions`, `.form-grid`, `.field-row` and the four page containers at 360px; fix what fails. → measured by §1.8's audit across every page that uses them.
+- [x] Check `.page-header`, `.filter-row`, `.filter-bar`, `.form-actions`, `.form-grid`, `.field-row` and the four page containers at 360px. ✅ Measured by §1.8's audit across every page that uses them: no finding at any phone size names one of these classes as the overflowing or overlapping element — they already wrap/stack (the Makeover built them that way). Nothing to fix.
 - [x] A reusable card-list pattern for the customer tables. ✅ **`.data-table--stack`**: below `md` each row is a card and each cell draws its column name from `data-label` beside the value; the header is visually hidden but stays in the DOM (screen readers keep real table semantics); a cell with no label (actions) spans the card. From `md` up it's an ordinary table. Spec (iframe at 375 and 1280).
 - [x] Style-guide additions. ✅ "Wide table — scrolls on a phone, first column pinned" and "Stacked table — rows become cards"; 2 specs in `style-guide.component.spec.ts` (sticky first column present; every data cell's `data-label` matches its header — the wiring a page copies).
 
@@ -202,21 +202,46 @@ Lower than any page, used by many:
 
 ### 1.6 `@honuware/ui` library components
 The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `@media` rules today. Its pages and components are used across every tier.
-- [ ] Audit and fix in the library repo: `hw-photo-upload` (26 uses), `hw-confirm-dialog`, the form controls and `hw-composite-row-control`, and the auth card (`hw-login`/`hw-register`/`hw-verify`). The CRUD table pages wait for Phase 5.
-- [ ] Library specs alongside each fix, per the library's own conventions.
-- [ ] Work against the library source via the `tsconfig.json` path block during development, then **one batched release per phase** (OQ-6, decided). Releasing needs your git commit/tag/push, so at the end of each phase with library changes I write the exact release steps here and pause on that one item.
+- [x] Audit and fix in the library repo. ✅ 10/5 — re-measured with the corrected tap check, the library's only phone problems outside the CRUD tables (Phase 5, `hw-table-view-control`) are in the **auth pages**: the show/hide-password eye was **24×24** (login, register ×2 — fiddly, right next to the field you're typing in) and *Create an account* was 24px tall. Both now 44px (the eye's box grows but stays transparent — the icon looks identical). `hw-confirm-dialog` needed nothing of its own: it's a MatDialog, so §1.4's global rules cover it. `hw-photo-upload` and the form controls had no findings.
+- [x] Library specs. ✅ 3 new specs (login: eye 44×44, link 44px; register: both eyes 44×44). Library suite **472 passed**, lint clean, `ng build honuware-ui` passes. Verified non-vacuous: reverting the login sizes fails 2.
+- [ ] **Release `@honuware/ui` 0.1.3 — yours (OQ-6).** I've bumped `projects/honuware-ui/package.json` to `0.1.3`; nothing else to edit. In `C:\Users\mason\source\repos\honuware-web-components`:
+	1. `git add -A && git commit -m "Release 0.1.3: 44px tap targets on the auth pages"`
+	2. `git push`
+	3. `git tag v0.1.3`  ← create the tag before pushing it
+	4. `git push origin v0.1.3`  ← this is what publishes (GitHub → Actions → wait for green)
+	5. Tell me when it's published and I'll pull it into the app (`npm install @honuware/ui@0.1.3 --save-exact` in `ui/`, then `ng test` + the auth audit at phone sizes, where the 6 tap-target warnings should be gone).
+	- *Changed from the plan:* I verified the fixes in the library's own suite rather than switching the app's `tsconfig.json` to the library source — that switch is easy to commit by accident and would break CI (no sibling checkout there).
 
 ### 1.7 App shell: header, mobile menu, footer
-- [ ] **Header at tablet widths (baseline's biggest finding):** the desktop menu bar does not fit at 768–1024 — labels wrap, the logo is pushed off-screen, the last item falls off the edge — on every page. **Show the hamburger + mobile menu below 1280px** (`xl`) instead of below 768 (OQ-11, decided) — iPads in both orientations get the phone menu; the desktop bar only appears from 1280, where every persona's menu fits. Geometry specs at 768, 1024 and 1280: below 1280 the hamburger is visible and the desktop bar hidden; at 1280 the logo and the last menu item are both inside the viewport. The mobile menu's own `md:hidden` and the shell's backdrop (`app.component.html`) switch at the same width, or the menu would open behind a desktop backdrop at tablet sizes.
-- [ ] Header at 360px: logo, hamburger and anything else in the 55px bar fit without overlap.
-- [ ] **Mobile cart affordance** — the cart badge renders only on desktop today. A cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items (OQ-3, decided).
-- [ ] Mobile menu: every menu item reachable, expanded submenus scroll, tap targets ≥ 44px, closes on navigation.
-- [ ] Footer stacks cleanly.
-- [ ] Safe-area insets on anything sticky.
-- [ ] Geometry specs in the header, mobile-menu and footer specs.
+- [x] **Header at tablet widths.** ✅ The hamburger + mobile menu now show **below 1280px** (`xl`), the desktop bar from 1280 (OQ-11) — in all four places that must agree: the hamburger and desktop bar (`header.component.html`), the mobile menu panel (`header-mobile-menu`), and the shell's menu/backdrop pair (`app.component.html`). Hooks `data-test="hamburger"` / `"desktop-menu"`; the hamburger also got an `aria-label` (it was an unlabelled icon button). Playwright `layout/header.spec.ts` at **all seven sizes, as admin** (the longest menu): logo on screen everywhere; below 1280 the hamburger visible and the bar hidden; at 1280 every top-level item inside the screen and on one line. Verified: switching back to `md` fails 6 (the tablet cases).
+- [x] Header at 360px. ✅ Same spec at `phone-small`: logo and hamburger both inside the viewport (logo 152px + cart 48px + hamburger 56px = 256px of 360).
+- [x] **Mobile cart.** ✅ Cart icon with its count, left of the hamburger, only when the cart has items; 48px wide; `aria-label` says the count ("Shopping cart, 2 items"). Spec: absent with an empty cart, shows the count with two items, sits left of the hamburger, ≥ 44px, and opens `/shop/cart`.
+- [x] Mobile menu. ✅ The audit's menu-open state (submenu expanded) is **clean at all six sizes below 1280**. Spec added: the menu covers the page column and **closes on navigation**, landing on the chosen page.
+- [x] Footer stacks cleanly. ✅ No findings at any phone size; checked by eye in the checkout and gallery screenshots.
+- [x] Safe-area insets on anything sticky. ✅ Nothing is pinned to an edge yet — tokens ready (§1.1); applied with the sticky pay bar in §3.2.
+- [x] Geometry specs. ✅ In `layout/header.spec.ts` (Playwright — the switch is a media query). Header/mobile-menu/app Karma specs still pass (9).
+- **Desktop note:** at 1280 the top-level labels still wrap to two lines ("Get / Started") — unchanged from the baseline, it's the current design. Not a mobile problem, so not touched.
 
 ### 1.8 Phase 1 audit
-- [ ] Full run; record the drop in overflow counts per tier. Desktop screenshots compared against the baseline.
+- [x] ✅ 10/5 — full run, 825 cases, 7.8 min. Errors per tier (cases with errors / cases):
+
+| Tier | 360 | 375 | 390 | 430 | tablet 768 | tablet 1024 | desktop |
+|---|---|---|---|---|---|---|---|
+| public | 3 / 24 | 3 / 24 | 3 / 24 | 3 / 24 | **3 / 24** (was 23) | 1 / 24 | 1 / 23 |
+| auth | 0 / 3 | 0 / 3 | 0 / 3 | 0 / 3 | **0 / 3** (was 3) | 0 / 3 | 0 / 3 |
+| account | 1 / 26 (was 2) | 1 / 26 (was 2) | 1 / 26 (was 2) | 1 / 26 | **0 / 26** (was 26) | 0 / 26 | 0 / 26 |
+| staff | 1 / 11 | 1 / 11 | 1 / 11 | 1 / 11 | **0 / 11** (was 11) | **0 / 11** (was 11) | 0 / 11 |
+| manage | 11 / 54 | 10 / 54 | 10 / 54 | 9 / 54 | **0 / 54** (was 54) | **0 / 54** (was 54) | 0 / 54 |
+
+	- **Tablets are fixed:** 199 erroring tablet cases → 4 (the calendar, Phase 2). The header was the whole story there.
+	- **Phones moved less — as expected.** Phase 1 fixed what's *shared*; most phone findings are per-page (overflow 65, overlap 28 → 24, cramped 166 → 153). Phases 2–5 take them page by page. Tap-target warnings 1,798 → **194**, almost entirely from measuring the real Material touch target (§1.2).
+	- **The audit caught a bug in Phase 1's own work:** the new `.data-table-scroll` example on the style guide shrank its columns to fit instead of scrolling, crushing the pinned name column to 75px. Fixed (data cells keep to one line; the pinned column gets a 10rem floor) with an iframe spec; verified it fails without the fix.
+- [x] Desktop screenshots vs the baseline. ✅ New tool `npm run audit:mobile:compare-desktop` (`compare-desktop.ts` — a minimal PNG decoder + pixel diff, self-tested in `compare-desktop.spec.ts`). Result: **5 changed, all intended** — the style guide (two new sections), the manage and staff dashboards (four even columns at 1280 instead of fixed 300px tiles — checked by eye), `/location` and `/shop/subscribe` (the map and Square iframes are now *masked*, see below). Everything else unchanged or noise.
+	- **Two harness fixes this needed**, both so the comparison means something: (1) `settle()` now waits for the Material Icons font explicitly — it sometimes arrived after `fonts.ready`, giving 17 false "changed" pages; (2) desktop shots **mask third-party iframes** (Google map tiles vary per load). Differences under **200 px** are reported as *noise* — sub-pixel anti-aliasing on header icons measured ~130px and looked identical enlarged; a real change is thousands.
+
+**Phase 1 verification:** `ng test` **3503 passed**, `ng lint` clean, production `ng build` passes; Playwright layout specs **35 passed** (21 skipped by design — each spec runs at the sizes it is about); harness self-tests **9 passed**; harness type-checks. Library: 472 passed, lint clean, builds.
+
+**Phase 1 complete except the `@honuware/ui` 0.1.3 release (§1.6), which is yours.** Phase 2 does not depend on it.
 
 ---
 
