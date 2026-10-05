@@ -1514,6 +1514,7 @@ You asked whether you can run backend tests that need Postgres in GitLab CI. **Y
 | `image:builder` | image | auto **only** if `server/docker/Dockerfile` changed, else manual | manual |
 | `build:server` | build | ✅ auto | skipped — `package:server` compiles everything anyway |
 | `test:backend` | test | ✅ auto | ✅ auto |
+| `test:deploy-scripts` | test | ✅ auto (added 10/5) | ✅ auto |
 | `test:frontend` | test | ✅ auto | ✅ auto |
 | `lint:frontend` | test | ✅ auto (required since 10/2) | ✅ auto (required since 10/2) |
 | `build:frontend` | test | ✅ auto | skipped — `package:ui` builds the same thing |
@@ -1880,7 +1881,12 @@ You mentioned saving branches per version — I'd do this via tags instead of br
 - [x] ~~Stop the helper, `docker stop` the server, `docker run -d` the new one~~ — **superseded.** The units are `Type=simple` with a foreground `docker run` (see `package/systemd/README.md`, "Why these specific systemd directives"), so the deploy never runs containers by hand. It rewrites `version.env` atomically and issues `systemctl restart` helper → server → helper; `systemctl restart` re-reads `EnvironmentFile=` on its own.
 - [x] Health-check poll on `/api/health` — 15 × 2s. Fails the job loudly on timeout, dumping `systemctl status` and 50 journal lines.
 - [ ] **Rollback on health failure.** Still not implemented, deliberately — see 6.5's note. The script prints the outgoing tag and the exact command to return to it, but reverting also means deciding what to do about a migration the new build already applied, which is a human call. Doing this properly means deciding a policy for backward-compatible migrations first (7.2's checklist is where that lives).
-- [ ] **Prune old images.** Nothing prunes today, and each tag adds a few hundred MB to a small root volume — which the 5.3 disk alarm will eventually catch as a surprise. `docker image prune -f` removes only *dangling* images, so it will not touch a previous tag you might want to roll back to; deleting old tags needs an explicit retention rule (keep the last N). Worth doing before tags accumulate, not after the alarm fires.
+- [x] **Prune old images.** Nothing prunes today, and each tag adds a few hundred MB to a small root volume — which the 5.3 disk alarm will eventually catch as a surprise. `docker image prune -f` removes only *dangling* images, so it will not touch a previous tag you might want to roll back to; deleting old tags needs an explicit retention rule (keep the last N). Worth doing before tags accumulate, not after the alarm fires. ✅ 2026-10-05 — **`deploy_update.sh` step 6, `prune_old_images`.**
+	- Runs **only after a healthy deploy**, so a failed deploy never deletes the image you'd roll back to. Keeps the newest **`KEEP_IMAGES`** tags (default **3**) by image creation time, and **always** keeps the tag now running and the one it replaced — after a rollback the running image is the *oldest* one. Removes both names per tag (`knottyyoga:<tag>` and the registry name), then `docker image prune -f` for the leftover layers. Logs free disk space at the end. `KEEP_IMAGES=0` disables it; a non-numeric value is refused rather than guessed at.
+	- **Never fails the deploy** — by the time it runs the new build is live and healthy, so a cleanup problem (e.g. an image still in use) is a logged `event=prune_warning`.
+	- Rolling back to an already-pruned tag still works: `deploy_update.sh` re-pulls it from the registry.
+	- **Tested:** `package/deploy_update_test.sh` — 16 checks against a fake `docker` (newest-N, rollback keeps the oldest running tag, previous tag survives outside N, `KEEP_IMAGES=0`/non-numeric, `-` registry, already-gone registry names, `<none>`, failing `rm`). Verified it catches a regression (removing the running-tag guard fails a check). Runs in CI as **`test:deploy-scripts`** (`bash:5.2`, seconds, branch and tag pipelines). Passed in Git Bash and in `bash:5.2`.
+	- **Expect on the next deploy:** whatever older images are on the box today (e.g. the manually deployed `v1.0.x`) beyond the newest 3 get removed — by design. `RUNBOOK.md` §3 updated (it still said "not yet live").
 
 ---
 
