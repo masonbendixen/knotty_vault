@@ -19,7 +19,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan
 
-> **Status (10/5/2026): plan written, no implementation yet.** Phases run 0 → 6 in order. Phase 0 builds the screenshot/audit harness everything else depends on; Phase 1 fixes the shared layers every page inherits; Phases 2–5 walk the pages in the order the Overview asks for — public, then account, then staff, then manage/admin. Each phase ends with a full audit run whose numbers get recorded here. The **Open questions** at the bottom each carry a default I will proceed with unless you say otherwise, so none of them blocks starting.
+> **Status (10/5/2026): plan written, no implementation yet.** Phases run 0 → 6 in order. Phase 0 builds the screenshot/audit harness everything else depends on; Phase 1 fixes the shared layers every page inherits; Phases 2–5 walk the pages in the order the Overview asks for — public, then account, then staff, then manage/admin. Each phase ends with a full audit run whose numbers get recorded here. **All ten open questions are resolved (10/5) — every default accepted — and the plan text below states them as decisions. Ready to start Phase 0.**
 
 ## How this works — the loop for every page
 
@@ -39,12 +39,13 @@ Please create a plan with phases of implementation. Within each phase, please re
 From `Website Makeover.md` and `Component Inventory for Designer.md` — not re-asked here:
 
 - **Mobile-first CSS**: default styles target the phone, `md:`/`lg:` add desktop. 44px tap targets, 16px minimum input font (below that iOS zooms the page on focus), safe-area insets on anything sticky, no hover-only affordances.
-- **`md` (768px) is the collapse line.** Tailwind's default screens are in use today (640/768/1024/1280) — see OQ-2.
+- **`md` (768px) is the collapse line.** Tailwind's default screens (640/768/1024/1280) **stay** — the Makeover's `sm:375 / lg:1280` change is not adopted (OQ-2, decided).
 - **Navigation:** keep the hamburger and the full-screen `header-mobile-menu`; no bottom tab bar (Makeover OQ 15).
 - **Tables (Makeover OQ 18):** `/manage` and `/admin` tables scroll horizontally with a sticky first column; customer lists (`my-events`, `purchase-history`, `my-vouchers`, cart, dashboard alert lists) collapse to cards.
 - **Calendar (Makeover OQ 19):** day view below `md`; week/month are desktop views. Same as Polish 13.1.
 - **Back office is not redesigned** — it inherits the shared blocks, made to work at phone width, nothing more.
 - **Tokens only.** No new literals (`ui/CLAUDE.md`), no `--color-*` set; dark mode and per-studio theming will override tokens later, so a literal now is a bug later.
+- **Don't wait for Ryan's 375 frames** (OQ-10, decided). Make today's layouts work on phones now. When his mobile frames arrive they replace these layouts, and this plan's harness and geometry specs become the safety net for that port. No page is held back for him.
 - **Polish before deploying Phase 13** (13.1–13.6) is folded into this plan — §2.4, §2.5, §2.7 — and gets ticked there too when done.
 
 ## Target sizes
@@ -79,7 +80,7 @@ Layouts break on long content, and the mock is mostly tidy short strings.
 - [ ] Specs for any mock method whose output changes.
 
 ### 0.3 The harness: `ui/e2e/mobile-audit/`
-- [ ] Add `@playwright/test` as a **dev** dependency and install its Chromium (OQ-1). Nothing in the shipped bundle changes.
+- [ ] Add `@playwright/test` as a **dev** dependency and install its Chromium (OQ-1, approved). Nothing in the shipped bundle changes.
 - [ ] A Playwright config with the seven target sizes as projects, starting `ng serve` (mock mode) itself and freezing the clock (`page.clock.setFixedTime`) so date-driven pages render identically every run — without that, desktop screenshot comparisons would differ every day.
 - [ ] Output (screenshots, JSON, HTML report) goes to a git-ignored folder; add it to `ui/.gitignore`.
 - [ ] npm scripts: `audit:mobile` (everything), plus a way to run one tier or one route while iterating.
@@ -133,7 +134,7 @@ Today component SCSS uses six different breakpoints (600, 639, 700, 767, 768, 90
 ### 1.4 Dialogs
 No dialog sets `maxWidth`, and several force a width or `min-width` wider than a phone: 780px (`class-schedule-manage.component.ts:540`), 460px and 420px (`today-classes`, `upcoming-classes`, `my-schedule`, `calendar-navigation.service`), `min-width: 360px` in three dialog stylesheets.
 - [ ] App-wide dialog defaults: never wider than the viewport minus a margin.
-- [ ] Below `md`: form dialogs go full-screen, short confirm dialogs stay centered at full width (OQ-4).
+- [ ] Below `md`: form dialogs (editors, booking, transfer requests) go full-screen; short confirm/info dialogs stay centered at full width with a margin. No bottom sheets (OQ-4, decided).
 - [ ] Remove the fixed widths and min-widths listed above.
 - [ ] Specs: each fixed dialog opens no wider than a 375px viewport.
 
@@ -146,11 +147,11 @@ Lower than any page, used by many:
 The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `@media` rules today. Its pages and components are used across every tier.
 - [ ] Audit and fix in the library repo: `hw-photo-upload` (26 uses), `hw-confirm-dialog`, the form controls and `hw-composite-row-control`, and the auth card (`hw-login`/`hw-register`/`hw-verify`). The CRUD table pages wait for Phase 5.
 - [ ] Library specs alongside each fix, per the library's own conventions.
-- [ ] Work against the library source via the `tsconfig.json` path block during development, then a release (OQ-6 — releasing needs your git steps).
+- [ ] Work against the library source via the `tsconfig.json` path block during development, then **one batched release per phase** (OQ-6, decided). Releasing needs your git commit/tag/push, so at the end of each phase with library changes I write the exact release steps here and pause on that one item.
 
 ### 1.7 App shell: header, mobile menu, footer
 - [ ] Header at 360px: logo, hamburger and anything else in the 55px bar fit without overlap.
-- [ ] **Mobile cart affordance** — the cart badge renders only on desktop today (OQ-3).
+- [ ] **Mobile cart affordance** — the cart badge renders only on desktop today. A cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items (OQ-3, decided).
 - [ ] Mobile menu: every menu item reachable, expanded submenus scroll, tap targets ≥ 44px, closes on navigation.
 - [ ] Footer stacks cleanly.
 - [ ] Safe-area insets on anything sticky.
@@ -184,7 +185,7 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 - [ ] Day view by default below `md`, chosen at first render from the viewport; an explicit choice is left alone after that.
 - [ ] Week/month views stay reachable but are desktop views; on a phone they scroll inside their own container (`min-w-[50rem]` today) rather than widening the page.
 - [ ] Opens scrolled to the first entry of the day, not midnight (Polish 13.2).
-- [ ] Day navigation with large prev/next buttons. Swipe between days is OQ-5.
+- [ ] Day navigation with large prev/next buttons. No swipe gesture for now (OQ-5, decided — possible follow-up).
 
 ### 2.6 People and events
 - [ ] `/instructors`, `/instructors/:id`, `/providers`, `/providers/:personId`, `/events`.
@@ -195,7 +196,7 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 ### 2.8 Phase 2 audit and sign-off
 - [ ] Zero horizontal overflow on every public route at every phone size. Record the numbers.
 - [ ] Tick Polish 13.1–13.5 in `Polish before deploying.md`.
-- [ ] Real-device check of the public pages (§6.4 — yours, OQ-8).
+- [ ] Real-device check of the public pages — yours (OQ-8, decided: real-device passes at the end of Phase 2, Phase 3, and §6.4). I write the exact steps here first.
 
 ---
 
@@ -210,7 +211,8 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 In purchase order, each tested with the persona logged in and items in the cart:
 - [ ] `/shop/cart` — collapses to cards (OQ 18).
 - [ ] `/shop/checkout/:productId`, `/shop/service/:productId`, `/shop/subscribe/:productId`, `/shop/event/:sessionId`, `/shop/series/:classInstanceId`.
-- [ ] Square card form fits at 360px; the pay button is reachable without scrolling past the card form on a 375 × 667 screen (OQ-7: sticky bottom pay bar).
+- [ ] Square card form fits at 360px; the pay button is reachable without scrolling past the card form on a 375 × 667 screen.
+- [ ] **Sticky bottom action bar** for the primary action (Pay / Book / Subscribe) on checkout and booking pages below `md`, with safe-area padding — checkout/booking only, not back-office forms (OQ-7, decided). Built once as a shared component (lower layer first), then used by each page; geometry spec that it stays inside the viewport and does not cover the last form field.
 - [ ] One end-to-end harness pass through the whole purchase in mock mode at `phone-se`.
 
 ### 3.3 Account hub and profile
@@ -274,7 +276,7 @@ In purchase order, each tested with the persona logged in and items in the cart:
 ## Phase 6 — Keep it fixed
 
 ### 6.1 Mobile audit in CI
-- [ ] A GitLab job that serves the mock build and runs the overflow check at phone sizes, failing the pipeline on any new horizontal overflow (OQ-9). Desktop screenshot comparison stays a local tool — too brittle across font rendering to gate CI on.
+- [ ] A GitLab job that serves the mock build and runs the overflow check at phone sizes, failing the pipeline on any new horizontal overflow — all tiers, phone sizes (OQ-9, decided; `test:mobile-audit`, a few minutes per pipeline). Desktop screenshot comparison stays a local tool — too brittle across font rendering to gate CI on.
 
 ### 6.2 Conventions
 - [ ] `ui/CLAUDE.md`: a "Mobile" section — the breakpoint mixin, the shared classes to use, the dialog rule, "every layout change gets a 375px geometry spec", how to run the audit.
@@ -289,7 +291,7 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 # Open questions
 
-Each has a default I'll proceed with if you don't answer. Answer inline under the question.
+> ✅ **All resolved 10/5/2026 — every default accepted.** Decisions are folded into the plan sections above (each cited as "OQ-n, decided"). New questions that come up during implementation get added below as OQ-11 onward, each with a default so work never stops on one.
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
 	- Mason- Sure. This sounds fine.
@@ -304,6 +306,10 @@ Each has a default I'll proceed with if you don't answer. Answer inline under th
 6. **OQ-6 Library releases.** Fixes in `@honuware/ui` need a publish, and publishing needs git commit/tag/push, which you do. *Default: I develop against the library source, batch all library changes for a phase into one release, and give you the exact release steps at the end of that phase (Phase 1 and possibly 3 and 5).*
 	- Mason- I'll go with your recommendation.
 7. **OQ-7 Sticky bottom bars** for primary actions (Pay, Book, Save) on phones — in the Makeover inventory, not built. *Default: yes for checkout/booking only (Phase 3), where the button otherwise sits below a tall card form; not for back-office forms.*
+	- Mason- I'll go with your recommendation.
 8. **OQ-8 Real-device checks.** *Default: two short passes by you — end of Phase 2 (public) and end of Phase 3 (a purchase). §6.4's final pass covers staff check-in.*
+	- Mason- I'll go with your recommendation.
 9. **OQ-9 CI gate.** *Default: yes, a `test:mobile-audit` job failing on new horizontal overflow at phone sizes, all tiers. It adds a few minutes per pipeline.*
+	- Mason- I'll go with your recommendation.
 10. **OQ-10 Ryan's 375 frames.** The Makeover's policy is "mobile keeps today's responsive behavior until his 375 frames exist", and some pending Track C screen ports (Our Classes, Cart/Checkout, Calendar, Class Detail, My Events) would rewrite pages this plan touches. *Default: proceed — make today's layouts work on phones now; when his frames arrive they replace these layouts, and the harness and specs from this plan become the safety net for that port. Tell me if any page should wait for him instead.*
+	- Mason- I'll go with your recommendation.
