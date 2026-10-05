@@ -70,35 +70,44 @@ Phones are emulated as real mobile devices (touch, device scale factor 2–3, mo
 
 ### 0.1 Mock personas (lowest layer: the data the pages render)
 Today `ServerAccessMock` starts logged in as an admin (`userInfoDefault`, `ServerAccess.mock.ts` ~408–420), so a public page always renders with the admin header and there is no way to see what a customer or a logged-out visitor sees.
-- [ ] Add a persona switch to the mock: `anonymous`, `customer`, `staff`, `admin` (default stays `admin`, so nothing changes for anyone running `ng serve` today). Selected by a `localStorage` key the harness sets before the app boots; mock-only — `ServerAccessNetwork` is untouched and nothing ships to production.
-- [ ] Each persona gets the roles/permissions that make the real guards (`AuthGuard`, `StaffGuard`, `AdminGuard`, `ManageProductsGuard`, `AuthorBlogGuard`) and the header menu behave as for that kind of user.
-- [ ] Specs in `ServerAccess.mock.spec.ts`: each persona's login state, roles and permissions; default is still admin.
+- [x] Add a persona switch to the mock: `anonymous`, `customer`, `staff`, `admin` (default stays `admin`, so nothing changes for anyone running `ng serve` today). Selected by a `localStorage` key the harness sets before the app boots; mock-only — `ServerAccessNetwork` is untouched and nothing ships to production. ✅ 10/5 — `MockPersona`, `readMockPersona`, key `knottyyoga.mockPersona`. Every signed-in persona is the **same person (id 1)** with different roles, so their purchases/schedule still have data; `anonymous` starts signed out and a login from the login page then makes it an ordinary customer.
+- [x] Each persona gets the roles/permissions that make the real guards (`AuthGuard`, `StaffGuard`, `AdminGuard`, `ManageProductsGuard`, `AuthorBlogGuard`) and the header menu behave as for that kind of user. ✅ `MOCK_PERSONA_ACCESS` — staff is `instructor` + `provider` (passes `StaffGuard`, not admin/manage).
+- [x] Specs in `ServerAccess.mock.spec.ts`: each persona's login state, roles and permissions; default is still admin. ✅ 7 specs, run through the **library's own `AuthService` + `hasStaffAccess`/`hasManageProducts`** — what the real guards see, not a re-statement of the roles table.
 
 ### 0.2 Stress data in the mock
 Layouts break on long content, and the mock is mostly tidy short strings.
-- [ ] Add a few deliberately hard records reachable from the main lists: a 40-character class name, a two-line instructor name, a price with cents, an event with a long description, a list long enough to scroll. Real studios (tenant theming) will have long names and wide logos.
-- [ ] Specs for any mock method whose output changes.
+- [x] Add a few deliberately hard records reachable from the main lists. ✅ 10/5 — **opt-in**, behind a second key (`knottyyoga.mockAuditData` = `1`), because seeding by default would shift ids that ~600 existing mock specs assert (`purchase.id === 1`, empty lists). Built through the mock's own `createPurchase` → `purchasePayCard` → `createSubscription`, so the records have exactly a real local-mode checkout's shape:
+	- product 6, *Restorative Partner Acro & Thai Massage Intensive Weekend*, long description, $12,345.00;
+	- purchase 1 — paid, three lines (product 6 ×2, a 90-min variant, a plain product) and a long portal note;
+	- subscription 1 — active Gold Membership.
+	- That fills `/my/purchases/1` and `/my/subscriptions/1`, which **404 on a fresh mock**. The cart is filled per-state (§0.5). More hard records get added as Phases 2–5 reach the pages that need them.
+- [x] Specs for any mock method whose output changes. ✅ 5 specs: off by default (purchase 1 is a 404, product 6 absent), on → purchase paid in full with product 6, subscription active, and it seeds even for `anonymous` while leaving it signed out.
 
 ### 0.3 The harness: `ui/e2e/mobile-audit/`
-- [ ] Add `@playwright/test` as a **dev** dependency and install its Chromium (OQ-1, approved). Nothing in the shipped bundle changes.
-- [ ] A Playwright config with the seven target sizes as projects, starting `ng serve` (mock mode) itself and freezing the clock (`page.clock.setFixedTime`) so date-driven pages render identically every run — without that, desktop screenshot comparisons would differ every day.
-- [ ] Output (screenshots, JSON, HTML report) goes to a git-ignored folder; add it to `ui/.gitignore`.
-- [ ] npm scripts: `audit:mobile` (everything), plus a way to run one tier or one route while iterating.
+- [x] Add `@playwright/test` as a **dev** dependency and install its Chromium (OQ-1, approved). Nothing in the shipped bundle changes. ✅ `@playwright/test` 1.63.0, pinned exact.
+- [x] A Playwright config with the seven target sizes as projects, starting `ng serve` (mock mode) itself and freezing the clock (`page.clock.setFixedTime`) so date-driven pages render identically every run. ✅ `playwright.config.ts` + `viewports.ts`: phones get touch, DPR 2–3 and a mobile UA; port **4300** so it never fights a dev server on 4200 (reuses one already there); clock frozen at **Wed 14 Oct 2026 10:00 Pacific**, timezone `America/Los_Angeles`, reduced motion.
+	- The app scrolls inside an inner column (`app.component.html`), so Playwright's "full page" screenshot captured **one screen**. The harness lets that column grow for the screenshot only — after the checks have run on the real layout — keeping horizontal clipping so the picture shows what a phone shows.
+	- A 10,000px page downscaled to one image is unreadable, and the crushed series cards (§0.6) looked fine in it. Each page is also saved as **`<page>.part-NN.png` slices of ~two screens** — those are what get reviewed.
+- [x] Output (screenshots, JSON, HTML report) goes to a git-ignored folder. ✅ `ui/e2e/mobile-audit/{output,report,test-results}` in the root `.gitignore` (the repo has no `ui/.gitignore`). Each case overwrites only its own files, so a filtered run keeps the rest.
+- [x] npm scripts. ✅ `audit:mobile`, `audit:mobile:phones`, `audit:mobile:self-test`; `AUDIT_TIER` / `AUDIT_ROUTE` / `AUDIT_STRICT` env filters; `--project=<size>`. All in `e2e/mobile-audit/README.md`.
 
 ### 0.4 The automated checks
-Run on every page at every size, so I am not relying on eyes alone:
-- [ ] **Horizontal overflow** — any visible element whose right edge passes the viewport, unless it sits inside a container that scrolls horizontally on purpose (a `.data-table-scroll`, a carousel). Note the app shell has `overflow-x-hidden`, so the usual `scrollWidth > clientWidth` test on the page **reports nothing** — clipping hides the bug instead of showing a scrollbar. The check has to measure elements.
-- [ ] **Tap targets** smaller than 44 × 44 for buttons, links, checkboxes, icon buttons (warning, not failure — some dense back-office tables will keep small targets by decision).
-- [ ] **Input font size** below 16px on phones (iOS zoom-on-focus).
-- [ ] **Dialogs and menus** larger than the viewport.
-- [ ] **Text overflow** — elements whose content is clipped (`scrollWidth > clientWidth` with `overflow: hidden` and no ellipsis).
-- [ ] Results per route × size into one JSON file, plus a short summary table I paste into this doc.
-- [ ] **Self-test for the checks**: a fixture page with one known instance of each problem, and a test that the harness finds all of them and nothing else — a checker that silently finds nothing is the failure mode to rule out.
+Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-checks.ts`; `summarize.ts` rolls results into `output/summary.md`.
+- [x] **Horizontal overflow** (error) — measured per element; only the outermost overflowing element of a chain is reported, with the Angular component it is in.
+	- ⚠️ **The first baseline reported zero overflow on all ~800 cases, and that was a bug in the check, not good news.** The app's page column is `overflow-y: scroll`, and CSS silently makes its `overflow-x` compute to `auto` — so the whole page looked like a "deliberately scrolling box" and everything in it was exempt. Fixed: a vertical scroller never counts as a deliberate horizontal container; an explicit horizontal scroller does; a clipping box only when narrower than the screen. Self-test case added for exactly that shape.
+- [x] **Tap targets** < 44 × 44 (warning). Inline links in running text are exempt (WCAG's inline exception); a control nested in a control is measured once.
+- [x] **Input font size** < 16px on phones (error).
+- [x] **Dialogs and menus** larger than the viewport (`overlay-overflow`, error).
+- [x] **Text clipped** in an `overflow: hidden` box without ellipsis (warning).
+- [x] **Added — cramped text** (warning). Found by *looking* at the first home-page screenshot: the series cards weren't too wide, they were **crushed** — the title column squeezed to a word per line. No overflow check can see that. Flags text wrapping to 3+ lines at under 10 characters a line, measured from the browser's real line boxes.
+- [x] **Added — overlap** (error). Same screenshot: the "Join from today" / "Book this date" buttons are drawn **on top of** the dates. Flags a button/link covering text in the same layer (an open menu or dialog covering the page is excluded — that is its job).
+- [x] Results per route × size as JSON, plus `summary.md` (errors per tier × size, findings by kind, worst components, worst pages).
+- [x] **Self-test**: `layout-checks.spec.ts`, 5 tests. One fixture plants each problem **and a look-alike that must not be reported** (scroll wrapper, carousel, aria-hidden drawer, inline link, ellipsis text, button beside text, the open mobile menu), and pins the exact set found. Verified it catches regressions: breaking the shell rule fails it.
 
 ### 0.5 Route manifest
-- [ ] One file listing every route by tier (public / auth / account / staff / manage+admin), its persona, and concrete IDs for parameterized routes (`/classes/:id`, `/my/purchases/:id`, `/manage/products/:id`, … — about 30 need one) taken from mock data.
-- [ ] A spec that compares the manifest against the app's actual route config and **fails when a route is missing** — so a page added later cannot silently skip the mobile audit.
-- [ ] Interaction states the harness drives explicitly (a page screenshot alone misses them): the mobile menu open with a submenu expanded, each dialog opened, the calendar's day/week/month views, the cart with items, checkout with the Square card form.
+- [x] One file listing every route. ✅ `e2e/mobile-audit/routes.ts` — **113 routes**: public 20, auth 3, account 25, staff 11, manage/admin/blog-admin 54. Concrete ids for every parameterised route, each checked against the mock to render real content. `/verify` navigates to `/login` on success *and* failure, so it has no resting page — recorded as an expected redirect (`expectRedirectTo`) rather than a failure.
+- [x] A spec that fails when a route is missing. ✅ `src/app/mobile-audit-routes.spec.ts` (runs in `ng test`): walks the real router config, resolving every lazy `loadChildren`, and fails on a route missing from the manifest, a stale manifest entry, duplicates, unaccounted redirects, an unfilled `:param`, or a persona that can't pass the route's gate. Guards against its own vacuity (must find 100+ routes). Verified by deleting one entry → fails.
+- [x] Interaction states. ✅ `states.ts`: mobile menu open **with a submenu expanded** (phones/tablet below `md`; the page under the menu is excluded from that case), calendar **day / week / month**, cart **with two items** (one deliberately long). **Changed from the plan:** dialogs are *not* all added up front — each dialog gets a state when its page is worked on in Phases 2–5, so it is audited from then on. Doing ~40 dialogs blind now would mean driving each one without knowing yet what it needs. Checkout with the Square form is covered by the plain checkout route (it renders the card form on load).
 
 ### 0.6 Baseline run
 - [ ] Full audit at all seven sizes. Record per tier: pages, pages with overflow, worst offenders. Keep the desktop screenshots as the regression baseline for the rest of the plan.
