@@ -146,7 +146,10 @@ Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-
 	- **Nothing dropped yet.** The code survey's dialog hotspots (fixed 420/460/780px) don't appear because dialogs aren't open in a plain page load — they get states as each page is worked (§0.5), and §1.4 fixes the widths regardless.
 
 ### 0.7 Phase 0 verification
-- [x] `ng test` — full suite (see below), `ng lint` clean, harness type-checks (`npm run audit:mobile:typecheck`), self-test 5/5.
+- [x] ✅ 10/5 — `ng test` **3485 passed**, `ng lint` clean, production `ng build` passes, harness type-checks (`npm run audit:mobile:typecheck`, new `e2e/mobile-audit/tsconfig.json` — Playwright only transpiles, ESLint only covers `src/`), self-test **5/5**, route-manifest spec **8/8**.
+- [x] **Unplanned fix, found by the full suite:** `InstructorLoadComponent`'s default "next 30 days" range added `30 × 24h` — across the Nov 1 fall-back that lands at 23:00 the day before, so the **date picker showed the range a day short** while the request rounded to the right day. Its spec started failing on Oct 2 for the same reason (the third DST bug this week — see `Deploying to AWS.md` 6.2). Now 30 *calendar* days; the spec pins the clock to 10/14/2026 so the DST case runs every day, not only in October, and fails if the old arithmetic comes back (verified).
+
+**Phase 0 complete.** Next: Phase 1, starting with §1.1 — after OQ-11 (the header breakpoint) has an answer or the default stands.
 
 ---
 
