@@ -882,24 +882,26 @@ Fresh database (`knottyyoga_database_helper --recreate_database`), server + Angu
 >
 > ⚠️ **A presence-only spec passes while a layout is visibly broken.** This project has hit that twice (the Massage card, the mat-card padding). Every item below asserts `getBoundingClientRect()` geometry at a phone viewport, not merely that an element exists.
 
+> ✅ **13.1–13.5 done 10/6/2026 in `Mobile UI Updates.md` Phase 2** (§2.2, §2.4, §2.5), which absorbed this phase. Details, specs and the hand-test steps are there; 13.6 is that plan's §2.8 real-device check.
+
 ### 13.1 [app] Calendar defaults to day view on mobile
-- [ ] Pick the default from the viewport at first render, not from a stored preference, and leave an explicit view choice alone once made.
+- [x] Pick the default from the viewport at first render, not from a stored preference, and leave an explicit view choice alone once made. ✅ Mobile UI §2.5 — day view below md, explicit `?view=` wins.
 
 ### 13.2 [app] Week view opens at the first thing on the day
-- [ ] Scroll the week view so the top of the screen is the first entry of a day's schedule, rather than at midnight with hours of empty grid above it.
-- [ ] Applies to whichever view is showing; the "first thing" is the earliest entry across the visible day(s), not a fixed hour.
+- [x] Scroll the week view so the top of the screen is the first entry of a day's schedule, rather than at midnight with hours of empty grid above it. ✅ Mobile UI §2.5 — `firstEntryScrollSegment`.
+- [x] Applies to whichever view is showing; the "first thing" is the earliest entry across the visible day(s), not a fixed hour. ✅ (The day view is a list, so it's the week view's time grid; on load and on every week change.)
 
 ### 13.3 [app] Upcoming events and series on the home page
-- [ ] Called out as the worst offenders. Expect card grids that do not collapse to one column, and fixed widths that force a horizontal scroll.
+- [x] Called out as the worst offenders. ✅ Mobile UI §1.5/§2.2 — not a grid or fixed-width problem in the end: the series card's row didn't wrap, so its text was crushed to a word per line and the Join/Book button was drawn over the dates.
 
 ### 13.4 [app] The "I'll be there" button
-- [ ] Called out specifically. Likely a fixed width or a label that wraps inside a fixed-height control.
+- [x] Called out specifically. ✅ Mobile UI §2.2 — a 20px line of muted text, now a 44px toggle-style control (green when attending); its card's status badge no longer covers a long title. ⚠️ Not visible in mock data — please confirm on a phone (Mobile UI §2.8 step 5).
 
 ### 13.5 [app] Our Classes
-- [ ] Called out as needing the most work. Scope this one properly after looking at it — it may be several items rather than one.
+- [x] Called out as needing the most work. ✅ Mobile UI §2.4 — three items: class rows crushed to letter width (a zero flex-basis meant the row never wrapped), week buttons breaking mid-label, the instructor/substitute line squeezed.
 
 ### 13.6 Live hand-testing (Phase 13)
-- [ ] Steps at a real phone width for each item, plus a sweep for horizontal page scroll — the single most reliable smell that something has a fixed width.
+- [ ] Steps at a real phone width for each item, plus a sweep for horizontal page scroll. → **Mobile UI Updates §2.8** (exact steps there). Yours.
 
 ---
 

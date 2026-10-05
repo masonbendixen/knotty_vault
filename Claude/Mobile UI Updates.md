@@ -249,37 +249,58 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 
 > Persona `anonymous`. The pages a prospective student sees first. Shared public building blocks first, then pages roughly in visitor-traffic order.
 
+> **How Phase 2 was worked (10/5–10/6):** the automated findings first, then **every public page read by eye** at 375px (and 360px where it mattered) — 22 pages, ~45 slices. The eye-review found as much as the audit did: the page gutter, the Our Classes week buttons, the product options, the instructor line.
+
 ### 2.1 Public building blocks
-- [ ] Home-page sections (`pages/public/home-page/sections/*`), class-info cards, instructor cards, the image carousel — whatever §0.6 shows breaking across several public pages.
+- [x] ✅ **`.page-container` gutter 8px → 16px on phones** — found by eye on the home page (headings and body text almost against the screen edge). It's the full-bleed container behind every home section, the footer and the calendar; it now matches the 16px every other container already had. md/lg unchanged. Iframe spec in `design-tokens.spec.ts` (16px at 375, 32px at 800, 64px at 1280).
+- [x] The series card (`offering-highlight`, home + `/events`) was fixed in §1.5. Class-info cards, instructor cards and the gallery carousel: no problems at any phone size.
 
 ### 2.2 Home (`/`) — includes Polish 13.3 and 13.4
-- [ ] Upcoming events and series sections: grids collapse to one column, no fixed widths (Polish 13.3, "the worst offenders").
-- [ ] The "I'll be there" button (Polish 13.4).
-- [ ] Hero, announcements, every other section.
+- [x] Upcoming events and series sections (Polish 13.3, "the worst offenders"). ✅ The series card was the offender — crushed text and a button over the dates — fixed in §1.5. The event cards were already fine. Re-checked by eye at 375.
+- [x] **"I'll be there" (Polish 13.4).** ✅ — *with a caveat.* It's the attendance control on a class chip (`app-calendar-event`, on the calendar and Our Classes for members). It was a line of muted text with a checkbox glyph, ~20px tall, nothing saying "tap me" — my reading of "looks bad". It now looks and sizes like a toggle: a bordered **44px** control, green when attending. And on a narrow card the Booked/Waitlisted badge, which was pinned in the corner where a long title ran under it, now sits above the title — a **container query** on the card (it's the card's width that matters, and that's testable by sizing the host). Karma specs at a 343px host (44px full and compact, badge above the title; badge still in the corner at 700px). Verified: 3 fail without the fix.
+	- ⚠️ **Caveat — the mock never shows this control**, for any persona: it needs a class occurrence the member's attendance template matches, and the mock's data doesn't line up. So it's verified by component specs, not seen in a screenshot. **Please look at it on your phone** (step 5 below), and if "looks bad" meant something else, say what.
+	- The *other* "I'll be there" buttons — on `/my/today-classes` and `/my/upcoming-classes` — are account pages: §3.5.
+- [x] ✅ Section "View all events →" / "See all memberships →" links: 20px → **44px** tap rows (same look). Hero, announcements, intro, get-started, artwork, membership: fine by eye.
 
 ### 2.3 Information pages
-- [ ] `/start` (Getting Started), `/about`, `/location`, `/blog`, `/gallery`, not-found.
+- [x] ✅ `/start`, `/about`, `/location`, `/blog`, `/gallery`, not-found — all fine at 360/375 by eye; no findings. (Broken-image icons throughout are the mock's missing photos, not layout. The footer's "Fa In Tw" are deliberate short labels from the site config.)
 
 ### 2.4 Classes — Polish 13.5
-- [ ] `/classes` (Our Classes) — "needs the most work". Scoped properly after the baseline screenshots; expect several items.
-- [ ] `/classes/all`, `/classes/:id`.
+- [x] `/classes` (Our Classes, "needs the most work"). ✅ Three problems:
+	- **Class rows crushed to letter width** — "12:00 PM · 60 min" broke a letter per line at 360. The row did wrap below md, but `.slot-body` is `flex: 1` (a *zero* basis), so photo + text + status always "fit" on one line and the wrap never happened. Now the text has a 10rem basis (shares a line with the photo) and the status chip takes its own line underneath — the same shape as the series card.
+	- **Week buttons wrapping mid-label** ("This / week", "Next / week"). Labels never break now; a button that doesn't fit moves to the next line, and the date range is its own line on small phones.
+	- **Instructor line** ("with Grace Hopper (Substituting for Ada Lovelace)") squeezed into two narrow columns — now wraps.
+	- Playwright `layout/our-classes.spec.ts`. ⚠️ **The first version of the week-button test was vacuous** — it measured button height, but a Material button's height is fixed and a wrapped label just overflows it. It now counts the label's line boxes. Verified against the original stylesheet: 5 cases fail.
+- [x] `/classes/all`: ✅ filter chips 33px → **44px**. `/classes/:id`: fine.
 
 ### 2.5 Calendar — Polish 13.1 and 13.2
-- [ ] Day view by default below `md`, chosen at first render from the viewport; an explicit choice is left alone after that.
-- [ ] Week/month views stay reachable but are desktop views; on a phone they scroll inside their own container (`min-w-[50rem]` today) rather than widening the page.
-- [ ] Opens scrolled to the first entry of the day, not midnight (Polish 13.2).
-- [ ] Day navigation with large prev/next buttons. No swipe gesture for now (OQ-5, decided — possible follow-up).
+- [x] Day view by default below `md`. ✅ `defaultCalendarViewFor(isBelowMd)` (`calendar.types.ts`); the service reads `matchMedia('(width < 768px)')` at first render. An explicit `?view=` always wins. Specs: the pure function; the service on a phone / wide screen / a browser where matchMedia throws (→ month).
+- [x] Week/month scroll inside their own box on a phone. ✅ The box was `overflow-scroll` (both axes, scrollbars always on) → `overflow-x-auto`. **And a worse bug the screenshots found:** the box centred its child with `items-center`, and a centred child wider than a scrolling box overflows to the *left*, where it can never be scrolled to — **at 768px the month grid lost its whole Sunday column.** Now centred with the child's `mx-auto`, which falls back to the left edge when there's no room.
+- [x] Opens at the first entry (Polish 13.2). ✅ `firstEntryScrollSegment(days)` — the start of the hour of the earliest class across the week shown (whole hours, so the row above is visible); 10:00 for an empty week. Applied on load and on prev/next week. (The day view is a list, not a time grid, so this is the week view.) The mock's earliest class is 4 AM — under the old fixed 10:00 it was scrolled out of sight. Specs for the function.
+- [x] Day navigation. ✅ Prev/next buttons 32px → **44px** below md (day, week and month views; desktop unchanged). No swipe (OQ-5).
+- [x] Month view chips: the title couldn't shrink (a flex item without `min-width: 0`) — now ellipsises inside its day cell.
+- Playwright `layout/calendar.spec.ts`: lands on day/month by width; explicit `?view=month` respected on a phone; month grid starts at the left edge, the box scrolls, the page doesn't; the week view opens with its first class in sight; 44px buttons. Verified against the original calendar files: **15 cases fail**.
+- **Two audit false positives fixed in the checker on the way** (self-tests added for both): text scrolled out of its scroll box (the week grid's hour labels under the header) and the hidden tail of an ellipsised title were being reported as "covered". Line boxes are now clipped to what's actually visible before the overlap test.
 
 ### 2.6 People and events
-- [ ] `/instructors`, `/instructors/:id`, `/providers`, `/providers/:personId`, `/events`.
+- [x] ✅ `/instructors`, `/instructors/:id`, `/providers`, `/providers/:personId`, `/events` — fine by eye; no findings.
 
 ### 2.7 Shop browsing (still logged out)
-- [ ] `/shop`, `/shop/services`, `/shop/subscriptions`, `/shop/:id`.
+- [x] ✅ `/shop`, `/shop/services`, `/shop/subscriptions` — fine (the 57-character stress product wraps cleanly). `/shop/:id`: the option buttons were ragged content-width boxes on a phone; below `sm` they're full-width rows.
 
 ### 2.8 Phase 2 audit and sign-off
-- [ ] Zero horizontal overflow on every public route at every phone size. Record the numbers.
-- [ ] Tick Polish 13.1–13.5 in `Polish before deploying.md`.
-- [ ] Real-device check of the public pages — yours (OQ-8, decided: real-device passes at the end of Phase 2, Phase 3, and §6.4). I write the exact steps here first.
+- [x] ✅ **Public tier, all seven sizes: 0 errors, 0 overlaps, 0 cramped text** (167 cases). Baseline was 3 / 24 pages with errors on every phone and 23 / 23 on tablets. Remaining: tap-target *warnings* only, both by decision — month-view event chips (month is a desktop view on a phone; Makeover OQ 19) and Our Classes title links (30px; the big photo beside each goes to the same page).
+- [x] Desktop vs baseline: everything changed is intended — the calendar week view (now opens at the first class), All Classes and home (a few px taller from the 44px chips/links), plus the Phase 1 items. Iframe masks explain the shop/location diffs.
+- [x] **Verification:** `ng test` **3515 passed**, `ng lint` clean, production build passes; Playwright layout specs 66 passed (53 skipped by design); harness self-tests 11 passed; harness type-checks.
+- [x] Tick Polish 13.1–13.5 in `Polish before deploying.md`. ✅
+- [ ] **Real-device check of the public pages — yours (OQ-8).** On your phone, **signed out**, in the phone's normal browser (Safari on iPhone, Chrome on Android), go to the site and check:
+	1. **Home** — scroll top to bottom. Text sits a thumb-width from both edges (not against them). Open the **Series & workshops** card: each class shows its name and dates readable, with its **Join / Book** button on its own line *below* the dates, full width.
+	2. **Menu (☰) → Our Classes** — each class row: photo and name side by side, time on one line ("12:00 PM · 60 min"), the status (Cancelled / Requires a membership…) on its own line below. **Previous / This week / Next week**: no word broken across two lines.
+	3. **Menu → Your Calendar** — it opens in **Day View** (not Month). Tap **›** a few times: big enough to hit first time. Then **Day View ▾ → Week**: the grid scrolls sideways inside its box, the page itself doesn't, and it opens with the earliest class visible. **Month**: the **Sun** column is visible at the left.
+	4. **Classes → All Classes** — the tag chips (Yoga / Aerial / …) are easy to tap.
+	5. **Sign in** (as a member with a weekly plan), then **Our Classes**: find a class showing **"I'll be there"** or **"Tap to plan attendance"** — it should look like a button (bordered, green when attending), not plain text. *This is the one change I could not see in the test data — tell me if it still looks wrong.*
+	6. **Turn the phone sideways** on Home and Our Classes: nothing cut off at the right edge.
+	- Anything that looks off: a screenshot + which step is all I need.
 
 ---
 
