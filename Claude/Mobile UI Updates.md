@@ -292,8 +292,11 @@ In purchase order, each tested with the persona logged in and items in the cart:
 Each has a default I'll proceed with if you don't answer. Answer inline under the question.
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
+	- Mason- Sure. This sounds fine.
 2. **OQ-2 Breakpoints.** The Makeover planned Tailwind screens `sm:375 / md:768 / lg:1280`; today Tailwind's defaults are live (640/768/1024/1280) and the 24 existing `sm:`/`lg:` classes assume them. *Default: keep the defaults — `md` (768) is the line both plans agree on, and changing `sm`/`lg` would shift existing layouts for no mobile gain.*
+	- Mason- I'll go with your recommendation.
 3. **OQ-3 Cart on mobile.** The cart badge is desktop-only. *Default: a cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items.*
+	- Mason- I'll go with your recommendation.
 4. **OQ-4 Dialogs on phones.** *Default: form dialogs (editors, booking, transfer requests) go full-screen below `md`; short confirm/info dialogs stay centered at full width with a margin. True bottom sheets (Makeover) are a larger change — deferred unless you want them.*
 5. **OQ-5 Calendar swipe** between days. *Default: not now — large prev/next buttons only. Swipe is a gesture-library addition with its own edge cases; a follow-up item if you want it.*
 6. **OQ-6 Library releases.** Fixes in `@honuware/ui` need a publish, and publishing needs git commit/tag/push, which you do. *Default: I develop against the library source, batch all library changes for a phase into one release, and give you the exact release steps at the end of that phase (Phase 1 and possibly 3 and 5).*
