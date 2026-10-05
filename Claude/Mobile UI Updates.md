@@ -298,8 +298,11 @@ Each has a default I'll proceed with if you don't answer. Answer inline under th
 3. **OQ-3 Cart on mobile.** The cart badge is desktop-only. *Default: a cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items.*
 	- Mason- I'll go with your recommendation.
 4. **OQ-4 Dialogs on phones.** *Default: form dialogs (editors, booking, transfer requests) go full-screen below `md`; short confirm/info dialogs stay centered at full width with a margin. True bottom sheets (Makeover) are a larger change — deferred unless you want them.*
+	- Mason- I'll go with your recommendation.
 5. **OQ-5 Calendar swipe** between days. *Default: not now — large prev/next buttons only. Swipe is a gesture-library addition with its own edge cases; a follow-up item if you want it.*
+	- Mason- I'll go with your recommendation.
 6. **OQ-6 Library releases.** Fixes in `@honuware/ui` need a publish, and publishing needs git commit/tag/push, which you do. *Default: I develop against the library source, batch all library changes for a phase into one release, and give you the exact release steps at the end of that phase (Phase 1 and possibly 3 and 5).*
+	- Mason- I'll go with your recommendation.
 7. **OQ-7 Sticky bottom bars** for primary actions (Pay, Book, Save) on phones — in the Makeover inventory, not built. *Default: yes for checkout/booking only (Phase 3), where the button otherwise sits below a tall card form; not for back-office forms.*
 8. **OQ-8 Real-device checks.** *Default: two short passes by you — end of Phase 2 (public) and end of Phase 3 (a purchase). §6.4's final pass covers staff check-in.*
 9. **OQ-9 CI gate.** *Default: yes, a `test:mobile-audit` job failing on new horizontal overflow at phone sizes, all tiers. It adds a few minutes per pipeline.*
