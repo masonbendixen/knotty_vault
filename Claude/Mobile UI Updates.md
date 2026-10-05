@@ -27,7 +27,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 2. **Fix it** in the lowest layer that owns the problem: a token or mixin before a shared class, a shared class before a shared component, a shared component before a page. A fix that would be copy-pasted onto three pages belongs one layer down.
 3. **Prove it.**
    - The audit for that page reports **zero horizontal overflow** at every phone width, and no new tap-target or input-font findings.
-   - A **geometry spec** in the component's `*.component.spec.ts` pins the fix at 375px: it sets the host width and asserts `getBoundingClientRect()` (nothing wider than the viewport, columns actually stacked, the button actually full width). Presence-only specs are not accepted — Polish Phase 13 records two layouts that passed presence specs while visibly broken. `site-theme.component.spec.ts:237` is the template.
+   - A **geometry spec** pins the fix, asserting `getBoundingClientRect()` (nothing wider than the viewport, columns actually stacked, the button actually full width). Presence-only specs are not accepted — Polish Phase 13 records two layouts that passed presence specs while visibly broken. Where it lives depends on what drives the layout (learned in §1.1):
+     - **Container-driven** (flex/grid that reacts to its own width): a Karma `*.component.spec.ts` that sizes the host — `site-theme.component.spec.ts:237` is the template.
+     - **Global classes behind a media query**: a Karma spec using the iframe-of-exact-width helper in `design-tokens.spec.ts`.
+     - **A component's own media query**: Karma can't do it — the test window can't be resized, and a TestBed component can't be mounted in an iframe. These get a **Playwright layout spec** at a real phone viewport, `e2e/mobile-audit/layout/*.spec.ts`, run against the mock app like the audit.
    - The **desktop (1280) screenshot is unchanged** against the Phase 0 baseline, or the change is intended and noted. Mobile work must not quietly break desktop.
    - `ng test`, `ng lint` and `ng build --configuration=production` pass.
 4. **Tick it** here, with the audit numbers.
@@ -159,11 +162,12 @@ Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-
 
 ### 1.1 Breakpoint mixin and tokens
 Today component SCSS uses six different breakpoints (600, 639, 700, 767, 768, 900px) and no shared definition.
-- [ ] `src/assets/styles/mixins/_breakpoints.scss` with `below(md)` / `at-least(md)` etc., values matching Tailwind's screens so SCSS and Tailwind classes switch at the same width.
-- [ ] Tokens still open from the Makeover: `--touch-target-min` (44px) and safe-area padding tokens (`env(safe-area-inset-*)`).
-- [ ] Move the 17 existing `@media` rules onto the mixin. Where a rule used an odd width, check the page at both widths before moving it.
-- [ ] Extend `design-tokens.spec.ts` for the new tokens; a spec that the mixin's widths equal Tailwind's.
-- [ ] `ui/CLAUDE.md`: a short "Breakpoints" section so new code uses the mixin.
+- [x] `src/assets/styles/mixins/_breakpoints.scss` with `below(md)` / `at-least(md)` etc., values matching Tailwind's screens so SCSS and Tailwind classes switch at the same width. ✅ 10/5 — `bp.at-least(name)` / `bp.below(name)` over `sm 640 · md 768 · lg 1024 · xl 1280`; an unknown name is a compile error. `below` is `width < X`, `at-least` is `width >= X`, so the two never overlap or leave a gap.
+- [x] Tokens still open from the Makeover. ✅ `--touch-target-min: 44px`; `--safe-area-top|right|bottom|left` over `env(safe-area-inset-*, 0px)`.
+	- **`viewport-fit=cover` deliberately NOT added to `index.html` yet.** Without it `env()` reports 0 everywhere; with it, landscape content slides under the notch unless the shell is padded. Nothing is pinned to an edge until Phase 3's sticky pay bar — **§3.2 adds the opt-in together with the bar** that needs it.
+- [x] Move the existing `@media` rules onto the mixin. ✅ **19 rules in 16 files** (the survey's "17" missed two in `_patterns.scss`). No raw `@media` left in app SCSS. Odd widths mapped to the nearest shared line — 639 → `below(sm)`, 767/768 → `below(md)`; **600 → `sm`** (schedule-template-editor, announcements-editor, our-classes), **700 → `md`** (offering-highlight, site-fonts, our-classes), **900 → `lg`** (blog editor's side-by-side panes, which need the room). Those moved by up to 124px; their pages are re-checked in §1.8's audit at every size.
+- [x] Extend `design-tokens.spec.ts`. ✅ 4 new specs. The breakpoint ones render probes inside an **iframe of an exact width** (its own viewport, so media queries fire — a Karma window can't be resized) at 639/640, 767/768, 1279/1280: the mixin (via `.form-grid`) and Tailwind's `sm:` flip at the same pixel. Verified non-vacuous: moving the mixin's `sm` to 600 fails it.
+- [x] `ui/CLAUDE.md`: "Breakpoints" paragraph next to the layout mixins.
 
 ### 1.2 Global base rules
 - [ ] Inputs, selects and textareas at least 16px on phones.
