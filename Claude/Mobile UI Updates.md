@@ -125,7 +125,7 @@ Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-
 **Findings on phones (all four sizes), by kind:** overflow 65 · overlap 28 · input-font 8 · overlay-overflow 0 · text-clipped 0 · cramped-text 166 (warning) · tap-target 1,798 (warning).
 
 **How to read it.**
-- **The tablet column is one bug, not 117.** At 768px the desktop menu bar doesn't fit: labels wrap to two lines, *Your Calendar* runs off the right edge, and **the logo is pushed out of view**. At 1024 the admin/staff menus (more items) still overflow; the customer menu just fits. → §1.7, and **OQ-11**.
+- **The tablet column is one bug, not 117.** At 768px the desktop menu bar doesn't fit: labels wrap to two lines, *Your Calendar* runs off the right edge, and **the logo is pushed out of view**. At 1024 the admin/staff menus (more items) still overflow; the customer menu just fits. → §1.7: hamburger below 1280 (**OQ-11, decided**).
 - **Phones look better than they are.** Most of what is wrong on a phone isn't *too wide* — it's **crushed** (cramped-text, 166) or **drawn over** (overlap, 28). The screenshots confirm it: the home page's series cards and Our Classes' class cards squeeze their text to a word per line, and on the series cards the Join/Book button sits on top of the dates. Neither shows up as overflow; both are what "looks terrible on mobile" means.
 - **Tap targets (1,798)** are almost all back-office icon buttons and table actions. §1.2's global minimum will remove most in one rule; the remainder are decided per page.
 
@@ -149,7 +149,7 @@ Run on every page at every size, so I am not relying on eyes alone. ✅ `layout-
 - [x] ✅ 10/5 — `ng test` **3485 passed**, `ng lint` clean, production `ng build` passes, harness type-checks (`npm run audit:mobile:typecheck`, new `e2e/mobile-audit/tsconfig.json` — Playwright only transpiles, ESLint only covers `src/`), self-test **5/5**, route-manifest spec **8/8**.
 - [x] **Unplanned fix, found by the full suite:** `InstructorLoadComponent`'s default "next 30 days" range added `30 × 24h` — across the Nov 1 fall-back that lands at 23:00 the day before, so the **date picker showed the range a day short** while the request rounded to the right day. Its spec started failing on Oct 2 for the same reason (the third DST bug this week — see `Deploying to AWS.md` 6.2). Now 30 *calendar* days; the spec pins the clock to 10/14/2026 so the DST case runs every day, not only in October, and fails if the old arithmetic comes back (verified).
 
-**Phase 0 complete.** Next: Phase 1, starting with §1.1 — after OQ-11 (the header breakpoint) has an answer or the default stands.
+**Phase 0 complete.** Next: Phase 1, starting with §1.1. OQ-11 is decided (hamburger below 1280), so nothing blocks it.
 
 ---
 
@@ -197,7 +197,7 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 - [ ] Work against the library source via the `tsconfig.json` path block during development, then **one batched release per phase** (OQ-6, decided). Releasing needs your git commit/tag/push, so at the end of each phase with library changes I write the exact release steps here and pause on that one item.
 
 ### 1.7 App shell: header, mobile menu, footer
-- [ ] **Header at tablet widths (baseline's biggest finding):** the desktop menu bar does not fit at 768–1024 — labels wrap, the logo is pushed off-screen, the last item falls off the edge — on every page. Move the hamburger breakpoint per **OQ-11** (default: below 1280) and add a geometry spec at 768 and 1024 that the logo and the last menu item are both inside the viewport.
+- [ ] **Header at tablet widths (baseline's biggest finding):** the desktop menu bar does not fit at 768–1024 — labels wrap, the logo is pushed off-screen, the last item falls off the edge — on every page. **Show the hamburger + mobile menu below 1280px** (`xl`) instead of below 768 (OQ-11, decided) — iPads in both orientations get the phone menu; the desktop bar only appears from 1280, where every persona's menu fits. Geometry specs at 768, 1024 and 1280: below 1280 the hamburger is visible and the desktop bar hidden; at 1280 the logo and the last menu item are both inside the viewport. The mobile menu's own `md:hidden` and the shell's backdrop (`app.component.html`) switch at the same width, or the menu would open behind a desktop backdrop at tablet sizes.
 - [ ] Header at 360px: logo, hamburger and anything else in the 55px bar fit without overlap.
 - [ ] **Mobile cart affordance** — the cart badge renders only on desktop today. A cart icon with its count in the header bar, left of the hamburger, shown only when the cart has items (OQ-3, decided).
 - [ ] Mobile menu: every menu item reachable, expanded submenus scroll, tap targets ≥ 44px, closes on navigation.
@@ -339,9 +339,10 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 # Open questions
 
-> ✅ **OQ-1 to OQ-10 resolved 10/5/2026 — every default accepted.** Decisions are folded into the plan sections above (each cited as "OQ-n, decided"). New questions that come up during implementation are added below from OQ-11, each with a default so work never stops on one.
+> ✅ **OQ-1 to OQ-11 resolved 10/5/2026 — every default accepted** (OQ-11: hamburger below 1280, folded into §1.7). Decisions are folded into the plan sections above (each cited as "OQ-n, decided"). New questions that come up during implementation are added below from OQ-11, each with a default so work never stops on one.
 
 11. **OQ-11 (new, from the baseline) — where should the header switch to the hamburger?** Today it switches at 768px (`md`), but the desktop menu doesn't fit until about 1100px for a customer and wider for admin/staff, who have more items: at iPad portrait the logo disappears and *Your Calendar* falls off the edge, on **every page**. Options: (a) hamburger below 1280 — iPads in both orientations get the phone menu, which works; (b) hamburger below 1024 and shrink the desktop menu (smaller labels/gaps) so it fits from 1024 — tighter, and the admin menu may still not fit; (c) keep 768 and make the bar scroll or wrap. *Default: (a), hamburger below 1280. It's the only option that fits every persona's menu at every tablet size without redesigning the menu, and the mobile menu is already the one built for touch.*
+	- Mason- I'll go with your recommendation.
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
 	- Mason- Sure. This sounds fine.
