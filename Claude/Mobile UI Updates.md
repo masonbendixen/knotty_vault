@@ -309,29 +309,54 @@ The library (`C:\Users\mason\source\repos\honuware-web-components`) has **no** `
 > Persona `anonymous` for the auth pages, `customer` for the rest. This is where money changes hands, so the checkout path gets the closest look.
 
 ### 3.1 Auth pages (library)
-- [ ] `/login`, `/register`, `/verify` — the components are in `@honuware/ui/auth`; fixes in the library (§1.6 process). Input types, `autocomplete`, `inputmode` on email/password fields.
+- [x] `/login`, `/register`, `/verify` — the components are in `@honuware/ui/auth`; fixes in the library (§1.6 process). Input types, `autocomplete`, `inputmode` on email/password fields. ✅ Already clean at every size from the 0.1.3 release (§1.6): 0 errors, 0 warnings on all three at all seven sizes. No further change.
 
 ### 3.2 Booking and checkout flow
 In purchase order, each tested with the persona logged in and items in the cart:
-- [ ] `/shop/cart` — collapses to cards (OQ 18).
-- [ ] `/shop/checkout/:productId`, `/shop/service/:productId`, `/shop/subscribe/:productId`, `/shop/event/:sessionId`, `/shop/series/:classInstanceId`.
-- [ ] Square card form fits at 360px; the pay button is reachable without scrolling past the card form on a 375 × 667 screen.
-- [ ] **Sticky bottom action bar** for the primary action (Pay / Book / Subscribe) on checkout and booking pages below `md`, with safe-area padding — checkout/booking only, not back-office forms (OQ-7, decided). Built once as a shared component (lower layer first), then used by each page; geometry spec that it stays inside the viewport and does not cover the last form field.
-- [ ] One end-to-end harness pass through the whole purchase in mock mode at `phone-se`.
+- [x] `/shop/cart` — collapses to cards (OQ 18). ✅ The cart already read as one card per line at 375 (name + details left, price + remove right). The one problem was the remove "×": a 15×24 target, now a 44px box whose negative margin keeps the row exactly as tall as before. Spec: 44×44, labelled, layout footprint still 24px.
+- [x] `/shop/checkout/:productId`, `/shop/service/:productId`, `/shop/subscribe/:productId`, `/shop/event/:sessionId`, `/shop/series/:classInstanceId`. ✅
+	- **Service booking date strip** — seven 60px day buttons + chevrons need ~533px; at 360 the strip ran 150px off-screen (the account tier's only overflow). Below 34rem of its own width (container query) the chevrons and a new week heading ("Oct 14 – Oct 20") sit on top and the seven days become an equal-width 7-column grid, each 44px tall. Desktop (568px of page) keeps the one-row strip. Specs at 328px (all seven inside, ≥44px, heading shown) and at 700px (one row, no heading).
+	- **Found on the way — DST bug in the same strip:** days were stepped by a fixed 86 400 000 ms, so the week of Oct 28 2026 (US fall-back Nov 1) showed **"Nov 1" twice** and every later day sat at 23:00 the previous evening. Now steps by calendar day (same fix as the provider-schedule DST bug). Spec pins Oct 28 → Nov 3 with seven distinct dates, each at local midnight.
+	- The other four pages had no layout errors; their only change is the sticky bar below.
+- [x] Square card form fits at 360px; the pay button is reachable without scrolling past the card form on a 375 × 667 screen. ✅ The form fit since §1.5; the pay button is now in the sticky bar, on screen from the first paint (`layout/sticky-action-bar.spec.ts` measures it before any scroll on cart, checkout, event, series and subscribe at all four phone sizes).
+- [x] **Sticky bottom action bar** for the primary action (Pay / Book / Subscribe) on checkout and booking pages below `md`, with safe-area padding — checkout/booking only, not back-office forms (OQ-7, decided). Built once as a shared component (lower layer first), then used by each page; geometry spec that it stays inside the viewport and does not cover the last form field. ✅
+	- **`app-sticky-action-bar`** (`shared/components/sticky-action-bar/`) — the page projects its own buttons. Below md: `position: sticky; bottom: 0`, surface fill, top divider, `padding-bottom: space-3 + --safe-area-bottom`. **Sticky, not fixed**: the bar keeps its place at the end of the form, so scrolled to the bottom it sits after the last field instead of over it, and it can never leave its page for the footer. Labels never wrap inside a button; two buttons that can't share a row (Book and Pay + Add to Cart at 360) put the second on its own full-width row. From md up: an ordinary row, no chrome — desktop screenshots identical.
+	- Used on all six: cart, checkout, service, subscribe, event, series.
+	- **`viewport-fit=cover` added to `index.html` with it**, as §1.1 promised. The shell (`.app-shell`) gives back the top and side insets, so in landscape the page sits beside the notch exactly as before; the footer pads its bottom by the home-indicator inset. All 0 on a screen without a notch.
+	- Specs: Karma — buttons projected side by side; in a real 375px iframe the bar is sticky and adds the inset under the buttons (1024: static, no padding); shell pads top/right/left by the insets and not the bottom; footer pads its bottom. Playwright (`layout/sticky-action-bar.spec.ts`, 5 pages): on screen at the top of the page, back in place after the last field at the end, every label one line, nothing wider than the phone; from md up `position: static` with no border; `viewport-fit=cover` present. Mutation (bar made static): Pay lands at 856–1097px on a 667px screen — fails.
+	- **Audit rule change:** a sticky/fixed element is now its own layer in the overlap check (like an open menu or dialog) — floating over the text scrolling beneath it is its job. Self-test added (page text under the bar: not reported; a control drawn over the bar's own text: still reported); mutation caught.
+- [x] One end-to-end harness pass through the whole purchase in mock mode at `phone-se`. ✅ `layout/purchase-flow.spec.ts`: cart with two items → Card on File → Pay (on screen before and after choosing the card, never scrolled to) → "Payment Complete!" → Purchase Details shows purchase #2, Paid. Pays with a card on file because typing into Square's sandbox iframe is network-bound; the card comes from a **separate** mock flag (`knottyyoga.mockAuditCard`) — seeding it with the general audit data made every checkout open on Card on File and hid the Square form from the audit (caught by the desktop comparison).
 
 ### 3.3 Account hub and profile
-- [ ] `/my/account`, `user-information`, `update-user-info`, `update-user-password`, `notification-preferences`, `cards`, `favorite-instructors`, `skills`.
+- [x] `/my/account`, `user-information`, `update-user-info`, `update-user-password`, `notification-preferences`, `cards`, `favorite-instructors`, `skills`. ✅ All already free of errors from Phase 1's shared work. One fix: the three show/hide-password eyes were bare 24×24 icons with no name — now `mat-icon-button` (48px touch target) labelled "Show password" / "Hide password". Spec: 3 toggles, ≥44px, labelled, each toggles.
 
 ### 3.4 Account lists — tables become cards
-- [ ] `/my/purchases` and `/my/purchases/:id`, `/my/events`, `/my/vouchers`, `/my/subscriptions` and `:id`, `gift-permissions` — using the §1.3 card-list pattern.
-- [ ] `attendance-history` — its five fixed columns (`180px 1.2fr 1.2fr 1fr 110px`) stack.
+- [x] `/my/purchases` and `/my/purchases/:id`, `/my/events`, `/my/vouchers`, `/my/subscriptions` and `:id`, `gift-permissions` — using the §1.3 card-list pattern. ✅ None of these is a table — each is already a list of cards/panels, so `.data-table--stack` had nothing to stack. What was wrong:
+	- **Purchase history:** Material's panel header is a fixed 48px row; at 375 the date wrapped to three lines and was cut off top and bottom. A narrow panel (container query, < 30rem) lets the header grow and puts the date on its own line above total + status. Specs at 343 (date one line, above total, all inside the header) and 760 (one row).
+	- **My subscriptions:** title, period and chevron shared one row at every width (a 3-line title, a 4-line period, clipped icons). The row now wraps on its own content (no breakpoint): title on its own line, details + chevron beneath. Back link now the shared `.back-link` (was a 16px link). **New spec file** `my-subscriptions.component.spec.ts` (7 tests — the component had none).
+	- **Purchase detail:** the seat-assignment "Set up sharing…" link was a 16px target → 44px.
+	- Events, vouchers, gift-permissions, subscription detail: clean, no change.
+- [x] `attendance-history` — its five fixed columns (`180px 1.2fr 1.2fr 1fr 110px`) stack. ✅ Instructor and Status were cut off by the card's clipped edge. A table narrower than 40rem (container query) hides the header and lays each row out as a card: date with status beside it, then class, where, instructor one per line. Desktop (768px) keeps the table. Specs at 343 and 800.
 
 ### 3.5 Schedules
-- [ ] `/my/my-schedule` (tabs), `today-classes`, `upcoming-offerings`, and their dialogs (fixed 420/460px today, §1.4).
+- [x] `/my/my-schedule` (tabs), `today-classes`, `upcoming-offerings`, and their dialogs (fixed 420/460px today, §1.4). ✅
+	- **Today's Classes** and the **Upcoming** tab: "I'll be there" was squeezed beside the details into a two-line, 36px-tall button. Both rows now wrap on their own content: the button keeps its label on one line and drops under the details, right-aligned, when they can't share a line. Specs in both components (phone: one-line label, inside the row; wide: beside the details).
+	- The "can't make it" note dialog is a confirm with one optional field, so it stays centred (the §1.4 rule) and already fits the phone width.
+	- **New audit states:** `my/today-classes [skip-dialog]` (plans the first class, then opens the dialog) and `my/my-schedule [upcoming]` (the Upcoming tab). Both clean.
+	- Upcoming offerings: clean; its only finding is the long heading "Upcoming Workshops & Series" wrapping to three lines (ordinary heading wrap, left as is).
 
 ### 3.6 Phase 3 audit and sign-off
-- [ ] Zero overflow on every account route at every phone size; the full purchase completes at `phone-se`.
-- [ ] Real-device purchase with a Square sandbox card (§6.4 — yours).
+- [x] Zero overflow on every account route at every phone size; the full purchase completes at `phone-se`. ✅ **Account tier: 0 errors at all seven sizes (28 cases each, incl. the 2 new states), 0 tap-target warnings.** Public and auth still 0. Full run: 942 passed. Desktop vs the Phase 0 baseline: the new Phase 3 differences are all intended — my-subscriptions (title on one line, badge beneath; shared back link), update-password (icon buttons), purchase detail (taller sharing link); the five checkout pages differ only by the Square-iframe mask the audit has applied since the baseline.
+	- Final numbers: `ng test` 3546 passed (3515 at end of Phase 2); `ng lint` clean; production build passes (pre-existing budget warnings only); layout specs 102 passed + purchase flow; harness self-tests 12 passed. Every fix mutation-checked (13 reverts, each fails its spec).
+	- Note for Phase 4: the staff tier also shows 0 now, but **not because anything was fixed** — this run's `/staff/check-in` had no bookings in its 90-minute window, so the row with the old overlap never rendered. Re-check it with bookings present when Phase 4 starts.
+- [ ] Real-device purchase with a Square sandbox card (§6.4 — yours). Steps, on your phone, against the sandbox deploy:
+	1. Sign in. **Shop → Services → Deep Tissue Massage**: the seven days fit across the screen under a heading like "Oct 5 – Oct 11", nothing cut off at the right. Tap the right arrow until the week after **Sun Nov 1**: it must start on **Mon Nov 2** (before the fix it started on "Sun Nov 1" again and lost Nov 8).
+	2. Pick a day and a time. On the confirm page, before scrolling: the red **Book and Pay** button is pinned at the bottom of the screen. Scroll down — it stays there; at the very bottom it sits just below the card form, not on top of it.
+	3. Enter Square's sandbox card **4111 1111 1111 1111**, any future expiry, CVV **111**, ZIP **12345**, and tap **Book and Pay**. It should land on "Booking Confirmed!".
+	4. Turn the phone sideways on the same kind of page: nothing slides under the notch, and the pay bar sits above the home bar.
+	5. **Account → Purchase History**: the date reads on one line above the price. **Account → Attendance History**: each class is a small card with nothing cut off on the right.
+	6. **Account → My Schedule → Upcoming**: "I'll be there" is one line, not squeezed.
+	- Anything that looks off: a screenshot + the step number.
 
 ---
 
