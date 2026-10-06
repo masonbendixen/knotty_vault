@@ -375,15 +375,36 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 > Persona `staff`. Eleven pages. Not redesigned — made to work.
 
+**The audit had been blind to most of this tier.** The plain page loads showed list or empty states: the check-in screen is a second view on the same route, the front-desk list had no mock data, and Person Skills needs a search before it shows anything. Phase 4 first gave the audit eyes, then fixed what it found:
+- **New audit states (8):** `class-checkin [session]` and `[walk-in]`, `person-skills [person]`, `[history]` and `[assign-dialog]`, `shift-requests [transfer-form]` and `[class-transfer-dialog]`, `time-off [request-form]`. Staff cases went from 77 to 133.
+- **Mock:** with the audit data on, `staffGetUpcomingCheckins` returns three bookings inside the 90-minute window (a long name + long email, a service with a variant, one already checked in). It used to always return none. Spec in `ServerAccess.mock.spec.ts`.
+- **Harness trap found:** the audit pins `Date.now()` (`setFixedTime`), and RxJS `debounceTime` measures elapsed time with it, so a debounced search never fires under the audit. A state moves the pinned clock forward after typing (`advancePinnedClock` in `states.ts`). Real browsers are unaffected.
+
 ### 4.1 Check-in first
-- [ ] `/staff/class-checkin` — the one staff page the Component Inventory flags as **mobile-first**: an instructor takes attendance standing in the studio, phone in hand. Large tap targets, no horizontal scroll, one-handed.
-- [ ] `/staff/check-in` — six fixed widths in its stylesheet today.
+- [x] `/staff/class-checkin` — the one staff page the Component Inventory flags as **mobile-first**: an instructor takes attendance standing in the studio, phone in hand. Large tap targets, no horizontal scroll, one-handed. ✅ The session list was fine; the **check-in screen** (never audited before) had six problems at 375:
+	- **The attendance checkbox** — the screen's one action — was a bare 24px glyph → **48px target** with a 32px box.
+	- Class name one word per line beside the two badges → the header wraps; the badges go beneath.
+	- "Add walk-in" squeezed onto three lines beside the search box → the row wraps; label on one line.
+	- The walk-in form's inputs kept their ~20-character natural width and ran off the screen → `width: 100%` in `minmax(0, 1fr)` columns.
+	- "Requirements not met" squeezed the attendee's name → the row wraps; the flag goes beneath.
+	- Notes toggle 32px → 44px.
+	- Karma (`phone geometry`, 6 tests at 343px + one wide-page test); every fix mutation-checked (5 fail on the old stylesheet; the label test also checked with wrap + nowrap removed).
+- [x] `/staff/check-in` — six fixed widths in its stylesheet today. ✅ With real rows now in the mock: no layout errors at any size — the fixed widths are on desktop-only elements. No change.
 
 ### 4.2 The rest
-- [ ] Dashboard (`/staff`; `.portal-card` from §1.3), `sessions`, `bookings`, `schedule` (7-column week grid), `time-off`, `shift-requests` and its dialogs, `preferences`, `person-skills` (table, dialogs), `exception-notes`.
+- [x] Dashboard (`/staff`; `.portal-card` from §1.3), `sessions`, `bookings`, `schedule` (7-column week grid), `time-off`, `shift-requests` and its dialogs, `preferences`, `person-skills` (table, dialogs), `exception-notes`. ✅
+	- **My Schedule (`/staff/schedule`)** — seven ~40px columns broke "8:00 AM – 4:00 PM" one or two letters per line. A narrow week (container query, < 40rem) stacks the days: one row each, day on the left, blocks on the right. Tablet/desktop keep seven columns. Karma at 343 and 1100.
+	- **Person Skills** — the skills and history tables ran 87px off the screen → both in `.data-table-scroll` (OQ 18, first column pinned). "Assign new skill" / "Change person" wrap instead of squeezing; history toggle 29px → 44px. The assign dialog already used the §1.4 full-screen config. Karma at 343.
+	- **Shift Requests** — three action buttons squeezed onto two-line labels → the row wraps. The transfer form's two selects ("Your A…", "Target …") — the page carried a **copy of the shared `.form-grid` rule that outranked the shared one** and cancelled its phone stacking; deleted. Same copy deleted from **Time Off**. Karma (labels one line) + Playwright `layout/staff.spec.ts` (forms stack below sm, side by side above).
+	- **Preferences** — the walk-ins switch had no accessible name and a 36px-wide target → `aria-label` + 44px. Karma.
+	- **My Sessions** — 32px side padding on a phone (every other page 16) → 16 below md; desktop unchanged. Playwright.
+	- Dashboard, bookings, time-off list, exception-notes: clean, no change.
+	- Test trap found twice: a Material button keeps its fixed 36px height while a wrapped label spills out of it, so "button height < 48" can never fail — the specs count the **label's** lines instead.
 
 ### 4.3 Phase 4 audit
-- [ ] Zero overflow on every staff route at phone sizes; record numbers.
+- [x] Zero overflow on every staff route at phone sizes; record numbers. ✅ **Staff: 0 errors and 0 warnings at all seven sizes, 19 cases each (11 pages + 8 states).** Full run 1044 passed; public/auth/account still 0. `ng test` **3567 passed**; lint clean. Desktop vs baseline: staff dashboard (the Phase 1 grid, accepted), check-in (taller — it now has the mock bookings), preferences (the switch moved a few px into its 44px box).
+- Noticed, not in Phase 4's scope: at exactly **1280px** the desktop header for a signed-in staff/admin user has one item too many, so "Get Started", "My Classes", "Upcoming Events" and "Your Calendar" wrap onto two lines (it's in the Phase 0 baseline too). See OQ-12.
+- Real-device check (yours, when convenient): **Staff → Class Check-In** → tap a class → tick an attendee with your thumb; tap **Add walk-in** and fill the three fields — nothing should run off the screen.
 
 ---
 
@@ -401,6 +422,7 @@ In purchase order, each tested with the persona logged in and items in the cart:
 ### 5.3 Forms and editors
 - [ ] Fixed widths in `event-create`, `voucher-management`, `class-schedule-manage`, `bundle-management`, `pricing-overview`, `subscription-revenue`; fixed-column grids in `event-create`, `page-content`, `image-carousels`.
 - [ ] The admin table-picker row (`admin.component.html:4`) wraps.
+- [ ] Found in Phase 4: component copies of the shared `.form-grid` rule outrank the shared one and cancel its phone stacking. Eight remain under `/manage`: `voucher-management`, `coupon-management`, `close-classes`, `product-detail`, `bundle-management`, `scheduling-exceptions`, `schedule-template-editor`, `schedule-detail` (`admin-comp`'s is a deliberate one-column variant). Delete the exact copies; give the variants (different gaps) a `bp.below(sm)` one-column rule.
 
 ### 5.4 Week grids and reports
 - [ ] `room-schedule-editor`, `schedule-grid`, `instructor-load`, `open-seat-heatmap`, `enrollment-trend`: 7-column and wide grids scroll inside their own container instead of widening the page.
@@ -435,6 +457,7 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 11. **OQ-11 (new, from the baseline) — where should the header switch to the hamburger?** Today it switches at 768px (`md`), but the desktop menu doesn't fit until about 1100px for a customer and wider for admin/staff, who have more items: at iPad portrait the logo disappears and *Your Calendar* falls off the edge, on **every page**. Options: (a) hamburger below 1280 — iPads in both orientations get the phone menu, which works; (b) hamburger below 1024 and shrink the desktop menu (smaller labels/gaps) so it fits from 1024 — tighter, and the admin menu may still not fit; (c) keep 768 and make the bar scroll or wrap. *Default: (a), hamburger below 1280. It's the only option that fits every persona's menu at every tablet size without redesigning the menu, and the mobile menu is already the one built for touch.*
 	- Mason- I'll go with your recommendation.
+12. **OQ-12 (new, found in Phase 4) — the desktop header is too crowded at 1280–~1400px for staff and admin.** At exactly 1280 (where OQ-11 switches to the desktop bar) a signed-in staff or admin user has one or two more items (Staff, Manage) than a customer, and "Get Started", "My Classes", "Upcoming Events" and "Your Calendar" each wrap onto two lines inside the black bar. It's in the Phase 0 baseline, so it's not a regression. **The §1.7 spec missed it:** it checks that all the items sit on one *row*, not that each item's *label* stays on one line — a test fix that will fail until the header is fixed. Options: (a) keep labels on one line (`white-space: nowrap`) and tighten the gaps between items from 1280 — no change to which menu you get, but the admin bar may still not fit and would then overflow; (b) for signed-in staff/admin only, show the hamburger up to ~1440 — always fits, but small laptops lose the desktop bar; (c) shorten labels at that width ("Get Started" → "Start", "Your Calendar" → "Calendar"). *Default: (a) first, measured as admin; if the admin bar still doesn't fit at 1280, add (b) for staff/admin only. Fixed together with the stronger test, in Phase 5 (it's an admin/staff desktop issue).*
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
 	- Mason- Sure. This sounds fine.
