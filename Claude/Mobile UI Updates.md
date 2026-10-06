@@ -412,26 +412,55 @@ In purchase order, each tested with the persona logged in and items in the cart:
 
 > Persona `admin`. 54 routes, used mostly at a desk — the goal is **usable** on a phone, not designed for it: nothing wider than the screen except tables, which scroll on purpose with a sticky first column.
 
+**How this phase was found.** The audit flagged 21 of 54 pages, but Phase 4 had shown that a clean audit can hide the real working UI. So every phone screenshot was also reviewed by eye (three parallel reviews + one of the forms), and the audit got eyes first:
+- **21 new audit states:** the 13 admin forms that only appear after an Add/Create click (bundles, coupons, vouchers, locations, providers, availability, templates, scheduling exceptions, skills, class tags, instructors, page content, class schedules); Attendance Templates' member view; the five other Site Theme tabs; and the room editor (below). Manage cases went from 54 to 73 per size.
+- **Mock data the pages needed** (audit-data only, each with a `ServerAccess.mock.spec.ts` test): a schedulable room with an active template of opening hours (the room editor and room occupancy only ever showed "No rooms found"); an admin-only weekly-plan template (Attendance Templates had nothing to find — admin only, because for the customer it would pre-tick "I'll be there" on the Phase 3 pages).
+- **Harness:** `clickToOpen()` and `advancePinnedClock()` helpers in `states.ts`.
+
 ### 5.1 Library CRUD pages
-- [ ] `/admin/tables/...` view/edit/new — `@honuware/ui/crud` (fix in the library, §1.6 process). `table-view-control` already scrolls; check the rest.
+- [x] `/admin/tables/...` view/edit/new — `@honuware/ui/crud` (fix in the library, §1.6 process). `table-view-control` already scrolls; check the rest. ✅ **In `@honuware/ui` 0.1.4 (bumped; yours to publish).** Two fixes in `table-view-control`:
+	- The pager (page size + "1–25 of 312" + four buttons, ~470px) ran ~100px off a phone → it wraps; its text no longer wraps ("Page 1 of 1" was three lines).
+	- The table squeezed every column to its narrowest before it ever scrolled — "Class Description" became a 55px column of word fragments → below 640px each data column keeps 7rem and the wrapper scrolls sideways.
+	- Library spec (pager inside the card, its text one line, at 343px) + app Playwright spec (columns ≥ 7rem, the box scrolls, pager on screen) — verified against a local build of the library swapped into `node_modules`, mutation-checked, then the published 0.1.3 restored. **The app test skips itself until 0.1.4 is installed**, and the audit still reports the two admin table pages' pager until then.
+	- Library: 473 tests pass, lint clean. Edit/new pages: usable (a doubly-indented card, a one-line description input) — not changed.
+	- **Release:** publish 0.1.4 (bump → commit → push → tag → push tag), then `npm install @honuware/ui@0.1.4 --save-exact` in `ui/`.
 
 ### 5.2 Tables
-- [ ] Wrap every bare table in `.data-table-scroll`: `product-list`, `schedule-list`, `subscription-list`, `subscription-detail`, `entitlement-list`, `event-payments`, `membership-tiers`, `refund-effectiveness`, `specialty-cost-section`, `blog-list`, plus whatever §0.6 finds.
-- [ ] Replace the six ad-hoc `overflow-x: auto` copies with the shared class.
+- [x] Wrap every bare table in `.data-table-scroll`: `product-list`, `schedule-list`, `subscription-list`, `subscription-detail`, `entitlement-list`, `event-payments`, `membership-tiers`, `refund-effectiveness`, `specialty-cost-section`, `blog-list`, plus whatever §0.6 finds. ✅ All ten, plus product detail's variant and rule tables (13 tables in 11 files).
+- [x] Replace the six ad-hoc `overflow-x: auto` copies with the shared class. ✅ The four that hold tables (event attendees ×3, event staff, pricing overview, product pricing) now use `.data-table-scroll`. The heatmap and enrollment-trend boxes hold charts, not tables — they keep their own sideways scrolling (§5.4).
+- Playwright: on ten table pages, every table either fits the phone or sits in a box that scrolls sideways and fits — **stricter than the audit**, which accepts a narrow clipping box (that is how products' "Subscriptio" got past it) and needed the page column excluded. Mutation: unwrapping products, blog posts or billing history fails it.
 
 ### 5.3 Forms and editors
-- [ ] Fixed widths in `event-create`, `voucher-management`, `class-schedule-manage`, `bundle-management`, `pricing-overview`, `subscription-revenue`; fixed-column grids in `event-create`, `page-content`, `image-carousels`.
-- [ ] The admin table-picker row (`admin.component.html:4`) wraps.
-- [ ] Found in Phase 4: component copies of the shared `.form-grid` rule outrank the shared one and cancel its phone stacking. Eight remain under `/manage`: `voucher-management`, `coupon-management`, `close-classes`, `product-detail`, `bundle-management`, `scheduling-exceptions`, `schedule-template-editor`, `schedule-detail` (`admin-comp`'s is a deliberate one-column variant). Delete the exact copies; give the variants (different gaps) a `bp.below(sm)` one-column rule.
+- [x] Fixed widths in `event-create`, `voucher-management`, `class-schedule-manage`, `bundle-management`, `pricing-overview`, `subscription-revenue`; fixed-column grids in `event-create`, `page-content`, `image-carousels`. ✅
+	- `event-create`: the Visibility rows were a fixed 220 + 180px grid — "Days before visible" ran off the screen → a wrapping row with the same widths. Karma.
+	- `image-carousels`: the four-column card head ran the actions 32px past a phone-width card (test written first, failed) → a narrow card (container query) puts the badges on a second row. Karma.
+	- The rest (voucher, class-schedule, bundle, pricing, revenue, page-content): no overflow at phone sizes once the grids below were fixed.
+- [x] The admin table-picker row (`admin.component.html:4`) wraps. ✅ A select + refresh button — already fits 343px; no change.
+- [x] Found in Phase 4: component copies of the shared `.form-grid` rule… ✅ Scheduling exceptions' exact copy deleted; six variants (vouchers, coupons, close classes, product detail, bundles, schedule detail) get a one-column rule below sm (`span 2` → `1 / -1`, or it adds a phantom column); schedule-template-editor already had it. **Six more two-column grids under other names** got the same: attendance template body, both provider add-forms, product rule summary, subscription info grid. This fixed the date pickers' calendar button drawn over the label (close classes, coupons, vouchers, scheduling exceptions). Playwright (8 forms: one field per row on a phone, side by side from sm); mutation-checked.
+	- **Hints spilling into the next field** (Material's fixed one-line subscript, the §1.5 trap): every hinted field in manage/admin/blog-admin (33 fields, 9 pages) → `subscriptSizing="dynamic"`. Playwright: every hint stays inside its own field on 4 pages; mutation-checked.
+	- **Full-screen form dialogs** (§1.4): Material hard-codes `max-height: 65vh` on dialog content, so a long form stopped two-thirds down the screen and cut a field in half (Add class → Tags) → the content fills the space between title and actions, actions at the bottom. Applies to every form dialog. Playwright (dialogs spec); mutation-checked.
 
 ### 5.4 Week grids and reports
-- [ ] `room-schedule-editor`, `schedule-grid`, `instructor-load`, `open-seat-heatmap`, `enrollment-trend`: 7-column and wide grids scroll inside their own container instead of widening the page.
+- [x] `room-schedule-editor`, `schedule-grid`, `instructor-load`, `open-seat-heatmap`, `enrollment-trend`. ✅
+	- **Class schedule grid** and **room schedule editor**: seven ~40px columns (a class tile ~900px tall) → a narrow week (container query) stacks the days, each a full-width block. Karma for both (phone + wide).
+	- **Instructor load**: name + two counts + a 120px bar ran the bar ~95px off a phone → tighter gaps, a narrower bar, header labels in the small size (their width sets the columns), 44px sort headers. Playwright — its first version compared boxes and passed while "Attendees ▼" overflowed leftwards into "Sessions"; it now compares text extents.
+	- Heatmap and enrollment trend: already scroll in their own box; no change.
+	- Room editor's delete ×: a 44px box below md only — from md up the week's ~100px columns can't spare it (my first attempt crushed the hours to four lines on desktop; caught by the audit, reverted to below-md).
 
 ### 5.5 Everything else in `/manage`, `/admin`, `/blog-admin`
-- [ ] Walk the remaining routes from the manifest; fix what the audit flags.
+- [x] Walk the remaining routes from the manifest; fix what the audit flags. ✅
+	- **Rows crushing their names** (Skills — "Wall Handstand" took 12 lines; Class Tags; Instructors) → the row wraps, name ≥ 10rem, badges/actions beneath; the "Add …" header button keeps its label on one line. Karma for all three.
+	- **Subscriptions**: stat tiles ran past the edge (Entitlements too) → equal-width tiles below sm; header and detail-page action buttons wrap instead of squeezing ("Cancel with Prorated Refund" was four lines). Playwright.
+	- **15 admin pages padded 32px each side** on a phone → the 16px gutter below md (desktop unchanged). Playwright (8 pages).
+	- **Shared back link** (`.page-header__back`): an arrow-only one was 24px wide → 44 × 44. design-tokens spec.
+	- **Blog editor**: the Markdown textarea was 14px (iOS zooms on focus) → 16px below md. Playwright.
+	- **Class Tags colour swatches**: 28px → 44px tap targets on a phone. Playwright.
+	- Left as is: Site Theme's colour-specimen demo link and two font toggles (39–42px), the style guide's demo table link — warnings, not errors; the Material tab strips that page with arrows.
+	- Noticed, not layout: `/manage/schedules/1` shows "Table "product_prices" not found in schema" in mock mode; the Instructor Load / Enrollment Trend back links say "Back to Manage Products"; the Add class dialog shows Name in its error state as soon as it opens.
+- [x] **OQ-12 (the crowded 1280px header)** — implemented with its default (a): measured as admin, labels on one line plus 8px item padding between 1280 and 1536 (Tailwind's `2xl`, added to the breakpoint map) fit every persona, admin with ~80px to spare — (b) wasn't needed. Desktop-menu items only (the first version also shrank the hamburger to 40px — caught by the room-page audit, fixed). The header spec now checks each label stays on one line and clears the logo, for admin, staff and customer; the old version fails for admin and staff. **This changes every desktop page's header between 1280 and 1536px** (items closer together) — that is the ~9,100-pixel difference on every desktop screenshot.
 
 ### 5.6 Phase 5 audit
-- [ ] Zero page overflow on every manage/admin route at phone sizes (scrolling tables excepted by design).
+- [x] Zero page overflow on every manage/admin route at phone sizes (scrolling tables excepted by design). ✅ **Manage: 0 errors on every route at every size, except the two admin table pages' pager — the library fix, verified against the local build, clears with 0.1.4.** 73 cases per size (54 pages + 19 states). Public/auth/account/staff still 0. `ng test` **3580 passed**; lint clean; build passes (no Sass warnings); layout specs 234 passed; full audit 1232 passed. Every fix mutation-checked.
 
 ---
 
@@ -458,6 +487,7 @@ In purchase order, each tested with the persona logged in and items in the cart:
 11. **OQ-11 (new, from the baseline) — where should the header switch to the hamburger?** Today it switches at 768px (`md`), but the desktop menu doesn't fit until about 1100px for a customer and wider for admin/staff, who have more items: at iPad portrait the logo disappears and *Your Calendar* falls off the edge, on **every page**. Options: (a) hamburger below 1280 — iPads in both orientations get the phone menu, which works; (b) hamburger below 1024 and shrink the desktop menu (smaller labels/gaps) so it fits from 1024 — tighter, and the admin menu may still not fit; (c) keep 768 and make the bar scroll or wrap. *Default: (a), hamburger below 1280. It's the only option that fits every persona's menu at every tablet size without redesigning the menu, and the mobile menu is already the one built for touch.*
 	- Mason- I'll go with your recommendation.
 12. **OQ-12 (new, found in Phase 4) — the desktop header is too crowded at 1280–~1400px for staff and admin.** At exactly 1280 (where OQ-11 switches to the desktop bar) a signed-in staff or admin user has one or two more items (Staff, Manage) than a customer, and "Get Started", "My Classes", "Upcoming Events" and "Your Calendar" each wrap onto two lines inside the black bar. It's in the Phase 0 baseline, so it's not a regression. **The §1.7 spec missed it:** it checks that all the items sit on one *row*, not that each item's *label* stays on one line — a test fix that will fail until the header is fixed. Options: (a) keep labels on one line (`white-space: nowrap`) and tighten the gaps between items from 1280 — no change to which menu you get, but the admin bar may still not fit and would then overflow; (b) for signed-in staff/admin only, show the hamburger up to ~1440 — always fits, but small laptops lose the desktop bar; (c) shorten labels at that width ("Get Started" → "Start", "Your Calendar" → "Calendar"). *Default: (a) first, measured as admin; if the admin bar still doesn't fit at 1280, add (b) for staff/admin only. Fixed together with the stronger test, in Phase 5 (it's an admin/staff desktop issue).*
+	- ✅ Implemented in Phase 5 with the default — (a) alone was enough (8px item padding from 1280 to 1536 fits admin with ~80px to spare). See §5.5.
 
 1. **OQ-1 Add Playwright as a dev dependency?** It's the screenshot/audit engine (§0.3). Dev-only — nothing changes in the shipped site — but it's a new tool in `package.json` and downloads a Chromium (~150 MB) on first install. *Default: yes.* (The alternative, driving your own Chrome through the browser extension, can't emulate phone sizes reliably and needs you present.)
 	- Mason- Sure. This sounds fine.
