@@ -1941,7 +1941,8 @@ What *is* waste is paying shared-runner minutes for it, and the from-scratch dep
 
 Run the runner **as a Linux container in Docker Desktop**, using the docker executor. Jobs then run as sibling Linux containers on Docker Desktop's VM — the same images CI uses today (`builder`, `node:22-bookworm`, `postgres:13.1`, `docker:27-cli` + `docker:27-dind`), so `.gitlab-ci.yml` needs almost no change. (Not the Windows-native runner: on a Windows host its docker executor runs *Windows* containers only.)
 
-- [ ] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Settings → Resources: leave the WSL2 defaults (it already uses all 32 threads). Without autostart, a reboot silently stops CI.
+- [ ] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Without autostart, a reboot silently stops CI.
+- [ ] **Docker VM memory (Q2a, default 40 GB):** create `C:/Users/mason/.wslconfig` with `[wsl2]` / `memory=40GB`, run `wsl --shutdown`, restart Docker Desktop, and confirm `docker info --format '{{.MemTotal}}'` reports ~40 GB (it is ~31 GB today: WSL2's default is half your 64 GB). The VM already sees all 32 threads.
 - [ ] **Create the runner in GitLab.** Project → Settings → CI/CD → Runners → **New project runner**:
 	- Tags: `knottyyoga-local`
 	- *Run untagged jobs*: **off** (9.2 tags every job; an untagged job reaching this runner would mean the YAML missed one)
@@ -1968,7 +1969,7 @@ Run the runner **as a Linux container in Docker Desktop**, using the docker exec
 	    --docker-image alpine:3.20 `
 	    --description mason-workstation
 	```
-- [ ] **Edit the runner config** for Docker-in-Docker over TLS (what `image:builder` and `package:server` use today) and to leave your machine some headroom:
+- [ ] **Edit the runner config** — jobs talk to your machine's Docker directly (the socket), which is what lets the builder image stay local (Q4) and replaces Docker-in-Docker for the two image jobs (9.2); plus the CPU budget from Q2:
 	```powershell
 	docker exec -it gitlab-runner sh -c "vi /etc/gitlab-runner/config.toml"
 	```
@@ -1977,12 +1978,11 @@ Run the runner **as a Linux container in Docker Desktop**, using the docker exec
 	concurrent = 2                     # top of the file: 2 jobs at once
 	[[runners]]
 	  [runners.docker]
-	    privileged = true              # docker:dind needs it
-	    volumes = ["/certs/client", "/cache"]   # dind TLS certs + the local job cache
-	    cpus = "20"                    # leave ~12 threads for your own builds/IDE
-	    pull_policy = ["if-not-present"]
+	    volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]  # host Docker + the local job cache
+	    cpus = "24"                    # PER JOB — your 24-thread budget (Q2)
+	    pull_policy = ["if-not-present"]   # use local images (knottyyoga_build) without pulling
 	```
-	Then `docker restart gitlab-runner`. (`privileged` gives job containers root on Docker Desktop's VM — acceptable for a private, single-owner project whose only pipelines are yours; see 9.7.)
+	Then `docker restart gitlab-runner`. No `privileged = true`: with the socket, no job runs its own Docker daemon. (The socket gives a job root-equivalent access to Docker Desktop's VM — acceptable for a private, single-owner project whose only pipelines are yours; see 9.7.) The `cpus` limit throttles CPU time but does **not** change what `nproc` reports inside the job — compile parallelism is capped separately by `JOBS` (9.2).
 - [ ] **Check:** Settings → CI/CD → Runners shows `mason-workstation` with a green dot.
 
 ## 9.2 Pin every job to the runner; turn the shared runners off
@@ -1995,6 +1995,9 @@ Two switches, both required: the tag makes jobs *eligible* for your runner; turn
 	  tags: [knottyyoga-local]
 	```
 	(One place, not 12 per-job edits — and a job added later inherits it.)
+- [ ] **`.gitlab-ci.yml`, same commit — use the host Docker instead of Docker-in-Docker** (the runner mounts the socket, 9.1): in the `.dind` fragment drop the `services: docker:27-dind` entry and the four `DOCKER_*` variables, and rename the fragment `.host-docker` (it no longer runs dind). `image:builder` and `package:server` keep working unchanged otherwise; their builds now land in Docker Desktop, so layer and BuildKit caches survive between pipelines.
+- [ ] **Builder image stays local (Q4, decided):** set `BUILDER_IMAGE: knottyyoga_build` — the very image your local Linux gate already uses, from the same `server/docker/Dockerfile` — and remove `image:builder`'s `docker push` (it now just rebuilds the local image when the Dockerfile changes). Jobs reference `knottyyoga_build:latest`, found locally via `pull_policy: if-not-present`. The **release** image (`$APP_IMAGE`) keeps going to GitLab's registry: the EC2 pulls it from there.
+- [ ] **Compile parallelism (Q2):** `server/docker/build_common.sh` runs `cmake --build -j"$(nproc)"`; change it to `-j"${JOBS:-$(nproc)}"` (local runs unchanged — no `JOBS`, all threads), and set `JOBS: "12"` in `.gitlab-ci.yml`'s `variables:` so two compiling jobs run ~24 compilers in total. `build_linux_release.sh` already honours `JOBS`; pass it into the release build as a Docker build arg (`--build-arg JOBS=$JOBS`, `ARG JOBS` in `package/Dockerfile`). **Check in 9.3:** the `build:server` / `test:backend` logs show `-j12`, and `package:server`'s shows `cmake build … (j=12)`.
 - [ ] **Settings → CI/CD → Runners → Instance runners:** toggle **Enable instance runners for this project** off.
 - [ ] **Test:** none needed beyond 9.3 — but if a job ever shows *"This job is stuck because you don't have any active runners online"*, the machine or Docker Desktop is off (9.6), not a YAML problem.
 
@@ -2004,14 +2007,13 @@ Two switches, both required: the tag makes jobs *eligible* for your runner; turn
 	- [ ] `build:server`, `test:backend` (Postgres sidecar — runs in the job's own network, does **not** collide with your local `knotty-postgres-docker` or its port)
 	- [ ] `test:frontend`, `lint:frontend`, `build:frontend`, `test:deploy-scripts`
 	- [ ] First run is a cold Conan/npm cache (expect the backend jobs to take ~15–20 min once); the second push should show the warm times (~6 min backend).
-- [ ] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles dependencies from scratch in dind — on 32 threads that is minutes, not hours, but it is the next thing to fix.
+- [ ] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles every dependency from scratch on each tag (no Conan cache inside the Dockerfile) — on your machine that is minutes, not hours, but it is the next thing to fix.
 - [ ] Record the per-job times in this section (they become the baseline for 9.4).
 
 ## 9.4 Make the release build fast: a persistent Conan cache for `package:server`
 
-The release `Dockerfile`'s builder stage runs `conan install --build=missing` *after* `COPY .`, so no Docker layer can cache the dependencies, and inside an ephemeral dind daemon nothing survives between tags anyway. On a self-hosted runner both can be fixed:
+The release `Dockerfile`'s builder stage runs `conan install --build=missing` *after* `COPY .`, so no Docker layer can cache the dependencies. With 9.2 the builds already run on Docker Desktop's own daemon (no ephemeral dind), so a BuildKit cache survives between tags — the Dockerfile just has to use one:
 
-- [ ] **Talk to the host's Docker directly instead of dind for the two image jobs** (`image:builder`, `package:server`). Runner `config.toml`: add `"/var/run/docker.sock:/var/run/docker.sock"` to `volumes`. `.gitlab-ci.yml` `.dind` fragment: drop the `services: docker:27-dind` entry and the four `DOCKER_*` variables (the CLI then uses the mounted socket). The BuildKit cache now lives in Docker Desktop and survives between tags.
 - [ ] **`package/Dockerfile`:** give the dependency build a BuildKit cache mount, so Conan's package cache persists across builds without being baked into the image:
 	```dockerfile
 	RUN --mount=type=cache,target=/root/.conan2 \
@@ -2021,9 +2023,10 @@ The release `Dockerfile`'s builder stage runs `conan install --build=missing` *a
 - [ ] **Test:** tag twice in a row. The second `package:server` must log Conan *"Already installed"* / *"Found in cache"* for the dependencies and finish in ~10 min; the image's `/api/health` must still report the new tag after deploy. Add the timings to 9.3's table.
 - [ ] **Do not raise the job timeout instead.** The 3h ceiling stays; with this cache the job should never get near it.
 
-## 9.5 Optional trims (each is a judgement call, defaults in 9.9)
+## 9.5 Trims
 
-- [ ] **Stop pushing the builder image to the registry** — with one runner it can use the locally built `builder:latest` (`pull_policy: if-not-present` already prefers it). Saves registry storage (GitLab's free namespace storage is limited; the gcc-based builder image is the largest thing in it). Keep pushing it if you ever want the shared runners back as a fallback.
+- [x] ~~Stop pushing the builder image to the registry~~ — **decided (Q4) and moved into 9.2.** Also delete the old `builder` repository under Deploy → Container Registry once 9.2 is live; it is the largest thing counting against GitLab's free storage.
+- [ ] **Skip the test jobs on tag pipelines (Q3a, default yes).** A tag pipeline re-runs every test on a commit whose `master` pipeline already passed. On tags: skip `test:backend`, `test:frontend`, `lint:frontend` (`build:server` already is); keep `test:deploy-scripts` (seconds, and it tests the script the deploy runs). Because "only tag a green commit" then carries real weight, `package:server` and `package:ui` first check it: query `GET /projects/:id/pipelines?sha=$CI_COMMIT_SHA&status=success&ref=master` with `CI_JOB_TOKEN`, and stop with *"commit X has no successful master pipeline — push and wait for green before tagging"* if the list is empty. Put that check in a small script (`ci/require_green_commit.sh`) with its own test in `test:deploy-scripts` (against a stubbed `curl`, the same pattern as `deploy_update_test.sh`), so the guard itself is tested.
 - [ ] **Prune old CI images/caches on a schedule** — Docker Desktop's disk grows with every job image and BuildKit cache. Monthly: `docker system prune -f` and `docker builder prune --keep-storage 30GB -f` (keeps the Conan cache warm while capping it).
 
 ## 9.6 Operating it day to day
@@ -2036,24 +2039,46 @@ The release `Dockerfile`'s builder stage runs `conan install --build=missing` *a
 
 ## 9.7 Security notes
 
-- The runner executes whatever `.gitlab-ci.yml` says, as root inside containers on your machine (`privileged`, and in 9.4 the Docker socket). That is safe **because the project is private and only you can push**. Keep it that way: no public forks, no outside contributors' merge requests running pipelines on this runner. If that ever changes, revisit before accepting their pipelines.
+- The runner executes whatever `.gitlab-ci.yml` says, as root inside containers on your machine, and the mounted Docker socket (9.1) lets a job start containers of its own — root-equivalent on Docker Desktop's VM. That is safe **because the project is private and only you can push**. Keep it that way: no public forks, no outside contributors' merge requests running pipelines on this runner. If that ever changes, revisit before accepting their pipelines.
 - The masked/protected CI variables (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` for `ci-deploy`, `EC2_INSTANCE_ID`, …) are now handed to containers on your machine instead of GitLab's. They were already usable from your machine via the AWS CLI, so this does not widen access; the `ci-deploy` IAM policy (6.5a) still limits what they can do.
 - The registry credentials (`CI_REGISTRY_PASSWORD`) are per-job tokens, as before.
 
 ## 9.8 Rollback
 
-- [ ] If the self-hosted runner misbehaves: re-enable instance runners (9.2), remove the `default: tags` block, and the pipeline is exactly what it was on 10/6. Undo 9.4's `.dind` change too if it was made (shared runners need dind). Nothing in this phase changes what gets built or deployed.
+- [ ] If the self-hosted runner misbehaves: re-enable instance runners (9.2) and revert 9.2's `.gitlab-ci.yml` commit — the `default: tags` block, the `.host-docker` fragment (shared runners need dind back), `BUILDER_IMAGE` back to the registry path with `image:builder`'s push restored and run once (shared runners cannot see your local `knottyyoga_build`), and `JOBS`. The pipeline is then exactly what it was on 10/6. Nothing in this phase changes what gets built or deployed.
 
 ## 9.9 Open questions (each has a default so work never stops on one)
 
 1. **Q1 — Consolidate on GitHub?** Everything else of yours is on GitHub, and GitHub also allows free self-hosted runners. *Default: not now — finish this phase on GitLab (an hour of work, no pipeline rewrite). Revisit as its own decision once the self-hosted runner has run a few releases; the migration cost is the CI rewrite, the registry move (EC2 login), and Releases.*
 	- Mason- I think I'll stick with gitlab for now but might move to github later.
+	- Claude- ✅ **Resolved: GitLab for now.** Nothing in this phase makes a later move harder: the build logic lives in repo scripts (`build_common.sh`, `build_and_test.sh`, `build_linux_release.sh`, `deploy_update.sh`), not in the YAML, so a GitHub Actions rewrite would mostly re-wire the same scripts. The runner itself is disposable either way.
 2. **Q2 — Runner concurrency.** *Default: `concurrent = 2`, `cpus = "20"` (9.1). Lower to 1 if CI slows your own builds.*
 	- Mason- My machine is a Intel Core i9-13900KF with 8 hyperthreaded performance cores (two threads each) and 16 efficiency cores. I would think that running up to 24 threads would be fine. Building seems to be the type of thing that hyperthreading would work well on. What do you think?
+	- Claude- **Agreed on 24 threads — but memory, not threads, is the real limit, and two details change the settings.** I checked the machine (10/7): 64 GB RAM, 32 logical CPUs, and Docker Desktop's Linux VM gets **all 32 CPUs but only ~31 GB** (WSL2's default is half your RAM; there is no `.wslconfig`).
+		- *Hyperthreading and E-cores:* compiling does benefit — a second thread on a P-core adds roughly 15–30%, and an E-core is worth very roughly half a P-core thread. Giving CI 24 of 32 threads is a sensible split.
+		- *Detail 1 — `cpus` is per job, not per runner.* With `concurrent = 2`, two jobs can each use up to the limit, and on a push `build:server` and `test:backend` both compile at once.
+		- *Detail 2 — the build scripts ignore the CPU limit.* `build_common.sh` runs `cmake --build -j$(nproc)`, and inside a container `nproc` still reports 32 even when `cpus` is capped, so two jobs start ~64 compiler processes. A heavy translation unit here (Boost, Crow, libpqxx headers) takes roughly 0.5–1.5 GB, so that can run a 31 GB VM out of memory — which shows up as a confusing `g++: fatal error: Killed signal terminated program cc1plus`, not as "out of memory".
+		- **Proposed settings** (folded into 9.1): `concurrent = 2`; `cpus = "24"` per job; compile parallelism capped by a `JOBS` variable — a one-line change, `build_common.sh` uses `${JOBS:-$(nproc)}`, so your local runs still use every thread — set to `12` in CI, so two compiling jobs run ~24 compilers in total (your 24-thread budget); and the Docker VM's memory raised to 40 GB with a `.wslconfig`, leaving ~24 GB for Windows, Visual Studio and your browser. That also helps the local Linux gate, which runs in the same VM.
+		- **One more round needed: Q2a below** (the `.wslconfig` change affects everything you run in WSL and Docker, so it's your call).
 3. **Q3 — Keep running the full backend suite on every push?** It is what caught most regressions, and on your machine it is ~6 min. *Default: yes, unchanged.*
 	- Mason- Yes, it is important. But if you verify that Linux and Windows build the test suite as part of doing the dev work, we probably don't want to run the same tests again.
+	- Claude- **They aren't quite the same tests, so I'd keep the push run — but you're right that there is real duplication, and it's in the tag pipeline.**
+		- *Why my local runs don't replace the push run:* I test the **working tree** (which can include files that never get committed), usually in **co-dev mode** against your local honuware checkout. CI tests the **commit**, against the **pinned honuware SHA**, from a clean checkout. They differ exactly when something has gone wrong: a file left out of the commit, a honuware change that was never pinned, a lockfile out of step. On your machine the push run costs $0 and ~6 minutes in the background, and nothing waits on it except a deploy.
+		- *Where it IS pure duplication:* a **tag pipeline re-runs every test on a commit whose `master` pipeline already passed** — the routine is to tag only green commits. That's the one to cut: on tag pipelines, skip `test:backend`, `test:frontend` and `lint:frontend` (`build:server` is already skipped); keep `test:deploy-scripts` (seconds, and it tests the script the deploy is about to run). "Only tag a green commit" then becomes load-bearing, so the package jobs would first check that the tagged commit already has a successful pipeline and stop with a clear message if not.
+		- **One more round needed: Q3a below.**
 4. **Q4 — Keep publishing the builder image to the registry?** *Default: keep for now (it is the fallback path back to shared runners); stop after a month of the self-hosted runner being reliable (9.5).*
 	- Mason- You mean putting the builder image in gitlab's registry? I don't think that is necessary and I think we can just keep the images locally.
+	- Claude- ✅ **Resolved: keep the builder image local.** Yes, that's what it meant: `image:builder` builds `server/docker/Dockerfile` and pushes it to GitLab's registry so the shared runners could pull it. With your runner it never needs to leave your machine. Better still, **that Dockerfile is the same one behind your local `knottyyoga_build:latest`** (the Linux gate's image), so CI and the local gate can share one image instead of keeping two copies. Plan changes (now in 9.1 and 9.2): `BUILDER_IMAGE` becomes the local `knottyyoga_build`, `image:builder` stops pushing (it rebuilds the local image when the Dockerfile changes), and jobs use it with `pull_policy: if-not-present`. That needs the host Docker socket, so the socket moved from 9.4 into 9.1 — which also retires Docker-in-Docker and `privileged` mode. **The release image (`$APP_IMAGE`) still goes to GitLab's registry**, because the EC2 pulls it from there.
+
+**Second round (10/7):**
+
+5. **Q2a — Give the Docker VM 40 GB?** Create `.wslconfig` in your user folder (`C:/Users/mason/.wslconfig`) containing:
+	```ini
+	[wsl2]
+	memory=40GB
+	```
+	then run `wsl --shutdown` and restart Docker Desktop. That caps WSL and Docker at 40 GB (up from ~31 GB) and leaves ~24 GB for Windows. *Default: yes, 40 GB. If Visual Studio and your browser regularly use more than ~20 GB, use 36 GB instead; if you'd rather not touch WSL at all, set CI's `JOBS` to 8 and keep the current memory.*
+6. **Q3a — Skip the test jobs on tag pipelines, guarded by a "this commit already passed" check?** *Default: yes. Tag pipelines run only `test:deploy-scripts`, packaging, release and deploy; the package jobs first confirm through the GitLab API (using the job's own token) that the tagged commit has a successful pipeline, and stop with a clear message if it doesn't.*
 
 # Monthly Cost Estimate (soft launch)
 
