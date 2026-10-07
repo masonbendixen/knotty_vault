@@ -1927,7 +1927,7 @@ What *is* waste is paying shared-runner minutes for it, and the from-scratch dep
 |---|---|---|
 | Compute cost | ~$10/day in packs | $0 (your electricity) |
 | `test:backend` | slow, Conan cache via GitLab's cache upload/download | ~6 min warm (local cache stays on disk) |
-| `package:server` (tags) | from-scratch deps in dind, ~3h, hit the ceiling | ~10 min once 9.4's Conan cache is in |
+| `package:server` (tags) | from-scratch deps in dind, ~3h, hit the ceiling | ~10–15 min once 9.4's Conan cache is in (measured: 9½ min at 24 threads) |
 | Availability | always on | **only when your PC is on and Docker Desktop is running** |
 
 **The trade-off you accept:** pipelines only run while your machine is on. Push from elsewhere and the jobs wait (they do not fall back to paid runners, by design — 9.2). For a one-person project that is the right trade.
@@ -2017,13 +2017,22 @@ Two switches, both required: the tag makes jobs *eligible* for your runner; turn
 
 The release `Dockerfile`'s builder stage runs `conan install --build=missing` *after* `COPY .`, so no Docker layer can cache the dependencies. With 9.2 the builds already run on Docker Desktop's own daemon (no ephemeral dind), so a BuildKit cache survives between tags — the Dockerfile just has to use one:
 
-- [ ] **`package/Dockerfile`:** give the dependency build a BuildKit cache mount, so Conan's package cache persists across builds without being baked into the image:
+- [x] **`package/Dockerfile`:** give the dependency build a BuildKit cache mount, so Conan's package cache persists across builds without being baked into the image:
 	```dockerfile
 	RUN --mount=type=cache,target=/root/.conan2 \
 	    KNOTTYYOGA_VERSION="${KNOTTYYOGA_VERSION}" ... bash ./package/build_linux_release.sh
 	```
 	The release still builds from a clean source tree every time — only the third-party binaries (Boost, libpqxx, OpenSSL, …) are reused, keyed by their exact Conan package IDs, so a dependency or compiler change still rebuilds what it must.
-- [ ] **Test:** tag twice in a row. The second `package:server` must log Conan *"Already installed"* / *"Found in cache"* for the dependencies and finish in ~10 min; the image's `/api/health` must still report the new tag after deploy. Add the timings to 9.3's table.
+	- **As implemented (10/7):** the mount is `target=/root/.conan2/p,sharing=locked` — the package store only (the same `p` directory CI's `cache:` blocks carry), not the whole Conan home, because the Conan profile is written by an earlier layer and mounting over the whole home would hide it. `sharing=locked` makes two simultaneous tag builds take turns rather than writing the store at once. `ARG JOBS` was added next to it (9.2).
+	- **Verified locally (10/7)** — two builds of the builder stage in a row, from a clean copy of the tree (what CI checks out), `JOBS=24`, on Docker Desktop:
+
+		| | Conan packages built from source | dependency step | whole builder stage |
+		|---|---|---|---|
+		| 1st build (empty cache) | 24 | 333 s | 907 s |
+		| 2nd build | **0** — all 35 listed as `Cache` | 5 s | 574 s |
+
+		The remaining ~9½ minutes is the app's own four binaries, which build clean by design. On your runner with `JOBS=12` expect roughly 12–15 min per tag. **Side effect:** those two builds already filled the cache on Docker Desktop, so your first tag should skip the dependency compile entirely.
+- [ ] **Test (in CI, after 9.3):** tag twice in a row. The second `package:server` must list every dependency as `- Cache` in Conan's package list (no `- Build`) and finish in ~15 min; the image's `/api/health` must still report the new tag after deploy. Add the timings to 9.3's table.
 - [ ] **Do not raise the job timeout instead.** The 3h ceiling stays; with this cache the job should never get near it.
 
 ## 9.5 Trims
