@@ -2047,6 +2047,7 @@ The release `Dockerfile`'s builder stage runs `conan install --build=missing` *a
 ## 9.9 Open questions (each has a default so work never stops on one)
 
 1. **Q1 — Consolidate on GitHub?** Everything else of yours is on GitHub, and GitHub also allows free self-hosted runners. *Default: not now — finish this phase on GitLab (an hour of work, no pipeline rewrite). Revisit as its own decision once the self-hosted runner has run a few releases; the migration cost is the CI rewrite, the registry move (EC2 login), and Releases.*
+	- Mason- I think I'll stick with gitlab for now but might move to github later.
 2. **Q2 — Runner concurrency.** *Default: `concurrent = 2`, `cpus = "20"` (9.1). Lower to 1 if CI slows your own builds.*
 3. **Q3 — Keep running the full backend suite on every push?** It is what caught most regressions, and on your machine it is ~6 min. *Default: yes, unchanged.*
 4. **Q4 — Keep publishing the builder image to the registry?** *Default: keep for now (it is the fallback path back to shared runners); stop after a month of the self-hosted runner being reliable (9.5).*
