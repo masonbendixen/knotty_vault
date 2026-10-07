@@ -2049,8 +2049,11 @@ The release `Dockerfile`'s builder stage runs `conan install --build=missing` *a
 1. **Q1 — Consolidate on GitHub?** Everything else of yours is on GitHub, and GitHub also allows free self-hosted runners. *Default: not now — finish this phase on GitLab (an hour of work, no pipeline rewrite). Revisit as its own decision once the self-hosted runner has run a few releases; the migration cost is the CI rewrite, the registry move (EC2 login), and Releases.*
 	- Mason- I think I'll stick with gitlab for now but might move to github later.
 2. **Q2 — Runner concurrency.** *Default: `concurrent = 2`, `cpus = "20"` (9.1). Lower to 1 if CI slows your own builds.*
+	- Mason- My machine is a Intel Core i9-13900KF with 8 hyperthreaded performance cores (two threads each) and 16 efficiency cores. I would think that running up to 24 threads would be fine. Building seems to be the type of thing that hyperthreading would work well on. What do you think?
 3. **Q3 — Keep running the full backend suite on every push?** It is what caught most regressions, and on your machine it is ~6 min. *Default: yes, unchanged.*
+	- Mason- Yes, it is important. But if you verify that Linux and Windows build the test suite as part of doing the dev work, we probably don't want to run the same tests again.
 4. **Q4 — Keep publishing the builder image to the registry?** *Default: keep for now (it is the fallback path back to shared runners); stop after a month of the self-hosted runner being reliable (9.5).*
+	- Mason- You mean putting the builder image in gitlab's registry? I don't think that is necessary and I think we can just keep the images locally.
 
 # Monthly Cost Estimate (soft launch)
 
