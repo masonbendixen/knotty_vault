@@ -1941,8 +1941,8 @@ What *is* waste is paying shared-runner minutes for it, and the from-scratch dep
 
 Run the runner **as a Linux container in Docker Desktop**, using the docker executor. Jobs then run as sibling Linux containers on Docker Desktop's VM — the same images CI uses today (`builder`, `node:22-bookworm`, `postgres:13.1`, `docker:27-cli` + `docker:27-dind`), so `.gitlab-ci.yml` needs almost no change. (Not the Windows-native runner: on a Windows host its docker executor runs *Windows* containers only.)
 
-- [ ] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Without autostart, a reboot silently stops CI.
-- [ ] **Docker VM memory (Q2a, decided: 40 GB):** create `C:/Users/mason/.wslconfig` with `[wsl2]` / `memory=40GB`, run `wsl --shutdown`, restart Docker Desktop, and confirm `docker info --format '{{.MemTotal}}'` reports ~40 GB (it is ~31 GB today: WSL2's default is half your 64 GB). The VM already sees all 32 threads.
+- [x] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Without autostart, a reboot silently stops CI. ✅ 2026-10-07
+- [x] **Docker VM memory (Q2a, decided: 40 GB):** create `C:/Users/mason/.wslconfig` with `[wsl2]` / `memory=40GB`, run `wsl --shutdown`, restart Docker Desktop, and confirm `docker info --format '{{.MemTotal}}'` reports ~40 GB (it is ~31 GB today: WSL2's default is half your 64 GB). The VM already sees all 32 threads. ✅ 2026-10-07
 - [ ] **Create the runner in GitLab.** Project → Settings → CI/CD → Runners → **New project runner**:
 	- Tags: `knottyyoga-local`
 	- *Run untagged jobs*: **off** (9.2 tags every job; an untagged job reaching this runner would mean the YAML missed one)
