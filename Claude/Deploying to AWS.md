@@ -2016,10 +2016,10 @@ Two switches, both required: the tag makes jobs *eligible* for your runner; turn
 
 ## 9.3 First pipeline on the runner — verify every job
 
-- [ ] Push a commit (or Pipelines → Run pipeline on `master`). Every push job should start within seconds of each other on `mason-workstation`:
-	- [ ] `build:server`, `test:backend` (Postgres sidecar — runs in the job's own network, does **not** collide with your local `knotty-postgres-docker` or its port)
-	- [ ] `test:frontend`, `lint:frontend`, `build:frontend`, `test:deploy-scripts`
-	- [ ] First run is a cold Conan/npm cache (expect the backend jobs to take ~15–20 min once); the second push should show the warm times (~6 min backend).
+- [x] Push a commit (or Pipelines → Run pipeline on `master`). Every push job should start within seconds of each other on `mason-workstation`: ✅ 2026-10-07
+	- [x] `build:server`, `test:backend` (Postgres sidecar — runs in the job's own network, does **not** collide with your local `knotty-postgres-docker` or its port) ✅ 2026-10-07
+	- [x] `test:frontend`, `lint:frontend`, `build:frontend`, `test:deploy-scripts` ✅ 2026-10-07
+	- [x] First run is a cold Conan/npm cache (expect the backend jobs to take ~15–20 min once); the second push should show the warm times (~6 min backend). ✅ 2026-10-07
 - [ ] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles every dependency from scratch on each tag (no Conan cache inside the Dockerfile) — on your machine that is minutes, not hours, but it is the next thing to fix.
 - [ ] Record the per-job times in this section (they become the baseline for 9.4).
 
