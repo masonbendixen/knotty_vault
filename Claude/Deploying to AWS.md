@@ -2020,8 +2020,15 @@ Two switches, both required: the tag makes jobs *eligible* for your runner; turn
 	- [x] `build:server`, `test:backend` (Postgres sidecar — runs in the job's own network, does **not** collide with your local `knotty-postgres-docker` or its port) ✅ 2026-10-07
 	- [x] `test:frontend`, `lint:frontend`, `build:frontend`, `test:deploy-scripts` ✅ 2026-10-07
 	- [x] First run is a cold Conan/npm cache (expect the backend jobs to take ~15–20 min once); the second push should show the warm times (~6 min backend). ✅ 2026-10-07
-- [ ] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles every dependency from scratch on each tag (no Conan cache inside the Dockerfile) — on your machine that is minutes, not hours, but it is the next thing to fix.
-- [ ] Record the per-job times in this section (they become the baseline for 9.4).
+- [x] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles every dependency from scratch on each tag (no Conan cache inside the Dockerfile) — on your machine that is minutes, not hours, but it is the next thing to fix. ✅ 2026-10-07
+- [x] Record the per-job times in this section (they become the baseline for 9.4). ✅ 2026-10-07
+	- test:deploy-scripts: 10s
+	- verify:green-commit: 7s
+	- package:server: 13min 4s
+	- package:ui: 35s
+	- release:gitlab: 11s
+	- deploy-manul:ec2: 28s
+	- deploy-manual:ui: 33s
 
 ## 9.4 Make the release build fast: a persistent Conan cache for `package:server`
 
