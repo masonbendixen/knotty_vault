@@ -1955,8 +1955,8 @@ Run the runner **as a Linux container in Docker Desktop**, using the docker exec
 	docker run -d --name gitlab-runner --restart always `
 	    -v /var/run/docker.sock:/var/run/docker.sock `
 	    -v gitlab-runner-config:/etc/gitlab-runner `
-	    gitlab/gitlab-runner:latest
-	docker exec gitlab-runner gitlab-runner --version   # note the version, then pin it (below)
+	    gitlab/gitlab-runner:v19.4.1     # pinned 10/7 (was :latest)
+	docker exec gitlab-runner gitlab-runner --version
 	```
 	```
 	PS C:\Users\mason> docker exec gitlab-runner gitlab-runner --version
@@ -1967,18 +1967,18 @@ GO version:   go1.26.5
 Built:        2026-09-24T03:56:12Z
 OS/Arch:      linux/amd64
 	```
-	`--restart always` brings it back after Docker Desktop restarts. **Pin the image** once it works: replace `:latest` with the version you just noted (`gitlab/gitlab-runner:v<version>`), so a runner upgrade is a deliberate act like every other pin in this repo.
-- [ ] **Register it** (same terminal; paste your token):
+	`--restart always` brings it back after Docker Desktop restarts. ✅ **Pinned 10/7: `gitlab/gitlab-runner:v19.4.1`** (the container was recreated on that tag; the config survived in the volume). **Pin the image** once it works: replace `:latest` with the version you just noted (`gitlab/gitlab-runner:v<version>`), so a runner upgrade is a deliberate act like every other pin in this repo.
+- [x] **Register it** (same terminal; paste your token): ✅ 2026-10-07
 	```powershell
 	docker exec -it gitlab-runner gitlab-runner register `
 	    --non-interactive `
 	    --url https://gitlab.com `
-	    --token glrt-rcTVDlgK6isTEnrNs4cqFWM6MQpvOjEKcDpidWF4Ngp0OjMKdTozdDc5Nhs.01.1n1wz22xr `
+	    --token glrt-PASTE-HERE `
 	    --executor docker `
 	    --docker-image alpine:3.20 `
 	    --description mason-workstation
 	```
-- [ ] **Edit the runner config** — jobs talk to your machine's Docker directly (the socket), which is what lets the builder image stay local (Q4) and replaces Docker-in-Docker for the two image jobs (9.2); plus the CPU budget from Q2:
+- [x] **Edit the runner config** ✅ 2026-10-07 (Claude) — jobs talk to your machine's Docker directly (the socket), which is what lets the builder image stay local (Q4) and replaces Docker-in-Docker for the two image jobs (9.2); plus the CPU budget from Q2:
 	```powershell
 	docker exec -it gitlab-runner sh -c "vi /etc/gitlab-runner/config.toml"
 	```
@@ -1991,8 +1991,9 @@ OS/Arch:      linux/amd64
 	    cpus = "24"                    # PER JOB — your 24-thread budget (Q2)
 	    pull_policy = ["if-not-present"]   # use local images (knottyyoga_build) without pulling
 	```
+	**Done by Claude 10/7/2026** (backup at `/etc/gitlab-runner/config.toml.bak` inside the container), plus one setting the runner itself asked for: `request_concurrency = 2` under `[[runners]]`. Without it the runner logs *"Long polling issues detected"*, and the second of two parallel jobs can sit up to a minute before it starts. To look at the file yourself: `docker exec gitlab-runner cat /etc/gitlab-runner/config.toml`. Note that the file holds the runner's token, so don't paste it anywhere.
 	Then `docker restart gitlab-runner`. No `privileged = true`: with the socket, no job runs its own Docker daemon. (The socket gives a job root-equivalent access to Docker Desktop's VM — acceptable for a private, single-owner project whose only pipelines are yours; see 9.7.) The `cpus` limit throttles CPU time but does **not** change what `nproc` reports inside the job — compile parallelism is capped separately by `JOBS` (9.2).
-- [ ] **Check:** Settings → CI/CD → Runners shows `mason-workstation` with a green dot.
+- [x] **Check:** Settings → CI/CD → Runners shows `mason-workstation` with a green dot. ✅ 2026-10-07
 
 ## 9.2 Pin every job to the runner; turn the shared runners off
 
