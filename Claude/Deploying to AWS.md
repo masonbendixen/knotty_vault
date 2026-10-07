@@ -1943,13 +1943,13 @@ Run the runner **as a Linux container in Docker Desktop**, using the docker exec
 
 - [x] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Without autostart, a reboot silently stops CI. ✅ 2026-10-07
 - [x] **Docker VM memory (Q2a, decided: 40 GB):** create `C:/Users/mason/.wslconfig` with `[wsl2]` / `memory=40GB`, run `wsl --shutdown`, restart Docker Desktop, and confirm `docker info --format '{{.MemTotal}}'` reports ~40 GB (it is ~31 GB today: WSL2's default is half your 64 GB). The VM already sees all 32 threads. ✅ 2026-10-07
-- [ ] **Create the runner in GitLab.** Project → Settings → CI/CD → Runners → **New project runner**:
+- [x] **Create the runner in GitLab.** Project → Settings → CI/CD → Runners → **New project runner**: ✅ 2026-10-07
 	- Tags: `knottyyoga-local`
 	- *Run untagged jobs*: **off** (9.2 tags every job; an untagged job reaching this runner would mean the YAML missed one)
 	- Description: `mason-workstation`
 	- *Protected*: off for now (it must run branch pipelines too)
 	- **Create runner** → copy the `glrt-…` token it shows (shown once).
-- [ ] **Start the runner container** (PowerShell):
+- [x] **Start the runner container** (PowerShell): ✅ 2026-10-07
 	```powershell
 	docker volume create gitlab-runner-config
 	docker run -d --name gitlab-runner --restart always `
@@ -1958,13 +1958,22 @@ Run the runner **as a Linux container in Docker Desktop**, using the docker exec
 	    gitlab/gitlab-runner:latest
 	docker exec gitlab-runner gitlab-runner --version   # note the version, then pin it (below)
 	```
+	```
+	PS C:\Users\mason> docker exec gitlab-runner gitlab-runner --version
+Version:      19.4.1
+Git revision: 3c39fceb
+Git branch:   19-4-stable
+GO version:   go1.26.5
+Built:        2026-09-24T03:56:12Z
+OS/Arch:      linux/amd64
+	```
 	`--restart always` brings it back after Docker Desktop restarts. **Pin the image** once it works: replace `:latest` with the version you just noted (`gitlab/gitlab-runner:v<version>`), so a runner upgrade is a deliberate act like every other pin in this repo.
 - [ ] **Register it** (same terminal; paste your token):
 	```powershell
 	docker exec -it gitlab-runner gitlab-runner register `
 	    --non-interactive `
 	    --url https://gitlab.com `
-	    --token glrt-PASTE-HERE `
+	    --token glrt-rcTVDlgK6isTEnrNs4cqFWM6MQpvOjEKcDpidWF4Ngp0OjMKdTozdDc5Nhs.01.1n1wz22xr `
 	    --executor docker `
 	    --docker-image alpine:3.20 `
 	    --description mason-workstation
