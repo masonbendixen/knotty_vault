@@ -1505,6 +1505,8 @@ For a soft launch, that coverage is plenty. Multi-AZ EC2 / RDS is a Phase 8 upgr
 
 # Phase 6 — GitLab CI/CD
 
+> **10/7/2026:** the jobs below are moving off GitLab's paid shared runners onto a self-hosted runner on your workstation — see **Phase 9**. The pipeline's design (stages, images, the Postgres sidecar, the tag-only package and deploy jobs) is unchanged by that move.
+
 > ✅ **PHASE 6 COMPLETE — 2026-10-03.** First tag deployed end-to-end through CI: **`v1.0.0-sandbox.3`**. Tag pipeline green (test, lint, `package:server`, `package:ui`, `release:gitlab`), then ▶ `deploy-manual:ec2` and ▶ `deploy-manual:ui` both passed, and the site at https://dv1tgxa9ok30f.cloudfront.net was checked by hand: the UI loads and reads/writes the RDS database through the API. `.1` and `.2` were burned on two pipeline bugs only a real tag run could expose — see 6.5 *How the job works*. Open follow-ups that do **not** block Phase 6: the two DST loops in 6.2, and 7.4's rollback + image pruning.
 
 You asked whether you can run backend tests that need Postgres in GitLab CI. **Yes** — GitLab "services" let you spin up a Postgres sidecar per job. Works well.
@@ -1908,6 +1910,146 @@ Not required to ship; listed so we don't forget.
 - [ ] **Helper liveness alarm**: CloudWatch Logs metric filter on the `knottyyoga-helper` log group looking for `[scheduler] event=job_success` lines, with an alarm if no match in the last 25 hours (longest interval is daily billing). Catches the case where the helper is "running" per systemd but its login keeps failing, so no jobs ever execute. Cheap insurance once we have customer data depending on the billing cycle.
 
 ---
+
+# Phase 9 — Run CI on a self-hosted runner (your machine)
+
+> **Why (10/7/2026):** GitLab's shared runners are slow, and on the free tier they cost real money. This pipeline was buying a $10 compute pack most days. The single most expensive job, `package:server`, recompiles every C++ dependency from scratch inside Docker-in-Docker on every tag (no Conan cache can reach it) and hit the 3h job ceiling on `v1.0.0-sandbox.5`. Meanwhile the same work already runs in minutes on your workstation (32 threads, a warm Conan cache, Docker Desktop). The plan: **register your machine as a GitLab runner, pin every job to it, switch the shared runners off.** GitLab stays the git host, the container registry, the Releases page, the CI/CD variables and the deploy buttons — only the compute moves.
+
+## 9.0 Is this the right approach? — Recommendation
+
+**Yes, with one correction to the premise.** The pipeline is *not* pure duplication of your local work, and it should not be dropped:
+- It builds from a **clean checkout on Linux**, which your local gate does not. It has already caught things your machine passed: the font-dependent Karma test (10/6 — green on Windows, red on the Linux runner), `.sh` files committed without an execute bit, a glibc mismatch between the builder and the runtime image. A self-hosted runner keeps that clean-room check — it runs in fresh containers from the same images — at no cost and at your machine's speed.
+- It is the **only path that produces the tagged release image** the EC2 pulls and the button that deploys it. That should not move to hand-run scripts.
+
+What *is* waste is paying shared-runner minutes for it, and the from-scratch dependency compile on every tag. Both go away here:
+
+| | Shared runners today | Self-hosted (this phase) |
+|---|---|---|
+| Compute cost | ~$10/day in packs | $0 (your electricity) |
+| `test:backend` | slow, Conan cache via GitLab's cache upload/download | ~6 min warm (local cache stays on disk) |
+| `package:server` (tags) | from-scratch deps in dind, ~3h, hit the ceiling | ~10 min once 9.4's Conan cache is in |
+| Availability | always on | **only when your PC is on and Docker Desktop is running** |
+
+**The trade-off you accept:** pipelines only run while your machine is on. Push from elsewhere and the jobs wait (they do not fall back to paid runners, by design — 9.2). For a one-person project that is the right trade.
+
+**Alternatives considered:**
+- *Stay on shared runners, just make them cheaper* (cache Conan in the builder image, skip work on tags). Helps, but you still pay, and every job still runs on 2 slow vCPUs. Worth doing anyway — 9.4 does the caching part on the self-hosted runner.
+- *Move the repo to GitHub* (everything else of yours is there). GitHub Actions also supports self-hosted runners for free, so the same idea applies there. But migration means rewriting `.gitlab-ci.yml` as workflows, moving the image registry (GHCR), redoing the EC2's registry login and the Releases. Not worth it to fix a cost problem a runner fixes in an hour. Open question 9.9 Q1.
+- *Drop CI and deploy from local scripts.* Loses the clean-room check and the reproducible tagged artifact. No.
+
+## 9.1 Install the runner (a container in Docker Desktop)
+
+Run the runner **as a Linux container in Docker Desktop**, using the docker executor. Jobs then run as sibling Linux containers on Docker Desktop's VM — the same images CI uses today (`builder`, `node:22-bookworm`, `postgres:13.1`, `docker:27-cli` + `docker:27-dind`), so `.gitlab-ci.yml` needs almost no change. (Not the Windows-native runner: on a Windows host its docker executor runs *Windows* containers only.)
+
+- [ ] **Docker Desktop:** Settings → General → *Start Docker Desktop when you sign in* ✓. Settings → Resources: leave the WSL2 defaults (it already uses all 32 threads). Without autostart, a reboot silently stops CI.
+- [ ] **Create the runner in GitLab.** Project → Settings → CI/CD → Runners → **New project runner**:
+	- Tags: `knottyyoga-local`
+	- *Run untagged jobs*: **off** (9.2 tags every job; an untagged job reaching this runner would mean the YAML missed one)
+	- Description: `mason-workstation`
+	- *Protected*: off for now (it must run branch pipelines too)
+	- **Create runner** → copy the `glrt-…` token it shows (shown once).
+- [ ] **Start the runner container** (PowerShell):
+	```powershell
+	docker volume create gitlab-runner-config
+	docker run -d --name gitlab-runner --restart always `
+	    -v /var/run/docker.sock:/var/run/docker.sock `
+	    -v gitlab-runner-config:/etc/gitlab-runner `
+	    gitlab/gitlab-runner:latest
+	docker exec gitlab-runner gitlab-runner --version   # note the version, then pin it (below)
+	```
+	`--restart always` brings it back after Docker Desktop restarts. **Pin the image** once it works: replace `:latest` with the version you just noted (`gitlab/gitlab-runner:v<version>`), so a runner upgrade is a deliberate act like every other pin in this repo.
+- [ ] **Register it** (same terminal; paste your token):
+	```powershell
+	docker exec -it gitlab-runner gitlab-runner register `
+	    --non-interactive `
+	    --url https://gitlab.com `
+	    --token glrt-PASTE-HERE `
+	    --executor docker `
+	    --docker-image alpine:3.20 `
+	    --description mason-workstation
+	```
+- [ ] **Edit the runner config** for Docker-in-Docker over TLS (what `image:builder` and `package:server` use today) and to leave your machine some headroom:
+	```powershell
+	docker exec -it gitlab-runner sh -c "vi /etc/gitlab-runner/config.toml"
+	```
+	Make these settings (others as `register` wrote them):
+	```toml
+	concurrent = 2                     # top of the file: 2 jobs at once
+	[[runners]]
+	  [runners.docker]
+	    privileged = true              # docker:dind needs it
+	    volumes = ["/certs/client", "/cache"]   # dind TLS certs + the local job cache
+	    cpus = "20"                    # leave ~12 threads for your own builds/IDE
+	    pull_policy = ["if-not-present"]
+	```
+	Then `docker restart gitlab-runner`. (`privileged` gives job containers root on Docker Desktop's VM — acceptable for a private, single-owner project whose only pipelines are yours; see 9.7.)
+- [ ] **Check:** Settings → CI/CD → Runners shows `mason-workstation` with a green dot.
+
+## 9.2 Pin every job to the runner; turn the shared runners off
+
+Two switches, both required: the tag makes jobs *eligible* for your runner; turning off instance runners makes your runner the *only* one, so nothing can quietly burn paid minutes.
+
+- [ ] **`.gitlab-ci.yml`:** add a `default:` block at the top so every job carries the tag:
+	```yaml
+	default:
+	  tags: [knottyyoga-local]
+	```
+	(One place, not 12 per-job edits — and a job added later inherits it.)
+- [ ] **Settings → CI/CD → Runners → Instance runners:** toggle **Enable instance runners for this project** off.
+- [ ] **Test:** none needed beyond 9.3 — but if a job ever shows *"This job is stuck because you don't have any active runners online"*, the machine or Docker Desktop is off (9.6), not a YAML problem.
+
+## 9.3 First pipeline on the runner — verify every job
+
+- [ ] Push a commit (or Pipelines → Run pipeline on `master`). Every push job should start within seconds of each other on `mason-workstation`:
+	- [ ] `build:server`, `test:backend` (Postgres sidecar — runs in the job's own network, does **not** collide with your local `knotty-postgres-docker` or its port)
+	- [ ] `test:frontend`, `lint:frontend`, `build:frontend`, `test:deploy-scripts`
+	- [ ] First run is a cold Conan/npm cache (expect the backend jobs to take ~15–20 min once); the second push should show the warm times (~6 min backend).
+- [ ] **Tag pipeline:** tag the next `v1.0.0-sandbox.N` and confirm `package:server` → `package:ui` → `release:gitlab` → ▶ `deploy-manual:ec2` → ▶ `deploy-manual:ui` all run here. Before 9.4, `package:server` still compiles dependencies from scratch in dind — on 32 threads that is minutes, not hours, but it is the next thing to fix.
+- [ ] Record the per-job times in this section (they become the baseline for 9.4).
+
+## 9.4 Make the release build fast: a persistent Conan cache for `package:server`
+
+The release `Dockerfile`'s builder stage runs `conan install --build=missing` *after* `COPY .`, so no Docker layer can cache the dependencies, and inside an ephemeral dind daemon nothing survives between tags anyway. On a self-hosted runner both can be fixed:
+
+- [ ] **Talk to the host's Docker directly instead of dind for the two image jobs** (`image:builder`, `package:server`). Runner `config.toml`: add `"/var/run/docker.sock:/var/run/docker.sock"` to `volumes`. `.gitlab-ci.yml` `.dind` fragment: drop the `services: docker:27-dind` entry and the four `DOCKER_*` variables (the CLI then uses the mounted socket). The BuildKit cache now lives in Docker Desktop and survives between tags.
+- [ ] **`package/Dockerfile`:** give the dependency build a BuildKit cache mount, so Conan's package cache persists across builds without being baked into the image:
+	```dockerfile
+	RUN --mount=type=cache,target=/root/.conan2 \
+	    KNOTTYYOGA_VERSION="${KNOTTYYOGA_VERSION}" ... bash ./package/build_linux_release.sh
+	```
+	The release still builds from a clean source tree every time — only the third-party binaries (Boost, libpqxx, OpenSSL, …) are reused, keyed by their exact Conan package IDs, so a dependency or compiler change still rebuilds what it must.
+- [ ] **Test:** tag twice in a row. The second `package:server` must log Conan *"Already installed"* / *"Found in cache"* for the dependencies and finish in ~10 min; the image's `/api/health` must still report the new tag after deploy. Add the timings to 9.3's table.
+- [ ] **Do not raise the job timeout instead.** The 3h ceiling stays; with this cache the job should never get near it.
+
+## 9.5 Optional trims (each is a judgement call, defaults in 9.9)
+
+- [ ] **Stop pushing the builder image to the registry** — with one runner it can use the locally built `builder:latest` (`pull_policy: if-not-present` already prefers it). Saves registry storage (GitLab's free namespace storage is limited; the gcc-based builder image is the largest thing in it). Keep pushing it if you ever want the shared runners back as a fallback.
+- [ ] **Prune old CI images/caches on a schedule** — Docker Desktop's disk grows with every job image and BuildKit cache. Monthly: `docker system prune -f` and `docker builder prune --keep-storage 30GB -f` (keeps the Conan cache warm while capping it).
+
+## 9.6 Operating it day to day
+
+- **The runner only works while your PC is on, signed in, with Docker Desktop running.** Jobs queue until it is back; nothing is lost. A deploy therefore also needs the machine on.
+- **Away and need a pipeline?** Temporarily turn instance runners back on (9.2) — and remove the `default: tags` line on that branch, since shared runners won't pick up jobs tagged `knottyyoga-local`. That is the paid path; flip it back afterwards.
+- **CPU contention:** with `concurrent = 2` and `cpus = "20"`, a pipeline and your own Visual Studio / Linux-gate build can share the machine. If your local builds feel slow while CI runs, drop to `concurrent = 1`.
+- **Logs:** `docker logs -f gitlab-runner`. **Upgrades:** bump the pinned image tag and `docker rm -f gitlab-runner` + re-run 9.1's `docker run` (the config is in the `gitlab-runner-config` volume and survives).
+- **Never run the local Linux gate and the CI backend job against the same database** — they don't: CI's Postgres is its own sidecar container. (The memory rule about not running the honuware and app suites concurrently applies to your local `knotty-postgres-docker`, not to CI.)
+
+## 9.7 Security notes
+
+- The runner executes whatever `.gitlab-ci.yml` says, as root inside containers on your machine (`privileged`, and in 9.4 the Docker socket). That is safe **because the project is private and only you can push**. Keep it that way: no public forks, no outside contributors' merge requests running pipelines on this runner. If that ever changes, revisit before accepting their pipelines.
+- The masked/protected CI variables (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` for `ci-deploy`, `EC2_INSTANCE_ID`, …) are now handed to containers on your machine instead of GitLab's. They were already usable from your machine via the AWS CLI, so this does not widen access; the `ci-deploy` IAM policy (6.5a) still limits what they can do.
+- The registry credentials (`CI_REGISTRY_PASSWORD`) are per-job tokens, as before.
+
+## 9.8 Rollback
+
+- [ ] If the self-hosted runner misbehaves: re-enable instance runners (9.2), remove the `default: tags` block, and the pipeline is exactly what it was on 10/6. Undo 9.4's `.dind` change too if it was made (shared runners need dind). Nothing in this phase changes what gets built or deployed.
+
+## 9.9 Open questions (each has a default so work never stops on one)
+
+1. **Q1 — Consolidate on GitHub?** Everything else of yours is on GitHub, and GitHub also allows free self-hosted runners. *Default: not now — finish this phase on GitLab (an hour of work, no pipeline rewrite). Revisit as its own decision once the self-hosted runner has run a few releases; the migration cost is the CI rewrite, the registry move (EC2 login), and Releases.*
+2. **Q2 — Runner concurrency.** *Default: `concurrent = 2`, `cpus = "20"` (9.1). Lower to 1 if CI slows your own builds.*
+3. **Q3 — Keep running the full backend suite on every push?** It is what caught most regressions, and on your machine it is ~6 min. *Default: yes, unchanged.*
+4. **Q4 — Keep publishing the builder image to the registry?** *Default: keep for now (it is the fallback path back to shared runners); stop after a month of the self-hosted runner being reliable (9.5).*
 
 # Monthly Cost Estimate (soft launch)
 
