@@ -566,6 +566,7 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 **OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest emails them. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. 12.3 swaps in real ones before rollout.
 
 **OQ-2 — Do they need to sign in now, and how do they get a password?** Knottyyoga has no forgot-password flow. If one of them later tries to **Register** with their real email, it will fail because the seeded row already exists. **Default:** the random seed password (D9) plus a new `knottyyoga_test_helper set_password` command (3.4) that you run to give each a temporary password, which they must change at first sign-in. A real self-service reset is a separate feature.
+- Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email 
 
 **OQ-3 — Which memberships include the non-beginner classes?** The Overview only says Beginner Knotty Yoga is Silver-or-Gold. With no membership group, a class is open **and free to everyone**. **Default:** Knotty Yoga, Handstands, Aerial Rope and both Partner Acro classes require Gold (D7).
 
