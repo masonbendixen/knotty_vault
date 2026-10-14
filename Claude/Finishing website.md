@@ -627,5 +627,7 @@ Want real copy for any of these seeded now?
 		- We have inch thick padded floors throughout the whole studio so yoga mats are not needed. We also have a grid of 24 aerial fabrics so people generally have their own equipment so there is no time wasted waiting in line for a turn on the equipment. Please come to our next intro workshop.
 
 **OQ-17 — Tell visitors which membership a class needs (Phase 10.3).** Today the class page says only "Members only — Upgrade your membership to attend." (fact 9), so nothing on Beginner Knotty Yoga says Silver is enough. **Default:** build 10.3 (small: one detail field, one endpoint field, one template branch).
+- Mason- let's make this change.
 
 **OQ-18 — Who builds.** The Overview says you build and run the tests; the standing 9/11 agreement is that I build Windows and Linux and report each. **Default:** I build both and report, announcing before long or destructive runs. Say if you'd rather I don't for this one.
+- Mason- I trust you more now! Please update the note that you build and run the tests on windows and linux but report the results to me. When stuff would break, I'd just paste the output to you so I figure I trust you now to remove myself from this loop as your model has improved.
