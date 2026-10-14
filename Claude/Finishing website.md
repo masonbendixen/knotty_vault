@@ -597,17 +597,20 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
 
 **OQ-12 — Test-only data times.** **Default:** Intro Workshop to Saturday 13:00–14:00; Aerial Series to Tuesday + Friday 19:00–20:00 (7.1).
--
+- Mason- let's remove both of these. I'm getting ready to deploy and want the website to be as it will actually function.
 
 **OQ-13 — Membership tier order.** **Default:** price ascending (Silver, Gold, Silver Couple's, Gold Couple's, Gold Family). **Alternative:** grouped by tier (Silver, Silver Couple's, Gold, Gold Couple's, Gold Family), which needs an explicit sort column on products.
+- Mason- I'd prefer the alternative.
 
 **OQ-14 — Membership descriptions.** **Default:**
 - Silver: "Unlimited Beginner Knotty Yoga classes."
 - Silver Couple's: "Unlimited Beginner Knotty Yoga classes for two."
 - Gold: "Every class on the weekly schedule. Some classes also need instructor approval."
 - Gold Couple's: the Gold text, for two. Gold Family: the Gold text, for three.
+- Mason- This sounds fine.
 
 **OQ-15 — Instructor bios.** Shown publicly on the Instructors page. **Default:** one factual line each from the schedule (e.g. Beth: "Teaches Beginner Knotty Yoga on Wednesdays."), editable later in Manage. Send real bios if you have them.
+- Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 
 **OQ-16 — Leftover copy that no longer matches the studio** *(flagged, not changed by default)*:
 - Mail sender name **"Knotty Yoga and Spa"** (`app_secret_values.cpp`).
@@ -615,6 +618,9 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 - Facility description: "a climbing wall", "Street parking is free after 6pm".
 
 Want real copy for any of these seeded now?
+- Mason - Let's do:
+	- Who we are
+		- Mason started teaching circus acrobatics in 2004 and quickly realized that few people had the strength needed to do aerial acrobatics. He began putting together a conditioning program to solve this and 
 
 **OQ-17 — Tell visitors which membership a class needs (Phase 10.3).** Today the class page says only "Members only — Upgrade your membership to attend." (fact 9), so nothing on Beginner Knotty Yoga says Silver is enough. **Default:** build 10.3 (small: one detail field, one endpoint field, one template branch).
 
