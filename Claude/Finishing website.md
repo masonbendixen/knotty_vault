@@ -620,7 +620,9 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 Want real copy for any of these seeded now?
 - Mason - Let's do:
 	- Who we are
-		- Mason started teaching circus acrobatics in 2004 and quickly realized that few people had the strength needed to do aerial acrobatics. He began putting together a conditioning program to solve this and 
+		- Mason started teaching circus acrobatics in 2004 and quickly realized that few people had the strength needed to do aerial acrobatics. He began putting together a conditioning program to solve this and took multiple aerial teacher trainings, the Ana Forrest Yoga instructor training, TRX instructor training, massage school, and multiple Thai massage schools in Thailand. Teaching students for over two decades, he has heavily refined the curriculum to a general purpose workout routine that supports most athletic activities.
+	- How we teach
+		- There is no magic. It's just consistency with intensity with technique coaching. 
 
 **OQ-17 — Tell visitors which membership a class needs (Phase 10.3).** Today the class page says only "Members only — Upgrade your membership to attend." (fact 9), so nothing on Beginner Knotty Yoga says Silver is enough. **Default:** build 10.3 (small: one detail field, one endpoint field, one template branch).
 
