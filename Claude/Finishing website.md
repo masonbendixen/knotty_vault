@@ -622,7 +622,9 @@ Want real copy for any of these seeded now?
 	- Who we are
 		- Mason started teaching circus acrobatics in 2004 and quickly realized that few people had the strength needed to do aerial acrobatics. He began putting together a conditioning program to solve this and took multiple aerial teacher trainings, the Ana Forrest Yoga instructor training, TRX instructor training, massage school, and multiple Thai massage schools in Thailand. Teaching students for over two decades, he has heavily refined the curriculum to a general purpose workout routine that supports most athletic activities.
 	- How we teach
-		- There is no magic. It's just consistency with intensity with technique coaching. 
+		- There is no magic to fitness: it's just consistency with intensity with technique coaching. Classes present a set of progressions to constantly move to the next level so you see continual improvement over time. You don't need any experience or background in acrobatics. You just need to attend consistently and be willing to do the work!
+	- Come and find us
+		- We have inch thick padded floors throughout the whole studio so yoga mats are not needed. We also have a grid of 24 aerial fabrics so people generally have their own equipment so there is no time wasted waiting in line for a turn on the equipment. Please come to our next intro workshop.
 
 **OQ-17 — Tell visitors which membership a class needs (Phase 10.3).** Today the class page says only "Members only — Upgrade your membership to attend." (fact 9), so nothing on Beginner Knotty Yoga says Silver is enough. **Default:** build 10.3 (small: one detail field, one endpoint field, one template branch).
 
