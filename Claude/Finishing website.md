@@ -579,20 +579,25 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 - Mason- Yes, this sounds correct.
 
 **OQ-6 — Is Mason still a massage provider?** He is assigned today, and the photo plan mentions a "Mason massage" photo, but the Overview gives hours only for Caleb. A provider with no hours appears in the picker with nothing to book. **Default:** Caleb only; re-adding Mason later is one admin row.
-- Let's just do Caleb for now.
+- Mason- Let's just do Caleb for now.
 
 **OQ-7 — Co-instructors (Phase 8).** It is a real feature: a new table, readers in three helpers, two endpoints and a dialog control. **Default:** build it. **Alternative:** Gifford alone on the slot, with Tiana named in nothing. Say which.
-- I think
+- Mason- we should support multiple instructors.
 
 **OQ-8 — Rolling availability (Phase 9).** **Default:** build it, with a 60-day horizon. **Alternative:** skip it and press **Generate** on Caleb's template in Manage every month. If that is forgotten, massage booking quietly shows nothing.
+- Mason- no no no... let's not make this a new feature. We can just add slots with the template. The generate availability feature is pretty simple. Could also do this as a scheduled job pretty easily if need be. Let's not complicate the webserver more than necessary.
 
 **OQ-9 — Getting this onto the live site.** **Default:** reinstall prod (D11, Phase 12). That **erases** every account registered there, every booking and purchase, and anything edited through Manage (page content, uploaded photos, carousel). Theme settings survive via export/import. **Has anything on prod been entered by hand that you want kept?** If so, I'll list it in 12.1 and carry it across, or switch to an in-place migration for just those parts.
+- Mason- No, I'm just in preview mode and still using the Square sandbox. Wipe away.
 
 **OQ-10 — Test accounts in the base seed.** `masonbendixen@hotmail.com` (an **admin**, password `mason`) and Kit Williams (`kit`) are created by `--install_schema`, so prod has them today. **Default:** move both to `--recreate_database_test` only (3.1). Hand-testing walkthroughs that use Kit as "the member" will say to run `--recreate_database_test`. Separately: **Mason's and Caleb's prod passwords are the committed `pass` / `caleb` unless you've changed them**, and the cloudfront URL is public. Worth changing now, regardless of this plan.
+- Mason- I'll manually have the three of us change our passwords as we deploy. I'm not that concerned about this.
 
 **OQ-11 — Where are the photos?** None of the eight "needed" files in 6.2 is in the tree. **Default:** you drop them into `src/database_helper/img/` under the names in the table, or give me paths as in the previous plan and I'll copy/convert them. New headshots for Mason and Caleb replace the existing `MasonInstructor.jpg` / `CalebInstructor.jpg`.
+- Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
 
 **OQ-12 — Test-only data times.** **Default:** Intro Workshop to Saturday 13:00–14:00; Aerial Series to Tuesday + Friday 19:00–20:00 (7.1).
+-
 
 **OQ-13 — Membership tier order.** **Default:** price ascending (Silver, Gold, Silver Couple's, Gold Couple's, Gold Family). **Alternative:** grouped by tier (Silver, Silver Couple's, Gold, Gold Couple's, Gold Family), which needs an explicit sort column on products.
 
