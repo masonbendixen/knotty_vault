@@ -564,19 +564,25 @@ Per D11 / OQ-9 (reinstall). Everything here runs on the EC2 host following the D
 *Each has a default the plan is written against. Answer inline and I'll adjust; anything unanswered goes ahead on its default.*
 
 **OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest emails them. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. 12.3 swaps in real ones before rollout.
+- Mason- I sent a message to all my instructors asking which email to use.
 
 **OQ-2 — Do they need to sign in now, and how do they get a password?** Knottyyoga has no forgot-password flow. If one of them later tries to **Register** with their real email, it will fail because the seeded row already exists. **Default:** the random seed password (D9) plus a new `knottyyoga_test_helper set_password` command (3.4) that you run to give each a temporary password, which they must change at first sign-in. A real self-service reset is a separate feature.
-- Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email 
+- Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email with a create new password flow? But for this, I figure I will give them a temporary password that they create here. Do we have must change password on next login support?
 
 **OQ-3 — Which memberships include the non-beginner classes?** The Overview only says Beginner Knotty Yoga is Silver-or-Gold. With no membership group, a class is open **and free to everyone**. **Default:** Knotty Yoga, Handstands, Aerial Rope and both Partner Acro classes require Gold (D7).
+- Mason- that's correct.
 
 **OQ-4 — "Instructor approval" as a skill level per class.** **Default:** four skills (table above), granted by an instructor on the skill-assignment page; Beginner Partner Acro's solo-flyer rule is description text only (D6). Say if any approval should instead be a single studio-wide "approved" skill.
+- Mason- Let's make skills for handstand, aerial_rope, intermediate_partner_acro. Say the things in there that I listed for each in the description.
 
 **OQ-5 — Should the Instructor role be able to check people in and grant approvals?** Check-in needs `staff_access`, and granting a skill needs `manage_skills`. Today only admins and Studio Managers have them. **Default:** grant both to the Instructor role, so Beth, Gifford and Tiana can run their own classes.
+- Mason- Yes, this sounds correct.
 
 **OQ-6 — Is Mason still a massage provider?** He is assigned today, and the photo plan mentions a "Mason massage" photo, but the Overview gives hours only for Caleb. A provider with no hours appears in the picker with nothing to book. **Default:** Caleb only; re-adding Mason later is one admin row.
+- Let's just do Caleb for now.
 
 **OQ-7 — Co-instructors (Phase 8).** It is a real feature: a new table, readers in three helpers, two endpoints and a dialog control. **Default:** build it. **Alternative:** Gifford alone on the slot, with Tiana named in nothing. Say which.
+- I think
 
 **OQ-8 — Rolling availability (Phase 9).** **Default:** build it, with a 60-day horizon. **Alternative:** skip it and press **Generate** on Caleb's template in Manage every month. If that is forgotten, massage booking quietly shows nothing.
 
