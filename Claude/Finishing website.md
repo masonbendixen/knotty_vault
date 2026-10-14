@@ -50,7 +50,15 @@ Class Descriptions
 
 Remove the other classes currently in the system.
 
-We currently don't have the spa yet so remove the spa products from the product catalog. Create Caleb Ault as a massage provide
+We currently don't have the spa yet so remove the spa products from the product catalog. Create Caleb Ault as a massage provider and please set his schedule as:
+- Mon 11am-3pm
+- Tue 11am-4pm
+- Thu 11am-4pm
+- Fri 11am-3pm
+- Sun 1:30pm-4pm
+
+For memberships, keep the existing memberships and add a Knotty Yoga Silver Membership that includes the Begin
+
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
