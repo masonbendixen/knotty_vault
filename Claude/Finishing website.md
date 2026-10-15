@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/15/2026
-Version: 0.3
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -83,6 +83,13 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
+  - The email sender becomes "Knotty Yoga".
+  - About ▸ Our Location gets Mason's text with driving directions. Phase 8 now carries both.
+  - OQ-19 and OQ-20 keep their defaults.
+  - Phase 4.7 is built on the existing UptimeRobot monitor instead of a new Route 53 check.
+  - Phase 4.0 records the incident's root cause: an unattended-upgrade restarted `systemd-networkd`.
+  - New 4.8 stops the host from doing that again.
 - **v0.3 (10/15/2026)** — the 10/15 production incident. The site went down at 19:08 UTC because the server never reconnects a dropped database connection. The investigation also found that the scheduled jobs had been refused since the 10/8 deploy. Fixing both, and making `/api/health` tell the truth, is a **new Phase 4**. The old Phases 4–14 move down one, to 5–15, and every reference in this doc was renumbered with them. Phases 2 and 3 are implemented.
 - **v0.2 (10/14/2026)** rewritten against Mason's answers to the open questions. The changes (phase numbers as of v0.3):
   - Photos are now Phase 1.
@@ -1169,12 +1176,14 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 14 walkthrough.
 - **Alternatives:** (a) two to a row on desktop: Silver pair, Gold pair, then Gold Family alone. (b) one row per tier family: Silver row and Gold row. That needs the cards to know which family a tier is in, which the data does not say today.
 - Mason- Let's go with the default.
+- → Plan: no change. The cards stay three to a row in tier order.
 
 **OQ-21 (new, from the 10/15 incident) — Who tells you the site is down?** Today nothing does: you find out by visiting it.
 - **Default (4.7):** a Route 53 health check plus a CloudWatch alarm that emails you. It stays inside AWS, needs no new account, costs about $1 a month, and checks every 30 seconds.
 - **Alternative:** a free outside service (e.g. UptimeRobot) checking the same URL every 5 minutes. No AWS setup, but it is one more account, and an outage is noticed more slowly.
 - **Not planned:** a watchdog that restarts the server whenever health fails. After 4.1 the server reconnects by itself, so a restart would only hide the next new kind of failure.
 - Mason- We did UptimeRobot as part of the deploying to AWS guide and it contacts me if the health check fails. But, because of the bug, the health check wasn't failing.
+- → Plan: 4.7 is rewritten around your existing UptimeRobot monitor, and the Route 53 default is dropped. The monitor already alerts on any non-2xx answer, and 4.2 makes health answer 503 in exactly this situation, so after 4.6 the monitor would catch a repeat of 10/15 with no change to it. Deploying to AWS's uptime section now carries a correction note saying the old "db ok means the database answered" claim was wrong.
 
 **OQ-2 — Do they need to sign in now, and how do they get a password?**
 - Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email with a create new password flow? But for this, I figure I will give them a temporary password that they create here. Do we have must change password on next login support?
