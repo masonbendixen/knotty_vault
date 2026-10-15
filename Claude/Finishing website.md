@@ -463,7 +463,10 @@ Prerequisite for every catalog and people change (fact 1). No content changes in
   - **Tier icons:** on all five tiers.
   - **Massage:** still linked to `massage_therapist` / `massage_room`.
   - **Admin metadata:** `products.sort_order` is labelled **Sort Order**.
-- [ ] Full suites on both platforms + full Angular suite *(results below once they finish)*.
+- [x] Full suites (10/15/2026):
+  - **Windows** (`x64-Debug`, all targets): **5204 passed.**
+  - **Linux** (container gate, plus `knottyyoga_database_helper` and `knottyyoga_the_server` built): **5204 passed.**
+  - **Angular:** **3588 of 3588** specs pass. `ng build` (production) succeeds, and `ng lint` reports all files passing. The build's CSS budget warnings were already there; this phase changed no stylesheet.
 
 ---
 
