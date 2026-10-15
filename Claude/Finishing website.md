@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/15/2026
-Version: 0.4
+Version: 0.5
 tags: 
 ---
 # Overview
@@ -83,6 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.5 (10/15/2026)** — Phase 4.1–4.5's gates are implemented in `server_components` and green on both platforms; each item records what changed in building it. The work also turned up a **second scheduler bug**: the helper's re-login after a 401 sent a garbled email (4.4), so after its first session expired it could not have recovered even without the CSRF refusals. Next is Mason's commit and push of `server_components`, then the pin bump (4.5) and the v1.0.4 release (4.6).
 - **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
   - The email sender becomes "Knotty Yoga".
   - About ▸ Our Location gets Mason's text with driving directions. Phase 8 now carries both.
@@ -539,52 +540,54 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - **It will recur.** Unattended-upgrades runs daily; any update to `systemd` or `netplan` does this again. 4.1 makes the server shrug it off, and 4.8 stops the host from causing it.
 
 ### 4.1 Reconnect a dropped connection *(server_components: data/sql_util/database_access)*
-- [ ] `DatabaseHelperProd` keeps the `DatabaseHelperInit` it was built from and gains `ResetConnection()`, which opens a fresh `pqxx::connection`. Exposed through `DatabaseHelper`.
+- [x] `DatabaseHelperProd` keeps the `DatabaseHelperInit` it was built from and gains `ResetConnection()`, which opens a fresh `pqxx::connection`. Exposed through `DatabaseHelper`.
   - *As built:* the new connection is opened **before** the swap, so a failed reconnect leaves the old one in place. The old connection is kept alive one generation more (`retiredConnection_`), because a caller may still hold a reference to it from `GetConnection()`. Helpers that cannot reconnect (the test harness's, `MakeNoDatabaseHelper`) throw `std::logic_error` rather than pretend.
   - *As built:* the reconnect reasons are `connection_closed` (found closed before BEGIN) and `begin_failed` (BEGIN threw and the connection is no longer open). An ordinary SQL error with a live connection does **not** reconnect.
-- [ ] `ProductionTransactionProvider::RunInTransaction`, still under its mutex:
+- [x] `ProductionTransactionProvider::RunInTransaction`, still under its mutex:
   - **Before BEGIN:** if the connection is closed, reconnect.
   - **If BEGIN itself throws `pqxx::broken_connection`:** reconnect once and begin again. This is safe because none of the caller's work has run yet.
   - **If the connection breaks mid-transaction:** reset it so the *next* transaction reconnects, and rethrow. The caller's work is **never re-run automatically**, because it may already have done something outside the database (a Square charge, an email).
-- [ ] TCP keepalives in the connection string (`keepalives=1 keepalives_idle=60 keepalives_interval=10 keepalives_count=3`), so a silently dead socket is noticed in about 90 seconds rather than by the next customer.
+- [x] TCP keepalives in the connection string (`keepalives=1 keepalives_idle=60 keepalives_interval=10 keepalives_count=3`), so a silently dead socket is noticed in about 90 seconds rather than by the next customer.
   - *As built:* also `tcp_user_timeout=30000`. Keepalives only probe an **idle** socket; a query sent into a dead NAT entry would otherwise sit in the kernel's retransmit queue for about 15 minutes. With it, the send fails after 30 seconds. The string is `kConnectionLivenessOptions` in `database_helper_init.h`.
-- [ ] One log line per reconnect: `[database] event=reconnected database=<name> reason=<…>`, so the journal says when it happened.
-- [ ] `PooledTransactionProvider` needs nothing of its own: each slot is a `ProductionTransactionProvider`.
-- [ ] Tests, against the test database, with a production provider pointed at it. A second connection kills the provider's backend with `pg_terminate_backend`, which is exactly what a dropped connection looks like to libpq:
+- [x] One log line per reconnect: `[database] event=reconnected database=<name> reason=<…>`, so the journal says when it happened.
+- [x] `PooledTransactionProvider` needs nothing of its own: each slot is a `ProductionTransactionProvider`.
+- [x] Tests, against the test database, with a production provider pointed at it. A second connection kills the provider's backend with `pg_terminate_backend`, which is exactly what a dropped connection looks like to libpq:
   - after the kill, the next transaction **succeeds**
   - a transaction running when its backend dies throws, is **not** re-run (a counter in the callback proves it ran once), and the transaction after it succeeds
   - a pool of 1 recovers the same way
   - the keepalive parameters appear in `GetConnectionString()`
+  - *As built:* also an ordinary SQL error does **not** reconnect, a healthy connection is kept, and the helpers that cannot reconnect refuse to. They are in `production_transaction_provider_test.cpp` and `database_helper_init_test.cpp`.
 
 ### 4.2 A health check that tells the truth *(server_components: platform/endpoints/health)*
-- [ ] `/api/health` probes the connections requests actually use:
+- [x] `/api/health` probes the connections requests actually use:
   - the global provider
   - **every tenant pool** in the `TenantResourceRegistry`
   - the request's resolved tenant, if any (resolving creates its pool)
 
   It reports `db: ok` only if all of them pass. With 4.1 in place a probe on a dropped connection reconnects and passes, so health fails only when the database really cannot be reached. That is what it should mean.
-- [ ] On failure: still 503, and the body names what failed, e.g. `{"status":"fail","db":"fail","failed":["knottyyoga"]}`. The 200 body is unchanged, so the deploy script's check keeps working.
+- [x] On failure: still 503, and the body names what failed, e.g. `{"status":"fail","db":"fail","failed":["knottyyoga"]}`. The 200 body is unchanged, so the deploy script's check keeps working.
   - *As built:* the global connection is named `global`; each tenant pool by its database name. A failed probe also writes `[health] event=probe_failed` to the journal. With no probe targets at all the answer is 503, not a vacuous 200. `TenantResourceRegistry` gained `GetAll()` for this.
-- [ ] Tests:
+- [x] Tests:
   - a registry holding a tenant whose provider throws → 503, naming it
   - everything healthy → 200 and today's body
   - no registry at all (tenancy inert) → behaves as today
+  - *As built:* plus the HTTP endpoint failing when the site's pool is dead though the global connection works, which is the 10/15 shape exactly (`health_test.cpp`).
 
 ### 4.3 Errors that say what they are *(server_components: foundation/util + platform/endpoints)*
-- [ ] `ErrorResponse::ServiceUnavailable(message)` → **503**. Today there is no 503 helper. Test.
-- [ ] `/api/login`:
+- [x] `ErrorResponse::ServiceUnavailable(message)` → **503**. Today there is no 503 helper. Test.
+- [x] `/api/login`:
   - A database failure (`pqxx::broken_connection`, `pqxx::sql_error`) is logged with context (`event=internal_error_context`) and answered **503** "Sign-in is temporarily unavailable. Please try again in a minute."
   - A wrong password still gets the same generic 401 as today. Nothing is revealed to a guesser.
-- [ ] `EndpointAuthHelper::Initialize`: the swallowed session-restore error is logged at ERROR, rate-limited to once a minute, so "everyone looks signed out" leaves a trace.
+- [x] `EndpointAuthHelper::Initialize`: the swallowed session-restore error is logged at ERROR, rate-limited to once a minute, so "everyone looks signed out" leaves a trace.
   - *As built:* the line is `[endpoint_auth] event=request_setup_failed path=… error="…" suppressed_since_last=N`. The once-a-minute limit is a small foundation class, `Util::LogThrottle` (with its own tests), and the `WebApp` owns the instance, so each server (and each test's `WebApp`) starts fresh instead of sharing a static. It also catches an empty `mail_app_password`, which fails in the same place.
   - *As built:* `/api/login` answers 503 for any `pqxx::failure` (broken connection, SQL error, …). Every other exception keeps the generic 401.
-- [ ] Tests: login over a provider that throws `broken_connection` → 503 and a logged context line; a wrong password → 401 as before; a session-restore failure logs once per minute, not per request.
+- [x] Tests: login over a provider that throws `broken_connection` → 503 and a logged context line; a wrong password → 401 as before; a session-restore failure logs once per minute, not per request.
 
 ### 4.4 The scheduled jobs get past the CSRF guard *(server_components: foundation/util/http + scheduler)*
-- [ ] `Http::HttpResponse` gains `std::vector<std::string> setCookies`, filled by the curl header callback with **every** `Set-Cookie`. The `headers` map keeps today's behaviour for everything else. Tests: two `Set-Cookie` lines both survive; the test HttpClient can return several.
-- [ ] `ApiClient::Login` stores every cookie. `CallEndpoint` sends them all, and on any non-GET call adds `X-CSRF-Token: <csrft>`, the double-submit the guard checks. The re-login-on-401 path refreshes both.
-- [ ] Not exempting the helper from CSRF instead: an exemption would mean trusting something the request says about itself. Doing the double-submit keeps one rule for every caller.
-- [ ] Tests:
+- [x] `Http::HttpResponse` gains `std::vector<std::string> setCookies`, filled by the curl header callback with **every** `Set-Cookie`. The `headers` map keeps today's behaviour for everything else. Tests: two `Set-Cookie` lines both survive; the test HttpClient can return several.
+- [x] `ApiClient::Login` stores every cookie. `CallEndpoint` sends them all, and on any non-GET call adds `X-CSRF-Token: <csrft>`, the double-submit the guard checks. The re-login-on-401 path refreshes both.
+- [x] Not exempting the helper from CSRF instead: an exemption would mean trusting something the request says about itself. Doing the double-submit keeps one rule for every caller.
+- [x] Tests:
   - `ApiClient` with a two-cookie login sends both cookies and the header
   - GET sends no header
   - re-login replaces both
@@ -597,7 +600,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - It is the second live-server test in honuware; the first is `http_client_test.cpp`, whose comment asks each one to make its own case. This one's case is in its header.
   - *As built:* the live `http_client_test` now also sends two `Set-Cookie` headers and checks that both arrive. The per-line header parser is a public `Http::ParseResponseHeaderLine` with its own unit tests. The `headers` map keeps last-wins for every header, `Set-Cookie` included.
   - *As built:* a job's own `X-CSRF-Token` overrides the engine's, as every other per-job header does.
-- [ ] **Found while mutation-checking the end-to-end test: the helper's re-login was broken too.**
+- [x] **Found while mutation-checking the end-to-end test: the helper's re-login was broken too.**
   - `CallEndpoint` re-logs in on a 401 by calling `Login(email_, password_)`, passing views into the client's own members. `Login` assigned the members first, which freed the buffers those views pointed into, and then built the request from freed memory.
   - Any address longer than 15 characters is affected, and `scheduler@knottyyoga.local` is 26. So once the helper's first session expired, every re-login sent a garbled email and failed, and every job after that would have failed. The 403s hid it.
   - Fixed: `Login` copies its arguments before touching the members.
@@ -605,13 +608,17 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - `ApiClientTest.ReloginSendsTheOriginalCredentials`, with the real service-account address.
     - A fifth step in the end-to-end test: log out (which leaves the helper holding a dead session), then the helper's next call gets 401, logs in again on its own, and its retry returns 200 with a new session cookie.
     - Both fail against the old code.
-- [ ] **Mutation checks (Windows):** each half of the fix was reverted on its own, and the end-to-end test failed every time:
+- [x] **Mutation checks (Windows):** each half of the fix was reverted on its own, and the end-to-end test failed every time:
   - every `Set-Cookie` → 401
   - the `X-CSRF-Token` header → 403
   - the re-login copy → 401, plus the unit test showing freed `0xDD` bytes sent as the email
 
 ### 4.5 Ship the server side
-- [ ] Gates on `server_components` (Linux + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
+- [x] Gates on `server_components` (Linux + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
+  - **server_components:** Windows 1819 passed, Linux 1819 passed.
+  - **knottyyoga against the local checkout:** Windows 5244 passed, Linux 5244 passed, and the Linux database helper and server binaries build. Phase 3 had 5204. The last change after this run was test-only, a log assertion in honuware's `login_test`, and it passed in both honuware runs above.
+  - **One knottyyoga change rides along:** `src/endpoints/web_app.cpp`'s link anchor named `&Endpoints::GetHealth`, which became ambiguous when 4.2 overloaded it. It now names the single-provider overload with a cast, which compiles against both the pinned and the new honuware. Honuware's own anchor list moved to `CollectHealthProbeTargets`.
+  - **The Windows build tree is configured against the local checkout** (`x64-Debug-local-honuware` in `CMakeUserPresets.json`, which persists `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the cache). That is right until the pin bump; the next item clears it.
 - [ ] **Mason** commits and pushes `server_components`.
 - [ ] Claude bumps `GIT_TAG` in knottyyoga's `CMakeLists.txt`, removes the local override, and re-runs the knottyyoga gates against the pinned SHA.
 - [ ] CommunityFinder has the same three bugs. It moves when Mason bumps its pin. Its helper is refused by the same guard if it is deployed.
