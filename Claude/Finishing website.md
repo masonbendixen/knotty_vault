@@ -571,6 +571,19 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - The exact console clicks get written into Deploying to AWS when this is done.
 - [ ] Only useful once 4.2 lands, since today's health check would have stayed green through this incident.
 
+### 4.8 Stop the host's network restarts from cutting live connections *(EC2, Deploying to AWS)*
+Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect and a log line.
+- [ ] Mark the EC2's interface **critical** in netplan, so a `systemd-networkd` restart keeps its DHCP address instead of dropping and re-acquiring it. That stops the NAT state from being flushed.
+  - A `/etc/netplan/99-knottyyoga.yaml` drop-in: `network: {version: 2, ethernets: {ens5: {critical: true}}}`.
+  - Then `sudo netplan apply`, and record it in Deploying to AWS's first-boot steps so a rebuilt instance gets it too.
+- [ ] **Verify before relying on it.** On the EC2:
+  - `sudo ss -tn dst <rds-endpoint-ip>` lists the server's database connections.
+  - `sudo systemctl restart systemd-networkd` simulates the upgrade.
+  - About 10 minutes later the site still loads **without** a server restart, and the RDS log has no new `Connection timed out`.
+  - Run this **after** 4.6 ships. Before then a failure means a manual restart, and that should be announced first.
+- [ ] **Alternative if `critical` is not enough:** run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly), so it is a fallback, not the default.
+- [ ] **Not planned:** disabling unattended-upgrades. Security patches matter more than avoiding a reconnect.
+
 ---
 
 # Phase 5 — People, roles and instructors
