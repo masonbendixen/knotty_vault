@@ -527,7 +527,8 @@ The five tiers made the cards' uneven heights visible: a name or description tha
 All the code is in `server_components`; knottyyoga only moves its pin. During development knottyyoga builds against the local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`), as Phase 12 does. This phase ships to production **on its own release (4.6), ahead of everything after it**: it is a fix to what is live today.
 
 ### 4.0 Now, by hand
-- [ ] `sudo systemctl restart knottyyoga-server` on the EC2, then `curl -sS http://localhost/api/health` and a page load through the CloudFront URL. This is the only cure until 4.6 ships.
+- [x] `sudo systemctl restart knottyyoga-server` on the EC2, then `curl -sS http://localhost/api/health` and a page load through the CloudFront URL. This is the only cure until 4.6 ships.
+  - Mason restarted it at **20:08:20 UTC** on 10/15. Checked at about 21:50 UTC: health ok and no "Lost connection" since. The helper has still had **26 refusals and no successful jobs** since the restart, as expected until 4.6.
 - [x] **Why did the connection drop?** Found 10/15:
   - **The connection did not die at 19:08.** That is when Mason's visit first *used* it. The last request that used the database successfully was **10/14 22:36 UTC**; the helper's refused jobs never reach the database, so the connection sat idle for 20½ hours.
   - **RDS events for the window:** only the nightly backup (09:06–09:09 UTC), which does not drop connections.
@@ -632,6 +633,7 @@ Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/
 Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect and a log line.
 - [ ] Mark the EC2's interface **critical** in netplan, so a `systemd-networkd` restart keeps its DHCP address instead of dropping and re-acquiring it. That stops the NAT state from being flushed.
   - A `/etc/netplan/99-knottyyoga.yaml` drop-in: `network: {version: 2, ethernets: {ens5: {critical: true}}}`.
+  - Checked 10/15: the interface is `ens5`. The only netplan file is cloud-init's `50-cloud-init.yaml`, which matches by MAC with `dhcp4: true`, `dhcp6: false` and sets nothing about `critical`. Netplan merges the drop-in on top by interface name, so cloud-init's file stays untouched.
   - Then `sudo netplan apply`, and record it in Deploying to AWS's first-boot steps so a rebuilt instance gets it too.
 - [ ] **Verify before relying on it.** On the EC2:
   - `sudo ss -tn dst <rds-endpoint-ip>` lists the server's database connections.
