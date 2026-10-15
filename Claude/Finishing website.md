@@ -475,6 +475,97 @@ Prerequisite for every catalog and people change (fact 1). No content changes in
 
 ---
 
+# Phase 4 — Production reliability: reconnect, a truthful health check, and the scheduled jobs *(honuware)*
+
+**The 10/15 incident (19:08 UTC).** The site looked hung. What the server's journal showed:
+- **The site's database connection dropped, and the server never replaced it.**
+  - Every request runs on the site's own pooled connection (tenancy's pool of 1). `DatabaseHelperProd` opens that connection once, at startup (`database_helper.cpp:38`), and has no way to reopen it.
+  - From 19:08:46 on, every request on it failed with *"Lost connection to the database server"*. The site stayed down until `systemctl restart`.
+- **`/api/health` kept answering `db: ok` the whole time.**
+  - It does make a database call (`SELECT 1`), but through `webApp->GetTransactionProvider()`, the deployment's *global* connection. That is a different socket from the one requests use.
+  - So the answer to "should the health check call the database?" is that it already does, on the wrong connection.
+- **The outage looked like a wrong password.**
+  - `/api/login` answers 401 "The email or password you entered is incorrect" for *any* exception (`login.cpp:33-34`), without logging why. Mason's 16 sign-in attempts at 19:09 all failed that way. His password was fine, and nothing could record the failures, so no lockout either.
+  - Session restore swallows every error (`EndpointAuthHelper::Initialize`), so signed-in people silently appeared signed out.
+- **Unrelated but found alongside it: no scheduled job had run since the 10/8 deploy.**
+  - Every helper call got 403 from `CsrfGuard`: *"csrft cookie missing"*. That covers billing, reminders, waitlist refunds, digests and attendance finalisation, about 200 refusals a day for a week.
+  - `Http::HttpResponse::headers` is a `std::map`. The login reply sets two cookies (`session_token` and `csrft`), and the second `Set-Cookie` overwrites the first, so the helper keeps one. It also never sends the `X-CSRF-Token` header the guard compares against (`csrf_guard.cpp:107-113`).
+
+All the code is in `server_components`; knottyyoga only moves its pin. During development knottyyoga builds against the local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`), as Phase 12 does. This phase ships to production **on its own release (4.6), ahead of everything after it**: it is a fix to what is live today.
+
+### 4.0 Now, by hand
+- [ ] `sudo systemctl restart knottyyoga-server` on the EC2, then `curl -sS http://localhost/api/health` and a page load through the CloudFront URL. This is the only cure until 4.6 ships.
+- [ ] **Why did the connection drop?** AWS console → **RDS** → **Events** (left sidebar), around **19:08 UTC on 10/15**. A reboot, failover or maintenance entry there explains it. If there is none, the drop came from the network, which 4.1's keepalives and reconnect cover either way. Record what you find here: *(…)*
+
+### 4.1 Reconnect a dropped connection *(server_components: data/sql_util/database_access)*
+- [ ] `DatabaseHelperProd` keeps the `DatabaseHelperInit` it was built from and gains `ResetConnection()`, which opens a fresh `pqxx::connection`. Exposed through `DatabaseHelper`.
+- [ ] `ProductionTransactionProvider::RunInTransaction`, still under its mutex:
+  - **Before BEGIN:** if the connection is closed, reconnect.
+  - **If BEGIN itself throws `pqxx::broken_connection`:** reconnect once and begin again. This is safe because none of the caller's work has run yet.
+  - **If the connection breaks mid-transaction:** reset it so the *next* transaction reconnects, and rethrow. The caller's work is **never re-run automatically**, because it may already have done something outside the database (a Square charge, an email).
+- [ ] TCP keepalives in the connection string (`keepalives=1 keepalives_idle=60 keepalives_interval=10 keepalives_count=3`), so a silently dead socket is noticed in about 90 seconds rather than by the next customer.
+- [ ] One log line per reconnect: `[database] event=reconnected database=<name> reason=<…>`, so the journal says when it happened.
+- [ ] `PooledTransactionProvider` needs nothing of its own: each slot is a `ProductionTransactionProvider`.
+- [ ] Tests, against the test database, with a production provider pointed at it. A second connection kills the provider's backend with `pg_terminate_backend`, which is exactly what a dropped connection looks like to libpq:
+  - after the kill, the next transaction **succeeds**
+  - a transaction running when its backend dies throws, is **not** re-run (a counter in the callback proves it ran once), and the transaction after it succeeds
+  - a pool of 1 recovers the same way
+  - the keepalive parameters appear in `GetConnectionString()`
+
+### 4.2 A health check that tells the truth *(server_components: platform/endpoints/health)*
+- [ ] `/api/health` probes the connections requests actually use:
+  - the global provider
+  - **every tenant pool** in the `TenantResourceRegistry`
+  - the request's resolved tenant, if any (resolving creates its pool)
+
+  It reports `db: ok` only if all of them pass. With 4.1 in place a probe on a dropped connection reconnects and passes, so health fails only when the database really cannot be reached. That is what it should mean.
+- [ ] On failure: still 503, and the body names what failed, e.g. `{"status":"fail","db":"fail","failed":["knottyyoga"]}`. The 200 body is unchanged, so the deploy script's check keeps working.
+- [ ] Tests:
+  - a registry holding a tenant whose provider throws → 503, naming it
+  - everything healthy → 200 and today's body
+  - no registry at all (tenancy inert) → behaves as today
+
+### 4.3 Errors that say what they are *(server_components: foundation/util + platform/endpoints)*
+- [ ] `ErrorResponse::ServiceUnavailable(message)` → **503**. Today there is no 503 helper. Test.
+- [ ] `/api/login`:
+  - A database failure (`pqxx::broken_connection`, `pqxx::sql_error`) is logged with context (`event=internal_error_context`) and answered **503** "Sign-in is temporarily unavailable. Please try again in a minute."
+  - A wrong password still gets the same generic 401 as today. Nothing is revealed to a guesser.
+- [ ] `EndpointAuthHelper::Initialize`: the swallowed session-restore error is logged at ERROR, rate-limited to once a minute, so "everyone looks signed out" leaves a trace.
+- [ ] Tests: login over a provider that throws `broken_connection` → 503 and a logged context line; a wrong password → 401 as before; a session-restore failure logs once per minute, not per request.
+
+### 4.4 The scheduled jobs get past the CSRF guard *(server_components: foundation/util/http + scheduler)*
+- [ ] `Http::HttpResponse` gains `std::vector<std::string> setCookies`, filled by the curl header callback with **every** `Set-Cookie`. The `headers` map keeps today's behaviour for everything else. Tests: two `Set-Cookie` lines both survive; the test HttpClient can return several.
+- [ ] `ApiClient::Login` stores every cookie. `CallEndpoint` sends them all, and on any non-GET call adds `X-CSRF-Token: <csrft>`, the double-submit the guard checks. The re-login-on-401 path refreshes both.
+- [ ] Not exempting the helper from CSRF instead: an exemption would mean trusting something the request says about itself. Doing the double-submit keeps one rule for every caller.
+- [ ] Tests:
+  - `ApiClient` with a two-cookie login sends both cookies and the header
+  - GET sends no header
+  - re-login replaces both
+  - **One end-to-end test:** `ApiClient` against the real web app's middleware (CsrfGuard included), through a test HttpClient that hands each request to `handle_full`. This is the test that would have caught the 10/8 regression; nothing exercised the helper against the guard.
+
+### 4.5 Ship the server side
+- [ ] Gates on `server_components` (Linux + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
+- [ ] **Mason** commits and pushes `server_components`.
+- [ ] Claude bumps `GIT_TAG` in knottyyoga's `CMakeLists.txt`, removes the local override, and re-runs the knottyyoga gates against the pinned SHA.
+- [ ] CommunityFinder has the same three bugs. It moves when Mason bumps its pin. Its helper is refused by the same guard if it is deployed.
+
+### 4.6 Release to production, ahead of the rest of the plan
+- [ ] **Mason** tags the release (v1.0.4) the normal way. The deploy's `--migrate` also applies Phase 3's `app/0010_products_sort_order` (adds the column; no data changes). The seed changes from Phases 2–3 do not reach production (fact 6).
+- [ ] On the EC2 afterwards:
+  - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
+  - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `event=job_success` lines within the hour, and no `status=403`.
+- [ ] **The week of missed jobs.** On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
+
+### 4.7 Watch it from outside (OQ-21)
+- [ ] **Default:** a Route 53 health check on `https://dv1tgxa9ok30f.cloudfront.net/api/health`.
+  - HTTPS, every 30 seconds, passing only if the body contains `"db":"ok"`.
+  - A CloudWatch alarm on it emails `masonbendixen@gmail.com` through SNS after 2 failures in a row.
+  - About $1 a month.
+  - The exact console clicks get written into Deploying to AWS when this is done.
+- [ ] Only useful once 4.2 lands, since today's health check would have stayed green through this incident.
+
+---
+
 # Phase 5 — People, roles and instructors
 
 ### 5.1 Temporary password *(business logic; answers OQ-2)*
@@ -1032,6 +1123,11 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 **OQ-20 (new, from Phase 3) — Five tiers on a three-column grid.** On a desktop-width screen the membership cards sit three to a row. So Silver, Silver Couple's and Gold share the first row, and Gold Couple's and Gold Family sit alone on the second. Gold is split from its own tiers, and the second row is two-thirds full. This shows on the Memberships page, the home page band and the shop.
 - **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 14 walkthrough.
 - **Alternatives:** (a) two to a row on desktop: Silver pair, Gold pair, then Gold Family alone. (b) one row per tier family: Silver row and Gold row. That needs the cards to know which family a tier is in, which the data does not say today.
+
+**OQ-21 (new, from the 10/15 incident) — Who tells you the site is down?** Today nothing does: you find out by visiting it.
+- **Default (4.7):** a Route 53 health check plus a CloudWatch alarm that emails you. It stays inside AWS, needs no new account, costs about $1 a month, and checks every 30 seconds.
+- **Alternative:** a free outside service (e.g. UptimeRobot) checking the same URL every 5 minutes. No AWS setup, but it is one more account, and an outage is noticed more slowly.
+- **Not planned:** a watchdog that restarts the server whenever health fails. After 4.1 the server reconnects by itself, so a restart would only hide the next new kind of failure.
 
 ### Resolved
 
