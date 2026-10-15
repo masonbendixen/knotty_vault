@@ -1453,6 +1453,8 @@ Note this is a **different agent** from the two already on the box: `amazon-ssm-
 
 Both watch `https://dv1tgxa9ok30f.cloudfront.net/api/health` from outside and tell you the whole stack is reachable — the one check that covers CloudFront, the origin guard, the server and the database at once (`/api/health` returns `db:"ok"` only if the database answered).
 
+> ⚠️ **Correction (10/15/2026): that last claim was not true.** `/api/health` probed the deployment's *global* database connection, while every real request runs on the site's own pooled connection. On 10/15 the site's connection was dead from 06:39 UTC: an unattended-upgrade restarted `systemd-networkd`, which flushed Docker's NAT state. Every page failed, and health still answered `db:"ok"`, so this monitor stayed green. [[Finishing website]] Phase 4.2 makes health probe the connections requests actually use, so it answers 503 and the monitor alerts. Phase 4.1 makes the server reconnect by itself. Nothing about the monitor itself needs changing.
+
 - **CloudWatch Synthetics:** ~$0.0012/run ⇒ **~$10/month** at a 5-minute interval.
 - **UptimeRobot free tier:** 5-minute interval, 50 monitors, **$0**.
 

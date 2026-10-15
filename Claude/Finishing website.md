@@ -278,6 +278,18 @@ The three blocks keep their ordinals and their links. Only the body text changes
 | 20 | How we teach | There is no magic to fitness: it's just consistency with intensity with technique coaching. Classes present a set of progressions to constantly move to the next level so you see continual improvement over time. You don't need any experience or background in acrobatics. You just need to attend consistently and be willing to do the work! | **See the class schedule** |
 | 30 | Come and find us | We have inch thick padded floors throughout the whole studio so yoga mats are not needed. We also have a grid of 24 aerial fabrics so people generally have their own equipment so there is no time wasted waiting in line for a turn on the equipment. Please come to our next intro workshop. | **Our location** |
 
+### About ▸ Our Location (OQ-16: Mason's text)
+
+The studio facility's description (`facilities.description`, shown on **About ▸ Our Location**) replaces the placeholder that mentioned a climbing wall and free street parking after 6pm:
+
+> Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes, plus a private room for massage and bodywork. Parking is abundant. Conveniently off the 520. Heading Eastbound on 520 take the first 148th exit and then the right sub exit labelled 152. Go "through" the first roundabout and then go "left" at the second. We're in the last building (14) before the parking lot bends to the right. Space 2545 / Knotty Yoga.
+
+One word differs from the answer as typed: **"We in the last building"** became **"We're in the last building"**, which reads as a dropped word. Everything else is verbatim, including the quoted "through" and "left". Say if it should go back exactly as typed.
+
+### Email sender name (OQ-16)
+
+Every email the site sends comes from **"Knotty Yoga"**, not "Knotty Yoga and Spa" (`kMailSenderNameValue`, a config-secret default). The sending address itself does not change.
+
 ---
 
 # Instructor bios (Mason: paste them here)
@@ -563,13 +575,11 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `event=job_success` lines within the hour, and no `status=403`.
 - [ ] **The week of missed jobs.** On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
 
-### 4.7 Watch it from outside (OQ-21)
-- [ ] **Default:** a Route 53 health check on `https://dv1tgxa9ok30f.cloudfront.net/api/health`.
-  - HTTPS, every 30 seconds, passing only if the body contains `"db":"ok"`.
-  - A CloudWatch alarm on it emails `masonbendixen@gmail.com` through SNS after 2 failures in a row.
-  - About $1 a month.
-  - The exact console clicks get written into Deploying to AWS when this is done.
-- [ ] Only useful once 4.2 lands, since today's health check would have stayed green through this incident.
+### 4.7 Watch it from outside (OQ-21, answered)
+Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/25) already checks `https://dv1tgxa9ok30f.cloudfront.net/api/health` every 5 minutes and emails Mason after 2 failures in a row. It counts any non-2xx answer as down. It stayed green through 10/15 only because health itself was wrong, and 4.2 makes health answer **503** when a connection requests use is dead, which the monitor already treats as an outage.
+- [ ] After 4.6 ships, confirm the monitor still shows **Up**: the 200 body is unchanged, so it should.
+- [x] Correct the claim in Deploying to AWS's uptime section that `/api/health` "returns `db:"ok"` only if the database answered". Until 4.2 it only proved the *global* connection answered. A correction note now sits under that paragraph (10/15).
+- **Not planned:** switching the monitor to a keyword match on `"db":"ok"`. Once 4.2 lands, a failing check already returns 503, so the keyword would add nothing.
 
 ### 4.8 Stop the host's network restarts from cutting live connections *(EC2, Deploying to AWS)*
 Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect and a log line.
@@ -689,13 +699,19 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 
 ---
 
-# Phase 8 — About page copy
+# Phase 8 — About page copy, the location's text and the sender name
 
 ### 8.1 Seed
 - [ ] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
+- [ ] `PopulateFacilities`: the studio's `description` becomes the **About ▸ Our Location** text above (OQ-16). It is a named constant in `seed_app_data.h`, so the test reads the same value the seeder writes.
+- [ ] `app_secret_values.cpp`: `kMailSenderNameValue` becomes **"Knotty Yoga"** (OQ-16). Move it into `app_secret_values.h`, so the tests that check a message's From name compare against the constant rather than a copy of the string.
+  - Eight tests assert the literal "Knotty Yoga and Spa" today: `app_secret_values_test`, `attendance_template_helper_test` (twice), `class_series_helper_test`, `favorite_instructor_helper_test`, `weekly_digest_helper_test`, `card_expiring_notification_test` and `signup_reminder_helper_test`. `class_checkin_helper_test` expects the subject "Welcome to Knotty Yoga and Spa - Your Account". It needs checking at implementation whether that subject is built from the sender name or from a separate site-name slot.
+- [ ] Not changed: `ServerAccess.mock.ts`'s local-mode copy of the old location text. It is fixture data, as 13.2 notes for the mock catalog.
 
 ### 8.2 Tests
 - [ ] Through the public About reader (the one behind `/api/about_sections`): three blocks, in ordinal order, with the new bodies, and no block containing "hootananny".
+- [ ] Through the location reader the public page uses (`TableHelpers::Facilities::GetActiveFacilities`, as `PopulateFacilitiesGivesTheStudioADescriptionAndTimezone` does today): the studio's description is the new text, and contains neither "climbing wall" nor "Street parking".
+- [ ] Sender name through the app's secret defaults (`app_secret_values_test`) and through one real message's From name. The eight existing assertions switch to the constant.
 
 ---
 
@@ -987,7 +1003,7 @@ Then start the server and the Angular app. Accounts:
    - **Massage** is listed with its photo.
    - **Early Bird Spa, Non-Peak Spa, Peak Spa and Late Night Spa are gone.**
    - **About** → **Our Providers** shows **Caleb Ault** only (not Mason).
-   - **About** → **Our Location** shows the studio photo.
+   - **About** → **Our Location** shows the studio photo, and text beginning "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes…" with the 520 directions. No climbing wall, no "Street parking is free after 6pm".
 
 **Silver member: Silver opens Beginner Knotty Yoga and nothing else**
 
@@ -1043,7 +1059,7 @@ Then start the server and the Angular app. Accounts:
 25. Sign out. **Sign In** → **Forgot password?**
     - **Email**: `masonbendixen@gmail.com` → **Send reset link**. The page says a link was sent if the account exists.
     - Repeat with `nobody@example.com`. The page shows the identical message.
-26. In the masonbendixen@gmail.com inbox, open **Reset your Knotty Yoga password** and click the link. The **Reset your password** page opens.
+26. In the masonbendixen@gmail.com inbox, open **Reset your Knotty Yoga password**. The sender reads **Knotty Yoga**, not "Knotty Yoga and Spa". Click the link. The **Reset your password** page opens.
     - **New Password** and **Confirm New Password**: `Reset-2026` → **Set Password**. The Log In page says the password has changed.
     - Signing in with `pass` now fails; `Reset-2026` works.
     - Clicking the email's link a second time shows **This reset link is invalid or has expired.**
@@ -1129,29 +1145,36 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 - → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
 
+### Resolved
+
+*Answered 10/15 first (OQ-16, 19, 20, 21), then the 10/14 answers.*
+
 **OQ-16 — Leftover copy that no longer matches the studio.**
 - Mason - Let's do: Who we are / How we teach / Come and find us *(full text moved into the About page table above, verbatim)*.
-- → Plan: Phase 8. **Two items remain unanswered, and the default is to leave both unchanged:**
+- → Plan: Phase 8, which now covers all three pieces of copy. The two follow-ups below were answered 10/15:
   - The mail sender name **"Knotty Yoga and Spa"** (`app_secret_values.cpp`). With the spa removed, would you like plain "Knotty Yoga"?
 	  - Mason- Let's just do Knotty Yoga
+	  - → Plan: 8.1. `kMailSenderNameValue` becomes "Knotty Yoga", and the eight tests that check the From name switch to the constant. Production picks it up with the Phase 15 reinstall.
   - The location's description on **About ▸ Our Location**, which still mentions "a climbing wall" and "Street parking is free after 6pm". Send replacement text, or say "drop the climbing wall".
 	  - Mason- Let's say: "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes, plus a private room for massage and bodywork. Parking is abundant. Conveniently off the 520. Heading Eastbound on 520 take the first 148th exit and then the right sub exit labelled 152. Go "through" the first roundabout and then go "left" at the second. We in the last building (14) before the parking lot bends to the right. Space 2545 / Knotty Yoga."
+	  - → Plan: the **About ▸ Our Location** section under *Target content*, seeded in 8.1. One word was changed, "We in" → "We're in", which is flagged there; say if it should stay exactly as typed.
 
 **OQ-19 (new) — Knotty Yoga approval as a skill?** The Overview says Knotty Yoga "requires instructor approval to attend. Should be able to do a pull-up and five regular pushups". The OQ-4 answer lists skills only for handstand, aerial_rope and intermediate_partner_acro.
 - **Default (written into the plan):** Knotty Yoga needs Gold only, and approval is checked at the door, as the class description says. Gold members can book it without an instructor first approving them in the system.
 - **Alternative:** a fourth skill `knotty_yoga` ("Able to do a pull-up and five regular pushups."), gated like Handstands. Every Gold member would then need an instructor's approval before booking the main class.
 - Mason- Let's go with the default.
+- → Plan: no change; the plan was already written this way (D6, and the Class access table). Knotty Yoga is Gold-only, with approval checked at the door.
 
 **OQ-20 (new, from Phase 3) — Five tiers on a three-column grid.** On a desktop-width screen the membership cards sit three to a row. So Silver, Silver Couple's and Gold share the first row, and Gold Couple's and Gold Family sit alone on the second. Gold is split from its own tiers, and the second row is two-thirds full. This shows on the Memberships page, the home page band and the shop.
 - **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 14 walkthrough.
 - **Alternatives:** (a) two to a row on desktop: Silver pair, Gold pair, then Gold Family alone. (b) one row per tier family: Silver row and Gold row. That needs the cards to know which family a tier is in, which the data does not say today.
+- Mason- Let's go with the default.
 
 **OQ-21 (new, from the 10/15 incident) — Who tells you the site is down?** Today nothing does: you find out by visiting it.
 - **Default (4.7):** a Route 53 health check plus a CloudWatch alarm that emails you. It stays inside AWS, needs no new account, costs about $1 a month, and checks every 30 seconds.
 - **Alternative:** a free outside service (e.g. UptimeRobot) checking the same URL every 5 minutes. No AWS setup, but it is one more account, and an outage is noticed more slowly.
 - **Not planned:** a watchdog that restarts the server whenever health fails. After 4.1 the server reconnects by itself, so a restart would only hide the next new kind of failure.
-
-### Resolved
+- Mason- We did UptimeRobot as part of the deploying to AWS guide and it contacts me if the health check fails. But, because of the bug, the health check wasn't failing.
 
 **OQ-2 — Do they need to sign in now, and how do they get a password?**
 - Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email with a create new password flow? But for this, I figure I will give them a temporary password that they create here. Do we have must change password on next login support?
