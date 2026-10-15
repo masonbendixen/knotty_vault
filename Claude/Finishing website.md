@@ -387,7 +387,9 @@ Prerequisite for every catalog and people change (fact 1). No content changes in
 
 ### 2.3 Verification
 - [x] **"Identical to today's", checked end to end.** No unit test can run the whole bootstrap, so the new `knottyyoga_database_helper --install_schema` seeded a throwaway database (`HONUWARE_DB_NAME=knottyyoga_phase2_check`). Its people, role assignments, products (including the provider and room links and the spa settings), variants, prices, booking windows and price schedule were then diffed against the local `knottyyoga` database built by the old code. The result: **identical, ids included.** The throwaway database was dropped afterwards, and the local `knottyyoga` database was only read.
-- [ ] Build and full test suite on both platforms *(results below once both finish)*.
+- [x] Build and full test suite on both platforms (10/15/2026):
+  - **Windows** (`x64-Debug`, all targets): **5193 passed.**
+  - **Linux** (container gate, plus `knottyyoga_database_helper` and `knottyyoga_the_server` built): **5193 passed.** It ran against the local honuware checkout, which is clean and identical to the pinned SHA `e662f4db`.
 
 ---
 
