@@ -1135,11 +1135,12 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - The mail sender name **"Knotty Yoga and Spa"** (`app_secret_values.cpp`). With the spa removed, would you like plain "Knotty Yoga"?
 	  - Mason- Let's just do Knotty Yoga
   - The location's description on **About ▸ Our Location**, which still mentions "a climbing wall" and "Street parking is free after 6pm". Send replacement text, or say "drop the climbing wall".
-	  - Mason- Let's say: "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes, plus a private room for massage and bodywork. Parking is abundant. Conveniently off or "
+	  - Mason- Let's say: "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes, plus a private room for massage and bodywork. Parking is abundant. Conveniently off the 520. Heading Eastbound on 520 take the first 148th exit and then the right sub exit labelled 152. Go "through" the first roundabout and then go "left" at the second. We in the last building (14) before the parking lot bends to the right. Space 2545 / Knotty Yoga."
 
 **OQ-19 (new) — Knotty Yoga approval as a skill?** The Overview says Knotty Yoga "requires instructor approval to attend. Should be able to do a pull-up and five regular pushups". The OQ-4 answer lists skills only for handstand, aerial_rope and intermediate_partner_acro.
 - **Default (written into the plan):** Knotty Yoga needs Gold only, and approval is checked at the door, as the class description says. Gold members can book it without an instructor first approving them in the system.
 - **Alternative:** a fourth skill `knotty_yoga` ("Able to do a pull-up and five regular pushups."), gated like Handstands. Every Gold member would then need an instructor's approval before booking the main class.
+- Mason- Let's go with the default.
 
 **OQ-20 (new, from Phase 3) — Five tiers on a three-column grid.** On a desktop-width screen the membership cards sit three to a row. So Silver, Silver Couple's and Gold share the first row, and Gold Couple's and Gold Family sit alone on the second. Gold is split from its own tiers, and the second row is two-thirds full. This shows on the Memberships page, the home page band and the shop.
 - **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 14 walkthrough.
