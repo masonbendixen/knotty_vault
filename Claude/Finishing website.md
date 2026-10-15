@@ -1012,6 +1012,7 @@ Per D11 (OQ-9: wipe). Everything here runs on the EC2 host following the Deployi
 - Mason - Let's do: Who we are / How we teach / Come and find us *(full text moved into the About page table above, verbatim)*.
 - → Plan: Phase 7. **Two items remain unanswered, and the default is to leave both unchanged:**
   - The mail sender name **"Knotty Yoga and Spa"** (`app_secret_values.cpp`). With the spa removed, would you like plain "Knotty Yoga"?
+	  - Mason- Let's just do Knotty Yoga
   - The location's description on **About ▸ Our Location**, which still mentions "a climbing wall" and "Street parking is free after 6pm". Send replacement text, or say "drop the climbing wall".
 
 **OQ-19 (new) — Knotty Yoga approval as a skill?** The Overview says Knotty Yoga "requires instructor approval to attend. Should be able to do a pull-up and five regular pushups". The OQ-4 answer lists skills only for handstand, aerial_rope and intermediate_partner_acro.
