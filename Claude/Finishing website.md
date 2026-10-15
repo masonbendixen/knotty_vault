@@ -117,7 +117,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 
 **Facts the plan depends on:**
 
-1. **Seed ids are still hardcoded in four places.** `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` (all still in `create_database.cpp`) address products 1–9 and variants 1–7 by literal id. `PopulateRoleAssignments` addresses people 1, 2 and 4. Removing the four spa products and adding two Silver ones renumbers everything after them, so **these have to move to natural keys before any catalog change.** That is the same failure mode as the Gold→instructor permission bug found in [[Database helper initialization]] Phase 3.2, and it is still listed there as an open follow-up.
+1. ✅ **Fixed in Phase 2 (10/15/2026)**: every seeder now resolves by natural key. What it said before: **Seed ids are still hardcoded in four places.** `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` (all still in `create_database.cpp`) address products 1–9 and variants 1–7 by literal id. `PopulateRoleAssignments` addresses people 1, 2 and 4. Removing the four spa products and adding two Silver ones renumbers everything after them, so **these have to move to natural keys before any catalog change.** That is the same failure mode as the Gold→instructor permission bug found in [[Database helper initialization]] Phase 3.2, and it is still listed there as an open follow-up.
 2. **The access gate already exists and is the right tool.** A class's `class_requirement_groups` are AND-ed and each group's literals are OR-ed. A literal is a permission (closure-expanded) **or** a skill level (`ClassAccessHelper::CheckAccess`). "Silver or Gold" is one group with two literals. "Instructor approval" is a skill-level literal, which is exactly what skill levels are for: "Can kick up to handstand against a wall" is the schema's own example.
 3. **"Requires attending the preceding class" already exists**: `class_schedule_slots.predecessor_class_schedule_slot_id` (SL-11), seeded today for Handstands. Four slots need it now.
 4. **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 10 exists.
@@ -348,21 +348,46 @@ How the site crops each kind, so the subject survives the crop:
 Prerequisite for every catalog and people change (fact 1). No content changes in this phase: a fresh database must come out **identical** to today's, which is what makes it safe to land first.
 
 ### 2.1 Move the remaining id-addressed seeders into `seed_app_data` *(seed)*
-- [ ] Move `PopulatePeople`, `PopulateRoleAssignments`, `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` from `create_database.cpp`'s anonymous namespace into `seed_app_data.{h,cpp}` (`namespace Seed`). Keep the same `(Transaction&, DatabaseHelper, DatabaseInfo)` signature, so a test can call them.
-- [ ] Variants: resolve the product by code (`massage`, …).
-- [ ] Prices: resolve the product by code, the variant by `product_variants.code`, and the price schedule by `kSeedPriceScheduleName`. Add a `LookupProductVariantIdByCode` helper beside the existing `Lookup*` ones (same contract: logs and returns 0).
-- [ ] Booking windows: resolve `massage` by code.
-- [ ] Role assignments: resolve people by email (`kMasonEmail`, `kCalebEmail`, plus a new `kMasonLiveEmail` for the gmail account). `RoleIdByName` already exists; move it alongside.
-- [ ] Move the trailing `UPDATE products … WHERE code = 'massage'` (provider type + required room type) into a named `Seed::PopulateServiceProductLinks`, resolved by code rather than by a subquery inside a string.
+- [x] Move `PopulatePeople`, `PopulateRoleAssignments`, `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` from `create_database.cpp`'s anonymous namespace into `seed_app_data.{h,cpp}` (`namespace Seed`). Keep the same `(Transaction&, DatabaseHelper, DatabaseInfo)` signature, so a test can call them.
+  - Each is now a `constexpr`-style table of structs walked by a loop (D3), in the same insertion order as before, so a fresh database numbers its rows exactly as it always has.
+  - New constant `kMassageProductCode`, used by every massage reference in the seed.
+- [x] Variants: resolve the product by code (`massage`, the four spa codes).
+- [x] Prices: resolve the product by code, the variant by `product_variants.code`, and the price schedule by `kSeedPriceScheduleName`. Add a `LookupProductVariantIdByCode` helper beside the existing `Lookup*` ones (same contract: logs and returns 0).
+  - Variant codes are unique across all products, so the code alone names the row.
+  - A missing variant **skips** that price rather than writing it at product level, which would charge every massage length the same.
+  - A missing price schedule logs `event=product_prices_seed_skipped` and writes nothing.
+- [x] Booking windows: resolve `massage` by code.
+- [x] Role assignments: resolve people by email. `RoleIdByName` moved alongside, into `seed_app_data.h`. It still throws on a missing role, because roles are created earlier in the same bootstrap. `PermissionIdByName` stays in `create_database.cpp`, where all of its callers are.
+  - **Correction to v0.2:** this item said "a new `kMasonLiveEmail` for the gmail account", but `kMasonEmail` already *is* the gmail account (`masonbendixen@gmail.com`). The one without a constant was the **hotmail** account (old person 1, "Mason2"). It is now `kMasonHotmailEmail`. Kit got `kKitEmail` so `PopulatePeople` spells every address once.
+- [x] Move the trailing `UPDATE products … WHERE code = 'massage'` (provider type + required room type) into a named `Seed::PopulateServiceProductLinks`, resolved by code rather than by a subquery inside a string. It writes through `DbCrud::UpdateRow`, and if the product, provider type or room type is missing it logs and writes neither column.
+- [x] The bootstrap order in `PopulateTables` is unchanged. `PopulateServiceProductLinks` sits exactly where the `UPDATE` was, after the provider and room types it needs.
 
 ### 2.2 Tests *(seed_app_data_test.cpp)*
-- [ ] Prices through `CatalogHelper::ResolveBestPriceForPerson`:
-  - the 60/90/120-minute massage variants price at 16000/22000/30000
-  - the intro workshop prices at 900
+- [x] Prices: `PopulateProductPricesResolvesRowsByNaturalKeyNotSeedOrder`.
+  - A decoy product, variant and **inactive** price schedule are inserted first.
+  - The 60/90/120-minute massage variants price at 16000/22000/30000 through `CatalogHelper::GetVariantListPrice`. `ResolveBestPriceForPerson` is product-level only and cannot see a variant price, so it is the wrong reader for those three.
+  - The intro workshop (900) and the three Gold memberships (20000/30000/40000) price through `CatalogHelper::ResolveBestPriceForPerson`, as an anonymous visitor.
+  - No price landed on any decoy.
+- [x] `PopulateProductPricesNeverPricesAVariantServiceAtProductLevel`: with no variants seeded, massage has no price at all, while the intro workshop still prices at 900.
+- [x] `PopulateProductPricesSkipsWithoutThePriceSchedule`.
+- [x] Variants: `PopulateProductVariantsGivesMassageItsThreeLengths`, through `CatalogHelper::GetVariantsForProduct`, with a decoy product first.
+- [x] Role assignments: `PopulateRoleAssignmentsResolvesPeopleByEmailNotSeedOrder`, through `PersonHelper::GetRolesForUser`.
+  - A decoy person is created first.
+  - Both Mason accounts are `admin`, Caleb is `admin` + `instructor`, Kit has no roles, and the decoy has none.
+- [x] People: `PopulatePeopleSeedsTheAccountsTheHandTestsSignInWith`. All four accounts sign in with their committed dev passwords (`PersonHelper::VerifyPassword`), with the right first names. The hand-testing walkthroughs depend on exactly these.
+  - Both people tests store libsodium's minimum Argon2 cost in `config_secrets` first. Otherwise `PopulatePeople`'s production cost made them take 15 s and 8 s on Windows Debug; now they take under a second.
+- [x] Booking window: `PopulateProductBookingWindowsLetsAnyoneBookMassageAWeekAhead`, through `ProductBookingWindows::ResolveAdvanceDaysForUser`. Massage gives 7 days and the decoy product gives 0.
+- [x] `PopulateServiceProductLinksPointsMassageAtItsProviderAndRoom`.
+  - Decoy provider and room types are inserted first.
+  - It reads through `TableHelpers::Products::GetProduct`, the same read `ServiceAvailabilityHelper::ComputeAvailableSlots` starts with.
+  - The intro workshop gets no provider type.
+- [x] `PopulateServiceProductLinksSkipsWithoutTheProviderType`: neither column is written.
+- [x] `LookupsReturnZeroWhenTheRowIsAbsent` also covers `LookupProductVariantIdByCode`.
+- [x] `IntroWorkshopSessionsAppearOnBothTheHomePageAndEventsFeeds` hand-inserted its own price, because `PopulateProductPrices` "still addresses products by hardcoded ids". It now calls the real `PopulateProductVariants` + `PopulateProductPrices`.
 
-  Insert a **decoy product, variant and price schedule first**, so a literal id would bind to the decoy. This is the same shape as the existing `PopulateClassSchedulesResolvesRowsByNaturalKeyNotSeedOrder`.
-- [ ] Role assignments through `PersonHelper::GetRolesForUser`: Mason and Caleb are Administrators and Caleb is an Instructor. Again, a decoy person is seeded first.
-- [ ] `PopulateServiceProductLinks`: the massage product resolves to the `massage_therapist` provider type and the `massage_room` room type.
+### 2.3 Verification
+- [x] **"Identical to today's", checked end to end.** No unit test can run the whole bootstrap, so the new `knottyyoga_database_helper --install_schema` seeded a throwaway database (`HONUWARE_DB_NAME=knottyyoga_phase2_check`). Its people, role assignments, products (including the provider and room links and the spa settings), variants, prices, booking windows and price schedule were then diffed against the local `knottyyoga` database built by the old code. The result: **identical, ids included.** The throwaway database was dropped afterwards, and the local `knottyyoga` database was only read.
+- [ ] Build and full test suite on both platforms *(results below once both finish)*.
 
 ---
 
