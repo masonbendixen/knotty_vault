@@ -140,7 +140,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
     - The front end is in `honuware-web-components` (`@honuware/ui/auth`), exact-pinned in `ui/package.json`.
     - **Forgot password (Phase 11) is therefore built in both honuware repos and then pinned in here.**
     - Honuware has exactly one framework migration (`honuware/0001_site_assets`). This app's migrations run through `app/0009_about_sections`.
-13. **Product order is name order, everywhere.** All three `TableHelpers::Products` listings `ORDER BY name, id`, `CatalogHelper` keeps that order, and the membership hosts only filter `kind === 'subscription'`. Grouping Silver before Gold (OQ-13) therefore needs a column, not a front-end sort.
+13. ✅ **Fixed in Phase 3 (10/15/2026)**: products now list by `sort_order`, then name. What it said before: **Product order is name order, everywhere.** All three `TableHelpers::Products` listings `ORDER BY name, id`, `CatalogHelper` keeps that order, and the membership hosts only filter `kind === 'subscription'`. Grouping Silver before Gold (OQ-13) therefore needs a column, not a front-end sort.
 
 ---
 
@@ -396,56 +396,74 @@ Prerequisite for every catalog and people change (fact 1). No content changes in
 # Phase 3 — Products, memberships and their display order
 
 ### 3.1 Schema: `products.sort_order` *(db_schema)*
-- [ ] `kProductsSortOrder = "sort_order"`, `INT NOT NULL DEFAULT 0`, in `MakeProductsTable`.
-- [ ] Admin metadata in `create_database.cpp`: column data info (integer edit) and friendly name **Sort Order**.
-- [ ] Idempotent migration **`app/0010_products_sort_order`** (`ADD COLUMN IF NOT EXISTS`) ([[gotcha_new_table_needs_migration]]). Prod gets the column through the reinstall anyway, but every other database needs it.
-- [ ] Migration test: applies to a table without the column, and is a no-op the second time.
+- [x] `kProductsSortOrder = "sort_order"`, `NOT NULL DEFAULT 0`, in `MakeProductsTable`. It is **`BIGINT`**, not the `INT` written here before, to match `product_variants.sort_order`.
+- [x] Admin metadata in `create_database.cpp`: column data info (`number` edit, "Display order wherever products are listed…") and friendly name **Sort Order**.
+- [x] Idempotent migration **`app/0010_products_sort_order`** (`ADD COLUMN IF NOT EXISTS sort_order BIGINT NOT NULL DEFAULT 0`) ([[gotcha_new_table_needs_migration]]). Prod gets the column through the reinstall anyway, but every other database needs it.
+- [x] Migration test `AppMigrationsTest.ProductsSortOrderAddsTheColumnAndIsIdempotent`. It drops the column with a product already in the table, applies the migration twice, and checks two things: the existing product reads back 0, and the subscription listing then orders by the new column.
 
 ### 3.2 Table helper *(sql_util/table_helpers)*
-- [ ] `TableHelpers::Products`: all three listing queries order by `sort_order ASC, name ASC, id ASC`.
-- [ ] Tests: `sort_order` wins over name; equal `sort_order` falls back to name, so today's alphabetical order is unchanged for unordered products.
+- [x] `TableHelpers::Products`: all three listing queries order by `sort_order ASC, name ASC, id ASC`.
+- [x] New `Products::SetSortOrder(transaction, id, sortOrder)`, which the duplicate action and the tests use. It stamps `updated_us` like the other setters.
+- [x] Tests: `SetSortOrderBasic`, plus one per listing query: `GetProductsListsBySortOrderBeforeName`, `GetActiveProductsListsBySortOrderBeforeName`, `GetProductsByKindListsBySortOrderBeforeName`. Each uses names whose alphabetical order is the *reverse* of the sort order, so a query still sorting by name fails. `GetProductsBreaksSortOrderTiesByName` covers the fallback: unordered products keep today's alphabetical order.
 
 ### 3.3 Business logic *(business_logic/payment)*
-- [ ] `CatalogHelper` keeps the table helper's order; expect no code change, verified by test. Test: the catalog lists the five memberships in sort order. Here the order **is** the contract, so asserting positions is right; CLAUDE.md's "don't assume order" is about unordered results.
-- [ ] `ProductHelper`'s duplicate (the "(Copy)" action) carries `sort_order` across. Add it if the copy is column-by-column; test.
+- [x] `CatalogHelper` keeps the table helper's order. As expected, no code change. Verified by `SeedAppDataTest.MembershipsListInTierOrderAtTheirMonthlyPrices` (3.10), which reads `CatalogHelper::GetCatalog`. Here the order **is** the contract, so asserting positions is right; CLAUDE.md's "don't assume order" is about unordered results.
+- [x] `ProductHelper::DuplicateProduct` copies column by column, so it now carries `sort_order` across via `SetSortOrder`. Test `DuplicateProductKeepsTheSourcesSortOrder`: a copy of Gold (30) lists right after Gold, ahead of a 50.
 
 ### 3.4 Silver permission *(seed)*
-- [ ] `PopulatePermissions`: add `silver_member`, "Knotty Yoga Silver Membership.", `is_pricing_eligible = true`. Add the name constant `kSilverMemberPermissionName` beside `kGoldMemberPermissionName`.
+- [x] `PopulatePermissions`: add `silver_member`, "Knotty Yoga Silver Membership.", `is_pricing_eligible = true`, right after `gold_member`. Add the name constant `kSilverMemberPermissionName` beside `kGoldMemberPermissionName`.
 
 ### 3.5 Product list *(seed)*
-- [ ] `PopulateProducts`: **remove** `early-bird-spa`, `non-peak-spa`, `peak-spa`, `late-night-spa`.
-- [ ] **Add** `silver-membership` and `silver-couples` (kind `subscription`), named as in the Memberships table.
-- [ ] Set all five memberships' descriptions and `sort_order` from the Memberships table.
+- [x] `PopulateProducts`: **remove** `early-bird-spa`, `non-peak-spa`, `peak-spa`, `late-night-spa`.
+- [x] **Add** `silver-membership` and `silver-couples` (kind `subscription`), named as in the Memberships table.
+- [x] Set all five memberships' descriptions and `sort_order` from the Memberships table. `PopulateProducts` is now a table of structs (D3). The other three products keep `sort_order` 0.
 
 ### 3.6 Variants, prices, entitlements *(seed)*
-- [ ] `PopulateProductVariants`: massage 60/90/120 only.
-- [ ] `PopulateProductPrices`: drop the spa rows; add Silver 16000 and Silver Couple's 24000 (monthly, no variant, like Gold).
-- [ ] `PopulateProductEntitlementRules`: `silver-membership` → 1 seat, `calendar_month`, `silver_member`; `silver-couples` → 2 seats, same.
+- [x] `PopulateProductVariants`: massage 60/90/120 only.
+- [x] `PopulateProductPrices`: drop the spa rows; add Silver 16000 and Silver Couple's 24000 (monthly, no variant, like Gold).
+- [x] `PopulateProductEntitlementRules`: `silver-membership` → 1 seat, `calendar_month`, `silver_member`; `silver-couples` → 2 seats, same.
 
 ### 3.7 Remove the spa infrastructure *(create_database.cpp bootstrap tail)*
-- [ ] Delete the spa `UPDATE`s, the `Spa` room schedule template and its seven entries, and every `product_schedule_windows` row (all four belonged to spa products).
-- [ ] `PopulateLocationRooms`: drop the `Spa` room. Room types stay (D8).
+- [x] Delete the spa `UPDATE`s, the `Spa` room schedule template and its seven entries, and every `product_schedule_windows` row (all four belonged to spa products). This also retires the `late-night-spa` → nonexistent `gold_fitness` visibility bug.
+- [x] `PopulateLocationRooms`: drop the `Spa` room. Room types stay (D8).
 
 ### 3.8 Tier icons *(seed)*
-- [ ] `PopulateSeedPhotos`' product table: `silver-membership` → `tier_icon_solo.svg`, `silver-couples` → `tier_icon_couple.svg`.
+- [x] `PopulateSeedPhotos`' product table: `silver-membership` → `tier_icon_solo.svg`, `silver-couples` → `tier_icon_couple.svg`.
 
-### 3.9 Frontend: Manage Products ▸ product form
-- [ ] `ProductDetailComponent`: a **Sort Order** number field in the **Product Information** card, saved by **Save Changes** with the rest. The `CatalogProduct` and product-row types gain `sort_order`.
-- [ ] Specs:
-  - the field loads the product's value
-  - **Save Changes** sends the edited value
-  - `MembershipTierCardsComponent` renders cards in **input** order, which pins that no host or card re-sorts what the server ordered
+### 3.9 Frontend: Manage Products
+- [x] `ProductDetailComponent`: a **Sort Order** number field in the **Product Information** card, right after **Kind**, hinted "Lower numbers list first. Ties list by name." **Save Changes** saves it with the rest through the generic `update_item`, so no new endpoint.
+  - A cleared field saves as `0`, because the column is `NOT NULL`.
+  - Decimals are dropped, because it is an integer.
+  - A product row without the column reads as `0`.
+- [x] **The product list** (Manage ▸ Products) uses the same order, as D12 asks. The generic table query sorts by one column, so the server still sorts by name, and `sortProductRows` stable-sorts by `sort_order` on top. Ties keep the name order. `ProductRow` gains `sort_order`.
+- [x] **Changed from v0.2:** `CatalogProduct` does **not** gain `sort_order`. The catalog's order *is* the contract and nothing displays the number, so adding it would only invite a host to re-sort.
+- [x] Specs (108 pass in the three files):
+  - `product-detail`: the field loads the product's value; **Save Changes** sends the edited value; a cleared field sends `'0'`; a product without the column reads as 0.
+  - `product-list`: a name-ordered server answer renders as sort order with name ties. Checked on both the array and the rendered table rows.
+  - `MembershipTierCardsComponent` renders cards in **input** order, which pins that no card re-sorts what the server ordered. The three hosts (Memberships page, home band, shop) only filter `kind === 'subscription'`; none of them sorts.
 
 ### 3.10 Seed tests
-- [ ] Rewrite `PopulateProductsSeedsTheDropInClassProduct` into a whole-catalog assertion: exactly the eight product codes, and **no product whose code contains `spa`**.
-- [ ] `SilverProductsGrantTheSilverMemberPermission`, modelled on the Gold test, including "the Silver and Gold permission ids differ".
-- [ ] Membership prices through `CatalogHelper`: 16000 / 24000 / 20000 / 30000 / 40000.
-- [ ] Membership order through `CatalogHelper`: Silver, Silver Couple's, Gold, Gold Couple's, Gold Family.
-- [ ] `PopulateSeedPhotosGivesEachMembershipTierItsIcon`: five tiers now.
-- [ ] Spa removal, checked through the readers:
-  - no `Spa` room in the facility's rooms
-  - no product schedule windows
-  - no room schedule templates
+- [x] `PopulateProductsSeedsExactlyTheStudiosProducts`: exactly the eight product codes through `Products::GetActiveProducts`, and **no product whose code contains `spa`**. I kept `PopulateProductsSeedsTheDropInClassProduct` alongside it rather than rewriting it, because it pins the drop-in's kind and the workshop's capacity.
+- [x] `SilverProductsGrantTheSilverMemberPermission`, modelled on the Gold test: seats 1/2, `calendar_month`, "the Silver and Gold permission ids differ", and the permission is pricing-eligible.
+- [x] Membership prices and order through `CatalogHelper::GetCatalog`, both in `MembershipsListInTierOrderAtTheirMonthlyPrices`:
+  - order: Silver, Silver Couple's, Gold, Gold Couple's, Gold Family
+  - prices: 16000 / 24000 / 20000 / 30000 / 40000
+- [x] `PopulateSeedPhotosGivesEachMembershipTierItsIcon`: five tiers now.
+- [x] Spa removal:
+  - **No `Spa` room:** `PopulateLocationRoomsSeedsTheGymAndMassageRoomOnly`, through the facility-filtered rows query that Manage ▸ Locations uses. It also checks that the `spa` room *type* survives.
+  - **No product schedule windows and no room schedule templates:** these lived in the bootstrap tail, which no unit test can call, so they were checked end to end instead (3.11).
+
+### 3.11 Verification
+- [x] **Fresh seed, end to end.** `knottyyoga_database_helper --install_schema` was run into a throwaway database (`knottyyoga_phase3_check`), which was dropped afterwards. The local `knottyyoga` database was not touched. The seed came out as follows:
+  - **Products:** eight, listing Class Drop-In, Intro Workshop, Massage (all 0, by name), then the five tiers at 10–50 with the OQ-14 descriptions.
+  - **Variants and prices:** three massage variants. Prices are 900 / 16000 / 22000 / 30000 / 16000 / 24000 / 20000 / 30000 / 40000.
+  - **Entitlements:** Silver ×1/×2 grants `silver_member`; Gold ×1/×2/×3 grants `gold_member`.
+  - **Rooms:** Main Gym and Massage Room 1. All six room types are still there, `spa` included.
+  - **Spa leftovers:** **0** room schedule templates, **0** template entries, **0** product schedule windows.
+  - **Tier icons:** on all five tiers.
+  - **Massage:** still linked to `massage_therapist` / `massage_room`.
+  - **Admin metadata:** `products.sort_order` is labelled **Sort Order**.
+- [ ] Full suites on both platforms + full Angular suite *(results below once they finish)*.
 
 ---
 
@@ -996,6 +1014,10 @@ Per D11 (OQ-9: wipe). Everything here runs on the EC2 host following the Deployi
 **OQ-19 (new) — Knotty Yoga approval as a skill?** The Overview says Knotty Yoga "requires instructor approval to attend. Should be able to do a pull-up and five regular pushups". The OQ-4 answer lists skills only for handstand, aerial_rope and intermediate_partner_acro.
 - **Default (written into the plan):** Knotty Yoga needs Gold only, and approval is checked at the door, as the class description says. Gold members can book it without an instructor first approving them in the system.
 - **Alternative:** a fourth skill `knotty_yoga` ("Able to do a pull-up and five regular pushups."), gated like Handstands. Every Gold member would then need an instructor's approval before booking the main class.
+
+**OQ-20 (new, from Phase 3) — Five tiers on a three-column grid.** On a desktop-width screen the membership cards sit three to a row. So Silver, Silver Couple's and Gold share the first row, and Gold Couple's and Gold Family sit alone on the second. Gold is split from its own tiers, and the second row is two-thirds full. This shows on the Memberships page, the home page band and the shop.
+- **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 13 walkthrough.
+- **Alternatives:** (a) two to a row on desktop: Silver pair, Gold pair, then Gold Family alone. (b) one row per tier family: Silver row and Gold row. That needs the cards to know which family a tier is in, which the data does not say today.
 
 ### Resolved
 
