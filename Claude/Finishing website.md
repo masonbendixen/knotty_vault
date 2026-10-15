@@ -596,6 +596,18 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - It is the second live-server test in honuware; the first is `http_client_test.cpp`, whose comment asks each one to make its own case. This one's case is in its header.
   - *As built:* the live `http_client_test` now also sends two `Set-Cookie` headers and checks that both arrive. The per-line header parser is a public `Http::ParseResponseHeaderLine` with its own unit tests. The `headers` map keeps last-wins for every header, `Set-Cookie` included.
   - *As built:* a job's own `X-CSRF-Token` overrides the engine's, as every other per-job header does.
+- [ ] **Found while mutation-checking the end-to-end test: the helper's re-login was broken too.**
+  - `CallEndpoint` re-logs in on a 401 by calling `Login(email_, password_)`, passing views into the client's own members. `Login` assigned the members first, which freed the buffers those views pointed into, and then built the request from freed memory.
+  - Any address longer than 15 characters is affected, and `scheduler@knottyyoga.local` is 26. So once the helper's first session expired, every re-login sent a garbled email and failed, and every job after that would have failed. The 403s hid it.
+  - Fixed: `Login` copies its arguments before touching the members.
+  - Tests:
+    - `ApiClientTest.ReloginSendsTheOriginalCredentials`, with the real service-account address.
+    - A fifth step in the end-to-end test: log out (which leaves the helper holding a dead session), then the helper's next call gets 401, logs in again on its own, and its retry returns 200 with a new session cookie.
+    - Both fail against the old code.
+- [ ] **Mutation checks (Windows):** each half of the fix was reverted on its own, and the end-to-end test failed every time:
+  - every `Set-Cookie` → 401
+  - the `X-CSRF-Token` header → 403
+  - the re-login copy → 401, plus the unit test showing freed `0xDD` bytes sent as the email
 
 ### 4.5 Ship the server side
 - [ ] Gates on `server_components` (Linux + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
