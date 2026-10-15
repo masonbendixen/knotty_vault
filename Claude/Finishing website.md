@@ -492,6 +492,19 @@ Prerequisite for every catalog and people change (fact 1). No content changes in
   - **Linux** (container gate, plus `knottyyoga_database_helper` and `knottyyoga_the_server` built): **5204 passed.**
   - **Angular:** **3588 of 3588** specs pass. `ng build` (production) succeeds, and `ng lint` reports all files passing. The build's CSS budget warnings were already there; this phase changed no stylesheet.
 
+### 3.12 Membership card layout (Mason's review of the five tiers, 10/15)
+The five tiers made the cards' uneven heights visible: a name or description that wraps onto another line pushed that card's price and **Subscribe** button below its neighbours'.
+- [x] **Prices and Subscribe buttons line up across a row.** `MembershipTierCardsComponent`'s content fills the card, and the price takes the spare space above itself (`margin-top: auto`), so the price and the button under it sit at the foot of every card. The grid already gives every card in a row the same height.
+- [x] **Less white space above the crest and between it and the name.**
+  - Most of it was inside the crest's box. The laurels are 222×160, and a 64 px *square* box drew them 46 px tall with about 9 px of empty box above and below. The box is now 64×48, the laurels' own shape.
+  - The gap under the crest is 8 px (was 12).
+  - The card's top padding is honestly 16 px now. The stylesheet said 24, but Material's `.mat-mdc-card-content:first-child` rule (16 px) always won, which a mutation run showed.
+- [x] Specs, measured in a 1280 px-wide viewport (`inViewportOf`), because the three columns are a media query:
+  - **Alignment:** three tiers, one with a name and description long enough to wrap. All price tops are equal, and all button tops are equal. Guards check that the three cards share one row and that the descriptions really differ in height. Mutation-checked: without the fix, the long tier's price sits at 337 px against 145 px for the others.
+  - **Spacing:** the crest box is 48 px tall, at most 16 px below the card's inner edge, and at most 8 px above the name. Mutation-checked: the old values fail on the box (64) and the gap (12).
+- [x] Angular: **3590 of 3590** specs pass, `ng lint` passes, and `ng build` succeeds.
+- Found along the way, not fixed: `page-not-found.component.spec.ts:37` asserts inside a callback that runs after the test ends. It logs "Expected a spy, but got Function" on every run and tests nothing.
+
 ---
 
 # Phase 4 — Production reliability: reconnect, a truthful health check, and the scheduled jobs *(honuware)*
@@ -711,7 +724,7 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 ### 8.1 Seed
 - [ ] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
 - [ ] `PopulateFacilities`: the studio's `description` becomes the **About ▸ Our Location** text above (OQ-16). It is a named constant in `seed_app_data.h`, so the test reads the same value the seeder writes.
-- [ ] `app_secret_values.cpp`: `kMailSenderNameValue` becomes **"Knotty Yoga"** (OQ-16). Move it into `app_secret_values.h`, so the tests that check a message's From name compare against the constant rather than a copy of the string.
+- [ ] `app_secret_values.cpp`: `kMailSenderNameValue` becomes **"Knotty Yoga"** (OQ-16). It is also the site's **studio name** (`Mail::LoadTenantBranding` sets `studioName = senderName`). So the same change fixes the footer's "© Copyright Knotty Yoga and Spa 2020" and email subjects such as "Welcome to Knotty Yoga and Spa - Your Account". The "2020" is hard-coded in `footer.component.html`, and nothing here changes it. Move it into `app_secret_values.h`, so the tests that check a message's From name compare against the constant rather than a copy of the string.
   - Eight tests assert the literal "Knotty Yoga and Spa" today: `app_secret_values_test`, `attendance_template_helper_test` (twice), `class_series_helper_test`, `favorite_instructor_helper_test`, `weekly_digest_helper_test`, `card_expiring_notification_test` and `signup_reminder_helper_test`. `class_checkin_helper_test` expects the subject "Welcome to Knotty Yoga and Spa - Your Account". It needs checking at implementation whether that subject is built from the sender name or from a separate site-name slot.
 - [ ] Not changed: `ServerAccess.mock.ts`'s local-mode copy of the old location text. It is fixture data, as 13.2 notes for the mock catalog.
 
