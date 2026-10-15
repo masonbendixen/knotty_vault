@@ -522,6 +522,7 @@ The five tiers made the cards' uneven heights visible: a name or description tha
 - **Unrelated but found alongside it: no scheduled job had run since the 10/8 deploy.**
   - Every helper call got 403 from `CsrfGuard`: *"csrft cookie missing"*. That covers billing, reminders, waitlist refunds, digests and attendance finalisation, about 200 refusals a day for a week.
   - `Http::HttpResponse::headers` is a `std::map`. The login reply sets two cookies (`session_token` and `csrft`), and the second `Set-Cookie` overwrites the first, so the helper keeps one. It also never sends the `X-CSRF-Token` header the guard compares against (`csrf_guard.cpp:107-113`).
+  - *Why `csrft` in particular (found while building 4.4):* Crow keeps response headers in an `unordered_multimap`. On Linux (libstdc++) a repeated header goes out **newest first**, so login's `session_token`-then-`csrft` reaches the wire as `csrft`, `session_token`, and last-wins kept `session_token`. A Windows server sends them in the other order, so the same helper would have lost the session cookie instead. Either way the job is refused.
 
 All the code is in `server_components`; knottyyoga only moves its pin. During development knottyyoga builds against the local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`), as Phase 12 does. This phase ships to production **on its own release (4.6), ahead of everything after it**: it is a fix to what is live today.
 
