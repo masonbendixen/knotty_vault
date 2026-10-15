@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/14/2026
-Version: 0.2
+Last Updated: 10/15/2026
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -83,15 +83,16 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.2 (10/14/2026)** rewritten against Mason's answers to the open questions. The changes:
+- **v0.3 (10/15/2026)** — the 10/15 production incident. The site went down at 19:08 UTC because the server never reconnects a dropped database connection. The investigation also found that the scheduled jobs had been refused since the 10/8 deploy. Fixing both, and making `/api/health` tell the truth, is a **new Phase 4**. The old Phases 4–14 move down one, to 5–15, and every reference in this doc was renumbered with them. Phases 2 and 3 are implemented.
+- **v0.2 (10/14/2026)** rewritten against Mason's answers to the open questions. The changes (phase numbers as of v0.3):
   - Photos are now Phase 1.
-  - Forgot password is a new phase (11).
+  - Forgot password is a new phase (12).
   - Membership order is a real product sort column (Phase 3).
   - The rolling-availability job is gone (OQ-8).
-  - The test-only seed data is retired (Phase 9).
+  - The test-only seed data is retired (Phase 10).
   - Kit and the second Mason account stay in the base seed.
   - Knotty Yoga gets no approval skill (OQ-19).
-  - The About page gets Mason's copy (Phase 7).
+  - The About page gets Mason's copy (Phase 8).
 - **Who builds (OQ-18, answered 10/14).** The Overview's line "I will build the C++ server and run tests myself" is superseded. **Claude builds and runs the tests on both Windows and Linux, fixes what fails, and reports the result for each platform** ("Windows: N passed. Linux: M passed."). Claude announces before long or destructive runs. Git stays Mason's: Claude only reads history, and Mason commits, pushes and tags.
 
 # Current state (verified against the code, 10/14/2026)
