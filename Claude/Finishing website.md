@@ -495,7 +495,14 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
 
 ### 4.0 Now, by hand
 - [ ] `sudo systemctl restart knottyyoga-server` on the EC2, then `curl -sS http://localhost/api/health` and a page load through the CloudFront URL. This is the only cure until 4.6 ships.
-- [ ] **Why did the connection drop?** AWS console → **RDS** → **Events** (left sidebar), around **19:08 UTC on 10/15**. A reboot, failover or maintenance entry there explains it. If there is none, the drop came from the network, which 4.1's keepalives and reconnect cover either way. Record what you find here: *(…)*
+- [x] **Why did the connection drop?** Found 10/15:
+  - **The connection did not die at 19:08.** That is when Mason's visit first *used* it. The last request that used the database successfully was **10/14 22:36 UTC**; the helper's refused jobs never reach the database, so the connection sat idle for 20½ hours.
+  - **RDS events for the window:** only the nightly backup (09:06–09:09 UTC), which does not drop connections.
+  - **The RDS Postgres log** (read in CloudShell): at **06:39:22 and 06:39:55 UTC** it logged `could not receive data from client: Connection timed out` for **two** connections from the EC2 (`172.31.2.31`, user `knottyyoga`). Postgres's keepalive probes went unanswered, so it hung up.
+  - **The EC2's journal:** at **06:35:15** Ubuntu's `unattended-upgrade` ran. At **06:35:30** its new `systemd` package restarted **`systemd-networkd`**, which re-enumerated `ens5`, `docker0` and the server container's `veth`, and re-acquired the DHCP address.
+  - **Why that breaks the database connections.** The server container's outbound connections go through Docker's MASQUERADE NAT, and the kernel drops MASQUERADE's connection-tracking entries when the host address goes away. RDS's keepalives then had nowhere to land, and RDS hung up four minutes later. The server process was never told and kept the dead socket (4.1).
+  - **Not fully explained:** why the global connection behind `/api/health` survived. Probably something used it inside the 06:35–06:39 window, which re-created the NAT entry before RDS gave up. It does not change the conclusion or the fix.
+  - **It will recur.** Unattended-upgrades runs daily; any update to `systemd` or `netplan` does this again. 4.1 makes the server shrug it off, and 4.8 stops the host from causing it.
 
 ### 4.1 Reconnect a dropped connection *(server_components: data/sql_util/database_access)*
 - [ ] `DatabaseHelperProd` keeps the `DatabaseHelperInit` it was built from and gains `ResetConnection()`, which opens a fresh `pqxx::connection`. Exposed through `DatabaseHelper`.
