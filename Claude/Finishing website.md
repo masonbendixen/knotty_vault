@@ -83,7 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.6 (10/16/2026)** — Mason pushed `server_components` as `cddb9cb`. knottyyoga and CommunityFinder now pin it, and both are green on both platforms: knottyyoga 5244/5244, CommunityFinder 1840/1840 (4.5). Next are Mason's commits of the two pins plus `web_app.cpp`, then the v1.0.4 release (4.6).
+- **v0.6 (10/16/2026)** — Mason pushed `server_components` as `cddb9cb`. knottyyoga and CommunityFinder now pin it, and both are green on both platforms: knottyyoga 5244/5244, CommunityFinder 1840/1840 (4.5). Next are Mason's commits of the two pins plus `web_app.cpp`. Then the release (4.6) is tagged **`v1.0.0-sandbox.9`**, not v1.0.4: production runs `v1.0.0-sandbox.8`, and the "v1.0.3" in its health answer is a stale `server.env` override.
 - **v0.5 (10/15/2026)** — Phase 4.1–4.5's gates are implemented in `server_components` and green on both platforms; each item records what changed in building it. The work also turned up a **second scheduler bug**: the helper's re-login after a 401 sent a garbled email (4.4), so after its first session expired it could not have recovered even without the CSRF refusals. Next is Mason's commit and push of `server_components`, then the pin bump (4.5) and the v1.0.4 release (4.6).
 - **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
   - The email sender becomes "Knotty Yoga".
@@ -639,8 +639,14 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin).
 
 ### 4.6 Release to production, ahead of the rest of the plan
-- [ ] **Mason** tags the release (v1.0.4) the normal way. The deploy's `--migrate` also applies Phase 3's `app/0010_products_sort_order` (adds the column; no data changes). The seed changes from Phases 2–3 do not reach production (fact 6).
+- [ ] **Claude** tags the release once master's pipeline for the pin-bump commit is green (Mason's request, 10/16).
+  - The tag is **`v1.0.0-sandbox.9`**, not v1.0.4. Production runs `knottyyoga:v1.0.0-sandbox.8` (`docker ps`, checked 10/16), and Deploying to AWS §7.1's convention is `v1.0.0-sandbox.N+1` until the switch to live Square, which becomes `v1.0.0`.
+  - "v1.0.4" was Claude's mistake. `/api/health` reports `v1.0.3` because `/etc/knottyyoga/server.env` still carries the hand-set `HONUWARE_VERSION=v1.0.3` from the 9/22 manual deploy, and an `--env-file` value overrides the image's own version. Claude read that number as the running build.
+  - The tag pipeline then runs `verify:green-commit`, `package:server`, `package:ui` and `release:gitlab`. **Nothing deploys until Mason presses ▶ `deploy-manual:ec2` and ▶ `deploy-manual:ui`.**
+  - The deploy's `--migrate` also applies Phase 3's `app/0010_products_sort_order` (adds the column; no data changes). The seed changes from Phases 2–3 do not reach production (fact 6).
+- [ ] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Until then, health keeps saying `v1.0.3` whatever is deployed, and `sudo docker ps` is the way to tell.
 - [ ] On the EC2 afterwards:
+  - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.9`.
   - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
   - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `event=job_success` lines within the hour, and no `status=403`.
 - [ ] **The week of missed jobs.** On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
