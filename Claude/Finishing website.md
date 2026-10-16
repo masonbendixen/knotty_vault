@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/16/2026
-Version: 0.6
+Version: 0.7
 tags: 
 ---
 # Overview
@@ -83,6 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.7 (10/16/2026)** — `v1.0.0-sandbox.9` is live (deployed 17:58 UTC), but it was tagged on `71d78efd`, the **Phase 3** commit. The Phase 4 pin commits never reached GitLab: knottyyoga `7f38fbe` and CommunityFinder `e7f9b6f` are both still "ahead 1" locally. So production now has Phases 2–3 but **not** the reconnect, the honest health check or the scheduler fix. Phase 4 ships as **`v1.0.0-sandbox.10`** (4.6).
 - **v0.6 (10/16/2026)** — Mason pushed `server_components` as `cddb9cb`. knottyyoga and CommunityFinder now pin it, and both are green on both platforms: knottyyoga 5244/5244, CommunityFinder 1840/1840 (4.5). Next are Mason's commits of the two pins plus `web_app.cpp`. Then the release (4.6) is tagged **`v1.0.0-sandbox.9`**, not v1.0.4: production runs `v1.0.0-sandbox.8`, and the "v1.0.3" in its health answer is a stale `server.env` override.
 - **v0.5 (10/15/2026)** — Phase 4.1–4.5's gates are implemented in `server_components` and green on both platforms; each item records what changed in building it. The work also turned up a **second scheduler bug**: the helper's re-login after a 401 sent a garbled email (4.4), so after its first session expired it could not have recovered even without the CSRF refusals. Next is Mason's commit and push of `server_components`, then the pin bump (4.5) and the v1.0.4 release (4.6).
 - **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
@@ -634,22 +635,34 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - The second linked a test program from the old file list. It passed 1800 tests, 40 short of Linux, and was missing exactly the new Phase 4 suites.
     - The third, after VS had finished, ran all 1840.
   - From now on Claude compares the Windows and Linux test names, not just the counts.
-- [ ] **Mason** commits:
-  - **knottyyoga:** `server/knottyyoga_server/CMakeLists.txt` (the pin) and `server/knottyyoga_server/src/endpoints/web_app.cpp` (the anchor).
-  - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin).
+- [x] **Mason** commits:
+  - **knottyyoga:** `server/knottyyoga_server/CMakeLists.txt` (the pin) and `server/knottyyoga_server/src/endpoints/web_app.cpp` (the anchor). Committed 10/16 as `7f38fbe`.
+  - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin). Committed 10/16 as `e7f9b6f`.
+- [ ] **Mason** pushes both commits. As of 10/16 18:15 UTC neither had reached GitLab: both repos' `git status` says `ahead 1`, and GitLab's knottyyoga master is still `71d78efd`. The commits were probably made with **Commit All** rather than **Commit All and Push**. In Visual Studio: **Git** → **Push**, once in each repo.
 
 ### 4.6 Release to production, ahead of the rest of the plan
-- [ ] **Claude** tags the release once master's pipeline for the pin-bump commit is green (Mason's request, 10/16).
-  - The tag is **`v1.0.0-sandbox.9`**, not v1.0.4. Production runs `knottyyoga:v1.0.0-sandbox.8` (`docker ps`, checked 10/16), and Deploying to AWS §7.1's convention is `v1.0.0-sandbox.N+1` until the switch to live Square, which becomes `v1.0.0`.
-  - "v1.0.4" was Claude's mistake. `/api/health` reports `v1.0.3` because `/etc/knottyyoga/server.env` still carries the hand-set `HONUWARE_VERSION=v1.0.3` from the 9/22 manual deploy, and an `--env-file` value overrides the image's own version. Claude read that number as the running build.
-  - The tag pipeline then runs `verify:green-commit`, `package:server`, `package:ui` and `release:gitlab`. **Nothing deploys until Mason presses ▶ `deploy-manual:ec2` and ▶ `deploy-manual:ui`.**
-  - The deploy's `--migrate` also applies Phase 3's `app/0010_products_sort_order` (adds the column; no data changes). The seed changes from Phases 2–3 do not reach production (fact 6).
+- [x] **`v1.0.0-sandbox.9`: tagged and deployed by Mason on 10/16, but it holds Phase 3, not Phase 4.**
+  - The tag points at `71d78efd` ("Phase 3 — Products, memberships and their display order"). GitLab's master was still there when the tag was made, because the Phase 4 commit had not been pushed (4.5). That commit pins honuware `e662f4d`, the code from before Phase 4.
+  - Checked on the EC2 at 18:12 UTC:
+    - both containers run `knottyyoga:v1.0.0-sandbox.9`, started 17:58
+    - `/api/health` answers 200 `db: ok`
+    - the site loads through CloudFront
+  - What it shipped is Phases 2–3: the `app/0010_products_sort_order` migration, ordering in Manage Products, and 3.12's membership-card layout. The seed changes from Phases 2–3 still do not reach production (fact 6).
+  - **How to tell it is not Phase 4:** the helper logs `event=login_success … cookies=1`. Phase 4's `ApiClient` keeps both login cookies and logs `cookies=2`. So sandbox.9's scheduled jobs are still refused with 403, and a dropped database connection still needs a manual restart (4.0).
+  - Also seen: at deploy time the helper started before the server was listening. It logged `Scheduler initialization failed: CURL error` twice, then systemd's restart 10 seconds later logged in fine. This is harmless.
+- [ ] **`v1.0.0-sandbox.10` is the Phase 4 release.**
+  - Once `7f38fbe` is on GitLab and master's pipeline for it is green (all six jobs), Claude tags it, per Mason's 10/16 request to tag the release after CI passes. If Mason tags it first, Claude sees the tag and skips.
+  - **The tag must be on `7f38fbe`.** Don't put it on whatever master happens to be. If tagging by hand, confirm that master's newest commit on GitLab is "Phase 4 — Production reliability…" before **New tag**.
+  - Naming: Deploying to AWS §7.1's convention is `v1.0.0-sandbox.N+1` until the switch to live Square, which becomes `v1.0.0`. "v1.0.4" was Claude's mistake. `/api/health` reports `v1.0.3` because `/etc/knottyyoga/server.env` still carries the hand-set `HONUWARE_VERSION=v1.0.3` from the 9/22 manual deploy, and an `--env-file` value overrides the image's own version. Claude read that number as the running build.
+  - The tag pipeline runs `verify:green-commit`, `package:server`, `package:ui` and `release:gitlab`. `verify:green-commit` refuses a commit that has no green master pipeline.
+  - **Nothing deploys until Mason presses ▶ `deploy-manual:ec2`.** `7f38fbe` changes only the server, so ▶ `deploy-manual:ui` is optional; it would redeploy sandbox.9's UI unchanged.
+  - No migrations: Phase 4 adds none.
 - [ ] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Until then, health keeps saying `v1.0.3` whatever is deployed, and `sudo docker ps` is the way to tell.
-- [ ] On the EC2 afterwards:
-  - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.9`.
+- [ ] On the EC2 after sandbox.10:
+  - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.10`.
   - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
-  - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `event=job_success` lines within the hour, and no `status=403`.
-- [ ] **The week of missed jobs.** On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
+  - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `login_success … cookies=2`, then `event=job_success` lines within the hour, and no `status=403`.
+- [ ] **The missed jobs** (10/8 until sandbox.10). On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
 
 ### 4.7 Watch it from outside (OQ-21, answered)
 Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/25) already checks `https://dv1tgxa9ok30f.cloudfront.net/api/health` every 5 minutes and emails Mason after 2 failures in a row. It counts any non-2xx answer as down. It stayed green through 10/15 only because health itself was wrong, and 4.2 makes health answer **503** when a connection requests use is dead, which the monitor already treats as an outage.
