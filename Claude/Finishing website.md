@@ -640,7 +640,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
 - [x] **Mason** commits:
   - **knottyyoga:** `server/knottyyoga_server/CMakeLists.txt` (the pin) and `server/knottyyoga_server/src/endpoints/web_app.cpp` (the anchor). Committed 10/16 as `7f38fbe`.
   - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin). Committed 10/16 as `e7f9b6f`.
-- [ ] **Mason** pushes both commits. As of 10/16 18:15 UTC neither had reached GitLab: both repos' `git status` says `ahead 1`, and GitLab's knottyyoga master is still `71d78efd`. The commits were probably made with **Commit All** rather than **Commit All and Push**. In Visual Studio: **Git** → **Push**, once in each repo.
+- [ ] **Mason** pushes both commits. **knottyyoga: pushed 10/16 19:25 UTC** (GitLab master = `7f38fbe`; master pipeline 2956756668 started). **CommunityFinder: still to push** (GitLab master `d642456`); it is not part of this release. Earlier, as of 10/16 18:15 UTC, neither had reached GitLab: both repos' `git status` says `ahead 1`, and GitLab's knottyyoga master is still `71d78efd`. The commits were probably made with **Commit All** rather than **Commit All and Push**. In Visual Studio: **Git** → **Push**, once in each repo.
 
 ### 4.6 Release to production, ahead of the rest of the plan
 - [x] **`v1.0.0-sandbox.9`: tagged and deployed by Mason on 10/16, but it holds Phase 3, not Phase 4.**
