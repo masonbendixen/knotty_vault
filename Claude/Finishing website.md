@@ -668,6 +668,8 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - Both freezes happened while the C++ `test:backend` job was busy on the same Docker VM. The likely cause is CPU starvation, which stalls Chromium for the 7 seconds that Karma's ping and reconnect timeouts allow. It does not show up as a test failing.
     - **Follow-up, only if it recurs:** give the Karma run some slack. Angular's built-in Karma config can't be tuned, so this means a `karmaConfig` in `angular.json` with `browserDisconnectTolerance: 1` (Karma re-runs after a disconnect, but never after a failed assertion). Not done now: the commit is already tagged.
 - [x] **Claude tagged `v1.0.0-sandbox.10`** on `7f38fbe` at 19:51 UTC, once master's pipeline 2956756668 was green. It is an annotated tag; GitLab confirms `refs/tags/v1.0.0-sandbox.10^{}` = `7f38fbe662dd…`.
+  - Tag pipeline 2956830295 passed: `verify:green-commit` 4 s, `test:deploy-scripts` 4 s, `package:ui` 34 s, `package:server` 771 s, `release:gitlab` 6 s.
+- [ ] **Mason** presses ▶ `deploy-manual:ec2` on that pipeline. ▶ `deploy-manual:ui` is optional.
 - [x] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Done 10/16 at Mason's request.
   - The file shrank by exactly that one line (24 bytes) and kept its `root:root 600` permissions.
   - `knottyyoga-server` was restarted at 18:36:22 UTC to pick up the change. Health now answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.9"}`, the image's own tag.
