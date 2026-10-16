@@ -84,6 +84,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 # Revision notes and working agreement
 
 - **v0.7 (10/16/2026)** — `v1.0.0-sandbox.9` is live (deployed 17:58 UTC), but it was tagged on `71d78efd`, the **Phase 3** commit. The Phase 4 pin commits never reached GitLab: knottyyoga `7f38fbe` and CommunityFinder `e7f9b6f` are both still "ahead 1" locally. So production now has Phases 2–3 but **not** the reconnect, the honest health check or the scheduler fix. Phase 4 ships as **`v1.0.0-sandbox.10`** (4.6).
+  - Later the same day, at Mason's request, the stale `HONUWARE_VERSION=v1.0.3` line was removed, so health now says `v1.0.0-sandbox.9`.
+  - 4.8's netplan `critical` drop-in was applied too. Its test (a `systemd-networkd` restart) **still killed an idle database connection** and hung the site from 18:52 to 19:03 UTC, until Claude restarted the server. `critical` is not the fix; Phase 4's keepalives and reconnect are. 4.8 now waits on sandbox.10 for a re-test.
 - **v0.6 (10/16/2026)** — Mason pushed `server_components` as `cddb9cb`. knottyyoga and CommunityFinder now pin it, and both are green on both platforms: knottyyoga 5244/5244, CommunityFinder 1840/1840 (4.5). Next are Mason's commits of the two pins plus `web_app.cpp`. Then the release (4.6) is tagged **`v1.0.0-sandbox.9`**, not v1.0.4: production runs `v1.0.0-sandbox.8`, and the "v1.0.3" in its health answer is a stale `server.env` override.
 - **v0.5 (10/15/2026)** — Phase 4.1–4.5's gates are implemented in `server_components` and green on both platforms; each item records what changed in building it. The work also turned up a **second scheduler bug**: the helper's re-login after a 401 sent a garbled email (4.4), so after its first session expired it could not have recovered even without the CSRF refusals. Next is Mason's commit and push of `server_components`, then the pin bump (4.5) and the v1.0.4 release (4.6).
 - **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
@@ -675,16 +677,41 @@ Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/
 
 ### 4.8 Stop the host's network restarts from cutting live connections *(EC2, Deploying to AWS)*
 Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect and a log line.
-- [ ] Mark the EC2's interface **critical** in netplan, so a `systemd-networkd` restart keeps its DHCP address instead of dropping and re-acquiring it. That stops the NAT state from being flushed.
+
+**Result, 10/16: `critical` did not stop it, and the test took the site down for 11 minutes.**
+- Mason asked for 4.8 on 10/16. Production was still on sandbox.9 (Phase 3), so nothing could reconnect.
+- The drop-in went on at 18:36:09. The server was restarted at 18:36:22 (for the version-line change), opened fresh database connections at 18:36:33, and `systemd-networkd` was restarted at 18:36:34. The three sockets showed the same ports before and after.
+- After a 15-minute wait, the first request to use the site's connection (18:52:02, `/api/catalog_products`) **hung**:
+  - It was sent into a dead socket: 13 retransmits, never acknowledged.
+  - Sandbox.9 has no `tcp_user_timeout`, so that request held the server, and **every** request after it (`/api/health` included) got no answer.
+  - CloudFront returned 504s, and UptimeRobot alerted Mason.
+- Claude saved the socket state, then ran `sudo systemctl restart knottyyoga-server` at 19:03:09. Health, catalog and classes answered 200 through CloudFront straight away.
+  - Outage: **18:52–19:03 UTC**, caused by this test.
+  - The helper's 18:58 jobs were caught in the hang. They would have been refused with 403 on sandbox.9 anyway.
+- **What the sockets show:**
+  - The connection that died was idle from 18:36:33 to 18:52.
+  - The global connection behind `/api/health` survived, because UptimeRobot's checks used it at 18:39, 18:44 and 18:49.
+  - That is 10/15's pattern exactly, and it answers 4.0's "not fully explained" point.
+  - The likely explanation: the NAT entries are still lost on a networkd restart, even with `KeepConfiguration=true`. A connection that sends something within a few minutes gets a fresh entry. An idle one never answers RDS's keepalives, and RDS hangs up.
+- **What fixes it is 4.1, not netplan:**
+  - Phase 4's keepalives (`keepalives_idle=60`) make every idle connection send a probe every minute, which re-creates its NAT entry well before RDS gives up.
+  - `tcp_user_timeout=30000` turns today's hang into a 30-second error.
+  - The reconnect brings the next request back.
+- [x] Mark the EC2's interface **critical** in netplan, so a `systemd-networkd` restart keeps its DHCP address instead of dropping and re-acquiring it. *It was meant to stop the NAT state from being flushed. It did not (see above).*
+  - **Applied 10/16 18:36 UTC.** `/etc/netplan/99-knottyyoga.yaml` (`root:root 600`) merges into cloud-init's `ens5` entry. `netplan get ethernets.ens5` shows the MAC match kept plus `critical: true`, and the generated `10-netplan-ens5.network` gains `KeepConfiguration=true`. A 10-minute automatic rollback timer was armed for the apply and cancelled once SSH and the address checked out.
+  - `netplan apply` itself reconfigured `ens5` ("DHCP lease lost", re-acquired the same address); networkd now logs "DHCPv4 connection considered critical".
+  - **Left in place:** it is harmless, but it does not do the job. Removing it is itself a networkd reconfigure, so do that only after sandbox.10. The removal can double as the re-test below. It is **not** added to Deploying to AWS's first-boot steps.
   - A `/etc/netplan/99-knottyyoga.yaml` drop-in: `network: {version: 2, ethernets: {ens5: {critical: true}}}`.
   - Checked 10/15: the interface is `ens5`. The only netplan file is cloud-init's `50-cloud-init.yaml`, which matches by MAC with `dhcp4: true`, `dhcp6: false` and sets nothing about `critical`. Netplan merges the drop-in on top by interface name, so cloud-init's file stays untouched.
-  - Then `sudo netplan apply`, and record it in Deploying to AWS's first-boot steps so a rebuilt instance gets it too.
-- [ ] **Verify before relying on it.** On the EC2:
-  - `sudo ss -tn dst <rds-endpoint-ip>` lists the server's database connections.
+  - Then `sudo netplan apply`.
+- [x] **Verify before relying on it.** Run 10/16 on sandbox.9 against this item's own advice to wait for 4.6. **Failed**, with the outage above.
+  - `sudo nsenter -t <server container pid> -n ss -tnoi "( dport = :5432 )"` lists the server's database connections (they live in the container's network namespace, so a plain `ss` on the host does not show them).
   - `sudo systemctl restart systemd-networkd` simulates the upgrade.
-  - About 10 minutes later the site still loads **without** a server restart, and the RDS log has no new `Connection timed out`.
-  - Run this **after** 4.6 ships. Before then a failure means a manual restart, and that should be announced first.
-- [ ] **Alternative if `critical` is not enough:** run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly), so it is a fallback, not the default.
+- [ ] **Re-test once sandbox.10 is live** (4.6), with the same steps: wait at least 15 minutes without touching the site, then load a page that reads the database (Classes).
+  - Pass: it loads first time, with no server restart and no 504.
+  - At most one `[database] event=reconnected` line in `sudo journalctl -u knottyyoga-server`; none is better, because it means the keepalives kept the NAT entry alive.
+  - Do it by removing the drop-in: `sudo rm /etc/netplan/99-knottyyoga.yaml && sudo netplan apply`. That cleans up and runs the test in one step.
+- [ ] **If the re-test still shows a failure a visitor would see:** run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly) and to `package/systemd/knottyyoga-server.service` in the repo.
 - [ ] **Not planned:** disabling unattended-upgrades. Security patches matter more than avoiding a reconnect.
 
 ---
