@@ -619,7 +619,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - **knottyyoga against the local checkout:** Windows 5244 passed, Linux 5244 passed, and the Linux database helper and server binaries build. Phase 3 had 5204. The last change after this run was test-only, a log assertion in honuware's `login_test`, and it passed in both honuware runs above.
   - **One knottyyoga change rides along:** `src/endpoints/web_app.cpp`'s link anchor named `&Endpoints::GetHealth`, which became ambiguous when 4.2 overloaded it. It now names the single-provider overload with a cast, which compiles against both the pinned and the new honuware. Honuware's own anchor list moved to `CollectHealthProbeTargets`.
   - **The Windows build tree is configured against the local checkout** (`x64-Debug-local-honuware` in `CMakeUserPresets.json`, which persists `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the cache). That is right until the pin bump; the next item clears it.
-- [ ] **Mason** commits and pushes `server_components`.
+- [x] **Mason** commits and pushes `server_components`. Pushed 10/15 as `cddb9cb` ("Phase 4 — Production reliability…"); its CI passed.
 - [ ] Claude bumps `GIT_TAG` in knottyyoga's `CMakeLists.txt`, removes the local override, and re-runs the knottyyoga gates against the pinned SHA.
 - [ ] CommunityFinder has the same three bugs. It moves when Mason bumps its pin. Its helper is refused by the same guard if it is deployed.
 
