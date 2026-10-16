@@ -663,7 +663,11 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - The commit touches no frontend code, so Claude reproduced the job in the same `node:22-bookworm` image with the same Chromium 155.
     - Run 1 froze the same way: "Chrome Headless … Disconnected … (ping timeout)" after 2781 of 3590 specs. It is not an assertion failure.
     - Run 2 passed 3590/3590, and Windows passed 3590/3590.
-    - So it is a flaky browser freeze, not a broken test. Retrying the job is enough for this release, and Claude is hunting the spec that freezes as a separate fix.
+    - So it is a flaky browser freeze, not a broken test. Mason pressed **Retry**: `test:frontend` passed in 123 s and `test:backend` in 1126 s, so the pipeline is green.
+    - **The hunt for the freezing spec found nothing.** Six more Linux runs, each logging every spec as it started and each in a different random order (seeds 18864, 61172, 99216, 34959, 45577, 14389), all passed 3590/3590. That makes 2 freezes in 9 Linux runs.
+    - Both freezes happened while the C++ `test:backend` job was busy on the same Docker VM. The likely cause is CPU starvation, which stalls Chromium for the 7 seconds that Karma's ping and reconnect timeouts allow. It does not show up as a test failing.
+    - **Follow-up, only if it recurs:** give the Karma run some slack. Angular's built-in Karma config can't be tuned, so this means a `karmaConfig` in `angular.json` with `browserDisconnectTolerance: 1` (Karma re-runs after a disconnect, but never after a failed assertion). Not done now: the commit is already tagged.
+- [x] **Claude tagged `v1.0.0-sandbox.10`** on `7f38fbe` at 19:51 UTC, once master's pipeline 2956756668 was green. It is an annotated tag; GitLab confirms `refs/tags/v1.0.0-sandbox.10^{}` = `7f38fbe662dd…`.
 - [x] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Done 10/16 at Mason's request.
   - The file shrank by exactly that one line (24 bytes) and kept its `root:root 600` permissions.
   - `knottyyoga-server` was restarted at 18:36:22 UTC to pick up the change. Health now answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.9"}`, the image's own tag.
