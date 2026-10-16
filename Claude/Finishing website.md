@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/15/2026
-Version: 0.5
+Last Updated: 10/16/2026
+Version: 0.6
 tags: 
 ---
 # Overview
@@ -83,6 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.6 (10/16/2026)** — Mason pushed `server_components` as `cddb9cb`. knottyyoga and CommunityFinder now pin it, and both are green on both platforms: knottyyoga 5244/5244, CommunityFinder 1840/1840 (4.5). Next are Mason's commits of the two pins plus `web_app.cpp`, then the v1.0.4 release (4.6).
 - **v0.5 (10/15/2026)** — Phase 4.1–4.5's gates are implemented in `server_components` and green on both platforms; each item records what changed in building it. The work also turned up a **second scheduler bug**: the helper's re-login after a 401 sent a garbled email (4.4), so after its first session expired it could not have recovered even without the CSRF refusals. Next is Mason's commit and push of `server_components`, then the pin bump (4.5) and the v1.0.4 release (4.6).
 - **v0.4 (10/15/2026)** — Mason's answers to OQ-16, 19, 20 and 21. The changes:
   - The email sender becomes "Knotty Yoga".
@@ -620,8 +621,22 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - **One knottyyoga change rides along:** `src/endpoints/web_app.cpp`'s link anchor named `&Endpoints::GetHealth`, which became ambiguous when 4.2 overloaded it. It now names the single-provider overload with a cast, which compiles against both the pinned and the new honuware. Honuware's own anchor list moved to `CollectHealthProbeTargets`.
   - **The Windows build tree is configured against the local checkout** (`x64-Debug-local-honuware` in `CMakeUserPresets.json`, which persists `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the cache). That is right until the pin bump; the next item clears it.
 - [x] **Mason** commits and pushes `server_components`. Pushed 10/15 as `cddb9cb` ("Phase 4 — Production reliability…"); its CI passed.
-- [ ] Claude bumps `GIT_TAG` in knottyyoga's `CMakeLists.txt`, removes the local override, and re-runs the knottyyoga gates against the pinned SHA.
-- [ ] CommunityFinder has the same three bugs. It moves when Mason bumps its pin. Its helper is refused by the same guard if it is deployed.
+- [x] Claude bumps `GIT_TAG` in knottyyoga's `CMakeLists.txt`, removes the local override, and re-runs the knottyyoga gates against the pinned SHA.
+  - `server/knottyyoga_server/CMakeLists.txt` now pins `cddb9cb56c317e4d6e8f769f1ea18b77c3dc48e3`.
+  - **Windows 5244 passed, Linux 5244 passed.** The two runs executed the same 5244 test names, including the new suites. Both Linux binaries build (`knottyyoga_database_helper`, `knottyyoga_the_server`), and the Linux log says `honuware : pinned SHA`. Both build trees' `_deps/honuware-src` hold `cddb9cb`.
+  - The Windows build tree is back on the pin: `FETCHCONTENT_SOURCE_DIR_HONUWARE` is empty in its cache. `CMakeUserPresets.json` and its `x64-Debug-local-honuware` preset are left in place for next time. In Visual Studio, pick the plain **x64-Debug** configuration, or the next reconfigure puts the override back. The local checkout is identical to `cddb9cb` today, so either one builds the same code.
+- [x] CommunityFinder moves to the same pin (Mason's request, 10/15).
+  - `server/communityfinder_server/CMakeLists.txt` now pins `cddb9cb`. No source changes were needed: it has no `GetHealth` link anchor.
+  - **Windows 1840 passed, Linux 1840 passed**, with the same test names on both. Both Linux binaries build (`communityfinder_database_helper`, `communityfinder_server`); on Windows all four executables build.
+  - What it gains: the reconnect (4.1), the truthful health check (4.2) and login's 503 (4.3). It has **no scheduler helper** (no `ApiClient` user, no helper executable), so 4.4's CSRF bug never affected it.
+  - **Windows needed three runs.** Visual Studio, open on `communityfinder_server`, reconfigured the same build tree after the `CMakeLists.txt` edit:
+    - The first build failed: FetchContent reported "Failed to unstash changes".
+    - The second linked a test program from the old file list. It passed 1800 tests, 40 short of Linux, and was missing exactly the new Phase 4 suites.
+    - The third, after VS had finished, ran all 1840.
+  - From now on Claude compares the Windows and Linux test names, not just the counts.
+- [ ] **Mason** commits:
+  - **knottyyoga:** `server/knottyyoga_server/CMakeLists.txt` (the pin) and `server/knottyyoga_server/src/endpoints/web_app.cpp` (the anchor).
+  - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin).
 
 ### 4.6 Release to production, ahead of the rest of the plan
 - [ ] **Mason** tags the release (v1.0.4) the normal way. The deploy's `--migrate` also applies Phase 3's `app/0010_products_sort_order` (adds the column; no data changes). The seed changes from Phases 2–3 do not reach production (fact 6).
