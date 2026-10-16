@@ -657,7 +657,10 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - The tag pipeline runs `verify:green-commit`, `package:server`, `package:ui` and `release:gitlab`. `verify:green-commit` refuses a commit that has no green master pipeline.
   - **Nothing deploys until Mason presses ▶ `deploy-manual:ec2`.** `7f38fbe` changes only the server, so ▶ `deploy-manual:ui` is optional; it would redeploy sandbox.9's UI unchanged.
   - No migrations: Phase 4 adds none.
-- [ ] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Until then, health keeps saying `v1.0.3` whatever is deployed, and `sudo docker ps` is the way to tell.
+- [x] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Done 10/16 at Mason's request.
+  - The file shrank by exactly that one line (24 bytes) and kept its `root:root 600` permissions.
+  - `knottyyoga-server` was restarted at 18:36:22 UTC to pick up the change. Health now answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.9"}`, the image's own tag.
+  - Deploying to AWS 5.1 step 7's "add `HONUWARE_VERSION` to `server.env`" note now says not to re-add it.
 - [ ] On the EC2 after sandbox.10:
   - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.10`.
   - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
