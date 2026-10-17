@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/17/2026
-Version: 0.10
+Version: 0.11
 tags: 
 ---
 # Overview
@@ -83,6 +83,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.11 (10/17/2026)** — Mason's answer to **OQ-22**: the default. 13.3 stands as written, so signed-in visitors will see every class, as signed-out ones do. OQ-22 moves to Resolved.
+  - OQ-1 (instructor emails), OQ-11 (photos) and OQ-15 (bios) stay open, each still waiting on the instructors or the photo shoot. Their defaults are unchanged. Of these, only the photos hold up a phase: Phase 9 attaches whatever exists when it lands, and any photo still missing is added later (9.1). The emails are needed before Phase 15; bios can even come after it, through Manage.
 - **v0.10 (10/17/2026)** — **Phase 6 is implemented.** Windows 5259 passed, Linux 5259 passed, with the same test names on both.
   - The six real classes replace the old ones, the three approval skills are seeded, every class has its access rule, and the 14-slot weekly schedule is in, with Beth on Wednesday and Gifford on Tuesday.
   - One change from the plan: a missing permission or skill now **fails closed** (6.3). The plan's "skip the whole class" would have left that class open to everyone.
@@ -1305,7 +1307,7 @@ During development, knottyyoga builds against the local `server_components` chec
 ### 13.2 Dead code
 - [ ] Delete `pages/public/services/homepage.service.ts` and its spec (fact 8).
 
-### 13.3 Signed-in visitors see every class (OQ-22, default)
+### 13.3 Signed-in visitors see every class (OQ-22, confirmed)
 - [ ] **Business logic.** `ClassCatalogHelper::GetClassesVisibleToPerson` keeps its "has an upcoming run" filter and drops the access-gate filter, so a signed-in visitor gets the same classes as a signed-out one. Update the `class_catalog_helper_test` cases that pin the hiding, and add one through the seeded rules: a signed-in non-member and a Silver member each see all six.
 - [ ] **Endpoint.** `/api/classes` test: a signed-in non-member gets six classes.
 - [ ] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
@@ -1517,16 +1519,17 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 - → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
 
+### Resolved
+
+*Newest first: 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+
 **OQ-22 — Signed in, Our Classes hides every class you can't attend yet.** *(Found implementing Phase 6, 10/17.)*
 - Signed out, **Our Classes** → **All Classes** lists all six classes. Signed in, it lists only the classes the person may already attend (`ClassCatalogHelper::GetClassesVisibleToPerson`, a deliberate rule from the access redesign, P-1/M-6). Until Phase 6 every class was open, so nobody noticed.
 - Now that all six need a membership, a signed-in **non-member sees an empty page**, a Silver member sees only Beginner Knotty Yoga, and **so do the staff**: Mason's and the instructors' accounts hold no membership. The weekly schedule is unaffected: it lists all 14 rows with their badges, signed in or out.
 - It also breaks 14.3 step 13, where a Silver Kit opens Knotty Yoga from **All Classes**.
 - **Default:** signed-in visitors see every scheduled class, as signed-out ones do, and the class page and badges say what each one needs. New item 13.3. Say if a signed-in member should keep seeing only what they can book.
 - Mason- Let's go with the default.
-
-### Resolved
-
-*Answered 10/15 first (OQ-16, 19, 20, 21), then the 10/14 answers.*
+- → Plan: 13.3 stands as written. Everyone sees all six classes on **All Classes**, signed in or out, and the class page says what each one needs. Until 13.3 lands, a signed-in non-member or staff account still sees an empty **All Classes** page; 6.6's last step notes it.
 
 **OQ-16 — Leftover copy that no longer matches the studio.**
 - Mason - Let's do: Who we are / How we teach / Come and find us *(full text moved into the About page table above, verbatim)*.
