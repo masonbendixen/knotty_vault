@@ -655,7 +655,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - What it shipped is Phases 2–3: the `app/0010_products_sort_order` migration, ordering in Manage Products, and 3.12's membership-card layout. The seed changes from Phases 2–3 still do not reach production (fact 6).
   - **How to tell it is not Phase 4:** the helper logs `event=login_success … cookies=1`. Phase 4's `ApiClient` keeps both login cookies and logs `cookies=2`. So sandbox.9's scheduled jobs are still refused with 403, and a dropped database connection still needs a manual restart (4.0).
   - Also seen: at deploy time the helper started before the server was listening. It logged `Scheduler initialization failed: CURL error` twice, then systemd's restart 10 seconds later logged in fine. This is harmless.
-- [ ] **`v1.0.0-sandbox.10` is the Phase 4 release.**
+- [x] **`v1.0.0-sandbox.10` is the Phase 4 release.** Tagged, deployed 10/17 01:30 UTC and verified (below).
   - Once `7f38fbe` is on GitLab and master's pipeline for it is green (all six jobs), Claude tags it, per Mason's 10/16 request to tag the release after CI passes. If Mason tags it first, Claude sees the tag and skips.
   - **The tag must be on `7f38fbe`.** Don't put it on whatever master happens to be. If tagging by hand, confirm that master's newest commit on GitLab is "Phase 4 — Production reliability…" before **New tag**.
   - Naming: Deploying to AWS §7.1's convention is `v1.0.0-sandbox.N+1` until the switch to live Square, which becomes `v1.0.0`. "v1.0.4" was Claude's mistake. `/api/health` reports `v1.0.3` because `/etc/knottyyoga/server.env` still carries the hand-set `HONUWARE_VERSION=v1.0.3` from the 9/22 manual deploy, and an `--env-file` value overrides the image's own version. Claude read that number as the running build.
@@ -677,7 +677,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - The file shrank by exactly that one line (24 bytes) and kept its `root:root 600` permissions.
   - `knottyyoga-server` was restarted at 18:36:22 UTC to pick up the change. Health now answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.9"}`, the image's own tag.
   - Deploying to AWS 5.1 step 7's "add `HONUWARE_VERSION` to `server.env`" note now says not to re-add it.
-- [ ] On the EC2 after sandbox.10:
+- [x] On the EC2 after sandbox.10:
   - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.10`.
   - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
   - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `login_success … cookies=2`, then `event=job_success` lines within the hour, and no `status=403`.
@@ -689,6 +689,17 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - The server's three database sockets show `timer:(keepalive,…)`, so 4.1's keepalives are on.
     - Through CloudFront, `/`, `/api/health`, `/api/classes`, `/api/catalog_products` and `/api/class_tags` all answer 200.
     - `[security_posture] prod=false` has been in every startup log since 10/15. That is deliberate: Deploying to AWS step 9 holds `production_mode_on` back until knottyyoga.com is live, because prod mode pins cookies and CORS to that domain.
+  - **The scheduled jobs run again, 10/17 02:30:50 UTC.** These are the first successful jobs since 10/8. All eight hourly jobs logged `event=job_success … status=200` in 82–134 ms:
+    - `send_event_reminders`
+    - `process_waitlist_refunds`
+    - `notify_admin_alerts`
+    - `send_instructor_exception_digests`
+    - `send_weekly_digests`
+    - `finalize_class_attendance`
+    - `send_signup_open_reminders`
+    - `expire_stale_waitlist`
+
+    No `status=403`, no `job_exception` and no `job_http_error` lines appeared. The server logged no `[database]` or `[health]` lines.
 - [ ] **The missed jobs** (10/8 until sandbox.10). On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
   - **When they first run.** The helper starts each job's timer when it starts (`JobScheduler::ScheduleNext` waits one full interval before the first run), and it started at 01:30:50 UTC on 10/17. So:
     - The hourly jobs (reminders, waitlist refunds, digests, attendance) first run at about **02:31 UTC on 10/17**.
