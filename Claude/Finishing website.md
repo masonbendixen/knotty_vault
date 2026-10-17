@@ -643,7 +643,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
 - [x] **Mason** commits:
   - **knottyyoga:** `server/knottyyoga_server/CMakeLists.txt` (the pin) and `server/knottyyoga_server/src/endpoints/web_app.cpp` (the anchor). Committed 10/16 as `7f38fbe`.
   - **CommunityFinder:** `server/communityfinder_server/CMakeLists.txt` (the pin). Committed 10/16 as `e7f9b6f`.
-- [ ] **Mason** pushes both commits. **knottyyoga: pushed 10/16 19:25 UTC** (GitLab master = `7f38fbe`; master pipeline 2956756668 started). **CommunityFinder: still to push** (GitLab master `d642456`); it is not part of this release. Earlier, as of 10/16 18:15 UTC, neither had reached GitLab: both repos' `git status` says `ahead 1`, and GitLab's knottyyoga master is still `71d78efd`. The commits were probably made with **Commit All** rather than **Commit All and Push**. In Visual Studio: **Git** → **Push**, once in each repo.
+- [x] **Mason** pushes both commits. **knottyyoga: pushed 10/16 19:25 UTC** (GitLab master = `7f38fbe`; master pipeline 2956756668 started). **CommunityFinder: pushed the evening of 10/16 Pacific**; GitLab master = `e7f9b6f`, and the local repo is level with `origin/master`. It is not part of this release. Earlier, as of 10/16 18:15 UTC, neither had reached GitLab: both repos' `git status` says `ahead 1`, and GitLab's knottyyoga master is still `71d78efd`. The commits were probably made with **Commit All** rather than **Commit All and Push**. In Visual Studio: **Git** → **Push**, once in each repo.
 
 ### 4.6 Release to production, ahead of the rest of the plan
 - [x] **`v1.0.0-sandbox.9`: tagged and deployed by Mason on 10/16, but it holds Phase 3, not Phase 4.**
@@ -690,10 +690,16 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - Through CloudFront, `/`, `/api/health`, `/api/classes`, `/api/catalog_products` and `/api/class_tags` all answer 200.
     - `[security_posture] prod=false` has been in every startup log since 10/15. That is deliberate: Deploying to AWS step 9 holds `production_mode_on` back until knottyyoga.com is live, because prod mode pins cookies and CORS to that domain.
 - [ ] **The missed jobs** (10/8 until sandbox.10). On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
+  - **When they first run.** The helper starts each job's timer when it starts (`JobScheduler::ScheduleNext` waits one full interval before the first run), and it started at 01:30:50 UTC on 10/17. So:
+    - The hourly jobs (reminders, waitlist refunds, digests, attendance) first run at about **02:31 UTC on 10/17**.
+    - The daily jobs (billing, grace period, expiring entitlements and vouchers, the cleanups) first run at about **01:31 UTC on 10/18**, which is 6:31 pm Pacific on 10/17.
+    - The card-expiry job runs every 30 days.
+  - **To close this item:** `sudo journalctl -u knottyyoga-helper --since "2026-10-18 01:30" --no-pager -o cat | grep -E "job=(run_billing|expire_grace_periods) "` shows `event=job_success` for both. Any redeploy or helper restart moves these times.
 
 ### 4.7 Watch it from outside (OQ-21, answered)
 Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/25) already checks `https://dv1tgxa9ok30f.cloudfront.net/api/health` every 5 minutes and emails Mason after 2 failures in a row. It counts any non-2xx answer as down. It stayed green through 10/15 only because health itself was wrong, and 4.2 makes health answer **503** when a connection requests use is dead, which the monitor already treats as an outage.
-- [ ] After 4.6 ships, confirm the monitor still shows **Up**: the 200 body is unchanged, so it should.
+- [x] After 4.6 ships, confirm the monitor still shows **Up**: the 200 body is unchanged, so it should.
+  - **Confirmed from the server's side, 10/17 02:10 UTC.** All 8 of UptimeRobot's checks since the sandbox.10 deploy (`HEAD /api/health`, every 5 minutes through CloudFront) got 200, including the ones during 4.8's network test. The server answered nothing with a 5xx, and logged no `[database]` or `[health]` lines. The monitor alerts only after 2 failures in a row, so it shows Up.
 - [x] Correct the claim in Deploying to AWS's uptime section that `/api/health` "returns `db:"ok"` only if the database answered". Until 4.2 it only proved the *global* connection answered. A correction note now sits under that paragraph (10/15).
 - **Not planned:** switching the monitor to a keyword match on `"db":"ok"`. Once 4.2 lands, a failing check already returns 503, so the keyword would add nothing.
 
@@ -755,7 +761,7 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
     - The same three sockets were still up.
   - **Why it held:** each connection now sends a keepalive within 60 seconds of going quiet. That re-creates its NAT entry long before RDS gives up, so no connection is ever idle long enough to die. Health also probes the site's pool now (4.2), so UptimeRobot touches it every 5 minutes as well. Had a socket died anyway, `tcp_user_timeout` would have failed it within 30 seconds and the next request would have reconnected (4.1).
 - **Fallback, not needed (the re-test passed):** if a failure a visitor would see ever turns up again, run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly) and to `package/systemd/knottyyoga-server.service` in the repo.
-- [ ] **Not planned:** disabling unattended-upgrades. Security patches matter more than avoiding a reconnect.
+- **Not planned:** disabling unattended-upgrades. Security patches matter more than avoiding a reconnect, and the re-test shows the keepalives absorb the network restarts they cause.
 
 ---
 
