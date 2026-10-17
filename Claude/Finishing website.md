@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/16/2026
-Version: 0.7
+Version: 0.8
 tags: 
 ---
 # Overview
@@ -83,6 +83,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.8 (10/16/2026, evening Pacific)** — **Phase 4 is in production.** Mason deployed `v1.0.0-sandbox.10` to the EC2 at 01:30 UTC on 10/17.
+  - Health names the real tag. The helper signs in with both cookies (`cookies=2`), and the database sockets carry keepalives (4.6).
+  - 4.8's re-test **passed**. Removing the `critical` drop-in restarted the host's networking, and the DHCP lease flapped as on 10/15. Sixteen minutes later every database page loaded first time, with no reconnect and no restart. The drop-in is gone, and the `--network host` fallback is not needed.
 - **v0.7 (10/16/2026)** — `v1.0.0-sandbox.9` is live (deployed 17:58 UTC), but it was tagged on `71d78efd`, the **Phase 3** commit. The Phase 4 pin commits never reached GitLab: knottyyoga `7f38fbe` and CommunityFinder `e7f9b6f` are both still "ahead 1" locally. So production now has Phases 2–3 but **not** the reconnect, the honest health check or the scheduler fix. Phase 4 ships as **`v1.0.0-sandbox.10`** (4.6).
   - Later the same day, at Mason's request, the stale `HONUWARE_VERSION=v1.0.3` line was removed, so health now says `v1.0.0-sandbox.9`.
   - 4.8's netplan `critical` drop-in was applied too. Its test (a `systemd-networkd` restart) **still killed an idle database connection** and hung the site from 18:52 to 19:03 UTC, until Claude restarted the server. `critical` is not the fix; Phase 4's keepalives and reconnect are. 4.8 now waits on sandbox.10 for a re-test.
@@ -541,7 +544,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - **The EC2's journal:** at **06:35:15** Ubuntu's `unattended-upgrade` ran. At **06:35:30** its new `systemd` package restarted **`systemd-networkd`**, which re-enumerated `ens5`, `docker0` and the server container's `veth`, and re-acquired the DHCP address.
   - **Why that breaks the database connections.** The server container's outbound connections go through Docker's MASQUERADE NAT, and the kernel drops MASQUERADE's connection-tracking entries when the host address goes away. RDS's keepalives then had nowhere to land, and RDS hung up four minutes later. The server process was never told and kept the dead socket (4.1).
   - **Not fully explained:** why the global connection behind `/api/health` survived. Probably something used it inside the 06:35–06:39 window, which re-created the NAT entry before RDS gave up. It does not change the conclusion or the fix.
-  - **It will recur.** Unattended-upgrades runs daily; any update to `systemd` or `netplan` does this again. 4.1 makes the server shrug it off, and 4.8 stops the host from causing it.
+  - **It will recur.** Unattended-upgrades runs daily; any update to `systemd` or `netplan` does this again. 4.1 makes the server shrug it off. 4.8 set out to stop the host from causing it, but `critical` could not. Its 10/17 re-test showed that 4.1's keepalives are enough on their own.
 
 ### 4.1 Reconnect a dropped connection *(server_components: data/sql_util/database_access)*
 - [x] `DatabaseHelperProd` keeps the `DatabaseHelperInit` it was built from and gains `ResetConnection()`, which opens a fresh `pqxx::connection`. Exposed through `DatabaseHelper`.
@@ -697,6 +700,8 @@ Nothing new to build. The **UptimeRobot** monitor set up in Deploying to AWS (9/
 ### 4.8 Stop the host's network restarts from cutting live connections *(EC2, Deploying to AWS)*
 Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect and a log line.
 
+**Result, 10/17 on sandbox.10: passed. The keepalives are the fix, and no host change is needed.** See the re-test item at the end of this section.
+
 **Result, 10/16: `critical` did not stop it, and the test took the site down for 11 minutes.**
 - Mason asked for 4.8 on 10/16. Production was still on sandbox.9 (Phase 3), so nothing could reconnect.
 - The drop-in went on at 18:36:09. The server was restarted at 18:36:22 (for the version-line change), opened fresh database connections at 18:36:33, and `systemd-networkd` was restarted at 18:36:34. The three sockets showed the same ports before and after.
@@ -719,18 +724,37 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 - [x] Mark the EC2's interface **critical** in netplan, so a `systemd-networkd` restart keeps its DHCP address instead of dropping and re-acquiring it. *It was meant to stop the NAT state from being flushed. It did not (see above).*
   - **Applied 10/16 18:36 UTC.** `/etc/netplan/99-knottyyoga.yaml` (`root:root 600`) merges into cloud-init's `ens5` entry. `netplan get ethernets.ens5` shows the MAC match kept plus `critical: true`, and the generated `10-netplan-ens5.network` gains `KeepConfiguration=true`. A 10-minute automatic rollback timer was armed for the apply and cancelled once SSH and the address checked out.
   - `netplan apply` itself reconfigured `ens5` ("DHCP lease lost", re-acquired the same address); networkd now logs "DHCPv4 connection considered critical".
-  - **Left in place:** it is harmless, but it does not do the job. Removing it is itself a networkd reconfigure, so do that only after sandbox.10. The removal can double as the re-test below. It is **not** added to Deploying to AWS's first-boot steps.
+  - **Removed 10/17 01:37 UTC** as the re-test below. `/etc/netplan/` again holds only cloud-init's `50-cloud-init.yaml`, and the generated `.network` file no longer has `KeepConfiguration`. It was never added to Deploying to AWS's first-boot steps.
   - A `/etc/netplan/99-knottyyoga.yaml` drop-in: `network: {version: 2, ethernets: {ens5: {critical: true}}}`.
   - Checked 10/15: the interface is `ens5`. The only netplan file is cloud-init's `50-cloud-init.yaml`, which matches by MAC with `dhcp4: true`, `dhcp6: false` and sets nothing about `critical`. Netplan merges the drop-in on top by interface name, so cloud-init's file stays untouched.
   - Then `sudo netplan apply`.
 - [x] **Verify before relying on it.** Run 10/16 on sandbox.9 against this item's own advice to wait for 4.6. **Failed**, with the outage above.
   - `sudo nsenter -t <server container pid> -n ss -tnoi "( dport = :5432 )"` lists the server's database connections (they live in the container's network namespace, so a plain `ss` on the host does not show them).
   - `sudo systemctl restart systemd-networkd` simulates the upgrade.
-- [ ] **Re-test once sandbox.10 is live** (4.6), with the same steps: wait at least 15 minutes without touching the site, then load a page that reads the database (Classes).
+- [x] **Re-test once sandbox.10 is live** (4.6), with the same steps: wait at least 15 minutes without touching the site, then load a page that reads the database (Classes). **Passed 10/17, with no reconnect needed.**
   - Pass: it loads first time, with no server restart and no 504.
   - At most one `[database] event=reconnected` line in `sudo journalctl -u knottyyoga-server`; none is better, because it means the keepalives kept the NAT entry alive.
   - Do it by removing the drop-in: `sudo rm /etc/netplan/99-knottyyoga.yaml && sudo netplan apply`. That cleans up and runs the test in one step.
-- [ ] **If the re-test still shows a failure a visitor would see:** run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly) and to `package/systemd/knottyyoga-server.service` in the repo.
+  - **What was run:**
+    - A 10-minute automatic rollback timer was armed (to put the drop-in back).
+    - The drop-in was removed and `netplan apply` ran at 01:37:35.
+    - `systemctl restart systemd-networkd` ran at 01:37:39, the exact 10/15 trigger.
+    - networkd logged "DHCP lease lost" and re-acquired `172.31.2.31`. SSH stayed up, and the timer was cancelled.
+  - **Right after:** the server's three database sockets (`:38128`, `:38144`, `:38160`) kept their ports. Their keepalive probes were answered: `timer:(keepalive,…,0)`, where the trailing 0 counts unanswered probes. UptimeRobot's health check at 01:38:32, 53 seconds after the flap, got 200 in the same second.
+  - **After 16 minutes (01:54:00), through CloudFront:**
+
+    | Page | Status | Time |
+    |---|---|---|
+    | `/api/classes` | 200 | 0.26 s |
+    | `/api/catalog_products` (the request that hung on 10/16) | 200 | 0.43 s |
+    | `/api/class_tags` | 200 | 0.15 s |
+    | `/api/health` | 200 | 0.17 s |
+
+    - No `[database]` or `[health]` lines in the server journal, so no reconnect was needed.
+    - No server restart since the deploy.
+    - The same three sockets were still up.
+  - **Why it held:** each connection now sends a keepalive within 60 seconds of going quiet. That re-creates its NAT entry long before RDS gives up, so no connection is ever idle long enough to die. Health also probes the site's pool now (4.2), so UptimeRobot touches it every 5 minutes as well. Had a socket died anyway, `tcp_user_timeout` would have failed it within 30 seconds and the next request would have reconnected (4.1).
+- **Fallback, not needed (the re-test passed):** if a failure a visitor would see ever turns up again, run the server container with `--network host`, as the helper already does. Then no NAT sits in the database path at all. It is a deploy change to the systemd unit (`-p 80:80` goes away, the server binds port 80 on the host directly) and to `package/systemd/knottyyoga-server.service` in the repo.
 - [ ] **Not planned:** disabling unattended-upgrades. Security patches matter more than avoiding a reconnect.
 
 ---
