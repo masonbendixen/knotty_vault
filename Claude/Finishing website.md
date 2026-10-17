@@ -898,48 +898,121 @@ From a fresh local database:
 3. **Back to staff portal** → **Check-In** card. It opens without a "not authorized" error.
 
 **A customer sees none of it**
-1. Sign out: **Beth** (the name menu) → **Sign Out**.
+1. Sign out: **Beth** (the name menu) → **Sign Out**, then **Log Out** in the dialog.
 2. **Sign In** as `kiteagle@gmail.com` / `kit`. There is no **Staff** in the top menu.
 
 ---
 
 # Phase 6 — Classes, approval skills, access rules and the weekly schedule
 
+**Implemented 10/17/2026.** RESULTS_PLACEHOLDER Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
+
+All four tables are in `seed_app_data.h`, each walked by one seeder and by its tests (D3):
+- `kSeedClasses`
+- `kSeedSkillLevels`
+- `kSeedClassAccess`
+- `kSeedClassSlots`
+
 ### 6.1 Skill levels *(seed)*
-- [ ] New `Seed::PopulateSkillLevels`: the three skills from the table above, via `TableHelpers::SkillLevels::AddSkillLevel` (code, name, description), with `sort_order` 10/20/30.
+- [x] New `Seed::PopulateSkillLevels`: the three skills from the table above, via `TableHelpers::SkillLevels::AddSkillLevel` (code, name, description), with `sort_order` 10/20/30. Codes `kHandstandSkillCode`, `kAerialRopeSkillCode` and `kIntermediatePartnerAcroSkillCode`.
 
 ### 6.2 Classes *(seed)*
-- [ ] `PopulateClasses`: the six classes with the Overview's descriptions, kind `recurring` (the column default). The four old classes are no longer created.
-- [ ] Copy is normalised only for spacing ("Beginner Knotty  Yoga" in the Overview has a double space). Otherwise verbatim; the studio can edit it in Manage.
-- [ ] Class-name constants in `seed_app_data.h`. The slot, access and photo tables all refer to these.
+- [x] `PopulateClasses`: the six classes with the Overview's descriptions, kind `recurring` (the column default). The four old classes are no longer created.
+- [x] Copy is normalised only for spacing ("Beginner Knotty  Yoga" in the Overview has a double space). Otherwise verbatim; the studio can edit it in Manage. A script compared all six descriptions and the three skill texts with this document: identical.
+- [x] Class-name constants in `seed_app_data.h`. The slot, access and photo tables all refer to these.
+- [x] **Also changed: the three existing class photos.** `PopulateSeedPhotos` named "Partner Acrobatics", which no longer exists. Its picture now goes on **Beginner Partner Acro**, and Knotty Yoga and Handstands keep theirs. The other three classes have no photo until Phase 9.
 
 ### 6.3 Access rules *(seed)*
-- [ ] New `Seed::PopulateClassRequirements`, data-driven from the Class access table:
+- [x] New `Seed::PopulateClassRequirements`, data-driven from the Class access table:
   - `ClassRequirementGroups::AddGroup` with label "Membership" or "Instructor approval", and `inline_description` as in the table. Customers see it once Phase 13 lands; until then only admins do (fact 9).
+  - The membership descriptions are "Silver or Gold membership" (Beginner Knotty Yoga) and "Gold membership" (the other five). The approval groups read "Instructor approval: Handstand" and so on.
   - `ClassRequirementGroupLiterals::AddPermissionLiteral` / `AddSkillLiteral` for the literals.
-- [ ] Permissions and skills are resolved by name and code. A missing one logs and skips that **whole class's** rules rather than writing half of them, because a half-written CNF is *more* permissive than intended.
-- [ ] Runs after `PopulatePermissions`, `PopulateSkillLevels` and `PopulateClasses`.
+- [x] Permissions and skills are resolved by name and code. **Changed from the plan: a missing one is logged and left out of its group, and the group is still written. It fails closed.** The plan said to skip the whole class's rules, and its reason was wrong: a class with **no** groups is open and free to everyone (D7), which is the most permissive outcome of all.
+  - With a literal left out, a group can only admit fewer people. A group none of whose literals resolved admits nobody: `CheckAccess` treats an empty group as unsatisfied. It also shows up in the Requirements editor, where it can be fixed.
+  - The log line is `event=class_requirement_literal_missing class=… skill=…` (or `permission=…`).
+- [x] Runs after `PopulatePermissions`, `PopulateSkillLevels` and `PopulateClasses`. In `PopulateTables`: `PopulateSkillLevels` → `PopulateClassRequirements` → `PopulateClassSchedules`, after the instructors.
 
 ### 6.4 The weekly schedule *(seed)*
-- [ ] Rewrite `PopulateClassSchedules` around one `constexpr` slot table (D3) holding the 14 rows above. Each row is `{ className, dayOfWeek, startMinutes, durationMinutes, instructorEmail, predecessor { className, dayOfWeek } }`.
-- [ ] One perpetual instance + default schedule per class (the existing `AddPerpetualSchedule` shape), all bound to `class-dropin` (unchanged decision D8 of the previous plan).
-- [ ] Predecessors are resolved through a `(className, dayOfWeek) → slotId` map, filled as slots are created.
+- [x] Rewrite `PopulateClassSchedules` around one `constexpr` slot table (D3) holding the 14 rows above. Each row is `{ className, dayOfWeek, startMinutes, durationMinutes, instructorEmail, predecessor { className, dayOfWeek } }`. The days are written as `Scheduling::kSunday` … `kSaturday`, so the table reads like the Overview.
+- [x] One perpetual instance + default schedule per class (the existing `AddPerpetualSchedule` shape), all bound to `class-dropin` (unchanged decision D8 of the previous plan). Each is created with the class's first slot.
+- [x] Predecessors are resolved through a `(className, dayOfWeek) → slotId` map, filled as slots are created.
   - The table is ordered so a predecessor always precedes its follower.
-  - If one doesn't, the seeder logs and skips the follower rather than writing a dangling id.
-- [ ] Tuesday Beginner Knotty Yoga gets Gifford as `instructor_person_id`. Tiana is added in Phase 11.
+  - If one doesn't, the seeder logs `event=class_slot_skipped … reason=predecessor_missing` and skips the follower rather than writing a dangling id. The predecessor is checked before the class's schedule is created, so a class whose every slot is skipped is left with no empty schedule either.
+  - A slot whose instructor is not seeded is still written, with no instructor (TBD), as before.
+- [x] Tuesday Beginner Knotty Yoga gets Gifford as `instructor_person_id`. Tiana is added in Phase 11.
+- [x] **Known, until Phase 10:** the test-only seed (`--recreate_database_test`) still adds the Aerial Series at Tue + Thu 19:00 in the Main Gym, which now double-books Thursday's Intermediate Partner Acro (fact 7). Phase 10 deletes it, so it was not moved. Plain `--recreate_database` is unaffected.
 
 ### 6.5 Tests
-- [ ] Replace `PopulateClassesSeedsTheSixStudioClasses` with the new six, plus "none of the four retired names exists".
-- [ ] **Access through `ClassAccessHelper::CheckAccess`** (D4), four seeded people:
+All in `seed_app_data_test.cpp`. Members are made the way a purchase makes them: a purchase, an entitlement built from the membership product's **own** entitlement rule, and a seat (`JoinMembership`). So the access tests cover the whole chain the hand tests walk (product → rule → permission → the class's group), not a permission granted by hand.
+- [x] Replace `PopulateClassesSeedsTheSixStudioClasses` with the new six, plus "none of the four retired names exists". Read through `ClassCatalogHelper::GetActiveClasses`, the signed-out **Our Classes** reader: names, descriptions, and kind `recurring`.
+- [x] `PopulateSkillLevelsSeedsTheThreeApprovalSkillsInOrder`: through `SkillLevels::GetActiveSkillLevels`, in sort order, with their descriptions.
+- [x] **Access through `ClassAccessHelper::CheckAccess`** (D4), four seeded people (`PopulateClassRequirementsAdmitsEachKindOfMemberToItsClasses`):
   - Silver-only member: Beginner Knotty Yoga **allowed**, all five others **denied**.
   - Gold-only member: Beginner Knotty Yoga, Knotty Yoga and Beginner Partner Acro **allowed**. Handstands, Aerial Rope and Intermediate Partner Acro **denied**, on the approval group only.
   - Gold member + `handstand`: Handstands **allowed**, Aerial Rope still denied.
-  - Non-member: everything denied. `Annotate` reports `members_only` for Beginner Knotty Yoga and Knotty Yoga, and `needs_skill` for Handstands (skill gates outrank membership gates).
-- [ ] Schedule: for each class, its slots match the slot table by **weekday and start** (never by array index), with the right instructor email.
-- [ ] Predecessors: each of the four followers names the right slot, **and** `predecessor.start + predecessor.duration == follower.start`.
-- [ ] Session instructors through `ClassCatalogHelper::GetClassDetail(...).upcomingSessions[].instructorNames`. For example, Wednesday Beginner Knotty Yoga reads "Beth Cooper".
-- [ ] `NoTwoSlotsCollideInTheSameRoom` over the 14 slots, using half-open intervals so back-to-back classes are legal.
-- [ ] Update `PopulateClassSchedulesResolvesRowsByNaturalKeyNotSeedOrder` and `PopulateClassSchedulesSkipsWhenPrerequisitesAreMissing` to the new table, and delete the three per-class slot tests they replace.
+  - Non-member: everything denied. `Annotate` reports `members_only` for Beginner Knotty Yoga and Knotty Yoga, and `needs_skill` for Handstands (skill gates outrank membership gates). This is its own test, `PopulateClassRequirementsTellsAVisitorWhatEachClassNeeds`, covering all six classes. It also pins that Beginner Knotty Yoga's buy link names Silver, the cheaper tier.
+- [x] **Added:** `EveryMembershipOpensTheClassesItsTierIncludes`. A member of each of the five membership products may attend Beginner Knotty Yoga, and only the three Gold ones may attend Knotty Yoga.
+- [x] **Added:** `PopulateClassRequirementsReadsBackInTheRequirementsEditor`. Each class's groups through `GetClassRequirements`, the Requirements card's reader: labels, descriptions and literals, matched by label.
+- [x] **Added:** `PopulateClassRequirementsFailsClosedWithoutTheSkills`. With no skills seeded, a Gold member is still refused Handstands, Aerial Rope and Intermediate Partner Acro, on the approval group (6.3).
+- [x] Schedule: for each class, its slots match the slot table by **weekday and start** (never by array index), with the right instructor email. `PopulateClassSchedulesPutsTheWeeklyScheduleOnTheCalendar` reads it through `CalendarHelper::GetCalendar`, the feed behind the **Weekly schedule** page:
+  - every one of the 14 slots, on its **local** weekday, at its local start and end (this pins the 0 = Sunday convention end to end)
+  - the instructor's full name and the "Requires attending" class
+  - each class's badge for a signed-out visitor
+- [x] Predecessors: each of the four followers names the right slot, **and** `predecessor.start + predecessor.duration == follower.start`. `PopulateClassSchedulesLinksEachFollowerToTheClassJustBeforeIt` reads them through `GetSlotsByImplementationWithPredecessor`, the admin slot editor's reader.
+- [x] **Added:** `PopulateClassSchedulesSkipsAFollowerWhosePredecessorIsMissing`. Without Beginner Partner Acro, both Intermediate Partner Acro slots are skipped and that class gets no schedule. The other 10 slots, and the other followers' links, are written.
+- [x] Session instructors through `ClassCatalogHelper::GetClassDetail(...).upcomingSessions[].instructorNames`. For example, Wednesday Beginner Knotty Yoga reads "Beth Cooper". `PopulateClassSchedulesNamesTheInstructorOnEachClassPage` covers every slot, matched by slot id.
+- [x] `NoTwoSlotsCollideInTheSameRoom` over the 14 slots, using half-open intervals so back-to-back classes are legal. It replaces `NoTwoSlotsCollideInTheSameRoomAfterTheFullTestSeed`, which included the test-only seed (6.4, known until Phase 10).
+- [x] Update `PopulateClassSchedulesResolvesRowsByNaturalKeyNotSeedOrder` and `PopulateClassSchedulesSkipsWhenPrerequisitesAreMissing` to the new table, and delete the three per-class slot tests they replace. Both now check all six classes and all 14 slots.
+- [x] Photo and class-name updates in the existing tests: `PopulateSeedPhotosAttachesProfileAndClassPictures` checks the three classes with a picture and the three without, and `AttachSeedPhotoSkipsAMissingFileWithoutThrowing` uses Aerial Rope instead of Tumbling.
+- [ ] MUTATION_PLACEHOLDER
+
+### 6.6 Hand-testing walkthrough
+From a fresh local database:
+1. Recreate it with `knottyyoga_database_helper --recreate_database`.
+2. Start the server and the Angular app. Use a window at least 1280 px wide, so the top menu isn't collapsed.
+
+**Signed out: the six classes**
+1. Top nav **Our Classes**. The page is headed **All Classes** and shows six cards:
+   - **Beginner Knotty Yoga**
+   - **Knotty Yoga**
+   - **Handstands**
+   - **Aerial Rope**
+   - **Beginner Partner Acro**
+   - **Intermediate Partner Acro**
+
+   There are no Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling or Aerial Fabric cards. Knotty Yoga, Handstands and Beginner Partner Acro have a photo; the other three have none until Phase 9.
+2. Click **Weekly schedule** (page headed **Our Classes**). The week has 14 classes matching the schedule table; Friday reads **No classes**. Each row shows its start time and length, then "with" the instructor. For example:
+   - **Saturday**: **Knotty Yoga**, "10:00 AM · 120 min", "with Mason Bendixen"
+   - **Wednesday**: **Beginner Knotty Yoga**, "5:00 PM · 60 min", "with Beth Cooper"
+   - **Tuesday**: **Beginner Knotty Yoga**, "6:00 PM · 60 min", "with Gifford Cheung"
+
+   If today's classes have already ended, click **Next week** to see a whole week.
+3. These four rows also read **Requires attending: …**:
+   - Monday 7:00 PM Handstands → **Knotty Yoga**
+   - Wednesday 7:00 PM Aerial Rope → **Knotty Yoga**
+   - Thursday 7:00 PM Intermediate Partner Acro → **Beginner Partner Acro**
+   - Sunday 12:00 PM Intermediate Partner Acro → **Beginner Partner Acro**
+4. Same page, badges:
+   - **Beginner Knotty Yoga**, **Knotty Yoga** and **Beginner Partner Acro** rows carry **Requires a membership**.
+   - **Handstands**, **Aerial Rope** and **Intermediate Partner Acro** carry **Prerequisite needed**.
+5. Click **Prerequisite needed** on the Monday 7:00 PM **Handstands** row. A dialog titled **Skill required** lists **Handstand** with "Able to easily kick up to a wall and hold a belly to the wall handstand for thirty seconds." Click **Got it**.
+6. **Our Classes** → **Handstands** card. **Required Skills** shows the **Handstand** chip, and **Pricing** reads **Members only**, "Upgrade your membership to attend."
+
+**As the administrator: the rules behind it**
+1. **Sign In**: `masonbendixen@gmail.com` / `pass`.
+2. **Admin** → **Manage Products** → **Class Schedules** → **Class**: **Beginner Knotty Yoga**. The **Requirements** card holds one group, **Membership**, with the Silver and Gold permissions. **Description (shown to members)** reads "Silver or Gold membership".
+3. Same page, **Class**: **Handstands**.
+   - The **Requirements** card holds **Membership** (Gold, "Gold membership") and **Instructor approval** (Handstand).
+   - Expand **Class Instances** → **Class Schedules** → **Class Schedule Slots**. There is one slot: **Monday**, **7:00 PM**, **60**, **Instructor** Mason Bendixen, **Requires attending** **Knotty Yoga · 6:00 PM–7:00 PM**.
+4. **Admin** → **Manage Products** → **Skills**: three skills, **Handstand**, **Aerial Rope** and **Intermediate Partner Acro**.
+
+**An instructor's approval is half of the rule**
+1. Still as Mason: top nav **Staff** → **Person Skills** card → **Search for a person**: type `Kit` and click **Kit Williams**. Then **Assign new skill** → **Skill**: **Handstand**, **Note (optional)**: `Belly to the wall, 30 seconds` → **Assign**.
+2. Sign out: **Mason** (the name menu) → **Sign Out**, then **Log Out** in the dialog. **Sign In** as `kiteagle@gmail.com` / `kit`.
+3. **My Classes** → **Full Schedule**:
+   - Monday 7:00 PM **Handstands** now reads **Requires a membership**, not **Prerequisite needed**. The approval is in; the Gold membership is still missing.
+   - Wednesday 7:00 PM **Aerial Rope** still reads **Prerequisite needed**: approval for Handstand opens nothing else.
+4. Known, not a fault of this phase: signed in, **Our Classes** → **All Classes** shows Kit no cards at all, because it lists only classes he may already attend (OQ-22, fixed in 13.3).
 
 ---
 
