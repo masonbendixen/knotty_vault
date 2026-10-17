@@ -669,7 +669,7 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
     - **Follow-up, only if it recurs:** give the Karma run some slack. Angular's built-in Karma config can't be tuned, so this means a `karmaConfig` in `angular.json` with `browserDisconnectTolerance: 1` (Karma re-runs after a disconnect, but never after a failed assertion). Not done now: the commit is already tagged.
 - [x] **Claude tagged `v1.0.0-sandbox.10`** on `7f38fbe` at 19:51 UTC, once master's pipeline 2956756668 was green. It is an annotated tag; GitLab confirms `refs/tags/v1.0.0-sandbox.10^{}` = `7f38fbe662dd…`.
   - Tag pipeline 2956830295 passed: `verify:green-commit` 4 s, `test:deploy-scripts` 4 s, `package:ui` 34 s, `package:server` 771 s, `release:gitlab` 6 s.
-- [ ] **Mason** presses ▶ `deploy-manual:ec2` on that pipeline. ▶ `deploy-manual:ui` is optional.
+- [x] **Mason** presses ▶ `deploy-manual:ec2` on that pipeline. ▶ `deploy-manual:ui` is optional. **Deployed 10/17 01:30:38 UTC** (the evening of 10/16 Pacific); EC2 only.
 - [x] **Optional, Mason's call (a production config change):** delete the `HONUWARE_VERSION=v1.0.3` line from `/etc/knottyyoga/server.env`, so `/api/health` names the tag that is actually running. Done 10/16 at Mason's request.
   - The file shrank by exactly that one line (24 bytes) and kept its `root:root 600` permissions.
   - `knottyyoga-server` was restarted at 18:36:22 UTC to pick up the change. Health now answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.9"}`, the image's own tag.
@@ -678,6 +678,14 @@ All the code is in `server_components`; knottyyoga only moves its pin. During de
   - `sudo docker ps` shows both containers on `knottyyoga:v1.0.0-sandbox.10`.
   - `curl -sS http://localhost/api/health` → `{"db":"ok",…}`.
   - `sudo journalctl -u knottyyoga-helper -n 50 --no-pager` shows `login_success … cookies=2`, then `event=job_success` lines within the hour, and no `status=403`.
+  - **Checked by Claude, 10/17 01:35 UTC:**
+    - Both containers run `knottyyoga:v1.0.0-sandbox.10`, started 01:30.
+    - `/api/health` answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.10"}`. It names the real tag now that the `server.env` override is gone.
+    - The helper logged `event=login_success … status=200 cookies=2` at 01:30:50, then `event=initialized jobs=19`. **The Phase 4 scheduler fix is live.**
+    - As with sandbox.9, the helper started before the server was listening. It failed twice ("Could not connect to server", then "Failure when receiving data from the peer"), and systemd's restart 10 seconds later logged in. This is harmless.
+    - The server's three database sockets show `timer:(keepalive,…)`, so 4.1's keepalives are on.
+    - Through CloudFront, `/`, `/api/health`, `/api/classes`, `/api/catalog_products` and `/api/class_tags` all answer 200.
+    - `[security_posture] prod=false` has been in every startup log since 10/15. That is deliberate: Deploying to AWS step 9 holds `production_mode_on` back until knottyyoga.com is live, because prod mode pins cookies and CORS to that domain.
 - [ ] **The missed jobs** (10/8 until sandbox.10). On the Square sandbox nothing real was lost. Billing and grace-period jobs pick up whatever is due on their next daily run. Reminders for classes that already happened are simply never sent.
 
 ### 4.7 Watch it from outside (OQ-21, answered)
