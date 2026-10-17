@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/16/2026
-Version: 0.8
+Version: 0.9
 tags: 
 ---
 # Overview
@@ -83,6 +83,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.9 (10/16/2026, evening Pacific)** — **Phase 5 is implemented.** Windows 5252 passed, Linux 5252 passed, with the same test names on both.
+  - Beth, Gifford and Tiana are seeded with random, unrecorded passwords, under OQ-1's placeholder emails. All five instructors hold the Instructor role and have instructor profiles with the default bios.
+  - Instructors can now check people in and grant skills (`staff_access` + `manage_skills`).
+  - `set_password` sets a temporary password that must be changed at first sign-in.
+  - Also confirmed: sandbox.10's hourly jobs ran at 02:30 UTC, all eight succeeded with no 403s, so 4.6 is closed. Only tomorrow's first daily run (billing, about 6:31 pm Pacific on 10/17) is still to check.
 - **v0.8 (10/16/2026, evening Pacific)** — **Phase 4 is in production.** Mason deployed `v1.0.0-sandbox.10` to the EC2 at 01:30 UTC on 10/17.
   - Health names the real tag. The helper signs in with both cookies (`cookies=2`), and the database sockets carry keepalives (4.6).
   - 4.8's re-test **passed**. Removing the `critical` drop-in restarted the host's networking, and the DHCP lease flapped as on 10/15. Sixteen minutes later every database page loaded first time, with no reconnect and no restart. The drop-in is gone, and the `--network host` fallback is not needed.
@@ -778,39 +783,122 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 
 # Phase 5 — People, roles and instructors
 
+**Implemented 10/16/2026 (evening Pacific).** Windows 5252 passed, Linux 5252 passed. The two runs executed the same 5252 test names; Phase 4's 5244 plus 8 new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Waiting on Mason's commit; reaching production goes with the rest of the seed in Phase 15 (fact 6).
+
 ### 5.1 Temporary password *(business logic; answers OQ-2)*
-- [ ] New `business_logic/accounts/temporary_password.{h,cpp}` in `knotty_yoga_core`: `Accounts::SetTemporaryPassword(transaction, databaseHelper, secrets, email, password)`.
+- [x] New `business_logic/accounts/temporary_password.{h,cpp}` in `knotty_yoga_core`: `Accounts::SetTemporaryPassword(transaction, databaseHelper, secrets, email, password)`.
   - Calls honuware's `PersonHelper::UpdatePassword` with the production secrets, so the hash gets production Argon2 cost.
   - Then `People::SetMustChangePassword(true)`.
   - Returns false for an unknown email.
   - It lives in this repo rather than in honuware so Phase 5 does not wait on a honuware release.
-- [ ] Tests `temporary_password_test.cpp`:
+  - **Also returns false, changing nothing, for an empty password and for an unverified account.** The second is `UpdatePassword`'s own rule, and the flag is set only after it succeeds, so a half-finished sign-up is neither activated nor left flagged.
+  - New `business_logic/accounts/CMakeLists.txt`, added to `business_logic/CMakeLists.txt`.
+- [x] Tests `temporary_password_test.cpp`, five of them:
   - the new password verifies and the old one no longer does, both through `PersonHelper::VerifyPassword`
-  - `/api/get_user_info`'s reader reports `must_change_password`
-  - an unknown email returns false and changes nothing
+  - `/api/get_user_info`'s reader reports `must_change_password`. This test calls the endpoint itself, signed in: `false` before, `true` after.
+  - an unknown email returns false and changes nothing (a bystander's password and flag are untouched)
+  - an empty password returns false and changes nothing
+  - an unverified account returns false and is not flagged
 
 ### 5.2 `set_password` command *(test_helper)*
-- [ ] `knottyyoga_test_helper` command `set_password`, alias `sp`, group "Users & Permissions", with `--email` and `--password`. It is a thin call to 5.1. It prints "… must choose a new password at next sign-in", and a clear error for an unknown email. Works against prod the same way `set_secret` does.
-- [ ] `test_helper` is not linked into the test executable, which is why the logic lives in 5.1, where it is tested.
+- [x] `knottyyoga_test_helper` command `set_password`, alias `sp`, group "Users & Permissions", with `--email` and `--password`. It is a thin call to 5.1. It prints "… must choose a new password at next sign-in", and a clear error for an unknown email. Works against prod the same way `set_secret` does.
+  - It prints, for example, "Temporary password set. Beth Cooper (beth.cooper@knottyyoga.local) must choose a new password at next sign-in."
+  - For an unknown email: "No verified account with email: nobody@example.com. Nothing was changed.", with exit code 1.
+  - It never prints the password.
+  - One-shot form: `knottyyoga_test_helper --command=set_password --email=… --password=…`.
+- [x] `test_helper` is not linked into the test executable, which is why the logic lives in 5.1, where it is tested.
 
 ### 5.3 People *(seed)*
-- [ ] `PopulatePeople`: add Beth Cooper, Gifford Cheung and Tiana Cheung, emails per **OQ-1**, via `CreateFullyValidatedUser` with a **random, unrecorded** password (D9): 32 bytes from the existing secure-random utility, base64, never logged.
-- [ ] Email constants `kBethEmail`, `kGiffordEmail`, `kTianaEmail` in `seed_app_data.h`.
-- [ ] Kit Williams and `masonbendixen@hotmail.com` stay exactly as they are (OQ-10).
+- [x] `PopulatePeople`: add Beth Cooper, Gifford Cheung and Tiana Cheung, emails per **OQ-1**, via `CreateFullyValidatedUser` with a **random, unrecorded** password (D9): 32 bytes from the existing secure-random utility, base64, never logged.
+  - The utility is `Auth::AuthHelper::RandomBytes`, which uses libsodium. The password exists only long enough to be hashed.
+  - The four development accounts keep their table and their committed passwords. The three instructors are a second table with no password column at all.
+- [x] Email constants `kBethEmail`, `kGiffordEmail`, `kTianaEmail` in `seed_app_data.h`. **OQ-1 is still open, so these are its placeholders:** `beth.cooper@knottyyoga.local`, `gifford.cheung@knottyyoga.local` and `tiana.cheung@knottyyoga.local`. Each is one line to change when the real address arrives.
+- [x] Kit Williams and `masonbendixen@hotmail.com` stay exactly as they are (OQ-10).
 
 ### 5.4 Roles *(seed)*
-- [ ] `PopulateRoleAssignments`: Instructor role for Mason, Caleb, Beth, Gifford and Tiana. Mason and Caleb keep Administrator.
-- [ ] `PopulateRolePermissions`: grant the Instructor role `staff_access` (door check-in) and `manage_skills` (granting the approval skills) (OQ-5, confirmed).
+- [x] `PopulateRoleAssignments`: Instructor role for Mason, Caleb, Beth, Gifford and Tiana. Mason and Caleb keep Administrator.
+- [x] `PopulateRolePermissions`: grant the Instructor role `staff_access` (door check-in) and `manage_skills` (granting the approval skills) (OQ-5, confirmed).
+  - **Moved, with `PopulateRoles` and `PermissionIdByName`,** from `create_database.cpp`'s anonymous namespace into `seed_app_data.{h,cpp}`, the way Phase 2 moved the other seeders. Nothing could call them from a test before. The move is otherwise unchanged; the two new grants are the only additions.
+  - **What `staff_access` opens, besides door check-in.** On the server it is the gate for every staff endpoint:
+    - **Check-In** and **Class Check-In**
+    - searching people
+    - quick accounts for walk-ins
+    - drop-in bookings
+    - membership upgrades at the door
+    - **Student Notes**
+
+    So an instructor can do all of these at the front desk. Nothing in Manage Products, billing or Manage Data is reachable: those need `manage_products`, `manage_subscriptions` or Administrator.
+  - **No front-end change was needed.** The **Staff** menu and the `/staff` pages already open for anyone holding the `instructor` permission (honuware's `hasStaffAccess`/`StaffGuard`). Until now, an Instructor-only person saw the portal but the server refused check-in and **Person Skills**.
 
 ### 5.5 Instructor profiles *(seed)*
-- [ ] `PopulateInstructors`: five rows, data-driven, with bios taken **verbatim** from the "Instructor bios" section above, or each name's default where nothing was pasted (OQ-15). The photo column moves to Phase 9's table.
+- [x] `PopulateInstructors`: five rows, data-driven, with bios taken **verbatim** from the "Instructor bios" section above, or each name's default where nothing was pasted (OQ-15). The photo column moves to Phase 9's table.
+  - No bios had been pasted, so all five are the defaults. `Seed::kSeedInstructors` in `seed_app_data.h` is the one table; the test walks it too (D3).
+  - Mason and Caleb keep their headshots. Beth, Gifford and Tiana have an empty photo entry, which is skipped without a "seed_image_missing" warning. Phase 9 attaches their pictures and moves all five into its photo table.
 
 ### 5.6 Tests
-- [ ] All five instructors exist with the expected bios, read through `InstructorProfileHelper::GetInstructorProfile` (the public Instructors page's reader).
-- [ ] The three new people can **not** sign in with any password present in the source tree (`VerifyPassword` against each dev password returns false), so D9 is pinned.
-- [ ] All five hold the Instructor role, through `PersonHelper::GetRolesForUser`.
-- [ ] An Instructor-only person holds `staff_access` and `manage_skills`, through `PersonHelper::GetPermissionsForUser`.
-- [ ] Kit and the hotmail account still exist in the base seed with their roles unchanged.
+- [x] All five instructors exist with the expected bios, read through `InstructorProfileHelper::GetInstructorProfile` (the public Instructors page's reader). `PopulateInstructorsSeedsAllFiveWithTheirBios`:
+  - the photo flag matches the table
+  - Kit and the hotmail account have no instructor profile
+- [x] The three new people can **not** sign in with any password present in the source tree (`VerifyPassword` against each dev password returns false), so D9 is pinned. `PopulatePeopleGivesTheNewInstructorsNoKnownPassword`:
+  - The passwords tried are `pass`, `mason`, `caleb`, `kit`, the test helper's default `Password123!`, the walkthrough's `Welcome-2026`, and empty.
+  - It then shows `set_password`'s path works for all three, which also pins that the seed creates them verified.
+- [x] All five hold the Instructor role, through `PersonHelper::GetRolesForUser` (`PopulateRoleAssignmentsResolvesPeopleByEmailNotSeedOrder`, updated).
+- [x] An Instructor-only person holds `staff_access` and `manage_skills`, through `PersonHelper::GetPermissionsForUser`. `PopulateRolePermissionsLetsInstructorsCheckInAndGrantSkills`:
+  - Beth holds exactly `instructor`, `staff_access` and `manage_skills`, with no admin permission.
+  - Gifford and Tiana match her, and Kit holds none.
+- [x] Kit and the hotmail account still exist in the base seed with their roles unchanged.
+- [x] **Mutation-checked on Linux.** Six deliberate breaks each failed their own test, and nothing else:
+  - a fixed `pass` instead of the random password
+  - the Instructor's `staff_access` grant removed
+  - Tiana's Instructor role removed
+  - a wrong bio written for the photo-less instructors
+  - the must-change flag not set
+  - the empty-password check removed
+
+  The sources were then restored byte-for-byte (hash-checked) and both suites re-run green.
+- [x] **End to end, outside the test harness,** on a throwaway database on the local Postgres, dropped afterwards (never `knottyyoga`):
+  - `knottyyoga_database_helper --install_schema` ran the real bootstrap, honuware's framework seed included.
+  - `set_password` refused `nobody@example.com` and set Beth's.
+  - The real server then answered:
+    - Beth with `pass`: 401. With the temporary password: 200.
+    - `/api/get_user_info` for Beth: `must_change_password: true`, roles `instructor`, permissions `instructor`, `staff_access` and `manage_skills`.
+    - `/api/get_user_info` for Kit: no roles, no permissions.
+    - `/api/get_instructors`: all five, with their bios; photos for Mason and Caleb only.
+
+### 5.7 Hand-testing walkthrough
+From a fresh local database:
+1. Recreate it with `knottyyoga_database_helper --recreate_database`.
+2. Start the server and the Angular app.
+
+**The instructors**
+1. **About** → **Instructors**. Five cards are shown: Mason Bendixen, Caleb Ault, Beth Cooper, Gifford Cheung and Tiana Cheung.
+2. Check the three new cards:
+   - Beth's reads "Teaches Beginner Knotty Yoga on Wednesdays."
+   - Gifford's and Tiana's each say they co-teach Tuesdays with the other.
+   - The three new cards have no photo yet (Phase 9).
+
+**Nobody knows the new instructors' passwords**
+1. **Sign In**: Email `beth.cooper@knottyyoga.local`, Password `pass`, then **Log In**. The sign-in is refused.
+
+**Letting Beth in**
+1. In `knottyyoga_test_helper`'s REPL, run `set_password --email=beth.cooper@knottyyoga.local --password=Welcome-2026`, or `sp` with the same arguments. It prints "Temporary password set. Beth Cooper (beth.cooper@knottyyoga.local) must choose a new password at next sign-in."
+2. **Sign In**: Email `beth.cooper@knottyyoga.local`, Password `Welcome-2026`, then **Log In**. The site opens **Change Password**.
+3. Click **Staff** in the top menu. The site sends you back to **Change Password**.
+4. On **Change Password**, enter:
+   - **Old Password** `Welcome-2026`
+   - **Reenter Old Password** `Welcome-2026`
+   - **New Password** `Beth-Studio-2026`
+
+   Then click **Update**.
+
+**What an instructor can do**
+1. The top menu now has **Staff** and no **Admin**.
+2. **Staff** → **Person Skills** card. In **Search for a person**, type `Kit` and click **Kit Williams**. It shows "This person has no skills assigned yet." and an **Assign new skill** button, with no error banner. The approval skills themselves arrive in Phase 6.
+3. **Back to staff portal** → **Check-In** card. It opens without a "not authorized" error.
+
+**A customer sees none of it**
+1. Sign out: **Beth** (the name menu) → **Sign Out**.
+2. **Sign In** as `kiteagle@gmail.com` / `kit`. There is no **Staff** in the top menu.
 
 ---
 
@@ -1316,6 +1404,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 **OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 12) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 15.
 - Mason- I sent a message to all my instructors asking which email to use.
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
+- → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 15. Until then the instructor digest and, after Phase 12, password-reset emails to these three go nowhere.
 
 **OQ-11 — Where are the photos?**
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
