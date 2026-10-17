@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/16/2026
-Version: 0.9
+Last Updated: 10/17/2026
+Version: 0.10
 tags: 
 ---
 # Overview
@@ -83,6 +83,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.10 (10/17/2026)** — **Phase 6 is implemented.** Windows 5259 passed, Linux 5259 passed, with the same test names on both.
+  - The six real classes replace the old ones, the three approval skills are seeded, every class has its access rule, and the 14-slot weekly schedule is in, with Beth on Wednesday and Gifford on Tuesday.
+  - One change from the plan: a missing permission or skill now **fails closed** (6.3). The plan's "skip the whole class" would have left that class open to everyone.
+  - New **OQ-22**: signed in, **Our Classes** lists only the classes a person may already attend. So after Phase 6, non-members and the staff see an empty list. The default fix is new item 13.3.
+  - Phase 5 was committed as `5ebb942a` and deliberately not tagged (see Phase 5).
 - **v0.9 (10/16/2026, evening Pacific)** — **Phase 5 is implemented.** Windows 5252 passed, Linux 5252 passed, with the same test names on both.
   - Beth, Gifford and Tiana are seeded with random, unrecorded passwords, under OQ-1's placeholder emails. All five instructors hold the Instructor role and have instructor profiles with the default bios.
   - Instructors can now check people in and grant skills (`staff_access` + `manage_skills`).
@@ -905,7 +910,7 @@ From a fresh local database:
 
 # Phase 6 — Classes, approval skills, access rules and the weekly schedule
 
-**Implemented 10/17/2026.** RESULTS_PLACEHOLDER Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
+**Implemented 10/17/2026.** Windows 5259 passed, Linux 5259 passed. The two runs executed the same 5259 test names: Phase 5's 5252, less the three per-class slot tests, plus ten new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
 
 All four tables are in `seed_app_data.h`, each walked by one seeder and by its tests (D3):
 - `kSeedClasses`
@@ -964,7 +969,26 @@ All in `seed_app_data_test.cpp`. Members are made the way a purchase makes them:
 - [x] `NoTwoSlotsCollideInTheSameRoom` over the 14 slots, using half-open intervals so back-to-back classes are legal. It replaces `NoTwoSlotsCollideInTheSameRoomAfterTheFullTestSeed`, which included the test-only seed (6.4, known until Phase 10).
 - [x] Update `PopulateClassSchedulesResolvesRowsByNaturalKeyNotSeedOrder` and `PopulateClassSchedulesSkipsWhenPrerequisitesAreMissing` to the new table, and delete the three per-class slot tests they replace. Both now check all six classes and all 14 slots.
 - [x] Photo and class-name updates in the existing tests: `PopulateSeedPhotosAttachesProfileAndClassPictures` checks the three classes with a picture and the three without, and `AttachSeedPhotoSkipsAMissingFileWithoutThrowing` uses Aerial Rope instead of Tumbling.
-- [ ] MUTATION_PLACEHOLDER
+- [x] **Mutation-checked on Linux.** Eight deliberate breaks, each caught by the test written for it:
+
+  | Break | Failed |
+  |---|---|
+  | Silver dropped from Beginner Knotty Yoga | `…AdmitsEachKindOfMemberToItsClasses`, `EveryMembershipOpens…`, `…TellsAVisitorWhatEachClassNeeds` |
+  | The approval group skipped when its skill is missing (fail open) | `…FailsClosedWithoutTheSkills` |
+  | Sunday written as ISO 7 | `…PutsTheWeeklyScheduleOnTheCalendar`, `…NamesTheInstructorOnEachClassPage` |
+  | Thursday Intermediate Partner Acro linked to Sunday's Beginner Partner Acro | `…LinksEachFollowerToTheClassJustBeforeIt` |
+  | A follower written without its link when the predecessor is missing | `…SkipsAFollowerWhosePredecessorIsMissing` |
+  | Skill sort order swapped | `…SeedsTheThreeApprovalSkillsInOrder` |
+  | Wednesday Beginner Knotty Yoga given to Caleb | `…PutsTheWeeklyScheduleOnTheCalendar`, `…NamesTheInstructorOnEachClassPage` (the spelled-out "Beth Cooper" checks) |
+  | Partner acro photo on Intermediate Partner Acro | `PopulateSeedPhotosAttachesProfileAndClassPictures` |
+
+  - The follower-link break gave no result the first time, in the batch of eight, and that log was not kept. Run again on its own, it was caught.
+  - The sources were restored byte for byte, with hashes checked inside the container and again from Windows. The 60 seed tests then passed on the restored files.
+- [x] **End to end, outside the test harness,** on a throwaway database on the local Postgres (`phase6_check`, dropped afterwards; never `knottyyoga`):
+  - `knottyyoga_database_helper --install_schema` ran the real bootstrap in its real order. The log has no `seed_lookup_missing`, `*_skipped`, `class_requirement_literal_missing` or `seed_image_*` line.
+  - The real server's `/api/classes`, signed out: the six classes.
+  - Its `/api/calendar`, signed out, over eight days: all 14 slots, each on its Pacific weekday and time, with its instructor, its badge (`members_only` on three classes, `needs_skill` on three) and the four "Requires attending" classes, exactly as in the schedule table.
+  - `/api/classes` signed in as Mason: **zero** classes, which confirms OQ-22.
 
 ### 6.6 Hand-testing walkthrough
 From a fresh local database:
