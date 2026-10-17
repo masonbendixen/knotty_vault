@@ -1522,6 +1522,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Now that all six need a membership, a signed-in **non-member sees an empty page**, a Silver member sees only Beginner Knotty Yoga, and **so do the staff**: Mason's and the instructors' accounts hold no membership. The weekly schedule is unaffected: it lists all 14 rows with their badges, signed in or out.
 - It also breaks 14.3 step 13, where a Silver Kit opens Knotty Yoga from **All Classes**.
 - **Default:** signed-in visitors see every scheduled class, as signed-out ones do, and the class page and badges say what each one needs. New item 13.3. Say if a signed-in member should keep seeing only what they can book.
+- Mason- Let's go with the default.
 
 ### Resolved
 
