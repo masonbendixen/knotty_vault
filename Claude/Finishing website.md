@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/17/2026
-Version: 0.11
+Version: 0.12
 tags: 
 ---
 # Overview
@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.12 (10/17/2026)** — **Phase 7's code and tests are in; its full runs are not.**
+  - Caleb is the only massage therapist. His real hours are a base-seed template, "Massage hours", with no end date, generated through the end of next month.
+  - New **7.4**: **Generate Availability** pressed twice used to double the hours. 15.4's monthly press always overlaps the last one, so the plan as written would have doubled every day. It now skips days the template already generated.
+  - The three affected suites pass on Linux, and all nine mutations were caught. The full Linux suite and the Windows build were stopped part-way because the machine ran low on memory (Phase 7 header).
 - **v0.11 (10/17/2026)** — Mason's answer to **OQ-22**: the default. 13.3 stands as written, so signed-in visitors will see every class, as signed-out ones do. OQ-22 moves to Resolved.
   - OQ-1 (instructor emails), OQ-11 (photos) and OQ-15 (bios) stay open, each still waiting on the instructors or the photo shoot. Their defaults are unchanged. Of these, only the photos hold up a phase: Phase 9 attaches whatever exists when it lands, and any photo still missing is added later (9.1). The emails are needed before Phase 15; bios can even come after it, through Manage.
 - **v0.10 (10/17/2026)** — **Phase 6 is implemented.** Windows 5259 passed, Linux 5259 passed, with the same test names on both.
@@ -912,7 +916,7 @@ From a fresh local database:
 
 # Phase 6 — Classes, approval skills, access rules and the weekly schedule
 
-**Implemented 10/17/2026.** Windows 5259 passed, Linux 5259 passed. The two runs executed the same 5259 test names: Phase 5's 5252, less the three per-class slot tests, plus ten new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
+**Implemented 10/17/2026; committed as `32c9235c`, not tagged.** Windows 5259 passed, Linux 5259 passed. The two runs executed the same 5259 test names: Phase 5's 5252, less the three per-class slot tests, plus ten new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
 
 All four tables are in `seed_app_data.h`, each walked by one seeder and by its tests (D3):
 - `kSeedClasses`
@@ -1044,7 +1048,10 @@ From a fresh local database:
 
 # Phase 7 — Caleb as the massage provider
 
-**Implemented 10/17/2026.** RESULTS_PENDING
+**Code and tests in, 10/17/2026; the full runs are still to do.**
+- Done: on Linux, the three affected suites pass (84 tests: the 64 seed tests, the template generator and the admin template endpoints), and both mutation checks were run.
+- Stopped: the full Linux suite and the Windows build were both stopped part-way by Claude Code because the machine ran low on memory. Neither had failed.
+- Still to do: the full suite on both platforms, the end-to-end run on a throwaway database, and the 7.5 hand-testing walkthrough, which waits on the end-to-end run's real slot times.
 
 The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the seeder and by its tests (D3).
 
