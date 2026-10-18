@@ -1227,38 +1227,12 @@ From a fresh local database:
 
 ---
 
-# Phase 9 — Attach the photos
+# Phase 9 — Retire the test-only seed data (OQ-12, D14)
 
-Uses Phase 1's files.
-
-### 9.1 Table-driven photo attachment *(seed)*
-- [ ] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
-  - `instructors`, by person email
-  - `classes`, by name
-  - `products`, by code
-  - `facilities`, by code
-- [ ] Instructor headshots move off `PopulateInstructors` into this table, so every picture is listed in one place.
-- [ ] Rows (files from 1.1):
-  - instructors: Mason, Caleb, Beth, Tiana, Gifford
-  - classes: all six
-  - product `massage` → `Massage.jpg`
-  - facility `knotty-yoga-studio` → `Studio.jpg`
-- [ ] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
-- [ ] Any photo still missing when this phase lands is left out of the table. It joins later as file + row + test expectation in one change (D10), and stays listed here unchecked until then.
-
-### 9.2 Tests
-- [ ] `EverySeedPhotoFileExists`: walks the same tables the seeder walks and asserts each file is in `SeedImageDirectory()`. This catches a renamed or deleted file.
-- [ ] Attachment by target type: each listed row has exactly one photo, and **classes not in the table have none** (the D5 wrong-row guard from the previous plan, kept).
-- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader.
-
----
-
-# Phase 10 — Retire the test-only seed data (OQ-12, D14)
-
-### 10.1 Seed
+### 9.1 Seed
 - [ ] Delete `PopulateIntroWorkshopSessions`, `PopulateAerialSeriesProduct`, `PopulateAerialSeriesRun` and `PopulateTestData` from `seed_app_data.{h,cpp}`. `PopulateProviderSchedule` already moved in 7.2. The `intro-workshop` **product** stays in the base catalog: staff schedule real workshop sessions through the UI, and the About copy invites people to the next one.
 
-### 10.2 `knottyyoga_database_helper`
+### 9.2 `knottyyoga_database_helper`
 - [ ] Remove the `--recreate_database_test` flag and its help text (`main.cpp`), and the `includeTestData` parameter of `CreateSchemaAndPopulate` (`create_database.{h,cpp}`).
 - [ ] Fix the stale reference in `ServerAccess.mock.ts`'s comment, and any doc that names the flag.
 - [ ] Update the hand-testing memory ([[feedback_test_instructions_format]]): the flag is gone and Kit is a base-seed member.
@@ -1457,6 +1431,34 @@ During development, knottyyoga builds against the local `server_components` chec
 - [ ] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
 
 *(Not in scope: `ServerAccess.mock.ts`'s local-mode catalog still has the old classes. It is fixture data for `ng serve -c local` and for dozens of specs; changing it is churn with no user-visible effect.)*
+
+---
+
+# Phase 13 — Attach the photos
+
+*Moved here from Phase 9 on 10/18/2026. The photos aren't in yet, and nothing before Verification needs them, so the four phases that don't use them went first. The items are unchanged; only the numbers moved.*
+
+Uses Phase 1's files.
+
+### 13.1 Table-driven photo attachment *(seed)*
+- [ ] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
+  - `instructors`, by person email
+  - `classes`, by name
+  - `products`, by code
+  - `facilities`, by code
+- [ ] Instructor headshots move off `PopulateInstructors` into this table, so every picture is listed in one place.
+- [ ] Rows (files from 1.1):
+  - instructors: Mason, Caleb, Beth, Tiana, Gifford
+  - classes: all six
+  - product `massage` → `Massage.jpg`
+  - facility `knotty-yoga-studio` → `Studio.jpg`
+- [ ] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
+- [ ] Any photo still missing when this phase lands is left out of the table. It joins later as file + row + test expectation in one change (D10), and stays listed here unchecked until then.
+
+### 13.2 Tests
+- [ ] `EverySeedPhotoFileExists`: walks the same tables the seeder walks and asserts each file is in `SeedImageDirectory()`. This catches a renamed or deleted file.
+- [ ] Attachment by target type: each listed row has exactly one photo, and **classes not in the table have none** (the D5 wrong-row guard from the previous plan, kept).
+- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader.
 
 ---
 
