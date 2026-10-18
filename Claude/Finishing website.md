@@ -1243,16 +1243,28 @@ From a fresh local database:
 # Phase 9 — Retire the test-only seed data (OQ-12, D14)
 
 ### 9.1 Seed
-- [ ] Delete `PopulateIntroWorkshopSessions`, `PopulateAerialSeriesProduct`, `PopulateAerialSeriesRun` and `PopulateTestData` from `seed_app_data.{h,cpp}`. `PopulateProviderSchedule` already moved in 7.2. The `intro-workshop` **product** stays in the base catalog: staff schedule real workshop sessions through the UI, and the About copy invites people to the next one.
+- [x] Delete `PopulateIntroWorkshopSessions`, `PopulateAerialSeriesProduct`, `PopulateAerialSeriesRun` and `PopulateTestData` from `seed_app_data.{h,cpp}`. `PopulateProviderSchedule` already moved in 7.2. The `intro-workshop` **product** stays in the base catalog: staff schedule real workshop sessions through the UI, and the About copy invites people to the next one.
+  - Their constants went with them: the Aerial Series' code, class name and run name in the header, and the workshop and series times, prices and capacity in the `.cpp`. So did the two includes only they used (`class_series_helper.h`, `db_schema/event_sessions.h`).
+  - **Left in place:** `Scheduling::NextWeekdaysAfter` in `business_logic/scheduling/seed_date_util`. The workshop seeder was its only caller, so nothing in the app uses it now. It is a tested date utility, and removing it wasn't in this phase's list.
 
 ### 9.2 `knottyyoga_database_helper`
-- [ ] Remove the `--recreate_database_test` flag and its help text (`main.cpp`), and the `includeTestData` parameter of `CreateSchemaAndPopulate` (`create_database.{h,cpp}`).
-- [ ] Fix the stale reference in `ServerAccess.mock.ts`'s comment, and any doc that names the flag.
-- [ ] Update the hand-testing memory ([[feedback_test_instructions_format]]): the flag is gone and Kit is a base-seed member.
+- [x] Remove the `--recreate_database_test` flag and its help text (`main.cpp`), and the `includeTestData` parameter of `CreateSchemaAndPopulate` (`create_database.{h,cpp}`).
+  - `CreateAndPopulateDatabases` lost the same parameter, and `RunRecreate` no longer takes one.
+  - `--create_tenant` passes `CreateSchemaAndPopulate` to the tenant provisioner directly again. It had been wrapped in a lambda only because the extra parameter stopped the function matching the provisioner's type.
+- [x] Fix the stale reference in `ServerAccess.mock.ts`'s comment, and any doc that names the flag.
+  - The comment now says the mock's two providers are fixture data from before Phase 7, not what a fresh database seeds. The data itself is unchanged.
+  - No document in the repository names the flag. The CLAUDE.md files, `server/*.md` and the launch settings were all checked.
+- [x] Update the hand-testing memory ([[feedback_test_instructions_format]]): the flag is gone and Kit is a base-seed member. It also now points at `seed_app_data.{h,cpp}` for the seed, not `create_database.cpp`.
 
 ### 9.3 Tests
-- [ ] Delete the test-data tests, including `OnlyPopulateTestDataAddsTheSampleData`.
-- [ ] A base-seed test asserts nothing sample-only exists: no `aerial-series` product, no `Aerial Series` class, and no event sessions at all.
+- [x] Delete the test-data tests, including `OnlyPopulateTestDataAddsTheSampleData`. Nine went: four for the workshop sessions, two for the Aerial Series product, two for its run, and that one.
+- [x] `TheBaseSeedHasNoSampleData` (new): runs the whole base seed in `PopulateTables`' order, then checks:
+  - no event sessions at all, while the `intro-workshop` product is still there;
+  - no `aerial-series` product, no `Aerial Series` class and no class series run;
+  - exactly the six real classes;
+  - one provider template, Caleb's.
+
+  The names are spelled out as literals, since the constants went with the seeders.
 
 ---
 
