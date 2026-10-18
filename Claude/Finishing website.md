@@ -83,7 +83,13 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.16 (10/18/2026)** — **Phase 10 is implemented.** REVISION-PENDING
+- **v0.16 (10/18/2026)** — **Phase 10 is implemented.** Windows 5306 passed, Linux 5306 passed, with the same test names on both; Angular 3608 passed.
+  - A slot can now carry co-instructors, and Tuesday's Beginner Knotty Yoga is Gifford's and Tiana's on the weekly schedule, the class page, both instructors' profiles and My Classes. A substitution still replaces both.
+  - Pay, the load grid, the exception digest and favorite alerts stay keyed on the lead, as planned.
+  - Admins add and remove co-instructors in the slot dialog (**Co-instructors** chips).
+  - All 14 C++ and 3 Angular mutations were caught. End to end, a fresh install and an upgraded database both behaved.
+  - Small additions beyond the plan, each noted in 10.3: assistants no longer headline a session; My Classes uses the same rule; "copy slots forward" carries co-instructors; "Substituting for" names the whole team.
+  - New **OQ-24**: a shift trade on a co-taught date drops the co-instructor from that date. Default: leave it.
 - **v0.15 (10/18/2026)** — **Phase 9 is implemented.** Windows 5260 passed, Linux 5260 passed, with the same test names on both.
   - The test-only seed is gone: no Intro Workshop sessions, no Aerial Series, and no `--recreate_database_test` flag. Every local database is now what production gets. The `intro-workshop` product stays.
   - All four mutations were caught by the new `TheBaseSeedHasNoSampleData`. End to end, the old flag is refused as unknown, and a fresh install shows no sample data on any page.
@@ -1307,7 +1313,9 @@ From a fresh local database:
 
 # Phase 10 — Co-instructors on a recurring slot (Gifford + Tiana)
 
-**Implemented 10/18/2026.** RESULTS-PENDING
+**Implemented 10/18/2026.** Windows 5306 passed, Linux 5306 passed. The two runs executed the same 5306 test names: Phase 9's 5260 plus 46 new. Angular: 3608 specs passed, `tsc --noEmit` (app and specs) and `ng build` clean.
+- On Windows, the server binary itself didn't relink: a running `knottyyoga_the_server.exe` held the file open. Everything else built, the tests included. The Linux run built and ran the server (10.8).
+- Production needs nothing beyond the Phase 15 reinstall. An upgraded database gets the table from `--migrate` (0011), which 10.8 checked.
 
 Fact 4: a slot cannot carry two instructors today. OQ-7: "we should support multiple instructors."
 
@@ -1403,10 +1411,42 @@ That is the conservative reading, and each can widen later on its own.
   The dialog has 5 new cases plus a rendered one (the chip's remove button), the manage page 6 (including the order of the calls and a rendered row), and the instructor profile 2. The class-detail case already existed.
 
 ### 10.7 Mutation check
-MUTATIONS-PENDING
+- [x] **C++, on Linux.** Fourteen deliberate breaks, each rebuilt and run against the affected suites (289 tests). Every one was caught:
+
+  | Break | Caught by |
+  |---|---|
+  | The seed leaves Tiana off Tuesday | the three seed tests: weekly schedule, class page, Tiana's profile |
+  | The shared reader forgets co-instructors | 20 tests across every caller, the seed included |
+  | A substitution no longer replaces the team | 10 tests, among them the older substitution tests |
+  | An assistant headlines the session | `AnAssistantDoesNotReplaceTheTeam` |
+  | The lead can be their own co-instructor | the helper test and the endpoint test |
+  | Someone who isn't an instructor can be added | the helper test and the endpoint test |
+  | Copying slots forward drops co-instructors | `CreateImplementationCopiesCoInstructorsForward` |
+  | Removing a co-instructor removes nothing | the helper test and the endpoint test |
+  | "Classes I teach" ignores co-taught slots | two profile tests and the seed's Tiana test |
+  | The calendar names only the lead as substituted for | `SubstitutionReplacesTheLeadAndCoInstructor` |
+  | The migration builds nothing | the migration test |
+  | The slot list stops carrying co-instructors | three endpoint tests |
+  | A lead also listed as a co-instructor is named twice | `ALeadAlsoListedAsCoInstructorIsNamedOnce` |
+  | One slot's co-instructors come back newest first | the table helper's and the shared reader's order tests |
+
+  The sources were restored byte for byte, with their hashes checked in the container and the broken lines searched for from Windows.
+- [x] **Angular.** Three breaks, each run against its own spec and restored by hash:
+  - the dialog offers the instructor as a co-instructor (3 dialog cases failed)
+  - the page adds before it removes (the "removals first" case)
+  - the profile shows a team line on a session taught alone (its case)
 
 ### 10.8 End to end
-E2E-PENDING
+- [x] **A fresh install.** `--install_schema` into a throwaway database on the local Postgres (`phase10_check`, dropped afterwards; never `knottyyoga`), with no seed warnings. Then, from the real server:
+  - **Weekly schedule:** every Tuesday Beginner Knotty Yoga reads "Gifford Cheung, Tiana Cheung"; Wednesday's reads "Beth Cooper".
+  - **The class page:** every Tuesday session names both.
+  - **Tiana's profile:** Beginner Knotty Yoga and nothing else; every session names both.
+  - **The slot list (admin):** Tuesday's slot carries Tiana, Wednesday's nobody.
+  - **The admin endpoints, signed in as Mason with a real CSRF token:**
+    - Gifford on his own slot is refused with 400 `CO_INSTRUCTOR_IS_LEAD`, and Tiana twice with 400 `DUPLICATE_CO_INSTRUCTOR`.
+    - Adding Tiana to Wednesday shows in the list, and removing her empties it again.
+    - Signed out, the add is refused.
+- [x] **An existing site.** The new table dropped from that database, as a site from before Phase 10 would be. `--migrate` then reported `applied=12 skipped=0`, 0011 among them, and the same add, list and remove worked through the endpoints.
 
 ### 10.9 Hand-testing walkthrough
 1. Recreate the database with `knottyyoga_database_helper --recreate_database`.
