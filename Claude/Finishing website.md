@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/17/2026
-Version: 0.12
+Last Updated: 10/18/2026
+Version: 0.13
 tags: 
 ---
 # Overview
@@ -83,6 +83,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.13 (10/18/2026)** — **Phase 8 is implemented.** Windows 5268 passed, Linux 5268 passed, with the same test names on both.
+  - About carries your three blocks, the location your text with the directions, and the site's name is "Knotty Yoga". That name is also the email sender, the footer's name and the name in email subjects.
+  - All eight mutations were caught. The end-to-end run compared the real server's answers with this document, character for character, and they match.
+  - Left as it was, noted in 8.1: an unused site setting still holds the old "40 years … hootananny" text. Nothing on the site has shown it since the About page became blocks.
+  - Phase 7 was committed as `74af2aa8`, not tagged.
 - **v0.12 (10/17/2026)** — **Phase 7 is implemented.** Windows 5267 passed, Linux 5267 passed, with the same test names on both.
   - Caleb is the only massage therapist. His real hours are a base-seed template, "Massage hours", with no end date, generated through the end of next month.
   - New **7.4**: **Generate Availability** pressed twice used to double the hours. 15.4's monthly press always overlaps the last one, so the plan as written would have doubled every day. It now skips days the template already generated.
@@ -1153,6 +1158,8 @@ From a fresh local database:
 
 # Phase 8 — About page copy, the location's text and the sender name
 
+**Implemented 10/18/2026.** Windows 5268 passed, Linux 5268 passed. The two runs executed the same 5268 test names: Phase 7's 5267 plus one new. Like the rest of the seed, it reaches production with the Phase 15 reinstall. That includes the sender name: it is a config-secret default, written once when a database is created, so the live site keeps "Knotty Yoga and Spa" until then.
+
 ### 8.1 Seed
 - [x] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
   - **Changed from the plan:** the blocks moved out of the function into one table, `kSeedAboutBlocks` in `seed_app_data.h`, which the seeder and its test both walk (D3), like the massage hours.
@@ -1188,6 +1195,35 @@ From a fresh local database:
   | The first block's button reads "Start here" | `…SeedsMasonsCopyInPageOrder` |
 
   The fourth row is why the value is spelled out once: the message tests follow the constant, so only that test notices the constant itself is wrong. The sources were restored byte for byte, with hashes checked in the container and the broken lines searched for from Windows.
+
+### 8.3 End to end
+- [x] On a throwaway database on the local Postgres (`phase8_check`, dropped afterwards; never `knottyyoga`), `knottyyoga_database_helper --install_schema` ran the real bootstrap with no seed warnings. The real server then answered, and a script compared its answers with **this document**, character for character:
+  - **About**: three blocks in ordinal order. Each title, body and button label matches its row in the About page table.
+  - **Our Location**: one location, whose text matches the **About ▸ Our Location** paragraph.
+  - None of the old copy appears: no hootananny, "40 years", climbing wall or "Street parking".
+  - The site's name, as the footer and the email subjects read it, is **Knotty Yoga**.
+
+  The first attempt stopped at the install: `--install_schema` expects the database to exist already, so it was created first and the check rerun.
+
+### 8.4 Hand-testing walkthrough
+From a fresh local database:
+1. Recreate it with `knottyyoga_database_helper --recreate_database`.
+2. Start the server and the Angular app. Use a window at least 1280 px wide, so the top menu isn't collapsed. Nothing here needs signing in.
+
+**The About page**
+1. Top nav **About** → **About Knotty Yoga**. Three blocks, top to bottom:
+   - **Who we are**, beginning "Mason started teaching circus acrobatics in 2004", with a **Get started** button.
+   - **How we teach**, beginning "There is no magic to fitness: it's just consistency with intensity with technique coaching.", with a **See the class schedule** button.
+   - **Come and find us**, beginning "We have inch thick padded floors throughout the whole studio", with an **Our location** button.
+2. Nothing on the page mentions forty years, a hootananny or a climbing wall.
+
+**Our Location**
+1. Click **Our location** under **Come and find us**. The page is headed **Our Location**, with one card, **Knotty Yoga Studio**, at 2545 152nd Ave NE, Redmond.
+2. Its text begins "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes" and ends "We're in the last building (14) before the parking lot bends to the right. Space 2545 / Knotty Yoga." No climbing wall, no "Street parking is free after 6pm".
+
+**The site's name**
+1. Scroll to the bottom of any page. The footer reads "© Copyright Knotty Yoga 2020 all rights reserved", without "and Spa". The "2020" is written into the page and is unchanged.
+2. The email sender is checked in Phase 14.3, step 26, which needs real mail.
 
 ---
 
