@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/18/2026
-Version: 0.14
+Version: 0.15
 tags: 
 ---
 # Overview
@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.15 (10/18/2026)** — **Phase 9 is implemented.** Windows 5260 passed, Linux 5260 passed, with the same test names on both.
+  - The test-only seed is gone: no Intro Workshop sessions, no Aerial Series, and no `--recreate_database_test` flag. Every local database is now what production gets. The `intro-workshop` product stays.
+  - All four mutations were caught by the new `TheBaseSeedHasNoSampleData`. End to end, the old flag is refused as unknown, and a fresh install shows no sample data on any page.
+  - Left in place, noted in 9.1: `NextWeekdaysAfter`, a tested date utility whose only caller was the deleted workshop seeder.
 - **v0.14 (10/18/2026)** — **The photos phase moves to just before Verification**, because the photos aren't in yet (OQ-11). The four phases that don't use them each move up one:
 
   | Was | Now | Phase |
@@ -1242,6 +1246,8 @@ From a fresh local database:
 
 # Phase 9 — Retire the test-only seed data (OQ-12, D14)
 
+**Implemented 10/18/2026.** Windows 5260 passed, Linux 5260 passed. The two runs executed the same 5260 test names: Phase 8's 5268, less the nine test-data tests, plus one new. Production never had the test-only seed (it was installed with `--install_schema`), so nothing changes there.
+
 ### 9.1 Seed
 - [x] Delete `PopulateIntroWorkshopSessions`, `PopulateAerialSeriesProduct`, `PopulateAerialSeriesRun` and `PopulateTestData` from `seed_app_data.{h,cpp}`. `PopulateProviderSchedule` already moved in 7.2. The `intro-workshop` **product** stays in the base catalog: staff schedule real workshop sessions through the UI, and the About copy invites people to the next one.
   - Their constants went with them: the Aerial Series' code, class name and run name in the header, and the workshop and series times, prices and capacity in the `.cpp`. So did the two includes only they used (`class_series_helper.h`, `db_schema/event_sessions.h`).
@@ -1265,6 +1271,36 @@ From a fresh local database:
   - one provider template, Caleb's.
 
   The names are spelled out as literals, since the constants went with the seeders.
+- [x] **Mutation-checked on Linux.** Four deliberate breaks, each putting a piece of the sample data back into the base seed. `TheBaseSeedHasNoSampleData` caught every one:
+
+  | Break | Failed |
+  |---|---|
+  | `PopulateClasses` adds an "Aerial Series" class | `TheBaseSeedHasNoSampleData`, `PopulateClassesSeedsTheSixStudioClasses` |
+  | `PopulateProducts` adds an `aerial-series` product | `TheBaseSeedHasNoSampleData`, `PopulateProductsSeedsExactlyTheStudiosProducts` |
+  | `PopulateClassSchedules` adds an event session | `TheBaseSeedHasNoSampleData`, `PopulateClassSchedulesSkipsWhenPrerequisitesAreMissing` |
+  | `PopulateProviderSchedules` adds a Mon–Fri 9–5 template beside Caleb's | `TheBaseSeedHasNoSampleData`, plus two Phase 7 template tests |
+
+  The source was restored byte for byte, with its hash checked in the container and the broken lines searched for from Windows.
+
+### 9.4 End to end
+- [x] With the Linux database helper built from these sources:
+  - **The old flag is refused.** `--recreate_database_test` exits with "ERROR: Unknown command line flag 'recreate_database_test'". It was run with destructive operations not allowed and the database host pointed at a name that cannot resolve, so even a helper that still had the flag could not have touched a database.
+  - **The usage text** (the helper run with no mode) lists `--recreate_database` and no longer lists `--recreate_database_test`.
+- [x] `--install_schema` into a throwaway database on the local Postgres (`phase9_check`, dropped afterwards; never `knottyyoga`): no seed warnings, and no sample-data lines in the log. The real server then answered:
+  - **Upcoming Events** and the home page's events band: no sessions.
+  - **Our Classes**: the six real classes, no Aerial Series.
+  - **The catalog**, signed in as Mason: no `aerial-series`; `intro-workshop` is there.
+
+### 9.5 Hand-testing walkthrough
+1. Run `knottyyoga_database_helper` with no options. The list of modes starts with `--recreate_database` and has no `--recreate_database_test`.
+2. Recreate the database with `knottyyoga_database_helper --recreate_database`.
+3. Start the server and the Angular app. Use a window at least 1280 px wide, so the top menu isn't collapsed. Stay signed out.
+
+**No sample workshops or series**
+1. On the home page, the **Upcoming events** section reads "No upcoming events at this time."
+2. Top nav **Upcoming Events**. The page is headed **Upcoming Events** and reads "No upcoming events at this time." No Aerial Series appears anywhere on it.
+3. Top nav **Our Classes**. **All Classes** shows the six real classes and no **Aerial Series** card.
+4. Click **Weekly schedule**. Tuesday has one class, **6:00 PM Beginner Knotty Yoga**. Thursday's 7:00 PM row is **Intermediate Partner Acro** only, with no Aerial Series beside it.
 
 ---
 
