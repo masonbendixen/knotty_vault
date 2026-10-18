@@ -83,10 +83,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.12 (10/17/2026)** — **Phase 7's code and tests are in; its full runs are not.**
+- **v0.12 (10/17/2026)** — **Phase 7 is implemented.** Windows 5267 passed, Linux 5267 passed, with the same test names on both.
   - Caleb is the only massage therapist. His real hours are a base-seed template, "Massage hours", with no end date, generated through the end of next month.
   - New **7.4**: **Generate Availability** pressed twice used to double the hours. 15.4's monthly press always overlaps the last one, so the plan as written would have doubled every day. It now skips days the template already generated.
-  - The three affected suites pass on Linux, and all nine mutations were caught. The full Linux suite and the Windows build were stopped part-way because the machine ran low on memory (Phase 7 header).
+  - All nine mutations were caught, and the end-to-end run on a throwaway database matched the hours.
+  - New **OQ-23**: **Edit Template** removes the hours its template generated, so after an edit **Book Now** offers no massage until Generate is pressed. The default is a note in 15.4 and no code change.
+  - Phase 6 was committed as `32c9235c`.
 - **v0.11 (10/17/2026)** — Mason's answer to **OQ-22**: the default. 13.3 stands as written, so signed-in visitors will see every class, as signed-out ones do. OQ-22 moves to Resolved.
   - OQ-1 (instructor emails), OQ-11 (photos) and OQ-15 (bios) stay open, each still waiting on the instructors or the photo shoot. Their defaults are unchanged. Of these, only the photos hold up a phase: Phase 9 attaches whatever exists when it lands, and any photo still missing is added later (9.1). The emails are needed before Phase 15; bios can even come after it, through Manage.
 - **v0.10 (10/17/2026)** — **Phase 6 is implemented.** Windows 5259 passed, Linux 5259 passed, with the same test names on both.
@@ -1048,10 +1050,7 @@ From a fresh local database:
 
 # Phase 7 — Caleb as the massage provider
 
-**Code and tests in, 10/17/2026; the full runs are still to do.**
-- Done: on Linux, the three affected suites pass (84 tests: the 64 seed tests, the template generator and the admin template endpoints), and both mutation checks were run.
-- Stopped: the full Linux suite and the Windows build were both stopped part-way by Claude Code because the machine ran low on memory. Neither had failed.
-- Still to do: the full suite on both platforms, the end-to-end run on a throwaway database, and the 7.5 hand-testing walkthrough, which waits on the end-to-end run's real slot times.
+**Implemented 10/17/2026.** Windows 5267 passed, Linux 5267 passed. The two runs executed the same 5267 test names: Phase 6's 5259, less the two 9–5 template tests, plus ten new. The first attempt at the full runs was stopped part-way when the machine ran low on memory, so they were run again one at a time. Like the rest of the seed, it reaches production with the Phase 15 reinstall; 7.4's fix ships with the next release of the server.
 
 The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the seeder and by its tests (D3).
 
@@ -1105,6 +1104,50 @@ Found while checking 15.4. `ScheduleTemplateHelper::GenerateAvailability` skippe
   - With the new check removed (the old behaviour), four tests fail: the two "twice" tests, the overlapping-range test and the monthly-press test.
   - With the check counting **any** template's hours, `…StillAddsAnotherTemplatesHoursToTheSameDay` fails.
   - The source was restored and its hash matches.
+
+### 7.5 End to end
+- [x] On a throwaway database on the local Postgres (`phase7_check`, dropped afterwards; never `knottyyoga`), `knottyyoga_database_helper --install_schema` ran the real bootstrap and the real server answered:
+  - The install log has no seed warning, and reads `provider_availability_generated days=32 skipped=0`. This also shows `PopulateTables` calls the new seeder, which no unit test can see.
+  - **Our Providers**: Caleb Ault, Massage Therapist, alone.
+  - Caleb's templates: one, "Massage hours", no end date, Mon/Tue/Thu/Fri 11:00 to 15:00 or 16:00 and Sun 13:30–16:00.
+  - **Book Now**'s slots for the next eight days (Sun 10/18 – Sun 10/25): only Caleb, only on Sunday, Monday, Tuesday, Thursday and Friday. Sunday's first start is 1:30 PM and the others' 11:00 AM. Monday and Friday's last massage ends 2:50 PM, Tuesday and Thursday's 4:00 PM, Sunday's 3:40 PM.
+  - Generate pressed twice through the real endpoint, from now through 70 days out: the first press `days_generated 18, days_skipped 32`, the second `0` and `50`. The booking slots before and after: 60 each, none offered twice.
+- [x] **Found: Edit Template wipes the generated hours.** The Templates page's **Edit Template** saves by deleting the template and creating a new one. The delete cascades: the template's entries **and every availability row generated from it** go with it. In the run above, all 32 days were gone afterwards. So after editing Caleb's hours, **Book Now** offers no massage until **Generate Availability** is pressed for the new template. Bookings already made are separate rows and are not touched. This is how the page has always worked; Phase 7 only makes it matter. OQ-23 has the default: a note in 15.4, and no code change.
+
+### 7.6 Hand-testing walkthrough
+From a fresh local database:
+1. Recreate it with `knottyyoga_database_helper --recreate_database`.
+2. Start the server and the Angular app. Use a window at least 1280 px wide, so the top menu isn't collapsed.
+
+**Signed out: one massage therapist**
+1. Top nav **About** → **Our Providers**: one card, **Caleb Ault**, "Massage Therapist". There is no Mason Bendixen card.
+
+**A customer books: only Caleb's hours**
+1. **Sign In** as `kiteagle@gmail.com` / `kit`.
+2. Top nav **Services** (page headed **Our Services**) → **Massage** → **Book Now**. The page is headed **Massage**, with a strip of days under it. If a day below isn't in the strip, use the **›** arrow (Next week).
+3. **Wed** and **Sat** are greyed out and can't be clicked: Caleb has no hours on either day.
+4. Click the next **Mon**. One card, **Caleb Ault**, with three closed hour headers: **11:00 AM**, **12:00 PM** and **1:00 PM**. Click **11:00 AM** to open it: **11:00 AM** offers **60-Minute Massage**, **90-Minute Massage** and **120-Minute Massage**. Open **1:00 PM**: the last time is **1:20 PM**, so nothing runs past 3:00 PM.
+5. Click the next **Tue**. The last hour header is **2:00 PM**. Open it: **2:40 PM** offers only the **60-Minute Massage**, because the day ends at 4:00 PM.
+6. Click the next **Sun**. The hour headers are **1:00 PM** and **2:00 PM**. Open **1:00 PM**: its first time is **1:30 PM**. Open **2:00 PM**: **2:40 PM** offers only the **60-Minute Massage**.
+
+**As the administrator: Caleb's template**
+1. Sign out: **Kit** (the name menu) → **Sign Out**, then **Log Out** in the dialog. **Sign In** as `masonbendixen@gmail.com` / `pass`.
+2. **Admin** → **Manage Products** → **Service Providers**: one card, **Caleb Ault**, with the **Massage Therapist** badge and **Accepting bookings** on. There is no Mason Bendixen card.
+3. Click **Templates** (page headed **Schedule Templates**). One card, **Massage hours**, with five chips:
+   - "Monday: 11:00 AM – 3:00 PM"
+   - "Tuesday: 11:00 AM – 4:00 PM"
+   - "Thursday: 11:00 AM – 4:00 PM"
+   - "Friday: 11:00 AM – 3:00 PM"
+   - "Sunday: 1:30 PM – 4:00 PM"
+
+**Generate is safe to press twice (7.4)**
+1. Same card → **Generate Availability**. Set:
+   - **From Date**: today
+   - **To Date**: the last day of next month
+   - **Facility**: Knotty Yoga Studio
+2. Click **Generate**. It reads "Generated 0 availability blocks. Skipped N days (already existed)." The seed already generated those days.
+3. Change **To Date** to the last day of the month after next and click **Generate** again. This time it generates some blocks and skips the rest.
+4. Sign back in as Kit and open **Services** → **Massage** → **Book Now** → the next **Mon**. Open each hour header: every time is listed once, as in step 4 of the customer section.
 
 ---
 
@@ -1452,10 +1495,10 @@ Then start the server and the Angular app. Accounts:
 
 **Massage: Caleb's hours**
 
-21. **Admin** → **Manage Products** → **Service Providers**: one card, **Caleb Ault**, with **Accepting bookings** on. Click **Templates**: one template, **Massage hours**, with chips for Mon, Tue, Thu, Fri and Sun at the hours in the massage table.
+21. **Admin** → **Manage Products** → **Service Providers**: one card, **Caleb Ault**, with **Accepting bookings** on. Click **Templates**: one template, **Massage hours**, with five chips, "Monday: 11:00 AM – 3:00 PM" through "Sunday: 1:30 PM – 4:00 PM", at the hours in the massage table.
 22. **Services** → **Massage** → **Book Now**.
     - In the week strip, click the next **Mon** (use **Next week** if needed). There is one provider card, **Caleb Ault**. The first hour header is **11:00 AM**, and no session starts so late that it would end after 3:00 PM.
-    - Click the next **Wed**: no provider card.
+    - The next **Wed** is greyed out and can't be clicked: no hours that day.
     - Click the next **Sun**: Caleb's earliest time is **1:30 PM**.
 
 **Temporary password (Phase 5)**
@@ -1527,6 +1570,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **Facility**: Knotty Yoga Studio
 
   Click **Generate**. It reports "Generated N availability blocks", and "Skipped M days (already existed)" for days already generated, so pressing it early or twice is harmless (7.4; before that fix a second press doubled the hours). If this ever gets forgotten, the massage picker simply shows no times after the last generated day. A scheduled job is the follow-up if it becomes a chore.
+- [ ] **After changing Caleb's hours with Edit Template, press Generate Availability straight away**, with the same three fields. Saving an edit replaces the template, and every hour generated from the old one goes with it, so until you press it **Book Now** offers no massage at all (OQ-23).
 
 ---
 
@@ -1559,6 +1603,12 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 **OQ-15 — Instructor bios.**
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 - → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
+
+**OQ-23 — Editing Caleb's hours removes his bookable times until Generate is pressed.** *(Found implementing Phase 7, 10/17.)*
+- On **Service Providers** → **Templates**, **Edit Template** saves by deleting the template and creating a new one. The delete takes every availability row generated from the old template with it (7.5). Right after an edit, **Book Now** offers no massage at all until **Generate Availability** is pressed on the new template. Bookings already made are untouched.
+- **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
+- **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
+- Say which.
 
 ### Resolved
 
