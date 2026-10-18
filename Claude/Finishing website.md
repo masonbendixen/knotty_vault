@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/18/2026
-Version: 0.15
+Version: 0.16
 tags: 
 ---
 # Overview
@@ -83,6 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.16 (10/18/2026)** — **Phase 10 is implemented.** REVISION-PENDING
 - **v0.15 (10/18/2026)** — **Phase 9 is implemented.** Windows 5260 passed, Linux 5260 passed, with the same test names on both.
   - The test-only seed is gone: no Intro Workshop sessions, no Aerial Series, and no `--recreate_database_test` flag. Every local database is now what production gets. The `intro-workshop` product stays.
   - All four mutations were caught by the new `TheBaseSeedHasNoSampleData`. End to end, the old flag is refused as unknown, and a fresh install shows no sample data on any page.
@@ -178,7 +179,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 1. ✅ **Fixed in Phase 2 (10/15/2026)**: every seeder now resolves by natural key. What it said before: **Seed ids are still hardcoded in four places.** `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` (all still in `create_database.cpp`) address products 1–9 and variants 1–7 by literal id. `PopulateRoleAssignments` addresses people 1, 2 and 4. Removing the four spa products and adding two Silver ones renumbers everything after them, so **these have to move to natural keys before any catalog change.** That is the same failure mode as the Gold→instructor permission bug found in [[Database helper initialization]] Phase 3.2, and it is still listed there as an open follow-up.
 2. **The access gate already exists and is the right tool.** A class's `class_requirement_groups` are AND-ed and each group's literals are OR-ed. A literal is a permission (closure-expanded) **or** a skill level (`ClassAccessHelper::CheckAccess`). "Silver or Gold" is one group with two literals. "Instructor approval" is a skill-level literal, which is exactly what skill levels are for: "Can kick up to handstand against a wall" is the schema's own example.
 3. **"Requires attending the preceding class" already exists**: `class_schedule_slots.predecessor_class_schedule_slot_id` (SL-11), seeded today for Handstands. Four slots need it now.
-4. **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 10 exists.
+4. ✅ **Fixed in Phase 10 (10/18/2026)**: a slot now carries co-instructors beside its lead, and Tuesday is Gifford's and Tiana's. What it said before: **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 10 exists.
 5. **Nothing extends provider availability over time.** `ScheduleTemplateHelper::GenerateAvailability` is called only by the seed and by the admin **Generate Availability** button. The seed generates through the end of the following month. **Per OQ-8 that stays manual**: once a month someone presses Generate Availability on Caleb's template (15.4). The generator skips days that already exist, so overlapping ranges are harmless. It also ignores `effective_to_us`, so an open-ended template keeps working.
 6. **Production does not pick up seed changes.** Prod was installed with `--install_schema` on 9/23, and every later deploy runs `--migrate`, which evolves the schema and never re-seeds. Phase 15 is how this content reaches the live site.
 7. **The test-only seed data collides with the real schedule.** The Intro Workshop (Sat 10–11) sits inside Saturday Knotty Yoga, the Aerial Series (Tue/Thu 19:00) sits on Thursday Intermediate Partner Acro, and Caleb's Mon–Fri 9–5 template duplicates his real hours. **Per OQ-12 all of it goes** (Phase 9). Caleb's template is promoted to real data with his real hours (Phase 7). After that `PopulateTestData` is empty, so the flag goes too (D14).
@@ -1306,6 +1307,8 @@ From a fresh local database:
 
 # Phase 10 — Co-instructors on a recurring slot (Gifford + Tiana)
 
+**Implemented 10/18/2026.** RESULTS-PENDING
+
 Fact 4: a slot cannot carry two instructors today. OQ-7: "we should support multiple instructors."
 
 Scope: an occurrence's **displayed** instructors become `staffing override if present, else slot lead + co-instructors`. These stay keyed on the **lead**:
@@ -1317,52 +1320,119 @@ Scope: an occurrence's **displayed** instructors become `staffing override if pr
 That is the conservative reading, and each can widen later on its own.
 
 ### 10.1 Schema *(db_schema)*
-- [ ] New nested table `class_schedule_slot_co_instructors`:
+- [x] New nested table `class_schedule_slot_co_instructors`:
   - `id`
   - `class_schedule_slot_id` (FK)
   - `person_id` (FK → people)
   - `created_us`, `updated_us`
   - UNIQUE(slot, person), and an index on slot
-- [ ] The full new-table checklist (CLAUDE.md):
+  - Both keys cascade, as every generated key does, so deleting a slot or a person takes their rows with it. Without that, **Delete slot** would fail on any co-taught slot.
+  - The unique constraint's index leads with the slot, so it *is* the per-slot index; there is no second one.
+- [x] The full new-table checklist (CLAUDE.md):
   - `make_app_tables`
   - `CreateTables`
   - the allowed, top-level and nested admin tables
   - column data info, friendly names and display template
   - table permission (`manage_class_schedule`)
   - CMakeLists
-- [ ] **Idempotent migration `app/0011_class_schedule_slot_co_instructors`** ([[gotcha_new_table_needs_migration]]), with a migration test.
+
+  The existing `create_database_test` checks (the admin metadata's own keys, and every table with column metadata on the allow list) now run over the new rows too.
+- [x] Schema test, 5 cases: a valid row with its defaults, both keys refusing unknown ids, the same person twice on one slot refused (another person, or the same person on another slot, allowed), and deleting the slot removing only its own rows.
+- [x] **Idempotent migration `app/0011_class_schedule_slot_co_instructors`** ([[gotcha_new_table_needs_migration]]), with a migration test.
+  - It is guarded on the table list, like 0006 and 0009, so the DDL lives only in `db_schema`.
+  - Unlike those tables, this one has foreign keys, and a key can only be described against a parent the schema object knows. So the migration builds the whole composed schema and creates just this table from it.
+  - Test: drop the table, apply, write and read a row through the table helper, replay with the row intact, then delete the slot and see the row go (so the keys came with it).
 
 ### 10.2 Table helper *(sql_util/table_helpers)*
-- [ ] `TableHelpers::ClassScheduleSlotCoInstructors`: `Add`, `GetForSlot`, `GetForSlots` (batch, for the catalog's N slots) and `Delete`. Tests for each, including the unique constraint.
+- [x] `TableHelpers::ClassScheduleSlotCoInstructors`: `Add`, `GetForSlot`, `GetForSlots` (batch) and `Delete`. Tests for each, including the unique constraint (6 cases).
+  - Every read returns rows in the order they were added, each with the person's first and last name.
+  - `GetForSlots` serves the admin slot list: one query for all of a schedule's slots. The pages that name instructors ask per occurrence, the way they already read staffing. That is fine at this studio's size.
 
 ### 10.3 Business logic *(business_logic/scheduling)*
-- [ ] One shared `EffectiveInstructorIds`: the staffing override if present, else lead + co-instructors, lead first. The instructor-profile helper already has a private version. Callers:
+- [x] One shared `EffectiveInstructorIds`: the staffing override if present, else lead + co-instructors, lead first. The instructor-profile helper already has a private version. Callers:
   - `ClassCatalogHelper` (class detail sessions)
   - `CalendarHelper`
   - `InstructorProfileHelper`, both "classes I teach" (whose SQL `UNION` gains the co-instructor table) and upcoming sessions
-- [ ] `ClassScheduleHelper`: add or remove a co-instructor on a slot, refusing the lead themself and a person who is not an instructor.
-- [ ] Tests per caller:
+
+  It is `Scheduling::EffectiveInstructorHelper` (new file), with `SlotInstructorIds` (the slot's own team) beside it. The profile helper's private copy is gone. Two things differ from the sketch above:
+  - **Only instructor and substitute staffing rows count.** An assistant row no longer replaces the team. That is the rule the substitution and shift-trade code already state ("assistants never headline a session"); before, three of these readers let an assistant row hide the instructor.
+  - **A fourth caller, `AttendanceTemplateHelper`.** It feeds My Classes' today and upcoming lists, the weekly digest email and an instructor's teaching list. Without it, My Classes would have said "with Gifford Cheung" while the calendar said both. It also puts the Tuesday class on Tiana's teaching list.
+- [x] `ClassScheduleHelper`: add or remove a co-instructor on a slot, refusing the lead themself and a person who is not an instructor.
+  - Error codes: `INVALID_SLOT`, `NOT_AN_INSTRUCTOR`, `CO_INSTRUCTOR_IS_LEAD` and `DUPLICATE_CO_INSTRUCTOR`; remove adds `CO_INSTRUCTOR_NOT_FOUND`.
+  - A duplicate is refused *before* the insert. A unique-key violation would abort the caller's whole transaction.
+  - **Copy slots forward** (a new class schedule copied from another) now copies each slot's co-instructors. Without that, Tiana would silently drop off a copied schedule.
+- [x] Substitutions name the whole team. "Substituting for" on the weekly schedule and My Classes now reads "Gifford Cheung, Tiana Cheung" rather than the lead alone.
+- [x] Tests per caller:
   - a co-taught occurrence lists both names
   - a substitution still **replaces** both
   - Tiana's instructor profile lists Beginner Knotty Yoga
   - the instructor-load grid is unchanged, which pins the scope line above
 
+  Where: the shared helper (7 cases, on real derived occurrences), the catalog (2), the calendar (2), the profile (2), My Classes and the teaching list (2), `ClassScheduleHelper` (8, including copy forward) and the load grid (1).
+- **Not changed, deliberately:**
+  - **Past attendance history** (My Classes ▸ history) still names the lead and any staffing, not co-instructors. It is its own SQL report and wasn't on this phase's list.
+  - **Shift trades on a co-taught class.** See OQ-24.
+
 ### 10.4 Endpoints
-- [ ] `POST /api/admin/class_schedule_slots/{id}/co_instructors` and `DELETE …/{personId}`, gated on `manage_class_schedule`, thin over 10.3.
-- [ ] Endpoint tests: auth (401/403), happy path, duplicate, and lead-as-co-instructor refused.
+- [x] `POST /api/admin/class_schedule_slots/{id}/co_instructors` and `DELETE …/{personId}`, gated on `manage_class_schedule`, thin over 10.3.
+  - As built: `POST /api/admin/class_schedule_slot/{id}/co_instructors` with `{ "person_id": N }`, and `DELETE /api/admin/class_schedule_slot/{id}/co_instructors/{personId}`. That is the singular `class_schedule_slot`, matching the slot's other routes.
+  - A missing slot, or a person who isn't on it, is 404; the other refusals are 400. Both answer `{ ok, error_code }` like the other slot edits.
+- [x] The slot list (`GET /api/admin/class_schedule/{id}/slots`) also returns `co_instructors`, every listed slot's rows with names, so the slot rows and the dialog can show them.
+- [x] Endpoint tests: auth (401/403), happy path, duplicate, and lead-as-co-instructor refused. Also: not an instructor, a missing slot or co-instructor (404), no `person_id` (400), and the slot list carrying the right rows for the right slots.
 
 ### 10.5 Seed
-- [ ] Tuesday Beginner Knotty Yoga gets Tiana as co-instructor. The slot table gains an optional `coInstructorEmail`.
-- [ ] Test through `ClassCatalogHelper`: Tuesday sessions read "Gifford Cheung, Tiana Cheung".
+- [x] Tuesday Beginner Knotty Yoga gets Tiana as co-instructor. The slot table gains an optional `coInstructorEmail`.
+- [x] Test through `ClassCatalogHelper`: Tuesday sessions read "Gifford Cheung, Tiana Cheung".
+  - The two per-slot seed tests (weekly schedule and class page) now expect each row's lead and co-instructor, both read from the seed table.
+  - New: Tiana's instructor profile, through its reader, teaches Beginner Knotty Yoga and nothing else, and every session on it is a Tuesday naming both.
 
 ### 10.6 Frontend
-- [ ] `ServerAccess` + network + mock + proxy methods for add and remove; `ServerAccess.mock.spec.ts` cases.
-- [ ] Slot form dialog (Manage ▸ class schedules): a **Co-instructors** chip picker beneath Instructor, reusing the instructor person picker. Manage Data is not a workflow ([[feedback_manage_data_is_debug_only]]).
-- [ ] Wherever a session renders one instructor name, render the list joined with ", ": class detail, calendar event and instructor profile.
-- [ ] Specs:
+- [x] `ServerAccess` + network + mock + proxy methods for add and remove; `ServerAccess.mock.spec.ts` cases (4). The slot list carries `co_instructors` in all three layers.
+- [x] Slot form dialog (Manage ▸ class schedules): a **Co-instructors** chip picker beneath Instructor, reusing the instructor person picker. Manage Data is not a workflow ([[feedback_manage_data_is_debug_only]]).
+  - The dialog only collects the list. After the slot itself saves, the page brings the co-instructors in line, removals first and then additions. So swapping Gifford and Tiana works in one save.
+  - The instructor is never offered as a co-instructor. Making a listed co-instructor the instructor takes their chip away.
+  - The slot's row on the page shows **Co-instructors** under **Instructor**.
+- [x] Wherever a session renders one instructor name, render the list joined with ", ": class detail, calendar event and instructor profile.
+  - The class page already listed every name, and the calendar gets its joined string from the server, so neither needed a change.
+  - The instructor profile showed no names on its sessions at all. A co-taught session there now reads "With Gifford Cheung, Tiana Cheung"; one taught alone stays as it was.
+- [x] Specs:
   - the dialog adds and removes a co-instructor
   - class detail renders two names
   - the lead cannot be picked as their own co-instructor
+
+  The dialog has 5 new cases plus a rendered one (the chip's remove button), the manage page 6 (including the order of the calls and a rendered row), and the instructor profile 2. The class-detail case already existed.
+
+### 10.7 Mutation check
+MUTATIONS-PENDING
+
+### 10.8 End to end
+E2E-PENDING
+
+### 10.9 Hand-testing walkthrough
+1. Recreate the database with `knottyyoga_database_helper --recreate_database`.
+2. Start the server and the Angular app. Use a window at least 1280 px wide, so the top menu isn't collapsed. Stay signed out.
+
+**Tuesday is Gifford's and Tiana's**
+1. Top nav **Our Classes** → **Weekly schedule**. Tuesday's **6:00 PM Beginner Knotty Yoga** reads **with Gifford Cheung, Tiana Cheung**. Wednesday's 5:00 PM Beginner Knotty Yoga still reads **with Beth Cooper**.
+2. Click **Beginner Knotty Yoga**. Each Tuesday session in the list reads **With: Gifford Cheung, Tiana Cheung**.
+3. **About** → **Instructors** → **Tiana Cheung**. **Classes** shows one chip, **Beginner Knotty Yoga**. Each session under **Upcoming sessions** is a Tuesday at 6:00 PM and reads **With Gifford Cheung, Tiana Cheung**.
+4. Back to **Instructors** → **Gifford Cheung**: the same sessions, with the same line.
+
+**Editing co-instructors**
+
+5. **Sign In** as `masonbendixen@gmail.com` / `pass`. **Admin** → **Manage Products** → **Class Schedules** → **Class**: **Beginner Knotty Yoga**.
+6. Expand **Perpetual**, then **Default schedule**, then the **Tue · 6:00 PM** slot. It reads **Instructor** Gifford Cheung and **Co-instructors** Tiana Cheung.
+7. Click the slot's pencil (**Edit slot**). The **Edit class schedule slot** dialog shows **Instructor (optional)**: Gifford Cheung, and a **Tiana Cheung** chip above **Co-instructors (optional)**.
+8. Click in **Co-instructors (optional)**. The list offers Mason Bendixen, Caleb Ault and Beth Cooper; Gifford and Tiana are not in it. Pick **Beth Cooper**: a Beth Cooper chip appears beside Tiana's. Click **Save**. The slot reads **Co-instructors** Tiana Cheung, Beth Cooper.
+9. Top nav **Our Classes** → **Weekly schedule**: Tuesday reads **with Gifford Cheung, Tiana Cheung, Beth Cooper**.
+10. Back on **Class Schedules** (steps 5–6), **Edit slot** again and click the ⊗ on the **Beth Cooper** chip, then **Save**. The slot is back to **Co-instructors** Tiana Cheung.
+11. **Edit slot** once more and change **Instructor (optional)** to **Tiana Cheung**: her chip disappears, because nobody co-teaches their own class. In **Co-instructors (optional)** pick **Gifford Cheung**, then **Save**. The slot reads **Instructor** Tiana Cheung, **Co-instructors** Gifford Cheung, and the weekly schedule's Tuesday reads **with Tiana Cheung, Gifford Cheung**.
+12. Swap them back the same way: **Instructor** Gifford Cheung, co-instructor Tiana Cheung, **Save**.
+
+**A substitution replaces both**
+
+13. On the **Tue · 6:00 PM** slot click ⇄ (**Substitute instructor for one date**). **Occurrence date**: next Tuesday; **Substitute instructor**: **Mason Bendixen**; **Reason**: `Both away` → **Substitute**.
+14. **Weekly schedule** (use **Next week** if needed): that Tuesday reads **with Mason Bendixen (Substituting for Gifford Cheung, Tiana Cheung)**. The Tuesday after it still reads **with Gifford Cheung, Tiana Cheung**.
 
 ---
 
@@ -1732,6 +1802,14 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - On **Service Providers** → **Templates**, **Edit Template** saves by deleting the template and creating a new one. The delete takes every availability row generated from the old template with it (7.5). Right after an edit, **Book Now** offers no massage at all until **Generate Availability** is pressed on the new template. Bookings already made are untouched.
 - **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
 - **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
+- Say which.
+
+**OQ-24 — A shift trade on a co-taught class drops the co-instructor from that date.** *(Found implementing Phase 10, 10/18.)*
+- A shift trade works by writing who teaches one date onto that date, the same record a substitution writes. Phase 10's rule is that such a record replaces the slot's whole team, which is right for a substitution ("both are away, Mason covers").
+- For a trade it is not quite right. When Gifford asks to trade one Tuesday, the system records Gifford alone as teaching it, so from the moment he asks, that Tuesday shows only Gifford and Tiana disappears from it. Once someone takes the shift, it shows only them.
+- Tiana herself can't trade a Tuesday: the request is refused with "You can only trade your own teaching shift", because only the lead holds the shift.
+- **Default:** leave it. Trades on the one co-taught class should be rare, and an admin substitution (which names whoever covers) is the workaround.
+- **Alternative:** when the lead asks to trade a co-taught date, record the co-instructors on that date too, so the trade replaces only the lead. That is a change to the shift-trade code, with tests.
 - Say which.
 
 ### Resolved
