@@ -1154,11 +1154,15 @@ From a fresh local database:
 # Phase 8 — About page copy, the location's text and the sender name
 
 ### 8.1 Seed
-- [ ] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
-- [ ] `PopulateFacilities`: the studio's `description` becomes the **About ▸ Our Location** text above (OQ-16). It is a named constant in `seed_app_data.h`, so the test reads the same value the seeder writes.
-- [ ] `app_secret_values.cpp`: `kMailSenderNameValue` becomes **"Knotty Yoga"** (OQ-16). It is also the site's **studio name** (`Mail::LoadTenantBranding` sets `studioName = senderName`). So the same change fixes the footer's "© Copyright Knotty Yoga and Spa 2020" and email subjects such as "Welcome to Knotty Yoga and Spa - Your Account". The "2020" is hard-coded in `footer.component.html`, and nothing here changes it. Move it into `app_secret_values.h`, so the tests that check a message's From name compare against the constant rather than a copy of the string.
-  - Eight tests assert the literal "Knotty Yoga and Spa" today: `app_secret_values_test`, `attendance_template_helper_test` (twice), `class_series_helper_test`, `favorite_instructor_helper_test`, `weekly_digest_helper_test`, `card_expiring_notification_test` and `signup_reminder_helper_test`. `class_checkin_helper_test` expects the subject "Welcome to Knotty Yoga and Spa - Your Account". It needs checking at implementation whether that subject is built from the sender name or from a separate site-name slot.
-- [ ] Not changed: `ServerAccess.mock.ts`'s local-mode copy of the old location text. It is fixture data, as 13.2 notes for the mock catalog.
+- [x] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
+  - **Changed from the plan:** the blocks moved out of the function into one table, `kSeedAboutBlocks` in `seed_app_data.h`, which the seeder and its test both walk (D3), like the massage hours.
+- [x] `PopulateFacilities`: the studio's `description` becomes the **About ▸ Our Location** text above (OQ-16). It is a named constant, `kStudioDescription` in `seed_app_data.h`, so the test reads the same value the seeder writes.
+- [x] `kMailSenderNameValue` becomes **"Knotty Yoga"** (OQ-16), and moved from `app_secret_values.cpp` into `app_secret_values.h`. It is also the site's **studio name** (`Mail::LoadTenantBranding` sets `studioName = senderName`). So the same change fixes the footer's "© Copyright Knotty Yoga and Spa 2020" and email subjects such as "Welcome to Knotty Yoga and Spa - Your Account". The "2020" is hard-coded in `footer.component.html`, and nothing here changes it.
+  - Eight tests asserted the literal "Knotty Yoga and Spa": `app_secret_values_test`, `attendance_template_helper_test` (twice), `class_series_helper_test`, `favorite_instructor_helper_test`, `weekly_digest_helper_test`, `card_expiring_notification_test` and `signup_reminder_helper_test`.
+  - **Checked:** `class_checkin_helper_test`'s subject is built from the sender name. honuware's `QuickAccountHelper` writes `"Welcome to " + branding.studioName + " - Your Account"`; there is no separate site-name slot. That test now builds the expected subject from the constant too.
+- [x] Not changed:
+  - `ServerAccess.mock.ts`'s local-mode copies of the old location text and the old About blocks. They are fixture data, as 13.2 notes for the mock catalog.
+  - The `site_about_markdown` default in `app_secret_values.cpp`, which still carries the "40 years … hootananny" text. Nothing on this site has displayed it since Polish 7.3 replaced it with the About blocks. It still rides along unseen in the site-settings data the browser loads, and in theme bundles, which Phase 15 doesn't use (OQ-9). Say if you want it emptied anyway.
 
 ### 8.2 Tests
 - [ ] Through the public About reader (the one behind `/api/about_sections`): three blocks, in ordinal order, with the new bodies, and no block containing "hootananny".
