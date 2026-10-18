@@ -1165,9 +1165,29 @@ From a fresh local database:
   - The `site_about_markdown` default in `app_secret_values.cpp`, which still carries the "40 years … hootananny" text. Nothing on this site has displayed it since Polish 7.3 replaced it with the About blocks. It still rides along unseen in the site-settings data the browser loads, and in theme bundles, which Phase 15 doesn't use (OQ-9). Say if you want it changed anyway.
 
 ### 8.2 Tests
-- [ ] Through the public About reader (the one behind `/api/about_sections`): three blocks, in ordinal order, with the new bodies, and no block containing "hootananny".
-- [ ] Through the location reader the public page uses (`TableHelpers::Facilities::GetActiveFacilities`, as `PopulateFacilitiesGivesTheStudioADescriptionAndTimezone` does today): the studio's description is the new text, and contains neither "climbing wall" nor "Street parking".
-- [ ] Sender name through the app's secret defaults (`app_secret_values_test`) and through one real message's From name. The eight existing assertions switch to the constant.
+- [x] `PopulateAboutSectionsSeedsMasonsCopyInPageOrder` (new, `seed_app_data_test.cpp`), through the public About reader (the one behind `/api/about_sections`):
+  - three blocks, in the page's order (Who we are, How we teach, Come and find us);
+  - every field equal to its `kSeedAboutBlocks` row;
+  - spelled out as well, so a wrong table can't pass by agreeing with itself: how each body opens, the **Get started** label and the `/location` link;
+  - no block containing "hootananny", "40 years" or "climbing wall".
+  
+  The older `…SeedsBlocksTheAboutPageCanRender` keeps its general checks. Its "40 years" line is gone.
+- [x] `PopulateFacilitiesGivesTheStudioADescriptionAndTimezone`, through the location reader the public page uses (`TableHelpers::Facilities::GetActiveFacilities`): the description equals `kStudioDescription`. Spelled out: it opens "Our home gym: a full acrobatics floor with crash mats", contains "We're in the last building (14)" and ends "Space 2545 / Knotty Yoga.". It contains neither "climbing wall" nor "Street parking".
+- [x] Sender name: `AppSecretValuesTest.RegistersBrandDefaultsForFrameworkKeys` spells out "Knotty Yoga", the one place the value itself is pinned. The eight From-name checks in real messages, and the welcome-email subject, compare against `App::kMailSenderNameValue`.
+- [x] **Mutation-checked on Linux.** Eight deliberate breaks, each caught:
+
+  | Break | Failed |
+  |---|---|
+  | Who we are carries the old "40 years … hootananny" copy | `…SeedsMasonsCopyInPageOrder` |
+  | The seeder writes the old location text instead of the constant | `PopulateFacilitiesGivesTheStudio…` |
+  | The location text says "We in", as typed | `PopulateFacilitiesGivesTheStudio…` |
+  | The sender name keeps the spa | `RegistersBrandDefaultsForFrameworkKeys` |
+  | The defaults register "Knotty Yoga and Spa" instead of the constant | `RegistersBrandDefaultsForFrameworkKeys`, plus all eight message tests (the welcome subject among them) |
+  | How we teach moves to the end of the page | `…SeedsMasonsCopyInPageOrder` |
+  | The seeder skips Come and find us | `…SeedsMasonsCopyInPageOrder` |
+  | The first block's button reads "Start here" | `…SeedsMasonsCopyInPageOrder` |
+
+  The fourth row is why the value is spelled out once: the message tests follow the constant, so only that test notices the constant itself is wrong. The sources were restored byte for byte, with hashes checked in the container and the broken lines searched for from Windows.
 
 ---
 
