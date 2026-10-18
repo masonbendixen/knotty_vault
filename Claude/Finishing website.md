@@ -1044,26 +1044,60 @@ From a fresh local database:
 
 # Phase 7 — Caleb as the massage provider
 
+**Implemented 10/17/2026.** RESULTS_PENDING
+
+The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the seeder and by its tests (D3).
+
 ### 7.1 Provider assignment *(seed)*
-- [ ] `PopulateProviderTypeAssignments`: Caleb only, `massage_therapist`, accepting bookings. Mason's assignment is dropped (OQ-6, confirmed).
+- [x] `PopulateProviderTypeAssignments`: Caleb only, `massage_therapist`, accepting bookings. Mason's assignment is dropped (OQ-6, confirmed).
 
 ### 7.2 Weekly hours *(seed)*
-- [ ] **Promote** the test-only `PopulateProviderSchedule` into the base seed as `Seed::PopulateProviderSchedules(…, nowUs)`. It already resolves Caleb and the studio by natural key and generates through `GenerateAvailability`. What changes:
+- [x] **Promote** the test-only `PopulateProviderSchedule` into the base seed as `Seed::PopulateProviderSchedules(…, nowUs)`. It still resolves Caleb and the studio by natural key and generates through `GenerateAvailability`. What changed:
   - The template is named **"Massage hours"**.
-  - It is **open-ended** (`effective_to_us` NULL, so future Generate presses keep working).
-  - It carries the five ISO entries above instead of Mon–Fri 9–5. The ISO constants are named locally, keeping the existing warning comment and adding `kIsoSunday = 7`.
-- [ ] Availability is generated from today's local midnight through `Scheduling::EndOfFollowingMonthUs(nowUs)` in the studio facility. Beyond that it is extended by hand each month (15.4).
-- [ ] `PopulateTables` reads `now_us()` once and passes it in, as `PopulateTestData` does today (D2 of the previous plan).
+  - It is **open-ended** (`effective_to_us` NULL). Checked first: nothing reads a provider template's dates. The generator ignores them, and the Templates page neither shows them nor sends real ones (it creates templates with 0 and 0). NULL only says "no end".
+  - It carries the five ISO entries above instead of Mon–Fri 9–5.
+  - **Changed from the plan:** the ISO constants (`kIsoMonday` … `kIsoSunday = 7`, with the warning comment) sit in `seed_app_data.h` beside the table rather than inside the function, because the tests walk the same table.
+- [x] Availability is generated from today's local midnight through `Scheduling::EndOfFollowingMonthUs(nowUs)` in the studio facility. Beyond that it is extended by hand each month (15.4), which 7.4 makes safe to repeat.
+- [x] `PopulateTables` reads `now_us()` once and passes it in. It runs last, after `PopulateServiceProductLinks`, so the massage product is bookable before its provider has hours.
+- [x] `PopulateTestData` no longer adds a template; the old 9–5 one and `PopulateProviderSchedule` are gone.
 
 ### 7.3 Tests
-- [ ] Through the **booking-slot reader** (the one behind the massage picker and `list_available_slots`):
-  - on a fixed Monday, Caleb offers slots inside 11:00–15:00 and none outside
-  - Wednesday and Saturday offer none
-  - a Sunday offers 13:30–16:00, which pins ISO 7
-- [ ] Every generated row is Caleb's, `source = template`, and on a Mon/Tue/Thu/Fri/Sun local date.
-- [ ] **Caleb's massage hours never overlap a class slot he teaches.** This cross-checks Phase 6's slot table against Phase 7's entries, so a future schedule edit that double-books him fails the gate.
-- [ ] Mason holds no provider assignment.
-- [ ] The test-data tests for the old 9–5 template move here and change to the new hours.
+All in `seed_app_data_test.cpp` unless named otherwise.
+- [x] `PopulateProviderTypeAssignmentsMakesCalebTheOnlyMassageTherapist` (replaces `…MakesBothMassageTherapists`), read through **About ▸ Our Providers**' reader (`ProviderDirectoryHelper`) and the assignment readers booking uses: Caleb alone, and **Mason holds no provider assignment**. `…SkipsWithoutTheProviderType` now checks Caleb.
+- [x] `PopulateProviderSchedulesWritesTheOpenEndedMassageHoursTemplate` (replaces the 9–5 template test), read the way **Templates** reads it: one template, "Massage hours", open-ended, its five entries matched by day. Spelled out as well: ISO days {1, 2, 4, 5, 7}, and Sunday 13:30–16:00.
+- [x] **Through the booking-slot reader** (`ServiceAvailabilityHelper::ComputeAvailableSlots`, behind **Book Now** and `list_available_slots`), `…OffersMassageOnlyInCalebsHours`. The plan said "a fixed Monday"; the reader drops anything already started by the database clock, so the test takes the seven days from tomorrow instead.
+  - Every slot is Caleb's, in the studio, inside that day's hours, and the first starts when he opens.
+  - Spelled out: Monday's first massage is 11:00 and Sunday's 13:30 (which pins ISO 7).
+  - Wednesday and Saturday offer none.
+- [x] `…GeneratesCalebsDaysThroughTheEndOfNextMonth` (replaces `ProviderAvailabilityIsGeneratedOnWeekdaysOnly`): every generated row is Caleb's, `source = template`, in the studio, at local midnight, on one of his days at that day's hours. The set of dates equals every such local date from today through the end of next month, worked out independently of the generator.
+- [x] **Caleb's massage hours never overlap a class he teaches** (`…NeverOverlapsAClassCalebTeaches`). His classes come from the calendar reader, his hours from the availability reader, across the whole generated window. It also checks he teaches Sunday, Monday and Thursday and has hours on each of those days, so the comparison is never empty.
+- [x] `PopulateProviderSchedulesSkipsWithoutCaleb`.
+- [x] `OnlyPopulateTestDataAddsTheSampleData`: Caleb's template now exists after the base seed, and the test-only seed adds no second one.
+- [x] **Mutation-checked on Linux.** Seven deliberate breaks, each caught:
+
+  | Break | Failed |
+  |---|---|
+  | Mason added back alongside Caleb | `…MakesCalebTheOnlyMassageTherapist` |
+  | Sunday written the class-slot way (0) | `…WritesTheOpenEnded…`, `…OffersMassageOnly…`, `…NeverOverlaps…` |
+  | Monday runs to 17:30, into his 17:00 class | `…NeverOverlapsAClassCalebTeaches` |
+  | The template given an end date again | `…WritesTheOpenEndedMassageHoursTemplate` |
+  | Only two weeks generated | `…GeneratesCalebsDaysThroughTheEndOfNextMonth` |
+  | Sunday opens at 13:00 | `…WritesTheOpenEnded…`, `…OffersMassageOnly…` |
+  | Thursday dropped | `…WritesTheOpenEnded…`, `…OffersMassageOnly…`, `…NeverOverlaps…` |
+
+  The sources were restored byte for byte, with hashes checked in the container and again from Windows. Leaving the call out of `PopulateTables` is the one break no unit test can see, since nothing can run `PopulateTables`; the end-to-end run covers it.
+
+### 7.4 Generate Availability is safe to press twice *(business_logic/scheduling)* — added
+Found while checking 15.4. `ScheduleTemplateHelper::GenerateAvailability` skipped only days with hand-entered or blocked hours. A second press over days the template had already generated added a second copy of them. 15.4's monthly press starts from today, so it always overlaps the last one: following it would have doubled every day already generated, and **Book Now** would have offered every time twice. 15.4 also said pressing twice was harmless.
+- [x] A day **this** template already generated is now skipped and counted in `days_skipped`, so the Templates page's "Skipped N days (already existed)" is true. Hours from a different template on the same day are still added, since that is a split shift. The check reuses `ProviderAvailability::GetAvailabilityForProviderOnDate`, with no new SQL.
+- [x] Tests:
+  - `schedule_template_helper_test.cpp`: `GenerateAvailabilityTwiceAddsNothingTheSecondTime`, `…OverAnOverlappingRangeAddsOnlyTheNewDays` and `…StillAddsAnotherTemplatesHoursToTheSameDay`.
+  - `admin_schedule_templates_test.cpp`: `GenerateAvailabilityPressedTwiceSkipsTheGeneratedDays`, through the endpoint the Generate button calls.
+  - `seed_app_data_test.cpp`: `MonthlyGeneratePressExtendsCalebsHoursWithoutDuplicates`, which runs 15.4's press on the seeded template, from today through the end of the month after next.
+- [x] **Mutation-checked on Linux:**
+  - With the new check removed (the old behaviour), four tests fail: the two "twice" tests, the overlapping-range test and the monthly-press test.
+  - With the check counting **any** template's hours, `…StillAddsAnotherTemplatesHoursToTheSameDay` fails.
+  - The source was restored and its hash matches.
 
 ---
 
@@ -1485,7 +1519,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **To Date**: the last day of next month
   - **Facility**: Knotty Yoga Studio
 
-  Click **Generate**. It reports "Generated N availability blocks", and "Skipped M days (already existed)" for days already generated, so pressing it early or twice is harmless. If this ever gets forgotten, the massage picker simply shows no times after the last generated day. A scheduled job is the follow-up if it becomes a chore.
+  Click **Generate**. It reports "Generated N availability blocks", and "Skipped M days (already existed)" for days already generated, so pressing it early or twice is harmless (7.4; before that fix a second press doubled the hours). If this ever gets forgotten, the massage picker simply shows no times after the last generated day. A scheduled job is the follow-up if it becomes a chore.
 
 ---
 
