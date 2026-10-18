@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/18/2026
-Version: 0.13
+Version: 0.14
 tags: 
 ---
 # Overview
@@ -83,6 +83,19 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.14 (10/18/2026)** — **The photos phase moves to just before Verification**, because the photos aren't in yet (OQ-11). The four phases that don't use them each move up one:
+
+  | Was | Now | Phase |
+  |---|---|---|
+  | 10 | **9** | Retire the test-only seed data |
+  | 11 | **10** | Co-instructors on a recurring slot |
+  | 12 | **11** | Forgot password |
+  | 13 | **12** | The class page names the membership; cleanup |
+  | 9 | **13** | Attach the photos |
+
+  - Every reference in the plan follows the new numbers, except in the revision notes below, which keep the numbers they were written with. Nine code comments in `src/database_helper/` that name these phases were renumbered too.
+  - Verification (14) and the production rollout (15) stay last: Verification's walkthrough checks the photographs.
+  - Phase 8 was validated by hand and committed as `f12a4c69`.
 - **v0.13 (10/18/2026)** — **Phase 8 is implemented.** Windows 5268 passed, Linux 5268 passed, with the same test names on both.
   - About carries your three blocks, the location your text with the directions, and the site's name is "Knotty Yoga". That name is also the email sender, the footer's name and the name in email subjects.
   - All eight mutations were caught. The end-to-end run compared the real server's answers with this document, character for character, and they match.
@@ -150,9 +163,9 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 | Instructors | Mason, Caleb | + Beth, Gifford, Tiana, with real bios when they arrive |
 | Massage providers | Mason **and** Caleb, no availability in the base seed | Caleb only, with his weekly hours |
 | About page | Placeholder copy ("40 years … hootananny") | Mason's copy (Phase 8) |
-| Test-only seed (`--recreate_database_test`) | Intro Workshop sessions, Aerial Series, Caleb's Mon–Fri 9–5 template | Retired (Phase 10). The local database matches production |
-| Password recovery | None. A forgotten password cannot be recovered | **Forgot password?** on the Log In page (Phase 12) |
-| Photos | Mason/Caleb profile + instructor; KnottyYoga, PartnerAcro, Handstand class photos; tier icons | All 13 subjects freshly shot (Phase 1), attached in Phase 9 |
+| Test-only seed (`--recreate_database_test`) | Intro Workshop sessions, Aerial Series, Caleb's Mon–Fri 9–5 template | Retired (Phase 9). The local database matches production |
+| Password recovery | None. A forgotten password cannot be recovered | **Forgot password?** on the Log In page (Phase 11) |
+| Photos | Mason/Caleb profile + instructor; KnottyYoga, PartnerAcro, Handstand class photos; tier icons | All 13 subjects freshly shot (Phase 1), attached in Phase 13 |
 | Database connection loss | The server never reconnects: one dropped connection takes the site down until a restart, while `/api/health` still says ok (the 10/15 incident) | Reconnects on its own; health probes the connection requests use (Phase 4) |
 | Scheduled jobs | Every job refused with 403 by the CSRF guard since the 10/8 deploy | Jobs run (Phase 4) |
 
@@ -161,12 +174,12 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 1. ✅ **Fixed in Phase 2 (10/15/2026)**: every seeder now resolves by natural key. What it said before: **Seed ids are still hardcoded in four places.** `PopulateProductVariants`, `PopulateProductPrices` and `PopulateProductBookingWindows` (all still in `create_database.cpp`) address products 1–9 and variants 1–7 by literal id. `PopulateRoleAssignments` addresses people 1, 2 and 4. Removing the four spa products and adding two Silver ones renumbers everything after them, so **these have to move to natural keys before any catalog change.** That is the same failure mode as the Gold→instructor permission bug found in [[Database helper initialization]] Phase 3.2, and it is still listed there as an open follow-up.
 2. **The access gate already exists and is the right tool.** A class's `class_requirement_groups` are AND-ed and each group's literals are OR-ed. A literal is a permission (closure-expanded) **or** a skill level (`ClassAccessHelper::CheckAccess`). "Silver or Gold" is one group with two literals. "Instructor approval" is a skill-level literal, which is exactly what skill levels are for: "Can kick up to handstand against a wall" is the schema's own example.
 3. **"Requires attending the preceding class" already exists**: `class_schedule_slots.predecessor_class_schedule_slot_id` (SL-11), seeded today for Handstands. Four slots need it now.
-4. **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 11 exists.
+4. **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 10 exists.
 5. **Nothing extends provider availability over time.** `ScheduleTemplateHelper::GenerateAvailability` is called only by the seed and by the admin **Generate Availability** button. The seed generates through the end of the following month. **Per OQ-8 that stays manual**: once a month someone presses Generate Availability on Caleb's template (15.4). The generator skips days that already exist, so overlapping ranges are harmless. It also ignores `effective_to_us`, so an open-ended template keeps working.
 6. **Production does not pick up seed changes.** Prod was installed with `--install_schema` on 9/23, and every later deploy runs `--migrate`, which evolves the schema and never re-seeds. Phase 15 is how this content reaches the live site.
-7. **The test-only seed data collides with the real schedule.** The Intro Workshop (Sat 10–11) sits inside Saturday Knotty Yoga, the Aerial Series (Tue/Thu 19:00) sits on Thursday Intermediate Partner Acro, and Caleb's Mon–Fri 9–5 template duplicates his real hours. **Per OQ-12 all of it goes** (Phase 10). Caleb's template is promoted to real data with his real hours (Phase 7). After that `PopulateTestData` is empty, so the flag goes too (D14).
+7. **The test-only seed data collides with the real schedule.** The Intro Workshop (Sat 10–11) sits inside Saturday Knotty Yoga, the Aerial Series (Tue/Thu 19:00) sits on Thursday Intermediate Partner Acro, and Caleb's Mon–Fri 9–5 template duplicates his real hours. **Per OQ-12 all of it goes** (Phase 9). Caleb's template is promoted to real data with his real hours (Phase 7). After that `PopulateTestData` is empty, so the flag goes too (D14).
 8. **`ui/src/app/pages/public/services/homepage.service.ts` is dead code.** Only its own spec imports it, and it hardcodes the old six-class list. It gets deleted rather than updated.
-9. **Customers never see a requirement group's `inline_description`.** The admin field is labelled "Description (shown to members)", but no customer template renders it. A visitor sees only **"Members only — Upgrade your membership to attend."** on the class page, or the **"Requires a membership"** badge on Our Classes. Nothing tells them *which* membership. The skill side does render: the class page's **"Required Skills"** section lists each skill's name and description, and the **"Skill required"** dialog shows the same. That is why the approval criteria go into the skill descriptions (D6). Phase 13 closes the membership half.
+9. **Customers never see a requirement group's `inline_description`.** The admin field is labelled "Description (shown to members)", but no customer template renders it. A visitor sees only **"Members only — Upgrade your membership to attend."** on the class page, or the **"Requires a membership"** badge on Our Classes. Nothing tells them *which* membership. The skill side does render: the class page's **"Required Skills"** section lists each skill's name and description, and the **"Skill required"** dialog shows the same. That is why the approval criteria go into the skill descriptions (D6). Phase 12 closes the membership half.
 10. **The class page does not show "Requires attending".** The predecessor shows on the weekly **Our Classes** list (`Requires attending: {Class}`) and in the admin slot editor, not on the class detail page. No change planned; the hand-testing steps check it where it renders.
 11. **Must-change-password is fully supported.** This answers the question in OQ-2.
     - The server side is honuware platform:
@@ -179,7 +192,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 12. **All of sign-in lives in honuware, not in this repo.** That means the Log In, Register, Check Email and Verify pages, `/api/login`, `/api/register`, `/api/verify`, the `email_verifications` table, `PersonHelper`, `LoginGate` and the verification mail.
     - The back end is in `server_components` (`components/platform/…`), pinned by `GIT_TAG` in the top-level `CMakeLists.txt`.
     - The front end is in `honuware-web-components` (`@honuware/ui/auth`), exact-pinned in `ui/package.json`.
-    - **Forgot password (Phase 12) is therefore built in both honuware repos and then pinned in here.**
+    - **Forgot password (Phase 11) is therefore built in both honuware repos and then pinned in here.**
     - Honuware has exactly one framework migration (`honuware/0001_site_assets`). This app's migrations ran through `app/0009_about_sections`; Phase 3 added `app/0010_products_sort_order`.
 13. ✅ **Fixed in Phase 3 (10/15/2026)**: products now list by `sort_order`, then name. What it said before: **Product order is name order, everywhere.** All three `TableHelpers::Products` listings `ORDER BY name, id`, `CatalogHelper` keeps that order, and the membership hosts only filter `kind === 'subscription'`. Grouping Silver before Gold (OQ-13) therefore needs a column, not a front-end sort.
 
@@ -189,8 +202,8 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 
 - **D1 — This is SEED data, built on mechanisms that already exist.** Classes, slots, predecessors, requirement groups, skill levels, entitlement rules, provider templates and photos all have tested tables and helpers. There are three new *mechanisms*:
   - product sort order (Phase 3, OQ-13)
-  - co-instructors (Phase 11, fact 4)
-  - forgot password (Phase 12, OQ-2)
+  - co-instructors (Phase 10, fact 4)
+  - forgot password (Phase 11, OQ-2)
 
   Phase 4 (database reconnect, truthful health, scheduled jobs) is a fix to the framework, not a content mechanism.
 
@@ -221,8 +234,8 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
   - **Knotty Yoga's approval** (OQ-19) and the **Beginner Partner Acro solo-flyer rule** stay in the class descriptions and are checked at the door. The system has no notion of "solo", and Knotty Yoga was left off the skill list in the OQ-4 answer.
 - **D7 — Every non-beginner class requires `gold_member`** (OQ-3, confirmed). Without some membership group, a class is open and free to everyone (fact 2's corollary). Beginner Knotty Yoga takes Silver **or** Gold.
 - **D8 — Spa removal keeps the room-type vocabulary.** These all go: the four spa products, their variants, prices and product schedule windows, the `Spa` room, and its room schedule template. The `spa` / `swim_spa` **room types** stay: they are reference vocabulary, harmless when unused, and "we don't have the spa *yet*" says it is coming back. This also retires the `late-night-spa` → nonexistent `gold_fitness` permission bug recorded in [[Database helper initialization]]'s follow-ups.
-- **D9 — New people never get a password from source control.** Beth, Gifford and Tiana are created with a random, unrecorded password, generated at seed time and never logged. To let one of them in, Mason sets a **temporary password with the must-change flag** (Phase 5), and they choose their own at first sign-in. Once Phase 12 ships, **Forgot password?** works too, given a real email (OQ-1). The four existing accounts keep their committed dev passwords; Mason, Caleb and Kit change theirs on production at deploy time (OQ-10, 15.3).
-- **D10 — Photos come first, and the code never waits on them.** Mason shoots them in Phase 1, and Claude converts them and attaches them in Phase 9. `AttachSeedPhoto` already logs and skips a missing file, so one late picture blocks nothing: it lands later as file + table row + test expectation in one change.
+- **D9 — New people never get a password from source control.** Beth, Gifford and Tiana are created with a random, unrecorded password, generated at seed time and never logged. To let one of them in, Mason sets a **temporary password with the must-change flag** (Phase 5), and they choose their own at first sign-in. Once Phase 11 ships, **Forgot password?** works too, given a real email (OQ-1). The four existing accounts keep their committed dev passwords; Mason, Caleb and Kit change theirs on production at deploy time (OQ-10, 15.3).
+- **D10 — Photos come first, and the code never waits on them.** Mason shoots them in Phase 1, and Claude converts them and attaches them in Phase 13, just before Verification. `AttachSeedPhoto` already logs and skips a missing file, so one late picture blocks nothing: it lands later as file + table row + test expectation in one change.
 - **D11 — Production gets the content by reinstall, not by a data migration** (OQ-9: "Wipe away"). Prod is in preview on the Square sandbox. `--install_schema --force` plus the `set_secret` block is already verified end to end (Deploying to AWS 5.1 step 4). An in-place migration would have to delete spa products under purchases, rename classes under bookings and re-key slots, all for smoke-test data.
 - **D12 — Product display order is a server-side `sort_order` column** (OQ-13). The tiers then group Silver, Silver Couple's, Gold, Gold Couple's, Gold Family.
   - Every listing (catalog, Services, Memberships, the home band, Manage Products) shares one order instead of each host sorting its own way.
@@ -363,7 +376,7 @@ Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Gifford Cheung."
 
 # Phase 1 — Take the photos (Mason)
 
-The later phases use these: Phase 9 attaches them and Phase 14's walkthrough looks for them. Nothing else blocks on them (D10), so the phases below can proceed while the shoot happens.
+The later phases use these: Phase 13 attaches them and Phase 14's walkthrough looks for them. Nothing else blocks on them (D10), so the phases below can proceed while the shoot happens.
 
 ### 1.1 Shot list
 
@@ -394,7 +407,7 @@ How the site crops each kind, so the subject survives the crop:
   - Phone rotation applied.
   - **All metadata stripped** (`-map_metadata -1`), because phone photos carry GPS coordinates.
   - Never `convert`: on Windows that resolves to the FAT-to-NTFS disk converter.
-- [ ] Claude opens every converted file to check orientation and framing against 1.1, and lists anything that needs a reshoot in this phase before Phase 9 wires it.
+- [ ] Claude opens every converted file to check orientation and framing against 1.1, and lists anything that needs a reshoot in this phase before Phase 13 wires it.
 
 ---
 
@@ -555,7 +568,7 @@ The five tiers made the cards' uneven heights visible: a name or description tha
   - `Http::HttpResponse::headers` is a `std::map`. The login reply sets two cookies (`session_token` and `csrft`), and the second `Set-Cookie` overwrites the first, so the helper keeps one. It also never sends the `X-CSRF-Token` header the guard compares against (`csrf_guard.cpp:107-113`).
   - *Why `csrft` in particular (found while building 4.4):* Crow keeps response headers in an `unordered_multimap`. On Linux (libstdc++) a repeated header goes out **newest first**, so login's `session_token`-then-`csrft` reaches the wire as `csrft`, `session_token`, and last-wins kept `session_token`. A Windows server sends them in the other order, so the same helper would have lost the session cookie instead. Either way the job is refused.
 
-All the code is in `server_components`; knottyyoga only moves its pin. During development knottyyoga builds against the local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`), as Phase 12 does. This phase ships to production **on its own release (4.6), ahead of everything after it**: it is a fix to what is live today.
+All the code is in `server_components`; knottyyoga only moves its pin. During development knottyyoga builds against the local checkout (`FETCHCONTENT_SOURCE_DIR_HONUWARE`), as Phase 11 does. This phase ships to production **on its own release (4.6), ahead of everything after it**: it is a fix to what is live today.
 
 ### 4.0 Now, by hand
 - [x] `sudo systemctl restart knottyyoga-server` on the EC2, then `curl -sS http://localhost/api/health` and a page load through the CloudFront URL. This is the only cure until 4.6 ships.
@@ -850,9 +863,9 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
   - **No front-end change was needed.** The **Staff** menu and the `/staff` pages already open for anyone holding the `instructor` permission (honuware's `hasStaffAccess`/`StaffGuard`). Until now, an Instructor-only person saw the portal but the server refused check-in and **Person Skills**.
 
 ### 5.5 Instructor profiles *(seed)*
-- [x] `PopulateInstructors`: five rows, data-driven, with bios taken **verbatim** from the "Instructor bios" section above, or each name's default where nothing was pasted (OQ-15). The photo column moves to Phase 9's table.
+- [x] `PopulateInstructors`: five rows, data-driven, with bios taken **verbatim** from the "Instructor bios" section above, or each name's default where nothing was pasted (OQ-15). The photo column moves to Phase 13's table.
   - No bios had been pasted, so all five are the defaults. `Seed::kSeedInstructors` in `seed_app_data.h` is the one table; the test walks it too (D3).
-  - Mason and Caleb keep their headshots. Beth, Gifford and Tiana have an empty photo entry, which is skipped without a "seed_image_missing" warning. Phase 9 attaches their pictures and moves all five into its photo table.
+  - Mason and Caleb keep their headshots. Beth, Gifford and Tiana have an empty photo entry, which is skipped without a "seed_image_missing" warning. Phase 13 attaches their pictures and moves all five into its photo table.
 
 ### 5.6 Tests
 - [x] All five instructors exist with the expected bios, read through `InstructorProfileHelper::GetInstructorProfile` (the public Instructors page's reader). `PopulateInstructorsSeedsAllFiveWithTheirBios`:
@@ -894,7 +907,7 @@ From a fresh local database:
 2. Check the three new cards:
    - Beth's reads "Teaches Beginner Knotty Yoga on Wednesdays."
    - Gifford's and Tiana's each say they co-teach Tuesdays with the other.
-   - The three new cards have no photo yet (Phase 9).
+   - The three new cards have no photo yet (Phase 13).
 
 **Nobody knows the new instructors' passwords**
 1. **Sign In**: Email `beth.cooper@knottyyoga.local`, Password `pass`, then **Log In**. The sign-in is refused.
@@ -938,11 +951,11 @@ All four tables are in `seed_app_data.h`, each walked by one seeder and by its t
 - [x] `PopulateClasses`: the six classes with the Overview's descriptions, kind `recurring` (the column default). The four old classes are no longer created.
 - [x] Copy is normalised only for spacing ("Beginner Knotty  Yoga" in the Overview has a double space). Otherwise verbatim; the studio can edit it in Manage. A script compared all six descriptions and the three skill texts with this document: identical.
 - [x] Class-name constants in `seed_app_data.h`. The slot, access and photo tables all refer to these.
-- [x] **Also changed: the three existing class photos.** `PopulateSeedPhotos` named "Partner Acrobatics", which no longer exists. Its picture now goes on **Beginner Partner Acro**, and Knotty Yoga and Handstands keep theirs. The other three classes have no photo until Phase 9.
+- [x] **Also changed: the three existing class photos.** `PopulateSeedPhotos` named "Partner Acrobatics", which no longer exists. Its picture now goes on **Beginner Partner Acro**, and Knotty Yoga and Handstands keep theirs. The other three classes have no photo until Phase 13.
 
 ### 6.3 Access rules *(seed)*
 - [x] New `Seed::PopulateClassRequirements`, data-driven from the Class access table:
-  - `ClassRequirementGroups::AddGroup` with label "Membership" or "Instructor approval", and `inline_description` as in the table. Customers see it once Phase 13 lands; until then only admins do (fact 9).
+  - `ClassRequirementGroups::AddGroup` with label "Membership" or "Instructor approval", and `inline_description` as in the table. Customers see it once Phase 12 lands; until then only admins do (fact 9).
   - The membership descriptions are "Silver or Gold membership" (Beginner Knotty Yoga) and "Gold membership" (the other five). The approval groups read "Instructor approval: Handstand" and so on.
   - `ClassRequirementGroupLiterals::AddPermissionLiteral` / `AddSkillLiteral` for the literals.
 - [x] Permissions and skills are resolved by name and code. **Changed from the plan: a missing one is logged and left out of its group, and the group is still written. It fails closed.** The plan said to skip the whole class's rules, and its reason was wrong: a class with **no** groups is open and free to everyone (D7), which is the most permissive outcome of all.
@@ -957,8 +970,8 @@ All four tables are in `seed_app_data.h`, each walked by one seeder and by its t
   - The table is ordered so a predecessor always precedes its follower.
   - If one doesn't, the seeder logs `event=class_slot_skipped … reason=predecessor_missing` and skips the follower rather than writing a dangling id. The predecessor is checked before the class's schedule is created, so a class whose every slot is skipped is left with no empty schedule either.
   - A slot whose instructor is not seeded is still written, with no instructor (TBD), as before.
-- [x] Tuesday Beginner Knotty Yoga gets Gifford as `instructor_person_id`. Tiana is added in Phase 11.
-- [x] **Known, until Phase 10:** the test-only seed (`--recreate_database_test`) still adds the Aerial Series at Tue + Thu 19:00 in the Main Gym, which now double-books Thursday's Intermediate Partner Acro (fact 7). Phase 10 deletes it, so it was not moved. Plain `--recreate_database` is unaffected.
+- [x] Tuesday Beginner Knotty Yoga gets Gifford as `instructor_person_id`. Tiana is added in Phase 10.
+- [x] **Known, until Phase 9:** the test-only seed (`--recreate_database_test`) still adds the Aerial Series at Tue + Thu 19:00 in the Main Gym, which now double-books Thursday's Intermediate Partner Acro (fact 7). Phase 9 deletes it, so it was not moved. Plain `--recreate_database` is unaffected.
 
 ### 6.5 Tests
 All in `seed_app_data_test.cpp`. Members are made the way a purchase makes them: a purchase, an entitlement built from the membership product's **own** entitlement rule, and a seat (`JoinMembership`). So the access tests cover the whole chain the hand tests walk (product → rule → permission → the class's group), not a permission granted by hand.
@@ -979,7 +992,7 @@ All in `seed_app_data_test.cpp`. Members are made the way a purchase makes them:
 - [x] Predecessors: each of the four followers names the right slot, **and** `predecessor.start + predecessor.duration == follower.start`. `PopulateClassSchedulesLinksEachFollowerToTheClassJustBeforeIt` reads them through `GetSlotsByImplementationWithPredecessor`, the admin slot editor's reader.
 - [x] **Added:** `PopulateClassSchedulesSkipsAFollowerWhosePredecessorIsMissing`. Without Beginner Partner Acro, both Intermediate Partner Acro slots are skipped and that class gets no schedule. The other 10 slots, and the other followers' links, are written.
 - [x] Session instructors through `ClassCatalogHelper::GetClassDetail(...).upcomingSessions[].instructorNames`. For example, Wednesday Beginner Knotty Yoga reads "Beth Cooper". `PopulateClassSchedulesNamesTheInstructorOnEachClassPage` covers every slot, matched by slot id.
-- [x] `NoTwoSlotsCollideInTheSameRoom` over the 14 slots, using half-open intervals so back-to-back classes are legal. It replaces `NoTwoSlotsCollideInTheSameRoomAfterTheFullTestSeed`, which included the test-only seed (6.4, known until Phase 10).
+- [x] `NoTwoSlotsCollideInTheSameRoom` over the 14 slots, using half-open intervals so back-to-back classes are legal. It replaces `NoTwoSlotsCollideInTheSameRoomAfterTheFullTestSeed`, which included the test-only seed (6.4, known until Phase 9).
 - [x] Update `PopulateClassSchedulesResolvesRowsByNaturalKeyNotSeedOrder` and `PopulateClassSchedulesSkipsWhenPrerequisitesAreMissing` to the new table, and delete the three per-class slot tests they replace. Both now check all six classes and all 14 slots.
 - [x] Photo and class-name updates in the existing tests: `PopulateSeedPhotosAttachesProfileAndClassPictures` checks the three classes with a picture and the three without, and `AttachSeedPhotoSkipsAMissingFileWithoutThrowing` uses Aerial Rope instead of Tumbling.
 - [x] **Mutation-checked on Linux.** Eight deliberate breaks, each caught by the test written for it:
@@ -1017,7 +1030,7 @@ From a fresh local database:
    - **Beginner Partner Acro**
    - **Intermediate Partner Acro**
 
-   There are no Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling or Aerial Fabric cards. Knotty Yoga, Handstands and Beginner Partner Acro have a photo; the other three have none until Phase 9.
+   There are no Therapeutic Knotty Yoga, Partner Acrobatics, Tumbling or Aerial Fabric cards. Knotty Yoga, Handstands and Beginner Partner Acro have a photo; the other three have none until Phase 13.
 2. Click **Weekly schedule** (page headed **Our Classes**). The week has 14 classes matching the schedule table; Friday reads **No classes**. Each row shows its start time and length, then "with" the instructor. For example:
    - **Saturday**: **Knotty Yoga**, "10:00 AM · 120 min", "with Mason Bendixen"
    - **Wednesday**: **Beginner Knotty Yoga**, "5:00 PM · 60 min", "with Beth Cooper"
@@ -1049,7 +1062,7 @@ From a fresh local database:
 3. **My Classes** → **Full Schedule**:
    - Monday 7:00 PM **Handstands** now reads **Requires a membership**, not **Prerequisite needed**. The approval is in; the Gold membership is still missing.
    - Wednesday 7:00 PM **Aerial Rope** still reads **Prerequisite needed**: approval for Handstand opens nothing else.
-4. Known, not a fault of this phase: signed in, **Our Classes** → **All Classes** shows Kit no cards at all, because it lists only classes he may already attend (OQ-22, fixed in 13.3).
+4. Known, not a fault of this phase: signed in, **Our Classes** → **All Classes** shows Kit no cards at all, because it lists only classes he may already attend (OQ-22, fixed in 12.3).
 
 ---
 
@@ -1158,7 +1171,7 @@ From a fresh local database:
 
 # Phase 8 — About page copy, the location's text and the sender name
 
-**Implemented 10/18/2026.** Windows 5268 passed, Linux 5268 passed. The two runs executed the same 5268 test names: Phase 7's 5267 plus one new. Like the rest of the seed, it reaches production with the Phase 15 reinstall. That includes the sender name: it is a config-secret default, written once when a database is created, so the live site keeps "Knotty Yoga and Spa" until then.
+**Implemented 10/18/2026; validated by hand and committed as `f12a4c69`.** Windows 5268 passed, Linux 5268 passed. The two runs executed the same 5268 test names: Phase 7's 5267 plus one new. Like the rest of the seed, it reaches production with the Phase 15 reinstall. That includes the sender name: it is a config-secret default, written once when a database is created, so the live site keeps "Knotty Yoga and Spa" until then.
 
 ### 8.1 Seed
 - [x] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
@@ -1168,7 +1181,7 @@ From a fresh local database:
   - Eight tests asserted the literal "Knotty Yoga and Spa": `app_secret_values_test`, `attendance_template_helper_test` (twice), `class_series_helper_test`, `favorite_instructor_helper_test`, `weekly_digest_helper_test`, `card_expiring_notification_test` and `signup_reminder_helper_test`.
   - **Checked:** `class_checkin_helper_test`'s subject is built from the sender name. honuware's `QuickAccountHelper` writes `"Welcome to " + branding.studioName + " - Your Account"`; there is no separate site-name slot. That test now builds the expected subject from the constant too.
 - [x] Not changed:
-  - `ServerAccess.mock.ts`'s local-mode copies of the old location text and the old About blocks. They are fixture data, as 13.2 notes for the mock catalog.
+  - `ServerAccess.mock.ts`'s local-mode copies of the old location text and the old About blocks. They are fixture data, as the note closing Phase 12 says of the mock catalog.
   - The `site_about_markdown` default in `app_secret_values.cpp`, which still carries the "40 years … hootananny" text. Nothing on this site has displayed it since Polish 7.3 replaced it with the About blocks. It still rides along unseen in the site-settings data the browser loads, and in theme bundles, which Phase 15 doesn't use (OQ-9). Say if you want it changed anyway.
 
 ### 8.2 Tests
@@ -1237,13 +1250,13 @@ From a fresh local database:
 - [ ] Fix the stale reference in `ServerAccess.mock.ts`'s comment, and any doc that names the flag.
 - [ ] Update the hand-testing memory ([[feedback_test_instructions_format]]): the flag is gone and Kit is a base-seed member.
 
-### 10.3 Tests
+### 9.3 Tests
 - [ ] Delete the test-data tests, including `OnlyPopulateTestDataAddsTheSampleData`.
 - [ ] A base-seed test asserts nothing sample-only exists: no `aerial-series` product, no `Aerial Series` class, and no event sessions at all.
 
 ---
 
-# Phase 11 — Co-instructors on a recurring slot (Gifford + Tiana)
+# Phase 10 — Co-instructors on a recurring slot (Gifford + Tiana)
 
 Fact 4: a slot cannot carry two instructors today. OQ-7: "we should support multiple instructors."
 
@@ -1255,7 +1268,7 @@ Scope: an occurrence's **displayed** instructors become `staffing override if pr
 
 That is the conservative reading, and each can widen later on its own.
 
-### 11.1 Schema *(db_schema)*
+### 10.1 Schema *(db_schema)*
 - [ ] New nested table `class_schedule_slot_co_instructors`:
   - `id`
   - `class_schedule_slot_id` (FK)
@@ -1271,10 +1284,10 @@ That is the conservative reading, and each can widen later on its own.
   - CMakeLists
 - [ ] **Idempotent migration `app/0011_class_schedule_slot_co_instructors`** ([[gotcha_new_table_needs_migration]]), with a migration test.
 
-### 11.2 Table helper *(sql_util/table_helpers)*
+### 10.2 Table helper *(sql_util/table_helpers)*
 - [ ] `TableHelpers::ClassScheduleSlotCoInstructors`: `Add`, `GetForSlot`, `GetForSlots` (batch, for the catalog's N slots) and `Delete`. Tests for each, including the unique constraint.
 
-### 11.3 Business logic *(business_logic/scheduling)*
+### 10.3 Business logic *(business_logic/scheduling)*
 - [ ] One shared `EffectiveInstructorIds`: the staffing override if present, else lead + co-instructors, lead first. The instructor-profile helper already has a private version. Callers:
   - `ClassCatalogHelper` (class detail sessions)
   - `CalendarHelper`
@@ -1286,15 +1299,15 @@ That is the conservative reading, and each can widen later on its own.
   - Tiana's instructor profile lists Beginner Knotty Yoga
   - the instructor-load grid is unchanged, which pins the scope line above
 
-### 11.4 Endpoints
-- [ ] `POST /api/admin/class_schedule_slots/{id}/co_instructors` and `DELETE …/{personId}`, gated on `manage_class_schedule`, thin over 11.3.
+### 10.4 Endpoints
+- [ ] `POST /api/admin/class_schedule_slots/{id}/co_instructors` and `DELETE …/{personId}`, gated on `manage_class_schedule`, thin over 10.3.
 - [ ] Endpoint tests: auth (401/403), happy path, duplicate, and lead-as-co-instructor refused.
 
-### 11.5 Seed
+### 10.5 Seed
 - [ ] Tuesday Beginner Knotty Yoga gets Tiana as co-instructor. The slot table gains an optional `coInstructorEmail`.
 - [ ] Test through `ClassCatalogHelper`: Tuesday sessions read "Gifford Cheung, Tiana Cheung".
 
-### 11.6 Frontend
+### 10.6 Frontend
 - [ ] `ServerAccess` + network + mock + proxy methods for add and remove; `ServerAccess.mock.spec.ts` cases.
 - [ ] Slot form dialog (Manage ▸ class schedules): a **Co-instructors** chip picker beneath Instructor, reusing the instructor person picker. Manage Data is not a workflow ([[feedback_manage_data_is_debug_only]]).
 - [ ] Wherever a session renders one instructor name, render the list joined with ", ": class detail, calendar event and instructor profile.
@@ -1305,13 +1318,13 @@ That is the conservative reading, and each can widen later on its own.
 
 ---
 
-# Phase 12 — Forgot password (OQ-2)
+# Phase 11 — Forgot password (OQ-2)
 
 Fact 12: this is built in the two honuware repos and then pinned here. **Nothing else in this plan depends on it.** The production rollout (Phase 15) goes ahead with or without it; until it ships, instructors get in with 5.2's temporary password. It follows the same build → push → pin cycle Phase 4 establishes, and touches some of the same files, so it starts after Phase 4's pin bump rather than in parallel.
 
 During development, knottyyoga builds against the local `server_components` checkout via `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the gitignored `CMakeUserPresets.json`, so both repos build together before anything is pushed.
 
-### 12.1 Schema *(server_components: platform/db_schema)*
+### 11.1 Schema *(server_components: platform/db_schema)*
 - [ ] New framework table `password_reset_tokens`:
   - `id`
   - `person_id` (FK → people, **UNIQUE**)
@@ -1324,10 +1337,10 @@ During development, knottyyoga builds against the local `server_components` chec
 - [ ] Idempotent framework migration **`honuware/0002_password_reset_tokens`**, with a migration test.
 - [ ] `login_attempts` kind `password_reset`; `auth_events` kinds `password_reset_requested` and `password_reset_completed`.
 
-### 12.2 Table helper *(server_components: platform/sql_util/table_helpers)*
+### 11.2 Table helper *(server_components: platform/sql_util/table_helpers)*
 - [ ] `TableHelpers::PasswordResetTokens`: `ReplaceForPerson` (delete + insert, so a new request kills the old link), `GetForPerson`, `IncrementAttempts`, `DeleteForPerson`. Tests for each.
 
-### 12.3 Business logic *(server_components: platform/business_logic/auth)*
+### 11.3 Business logic *(server_components: platform/business_logic/auth)*
 - [ ] `Auth::PasswordResetHelper::RequestReset(transaction, secrets, mail, email)`:
   - Unknown email: does nothing, and sends no mail.
   - Known email:
@@ -1362,7 +1375,7 @@ During development, knottyyoga builds against the local `server_components` chec
   - success clears must-change and the lockout, verifies the email, ends sessions and device tokens, and the link cannot be reused
   - the gate caps per email and per IP
 
-### 12.4 Endpoints *(server_components: platform/endpoints)*
+### 11.4 Endpoints *(server_components: platform/endpoints)*
 - [ ] `POST /api/forgot_password` `{email}`:
   - **Always `200`** with the same body, whether or not the account exists.
   - Synchronous SQL first, then the mail send is queued on `ThreadPool` ([[feedback_sync_sql_before_threadpool_queue]]), so response time does not reveal whether the account exists either.
@@ -1381,12 +1394,12 @@ During development, knottyyoga builds against the local `server_components` chec
   - a bad secret gets the generic 400
   - `ThreadPool::Shutdown()` right after each `handle_full`
 
-### 12.5 Ship the server side
+### 11.5 Ship the server side
 - [ ] Gates on `server_components` (Linux `docker/build_and_test.sh` + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
 - [ ] **Mason** commits and pushes `server_components`.
 - [ ] Claude bumps `GIT_TAG` in knottyyoga's top-level `CMakeLists.txt` to that SHA, removes the local `FETCHCONTENT_SOURCE_DIR_HONUWARE` override, and re-runs the knottyyoga gates. CommunityFinder pins its own SHA and is untouched until it bumps.
 
-### 12.6 Frontend library *(honuware-web-components: `@honuware/ui/auth`)*
+### 11.6 Frontend library *(honuware-web-components: `@honuware/ui/auth`)*
 - [ ] `HonuwareAuthAccess` gains `forgotPassword(email)` and `resetPassword(email, secret, newPassword)`. `AUTH_ROUTES` gains `forgotPasswordPath: '/forgot-password'` and `resetPasswordPath: '/reset-password'`.
 - [ ] `LoginComponent`: a **Forgot password?** link beneath the password field.
 - [ ] `ForgotPasswordComponent`:
@@ -1407,7 +1420,7 @@ During development, knottyyoga builds against the local `server_components` chec
   - reset's success and failure paths
 - [ ] Minor version bump in `projects/honuware-ui/package.json`. **Mason** commits, pushes, creates the tag and pushes the tag ([[reference_honuware_ui_release]]).
 
-### 12.7 Knottyyoga wiring *(ui/)*
+### 11.7 Knottyyoga wiring *(ui/)*
 - [ ] `npm install @honuware/ui@X.Y.0 --save-exact`.
 - [ ] `ServerAccess` (+ network + mock + proxy) implements `forgotPassword` / `resetPassword`; `ServerAccess.mock.spec.ts` cases.
 - [ ] `auth.routes.ts`: `forgot-password` → `ForgotPasswordComponent`, `reset-password` → `ResetPasswordComponent`.
@@ -1415,17 +1428,17 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ---
 
-# Phase 13 — The class page names the membership; cleanup
+# Phase 12 — The class page names the membership; cleanup
 
-### 13.1 Say which membership a class needs (OQ-17, confirmed)
+### 12.1 Say which membership a class needs (OQ-17, confirmed)
 - [ ] **Business logic.** `ClassCatalogHelper::GetClassDetail` adds the class's non-empty membership-group `inline_description`s to the detail, reusing `ClassAccessHelper::GetClassRequirements`, which already resolves them. Test: Beginner Knotty Yoga's detail carries "Silver or Gold membership", and Knotty Yoga's carries "Gold membership".
 - [ ] **Endpoint.** The class-detail endpoint serialises it; `scheduling_key_value_table.cpp` already writes `inline_description` for the admin view. Endpoint test.
 - [ ] **Frontend.** The class page's "Members only" pricing state reads **"Members only: Silver or Gold membership"**, falling back to today's "Upgrade your membership to attend." when there is no description. Type + mock + spec, covering both the described and the undescribed state.
 
-### 13.2 Dead code
+### 12.2 Dead code
 - [ ] Delete `pages/public/services/homepage.service.ts` and its spec (fact 8).
 
-### 13.3 Signed-in visitors see every class (OQ-22, confirmed)
+### 12.3 Signed-in visitors see every class (OQ-22, confirmed)
 - [ ] **Business logic.** `ClassCatalogHelper::GetClassesVisibleToPerson` keeps its "has an upcoming run" filter and drops the access-gate filter, so a signed-in visitor gets the same classes as a signed-out one. Update the `class_catalog_helper_test` cases that pin the hiding, and add one through the seeded rules: a signed-in non-member and a Silver member each see all six.
 - [ ] **Endpoint.** `/api/classes` test: a signed-in non-member gets six classes.
 - [ ] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
@@ -1466,7 +1479,7 @@ Uses Phase 1's files.
 
 ### 14.1 Build and test (Claude, both platforms; reported per platform)
 - [ ] knottyyoga: Linux gate (`server/docker/build_and_test.sh`) and Windows (`x64-Debug`). Also build `knottyyoga_database_helper` and `knottyyoga_test_helper` explicitly, since the gate builds neither `main.cpp`.
-- [ ] Phases 4 and 12 only: the `server_components` gates on both platforms. Phase 12 also: `honuware-web-components` `ng test` + build.
+- [ ] Phases 4 and 11 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
 - [ ] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`.
 
 ### 14.2 Local run
@@ -1573,7 +1586,7 @@ Then start the server and the Angular app. Accounts:
 
     Click **Update**. **My Classes** now opens normally.
 
-**Forgot password (Phase 12)**
+**Forgot password (Phase 11)**
 
 25. Sign out. **Sign In** → **Forgot password?**
     - **Email**: `masonbendixen@gmail.com` → **Send reset link**. The page says a link was sent if the account exists.
@@ -1583,11 +1596,11 @@ Then start the server and the Angular app. Accounts:
     - Signing in with `pass` now fails; `Reset-2026` works.
     - Clicking the email's link a second time shows **This reset link is invalid or has expired.**
 
-**Co-instructors (Phase 11)**
+**Co-instructors (Phase 10)**
 
 27. **My Classes** → **Full Schedule** → Tuesday 6:00 PM **Beginner Knotty Yoga** reads **with Gifford Cheung, Tiana Cheung**. **About** → **Instructors** → **Tiana Cheung** lists Beginner Knotty Yoga among her classes.
 
-**Nothing sample-only (Phase 10)**
+**Nothing sample-only (Phase 9)**
 
 28. **Upcoming Events** lists nothing. **Our Classes** has no **Aerial Series**. This base seed is exactly what production gets.
 
@@ -1621,7 +1634,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - [ ] Mason, Caleb and Kit each sign in and change their password: first-name menu → **Profile** → **Change Password** (OQ-10). The seeded ones are in source control. This includes the `masonbendixen@hotmail.com` admin.
 - [ ] For each instructor who should sign in, either:
   - `knottyyoga_test_helper --command=set_password` (5.2), with the temporary password handed over in person, or
-  - once Phase 12 is live and their real email is seeded, they click **Forgot password?** themselves
+  - once Phase 11 is live and their real email is seeded, they click **Forgot password?** themselves
 - [ ] Paste any bios that arrived late under **Admin** → **Manage Products** → **Instructors** (OQ-15).
 - [ ] The public half of the Phase 14.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
 
@@ -1653,14 +1666,15 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 ### Still open
 
-**OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 12) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 15.
+**OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 11) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 15.
 - Mason- I sent a message to all my instructors asking which email to use.
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
-- → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 15. Until then the instructor digest and, after Phase 12, password-reset emails to these three go nowhere.
+- → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 15. Until then the instructor digest and, after Phase 11, password-reset emails to these three go nowhere.
 
 **OQ-11 — Where are the photos?**
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
+- → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 
 **OQ-15 — Instructor bios.**
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
@@ -1680,9 +1694,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Signed out, **Our Classes** → **All Classes** lists all six classes. Signed in, it lists only the classes the person may already attend (`ClassCatalogHelper::GetClassesVisibleToPerson`, a deliberate rule from the access redesign, P-1/M-6). Until Phase 6 every class was open, so nobody noticed.
 - Now that all six need a membership, a signed-in **non-member sees an empty page**, a Silver member sees only Beginner Knotty Yoga, and **so do the staff**: Mason's and the instructors' accounts hold no membership. The weekly schedule is unaffected: it lists all 14 rows with their badges, signed in or out.
 - It also breaks 14.3 step 13, where a Silver Kit opens Knotty Yoga from **All Classes**.
-- **Default:** signed-in visitors see every scheduled class, as signed-out ones do, and the class page and badges say what each one needs. New item 13.3. Say if a signed-in member should keep seeing only what they can book.
+- **Default:** signed-in visitors see every scheduled class, as signed-out ones do, and the class page and badges say what each one needs. New item 12.3. Say if a signed-in member should keep seeing only what they can book.
 - Mason- Let's go with the default.
-- → Plan: 13.3 stands as written. Everyone sees all six classes on **All Classes**, signed in or out, and the class page says what each one needs. Until 13.3 lands, a signed-in non-member or staff account still sees an empty **All Classes** page; 6.6's last step notes it.
+- → Plan: 12.3 stands as written. Everyone sees all six classes on **All Classes**, signed in or out, and the class page says what each one needs. Until 12.3 lands, a signed-in non-member or staff account still sees an empty **All Classes** page; 6.6's last step notes it.
 
 **OQ-16 — Leftover copy that no longer matches the studio.**
 - Mason - Let's do: Who we are / How we teach / Come and find us *(full text moved into the About page table above, verbatim)*.
@@ -1717,7 +1731,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- Hrm... the forgot password flow seems like a bad problem. Can we add a phase to correct that with a forgot email button that sends an email with a create new password flow? But for this, I figure I will give them a temporary password that they create here. Do we have must change password on next login support?
 - → Plan: **Yes, must-change-password is fully supported** (fact 11). After signing in with a flagged account, the site goes straight to Change Password and keeps returning there until it is changed.
   - Phase 5.1–5.2 adds `set_password`, which sets a temporary password **and** the flag in one step, so you choose the temporary password and hand it over.
-  - Phase 12 is the forgot-password flow: a **Forgot password?** link on Log In, an email with a single-use link that expires in an hour, and a page to set a new password.
+  - Phase 11 is the forgot-password flow: a **Forgot password?** link on Log In, an email with a single-use link that expires in an hour, and a page to set a new password.
 
 **OQ-3 — Gold for the non-beginner classes.** Mason- that's correct. → D7.
 
@@ -1727,7 +1741,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 **OQ-6 — Mason as a massage provider.** Mason- Let's just do Caleb for now. → 7.1.
 
-**OQ-7 — Co-instructors.** Mason- we should support multiple instructors. → Phase 11.
+**OQ-7 — Co-instructors.** Mason- we should support multiple instructors. → Phase 10.
 
 **OQ-8 — Rolling availability.**
 - Mason- no no no... let's not make this a new feature. We can just add slots with the template. The generate availability feature is pretty simple. Could also do this as a scheduled job pretty easily if need be. Let's not complicate the webserver more than necessary.
@@ -1737,13 +1751,13 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 **OQ-10 — Test accounts in the base seed.** Mason- I'll manually have the three of us change our passwords as we deploy. I'm not that concerned about this. → Kit and `masonbendixen@hotmail.com` stay in the base seed, unchanged (5.3). 15.3 is the password change for Mason (both accounts), Caleb and Kit.
 
-**OQ-12 — Test-only data.** Mason- let's remove both of these. I'm getting ready to deploy and want the website to be as it will actually function. → Phase 10 and D14. With both gone and Caleb's template promoted to real data, nothing test-only remains, so `--recreate_database_test` is removed too.
+**OQ-12 — Test-only data.** Mason- let's remove both of these. I'm getting ready to deploy and want the website to be as it will actually function. → Phase 9 and D14. With both gone and Caleb's template promoted to real data, nothing test-only remains, so `--recreate_database_test` is removed too.
 
 **OQ-13 — Membership tier order.** Mason- I'd prefer the alternative. → D12, Phase 3: grouped by tier through a new `products.sort_order` column, editable as **Sort Order** in Manage Products.
 
 **OQ-14 — Membership descriptions.** Mason- This sounds fine. → The Memberships table.
 
-**OQ-17 — Tell visitors which membership a class needs.** Mason- let's make this change. → 13.1.
+**OQ-17 — Tell visitors which membership a class needs.** Mason- let's make this change. → 12.1.
 
 **OQ-18 — Who builds.**
 - Mason- I trust you more now! Please update the note that you build and run the tests on windows and linux but report the results to me. When stuff would break, I'd just paste the output to you so I figure I trust you now to remove myself from this loop as your model has improved.
