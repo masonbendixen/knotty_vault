@@ -1050,7 +1050,7 @@ From a fresh local database:
 
 # Phase 7 — Caleb as the massage provider
 
-**Implemented 10/17/2026.** Windows 5267 passed, Linux 5267 passed. The two runs executed the same 5267 test names: Phase 6's 5259, less the two 9–5 template tests, plus ten new. The first attempt at the full runs was stopped part-way when the machine ran low on memory, so they were run again one at a time. Like the rest of the seed, it reaches production with the Phase 15 reinstall; 7.4's fix ships with the next release of the server.
+**Implemented 10/17/2026; committed as `74af2aa8`, not tagged.** Windows 5267 passed, Linux 5267 passed. The two runs executed the same 5267 test names: Phase 6's 5259, less the two 9–5 template tests, plus ten new. The first attempt at the full runs was stopped part-way when the machine ran low on memory, so they were run again one at a time. Like the rest of the seed, it reaches production with the Phase 15 reinstall; 7.4's fix ships with the next release of the server.
 
 The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the seeder and by its tests (D3).
 
