@@ -1780,6 +1780,7 @@ During development, knottyyoga builds against the local `server_components` chec
   - No change to `/api/verify`, the SPA or either app. The test utility that computes the expected activation mail goes through the same builder, so the existing activation tests in all three repos follow the change by themselves.
 - [x] Gates: `server_components` on both platforms.
   - **Windows: 1895 passed. Linux: 1895 passed** (1889 + the 6 new), with the same test names on both.
+  - **knottyyoga against the local checkout, Linux: 5382 passed** (5376 + the 6), and both executables build. Its own activation tests needed no change.
 - [x] Mutation check, 2 mutations, on the Windows honuware build. **Both caught**:
   - The builder going back to `URLEncode`: 4 tests fail. They are both of the plus-address tests and the two exact-body tests.
   - The encoder leaving `+` unencoded: 4 tests fail, including the reset mail's plus-address test, which now goes through the shared encoder.
