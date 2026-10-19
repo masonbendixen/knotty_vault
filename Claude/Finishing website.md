@@ -1778,12 +1778,14 @@ During development, knottyyoga builds against the local `server_components` chec
   - `person_verify_mail_test`: the expected link now has `%40` for `@`. New `PlusAddressedEmailIsEncodedInTheLink`.
   - `person_test`: new `PlusAddressedEmailActivatesFromItsLink`. It registers `mason+test@example.com`, reads the email and secret back out of the sent mail the way Angular does (a bare `+` becomes a space, then `%XX` is decoded), passes them to `VerifyPersonEmail`, and checks that the account is now verified.
   - No change to `/api/verify`, the SPA or either app. The test utility that computes the expected activation mail goes through the same builder, so the existing activation tests in all three repos follow the change by themselves.
-- [ ] Gates: `server_components` on both platforms.
-  - **Linux: 1895 passed** (1889 + the 6 new).
-  - Windows: *running.*
-- [ ] Mutation check, 2 mutations:
-  - the builder going back to `URLEncode`
-  - the encoder leaving `+` unencoded
+- [x] Gates: `server_components` on both platforms.
+  - **Windows: 1895 passed. Linux: 1895 passed** (1889 + the 6 new), with the same test names on both.
+- [x] Mutation check, 2 mutations, on the Windows honuware build. **Both caught**:
+  - The builder going back to `URLEncode`: 4 tests fail. They are both of the plus-address tests and the two exact-body tests.
+  - The encoder leaving `+` unencoded: 4 tests fail, including the reset mail's plus-address test, which now goes through the shared encoder.
+
+  The files were restored byte for byte, and a clean run of the same suites passes.
+  - *Not mutated:* `PreliminaryRegisterPerson` pre-encoding again with `URLEncode`. That would encode twice, but `URLEncode` leaves every character an address normally has (`+`, `@`, `.`, letters, digits) as it is. So the output is the same for any real address, and no test can tell the two apart.
 - [ ] **Mason** commits and pushes `server_components`.
 - [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to that SHA and runs both apps' pinned gates on both platforms.
 
