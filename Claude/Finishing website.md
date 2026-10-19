@@ -1667,19 +1667,22 @@ During development, knottyyoga builds against the local `server_components` chec
     - Also `AuthHttpAccess` 2, the proxy 1, `AuthService` 1, the `ErrorInterceptor` 1 (no bounce to login on a 401 from either endpoint), and `MockAuthAccess` 3.
 
     `npm run lint` and `npm run build` are clean.
-- [ ] Minor version bump in `projects/honuware-ui/package.json`. **Mason** commits, pushes, creates the tag and pushes the tag ([[reference_honuware_ui_release]]).
-  - *Done by Claude:* `0.2.0` → **`0.3.0`**, and the package README lists the two pages and how to route them. **Mason:** commit, push, `git tag v0.3.0`, `git push origin v0.3.0`.
+- [x] Minor version bump in `projects/honuware-ui/package.json`. **Mason** commits, pushes, creates the tag and pushes the tag ([[reference_honuware_ui_release]]).
+  - *Done by Claude:* `0.2.0` → **`0.3.0`**, and the package README lists the two pages and how to route them.
+  - *Released by Mason:* commit `b7d77d4`, tag `v0.3.0`. **`@honuware/ui@0.3.0` is on npm** (published 10/18 21:49 Pacific) and is now `latest`.
+  - The published code matches Claude's local build. The only differences are in a few component templates: Claude's Windows checkout has CRLF line endings there, CI's has LF. Like 0.2.0, the package has a single top-level `package.json`.
   - *CommunityFinder* pins `@honuware/ui` 0.1.2 and has its own `AuthAccess` implementation. When it moves to 0.3.0 it needs the two new methods; nothing changes for it until then.
 
 ### 11.7 Knottyyoga wiring *(ui/)*
-- [ ] `npm install @honuware/ui@X.Y.0 --save-exact`.
-  - *Waits on Mason's 0.3.0 release (11.6).* Until then, `ui/node_modules/@honuware/ui` holds Claude's **local build of 0.3.0**, so the app compiles and runs with the new pages for hand-testing. `package.json` and the lock file still say 0.2.0, and the installed 0.2.0 is backed up in Claude's scratch folder. After the release: `npm install @honuware/ui@0.3.0 --save-exact`, which replaces the local build with the published one; the code is identical.
+- [x] `npm install @honuware/ui@X.Y.0 --save-exact`.
+  - *Done 10/19:* `npm install @honuware/ui@0.3.0 --save-exact`. `ui/package.json` and the lock file now say **0.3.0**, and the published package replaced Claude's local build in `node_modules`.
 - [x] `ServerAccess` (+ network + mock + proxy) implements `forgotPassword` / `resetPassword`; `ServerAccess.mock.spec.ts` cases.
   - *As built:* in local mode the mock accepts any request, and any reset link that has all its parts; a reset signs the mock session out. 4 mock spec cases.
 - [x] `auth.routes.ts`: `forgot-password` → `ForgotPasswordComponent`, `reset-password` → `ResetPasswordComponent`.
   - *As built:* plus a new `auth.routes.spec.ts` (2 cases) pinning both routes to `DEFAULT_AUTH_ROUTES`' paths, which are where the login link and the reset mail send people. The mobile-audit route list gained both pages; its Karma guard fails on any unlisted route.
 - [x] `ng test`, `tsc --noEmit`, `ng build`.
   - Against the local 0.3.0 build: **Angular 3614 passed** (3608 + 6). `tsc` is clean for both app and specs, `ng lint` is clean, and `ng build` is OK with the same six old budget warnings.
+  - **Re-run against the published 0.3.0 (10/19):** 3614 passed; `tsc` clean for app and specs; `ng build` OK with the same six budget warnings.
 
 ### 11.8 Mutation check
 
