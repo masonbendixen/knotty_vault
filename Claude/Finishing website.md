@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/19/2026
-Version: 0.20
+Version: 0.21
 tags: 
 ---
 # Overview
@@ -83,6 +83,13 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
+  - Each class page names the membership it needs ("Members only: Silver or Gold membership").
+  - Signed in, **All Classes** lists all six classes for everyone.
+  - The dead homepage service is gone.
+  - Found while checking 12.3: **Required Skills** had never appeared on any class page, because the server never filled it in. 12.1 fixes it with the same lookup.
+  - Two new open questions: OQ-26 (a badge on the All Classes cards?) and OQ-27 (what an unapproved Gold member reads under **Pricing**).
+  - Results: knottyyoga Windows 5389 and Linux LINUX_COUNT, Angular 3618, and all 12 mutations caught. Hand-test steps are in 12.6.
 - **v0.20 (10/19/2026)** — **Phase 11 is complete.**
   - Mason hand-tested forgot password and committed everything.
   - The checks the low-memory stop had interrupted are now run against the committed code:
@@ -1827,20 +1834,130 @@ During development, knottyyoga builds against the local `server_components` chec
 
 # Phase 12 — The class page names the membership; cleanup
 
+**Implemented 10/19/2026, not committed.** It is all in knottyyoga, with no `server_components` change and no pin bump.
+- **knottyyoga: Windows 5389 passed. Linux LINUX_COUNT passed.** That is Phase 11's 5382 plus 7 new tests, with the same names on both platforms.
+- **Angular: 3618 passed.** That is 3614, less the deleted service's one spec, plus 5 new.
+- All 12 mutations were caught.
+
 ### 12.1 Say which membership a class needs (OQ-17, confirmed)
-- [ ] **Business logic.** `ClassCatalogHelper::GetClassDetail` adds the class's non-empty membership-group `inline_description`s to the detail, reusing `ClassAccessHelper::GetClassRequirements`, which already resolves them. Test: Beginner Knotty Yoga's detail carries "Silver or Gold membership", and Knotty Yoga's carries "Gold membership".
-- [ ] **Endpoint.** The class-detail endpoint serialises it; `scheduling_key_value_table.cpp` already writes `inline_description` for the admin view. Endpoint test.
-- [ ] **Frontend.** The class page's "Members only" pricing state reads **"Members only: Silver or Gold membership"**, falling back to today's "Upgrade your membership to attend." when there is no description. Type + mock + spec, covering both the described and the undescribed state.
+- [x] **Business logic.** `ClassCatalogHelper::GetClassDetail` adds the class's non-empty membership-group `inline_description`s to the detail, reusing `ClassAccessHelper::GetClassRequirements`, which already resolves them. Test: Beginner Knotty Yoga's detail carries "Silver or Gold membership", and Knotty Yoga's carries "Gold membership".
+  - *As built:* a new `ClassDetail.membershipRequirements` list.
+    - A group counts as a membership when it has a permission in it. That is `Annotate`'s own rule, the one behind the schedule's badges, so the class page and the badges can't disagree.
+    - The list belongs to the class, so every viewer gets the same one.
+  - **Found at 12.3's check and fixed here: Required Skills never appeared on any class page.**
+    - `ClassDetail.requiredSkills` was declared "for Phase 3", and nothing ever filled it.
+    - The page's chips, held/missing marks and "You're missing" box were built and tested, but never had data. 6.6 step 6 and the 14.3 walkthrough both expect a **Handstand** chip.
+    - The same loop now fills the list with the skill names from every group that has no permission in it.
+  - Tests in `class_catalog_helper_test`:
+    - `GetClassDetailNamesTheMembershipAndTheSkillItNeeds`: a visitor and a Gold member get the same two lists.
+    - `GetClassDetailCountsAGroupWithAPermissionAsAMembership`: a "permission or skill" group is a membership, and its skill is not listed as required.
+    - `GetClassDetailLeavesOutAMembershipWithNoDescription`: an undescribed membership adds nothing, and the class is still members-only. A class with no groups needs nothing.
+  - Through the seeded rules, in `seed_app_data_test`: `PopulateClassRequirementsNamesWhatEachClassNeedsOnItsPage`.
+    - All six classes are checked against the table the seeder walks, including the plan's two examples.
+    - Handstands, Aerial Rope and Intermediate Partner Acro each carry their skill.
+- [x] **Endpoint.** The class-detail endpoint serialises it; `scheduling_key_value_table.cpp` already writes `inline_description` for the admin view. Endpoint test.
+  - *As built:* `/api/classes/<id>` sends `membership_requirements` as a JSON array beside `required_skills`, and both are always present.
+    - The endpoint builds them from the struct, as it already did for `required_skills`, rather than through the key-value table, where they would be one joined string.
+  - Tests:
+    - New `GetClassDetailTest.NamesTheMembershipAndTheSkillTheClassNeeds`.
+    - The existing detail test now checks that both lists are present and empty.
+- [x] **Frontend.** The class page's "Members only" pricing state reads **"Members only: Silver or Gold membership"**, falling back to today's "Upgrade your membership to attend." when there is no description. Type + mock + spec, covering both the described and the undescribed state.
+  - *As built:*
+    - When the class names its membership, that one line replaces both of today's lines.
+    - When it names none, or only blank text, the page keeps "Members only" and "Upgrade your membership to attend."
+    - Two required memberships join with "and".
+    - A viewer who can attend sees no membership text.
+    - The network layer turns a missing list into an empty one.
+  - Specs:
+    - 4 in `class-detail.component.spec.ts`, checking the notice's exact lines.
+    - 1 in `ServerAccess.mock.spec.ts`; the mock's default is also asserted.
+    - The network layer has no spec file in this repo, so its one-line default is checked by `tsc` only.
 
 ### 12.2 Dead code
-- [ ] Delete `pages/public/services/homepage.service.ts` and its spec (fact 8).
+- [x] Delete `pages/public/services/homepage.service.ts` and its spec (fact 8).
+  - Only its own spec imported it. The emptied `pages/public/services/` folder went too.
 
 ### 12.3 Signed-in visitors see every class (OQ-22, confirmed)
-- [ ] **Business logic.** `ClassCatalogHelper::GetClassesVisibleToPerson` keeps its "has an upcoming run" filter and drops the access-gate filter, so a signed-in visitor gets the same classes as a signed-out one. Update the `class_catalog_helper_test` cases that pin the hiding, and add one through the seeded rules: a signed-in non-member and a Silver member each see all six.
-- [ ] **Endpoint.** `/api/classes` test: a signed-in non-member gets six classes.
-- [ ] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
+- [x] **Business logic.** `ClassCatalogHelper::GetClassesVisibleToPerson` keeps its "has an upcoming run" filter and drops the access-gate filter, so a signed-in visitor gets the same classes as a signed-out one. Update the `class_catalog_helper_test` cases that pin the hiding, and add one through the seeded rules: a signed-in non-member and a Silver member each see all six.
+  - *As built:* `personId` stays in the signature, unused, because the endpoint still calls a separate function for signed-in visitors.
+  - Tests:
+    - `GetClassesVisibleToPersonHidesMembersOnlyFromNonMember` is replaced by `…ShowsClassesTheViewerCannotAttend`. A non-member and a member each see a members-only class and an approval-gated one.
+      - It first checks that the gate really refuses them, so the test can't pass vacuously.
+    - Through the seeded rules: `EverySignedInViewerSeesAllSixClasses`. A non-member, a Silver member and Mason each see exactly the six; before this they saw 0, 1 and 0.
+  - The same list also feeds **Close Classes**' class picker and **Attendance History**'s class filter. So a staff account without a membership now gets every class there too.
+- [x] **Endpoint.** `/api/classes` test: a signed-in non-member gets six classes.
+  - *As built:* `GetClassesTest.SignedInNonMemberSeesMembersOnlyClasses` signs in through a real session cookie and sees two members-only classes of its own.
+    - The "six" is pinned through the seeded rules above, in the reader this endpoint calls unchanged.
+- [x] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
+  - **Members only:** yes.
+  - **Required Skills:** no. It never had data, and is fixed in 12.1.
+  - **A badge on the All Classes cards:** not added; that is **OQ-26**, with "no badge" as the default.
 
 *(Not in scope: `ServerAccess.mock.ts`'s local-mode catalog still has the old classes. It is fixture data for `ng serve -c local` and for dozens of specs; changing it is churn with no user-visible effect.)*
+
+### 12.4 Verification
+- [x] knottyyoga C++:
+  - **Windows: 5389 passed. Linux: LINUX_COUNT passed.** Both platforms ran the same test names.
+  - Every executable built on Windows, the server included.
+  - On Linux the gate built both `knottyyoga_database_helper` and `knottyyoga_the_server`.
+  - The final runs are on the final code. Removing an untested de-duplication of skill names, after the first runs, is the only change since.
+- [x] Angular (`ui/`):
+  - **3618 passed.**
+  - `tsc --noEmit` is clean for the app and for the specs, and `ng lint` passes.
+  - `ng build` is OK, with the same six budget warnings as before.
+
+### 12.5 Mutation check
+- [x] **C++, on the knottyyoga Windows build: 7 mutations, all caught.**
+  - The access gate filtering **All Classes** again fails 3 tests: the helper test, the seeded six-class test and the endpoint test.
+  - The membership text never reaching the detail fails 4 tests.
+  - Counting every group as a membership, approvals included, fails 3 tests.
+  - Only a group's first literal deciding whether it is a membership fails the mixed-group test.
+  - The skill never reaching **Required Skills** fails 3 tests.
+  - An undescribed membership adding an empty requirement fails the no-description test.
+  - The endpoint dropping the list fails the endpoint test.
+
+  Every file was restored byte for byte, and a clean run of the same suites passes: 39 tests.
+- [x] **Angular: 5 mutations, all caught.**
+  - Joining with a comma.
+  - The notice not naming the membership.
+  - A blank description counting as a membership.
+  - An undescribed class losing the generic wording.
+  - Local mode dropping the list.
+
+  Every file was restored, and the two specs pass clean: 50 and 630 tests.
+
+### 12.6 Hand-testing walkthrough
+
+**Before you start.** Recreate the local database with `knottyyoga_database_helper --recreate_database`. Start the server from Visual Studio's **x64-Debug** configuration and the site from `ng serve`, both rebuilt or restarted since this phase. Use a window at least 1280 px wide, and start signed out.
+
+**Signed out: each class page says what it needs**
+1. Top nav **Our Classes**. The page is headed **All Classes**. Click **Beginner Knotty Yoga**.
+   - **Pricing** reads **Members only: Silver or Gold membership** on one line, with no "Upgrade your membership to attend." under it.
+   - There is no **Required Skills** section.
+2. Click **All Classes** at the top, then **Knotty Yoga**. **Pricing** reads **Members only: Gold membership**.
+3. **All Classes** → **Handstands**.
+   - **Pricing** reads **Members only: Gold membership**.
+   - **Required Skills** shows one chip, **Handstand**.
+4. Likewise:
+   - **Aerial Rope**: **Members only: Gold membership**, and an **Aerial Rope** chip.
+   - **Intermediate Partner Acro**: **Members only: Gold membership**, and an **Intermediate Partner Acro** chip.
+   - **Beginner Partner Acro**: **Members only: Gold membership**, and no **Required Skills**.
+
+**Signed in without a membership: every class is still listed**
+5. **Sign In**: Email `kiteagle@gmail.com`, Password `kit`, then **Log In**. Kit holds no membership.
+6. Top nav **My Classes**, then **Browse all classes**. **All Classes** shows the same six cards. Before this phase it showed Kit none.
+7. Click **Handstands**.
+   - **Pricing** reads **Members only: Gold membership**.
+   - **Required Skills** shows the **Handstand** chip with a red mark, and a box: "You're missing: Handstand" and "Talk to staff for evaluation."
+8. Sign out: **Kit** (the name menu) → **Sign Out**, then **Log Out** in the dialog.
+9. **Sign In** as `masonbendixen@gmail.com` / `pass`. **My Classes** → **Browse all classes** shows all six cards. Mason's account holds no membership either, and before this phase it showed none.
+
+**The weekly schedule is unchanged**
+10. Still as Mason, top nav **My Classes**. The page is headed **Our Classes**.
+    - **Beginner Knotty Yoga**, **Knotty Yoga** and **Beginner Partner Acro** rows still carry **Requires a membership**.
+    - **Handstands**, **Aerial Rope** and **Intermediate Partner Acro** still carry **Prerequisite needed**.
+
+    This phase changed the class list, not the schedule.
 
 ---
 
