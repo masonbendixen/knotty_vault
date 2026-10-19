@@ -1621,9 +1621,14 @@ During development, knottyyoga builds against the local `server_components` chec
 - [ ] Gates on `server_components` (Linux `docker/build_and_test.sh` + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
   - **server_components: Windows 1889 passed, Linux 1889 passed**, with the same test names on both (1819 at the Phase 4 pin, so 70 new).
   - **knottyyoga against the local checkout, Linux: 5376 passed** (5306 + the 70), and both `knottyyoga_database_helper` and `knottyyoga_the_server` build. The log confirms `honuware : /honuware (local override)`. No knottyyoga server source changed.
-  - **knottyyoga against the local checkout, Windows: not finished.** The build was stopped at 1161 of 2517 steps, with no errors so far, when Claude Code reaped background runs for low memory (10/18 evening). It will be re-run when Mason says to. The Windows build tree is now configured against the local checkout (`x64-Debug-local-honuware`, `FETCHCONTENT_SOURCE_DIR_HONUWARE` set in its cache), as in Phase 4.
-- [ ] **Mason** commits and pushes `server_components`.
-- [ ] Claude bumps `GIT_TAG` in knottyyoga's top-level `CMakeLists.txt` to that SHA, removes the local `FETCHCONTENT_SOURCE_DIR_HONUWARE` override, and re-runs the knottyyoga gates. CommunityFinder pins its own SHA and is untouched until it bumps.
+  - **knottyyoga against the local checkout, Windows: not finished.** The build was stopped at 1161 of 2517 steps, with no errors so far, when Claude Code reaped background runs for low memory (10/18 evening). Superseded by the pinned Windows run below, which builds the same code.
+- [x] **Mason** commits and pushes `server_components`: **`4f72341`** ("Phase 11 — Forgot password"), green in CI.
+- [ ] Claude bumps `GIT_TAG` in knottyyoga's top-level `CMakeLists.txt` to that SHA, removes the local `FETCHCONTENT_SOURCE_DIR_HONUWARE` override, and re-runs the knottyyoga gates.
+  - *Done:* `GIT_TAG` is `4f723413ada4ac823ea71e280de0a40013fd5b1b` in **both** knottyyoga and CommunityFinder (Mason asked for both, 10/18). Nothing else changed in either repo.
+  - The Windows build tree is back on the pin: `FETCHCONTENT_SOURCE_DIR_HONUWARE` is empty in its cache, and `_deps/honuware-src` is a clean clone at `4f72341`. Visual Studio's configuration is the plain **x64-Debug**, so it won't put the override back.
+  - **knottyyoga, pinned, Linux: 5376 passed**, the same count as against the local checkout, and both executables build. The log says `pinned SHA (FetchContent will clone it)`.
+  - knottyyoga, pinned, Windows: *pending.*
+  - CommunityFinder, pinned, Linux and Windows: *pending* (1840 at `cddb9cb`).
 
 ### 11.6 Frontend library *(honuware-web-components: `@honuware/ui/auth`)*
 - [x] `HonuwareAuthAccess` gains `forgotPassword(email)` and `resetPassword(email, secret, newPassword)`. `AUTH_ROUTES` gains `forgotPasswordPath: '/forgot-password'` and `resetPasswordPath: '/reset-password'`.
