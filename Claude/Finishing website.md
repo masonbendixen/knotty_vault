@@ -89,7 +89,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - The dead homepage service is gone.
   - Found while checking 12.3: **Required Skills** had never appeared on any class page, because the server never filled it in. 12.1 fixes it with the same lookup.
   - Two new open questions: OQ-26 (a badge on the All Classes cards?) and OQ-27 (what an unapproved Gold member reads under **Pricing**).
-  - Results: knottyyoga Windows 5389 and Linux LINUX_COUNT, Angular 3618, and all 12 mutations caught. Hand-test steps are in 12.6.
+  - Results: knottyyoga Windows 5389 and Linux 5389, Angular 3618, and all 12 mutations caught. Hand-test steps are in 12.6.
 - **v0.20 (10/19/2026)** — **Phase 11 is complete.**
   - Mason hand-tested forgot password and committed everything.
   - The checks the low-memory stop had interrupted are now run against the committed code:
@@ -1835,7 +1835,7 @@ During development, knottyyoga builds against the local `server_components` chec
 # Phase 12 — The class page names the membership; cleanup
 
 **Implemented 10/19/2026, not committed.** It is all in knottyyoga, with no `server_components` change and no pin bump.
-- **knottyyoga: Windows 5389 passed. Linux LINUX_COUNT passed.** That is Phase 11's 5382 plus 7 new tests, with the same names on both platforms.
+- **knottyyoga: Windows 5389 passed. Linux 5389 passed.** That is Phase 11's 5382 plus 7 new tests, with the same names on both platforms.
 - **Angular: 3618 passed.** That is 3614, less the deleted service's one spec, plus 5 new.
 - All 12 mutations were caught.
 
@@ -1897,7 +1897,7 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 12.4 Verification
 - [x] knottyyoga C++:
-  - **Windows: 5389 passed. Linux: LINUX_COUNT passed.** Both platforms ran the same test names.
+  - **Windows: 5389 passed. Linux: 5389 passed.** Both platforms ran the same test names.
   - Every executable built on Windows, the server included.
   - On Linux the gate built both `knottyyoga_database_helper` and `knottyyoga_the_server`.
   - The final runs are on the final code. Removing an untested de-duplication of skill names, after the first runs, is the only change since.
