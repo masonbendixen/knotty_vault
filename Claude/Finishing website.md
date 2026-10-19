@@ -2019,6 +2019,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
 - **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
 - Say which.
+- Mason- I'll go with the default.
 
 **OQ-24 — A shift trade on a co-taught class drops the co-instructor from that date.** *(Found implementing Phase 10, 10/18.)*
 - A shift trade works by writing who teaches one date onto that date, the same record a substitution writes. Phase 10's rule is that such a record replaces the slot's whole team, which is right for a substitution ("both are away, Mason covers").
@@ -2027,6 +2028,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** leave it. Trades on the one co-taught class should be rare, and an admin substitution (which names whoever covers) is the workaround.
 - **Alternative:** when the lead asks to trade a co-taught date, record the co-instructors on that date too, so the trade replaces only the lead. That is a change to the shift-trade code, with tests.
 - Say which.
+- Mason- Let's go with the default.
 
 **OQ-25 — A plus-addressed email can't activate its account.** *(Found implementing Phase 11, 10/18.)*
 - The activation mail's link writes the address with honuware's `URLEncode`, which leaves `+` as it is, so `mason+test@gmail.com` goes out as `?email=mason+test@gmail.com`.
@@ -2035,6 +2037,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** fix it in the honuware component the next time it is opened, by building the activation link with the reset mail's encoder, with a test for a `+` address. It is not part of Phase 11.
 - **Alternative:** fix it now, in the same `server_components` change as Phase 11 (one line plus a test), before Mason commits it.
 - Say which.
+- Mason- Let's fix it now.
 
 ### Resolved
 
