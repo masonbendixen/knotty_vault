@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/18/2026
-Version: 0.16
+Version: 0.17
 tags: 
 ---
 # Overview
@@ -83,6 +83,17 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.17 (10/18/2026)** — **Phase 11 is built, in all three repos; some checks wait on memory.**
+  - `server_components` has the table, the migration, the reset helper and mail, the gate checks, and the two endpoints. Windows 1889 passed, Linux 1889 passed, with the same names on both. knottyyoga built against it passes 5376 on Linux, and both of its programs build.
+  - `@honuware/ui` 0.3.0 has the **Forgot password?** link and the two new pages: 514 specs, lint and build clean. knottyyoga is wired to them and passes 3614 Angular specs against a local build of 0.3.0.
+  - Found while building: both endpoints had to be exempt from the CSRF guard, or no signed-out visitor could use them (11.4).
+  - **Stopped by a low-memory reap and not restarted:**
+    - knottyyoga's Windows build against the local checkout
+    - the mutation checks (11.8)
+    - the end-to-end run (11.9)
+
+    They are ready to run when Mason says.
+  - New **OQ-25**: the *activation* link has always broken for plus-addressed emails. Default: fix it next time the component is opened.
 - **v0.16 (10/18/2026)** — **Phase 10 is implemented.** Windows 5306 passed, Linux 5306 passed, with the same test names on both; Angular 3608 passed.
   - A slot can now carry co-instructors, and Tuesday's Beginner Knotty Yoga is Gifford's and Tiana's on the weekly schedule, the class page, both instructors' profiles and My Classes. A substitution still replaces both.
   - Pay, the load grid, the exception digest and favorite alerts stay keyed on the lead, as planned.
@@ -1608,6 +1619,9 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 11.5 Ship the server side
 - [ ] Gates on `server_components` (Linux `docker/build_and_test.sh` + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
+  - **server_components: Windows 1889 passed, Linux 1889 passed**, with the same test names on both (1819 at the Phase 4 pin, so 70 new).
+  - **knottyyoga against the local checkout, Linux: 5376 passed** (5306 + the 70), and both `knottyyoga_database_helper` and `knottyyoga_the_server` build. The log confirms `honuware : /honuware (local override)`. No knottyyoga server source changed.
+  - **knottyyoga against the local checkout, Windows: not finished.** The build was stopped at 1161 of 2517 steps, with no errors so far, when Claude Code reaped background runs for low memory (10/18 evening). It will be re-run when Mason says to. The Windows build tree is now configured against the local checkout (`x64-Debug-local-honuware`, `FETCHCONTENT_SOURCE_DIR_HONUWARE` set in its cache), as in Phase 4.
 - [ ] **Mason** commits and pushes `server_components`.
 - [ ] Claude bumps `GIT_TAG` in knottyyoga's top-level `CMakeLists.txt` to that SHA, removes the local `FETCHCONTENT_SOURCE_DIR_HONUWARE` override, and re-runs the knottyyoga gates. CommunityFinder pins its own SHA and is untouched until it bumps.
 
@@ -1662,11 +1676,54 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 11.8 Mutation check
 
-*(Filled in below when the run finishes.)*
+- [ ] **C++ (honuware, Windows):** 22 mutations are scripted, one per safeguard. Among them:
+  - storing the secret rather than its hash
+  - a new request not replacing the old link
+  - the fifth wrong secret not deleting it
+  - a used link surviving
+  - sessions, lockout or must-change surviving a reset
+  - no email verification
+  - the test-cost hash
+  - expired links working
+  - the request cap counting only failures
+  - requests not recorded
+  - no gate
+  - failures recorded as successes
+  - the CSRF exemption missing
+  - the migration never creating the table
+  - `+` left unencoded
+  - `ClearLoginLockout` leaving the lock
+  - the attempt count skipping successes
+  - a new database without the table
+  - mail to the typed address
+  - the TTL secret ignored
+
+  **Not run yet:** held back after the memory reap; to run when Mason says.
+- [ ] **@honuware/ui:** 7 mutations are scripted:
+  - a failed request shows nothing
+  - the secret stays in the address bar
+  - mismatched passwords reach the server
+  - a failed reset offers no new link
+  - **Forgot password?** points elsewhere
+  - a 401 from the reset endpoints bounces to Log In
+  - the wrong JSON key
+
+  The run was reaped during the first mutation. Its file was put back by hand and checked, so the library source is as built. To re-run when Mason says.
 
 ### 11.9 End to end
 
-*(Filled in below when the run finishes.)*
+- [ ] Scripted, not run yet (held back with the rest). It runs against a throwaway `phase11_check` database through the real server, middleware included, with outgoing mail pointed at a closed local port so nothing leaves the container. It covers:
+  - a signed-out request getting through the CSRF guard
+  - identical answers for known and unknown addresses
+  - one hashed link stored
+  - both requests counted, and the audit events
+  - a wrong secret giving the generic 400 and counting
+  - Beth signing in with a Phase 5 temporary password, then resetting it, with her old session ended and the new password working
+  - must-change cleared
+  - the link refused a second time
+  - the sixth request in an hour answering 429
+
+  A second mode drops the table and checks that `--migrate` brings it back.
 
 ### 11.10 Hand-testing walkthrough
 
