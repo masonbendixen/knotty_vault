@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/19/2026
-Version: 0.18
+Version: 0.19
 tags: 
 ---
 # Overview
@@ -83,6 +83,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.19 (10/19/2026)** — **11.11 is pinned in both apps.** Mason pushed the activation-link fix as `server_components` `4b59f5b` (green in CI). Both apps now pin it: knottyyoga Windows 5382 and Linux 5382; CommunityFinder Windows 1916 and Linux 1916; same names on both platforms. Phase 11's code is complete. Still to do: Mason's commit of the two pin lines and the knottyyoga UI changes, his hand-test (11.10, now 15 steps), and the 11.8/11.9 runs stopped earlier by low memory.
 - **v0.18 (10/19/2026)** — **Mason answered OQ-23, 24 and 25; Phase 11 gains the activation-link fix.**
   - OQ-23 and OQ-24: the defaults stand, with no code change. Both moved to *Resolved*.
   - OQ-25: **fix it now.** New **11.11**: the activation link encodes the address the way the reset link does, so `mason+test@…` can activate. The encoder moved into foundation (`URLEncodeQueryValue` in `util/types.h`) and both mails use it. That is a second `server_components` change, so 11.11 ends with another commit, pin bump and gates in both apps.
@@ -1741,7 +1742,7 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 11.10 Hand-testing walkthrough
 
-**Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug** configuration once 11.11's pin bump has landed (before that, steps 1–12 already work on the current pin, and steps 13–15 need the 11.11 code), and the site from `ng serve`, restarted since `@honuware/ui` 0.3.0 was installed (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
+**Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug** configuration at 11.11's pin (`4b59f5b`; a server started before 10/19 is older, so stop it and rebuild it first: steps 13–15 fail on the old one), and the site from `ng serve`, restarted since `@honuware/ui` 0.3.0 was installed (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
 
 **Asking for a link**
 
@@ -1787,8 +1788,11 @@ During development, knottyyoga builds against the local `server_components` chec
 
   The files were restored byte for byte, and a clean run of the same suites passes.
   - *Not mutated:* `PreliminaryRegisterPerson` pre-encoding again with `URLEncode`. That would encode twice, but `URLEncode` leaves every character an address normally has (`+`, `@`, `.`, letters, digits) as it is. So the output is the same for any real address, and no test can tell the two apart.
-- [ ] **Mason** commits and pushes `server_components`.
-- [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to that SHA and runs both apps' pinned gates on both platforms.
+- [x] **Mason** commits and pushes `server_components`: **`4b59f5b`** ("Phase 11 cleanup", the 9 files above), green in CI.
+- [x] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to `4b59f5b` and runs both apps' pinned gates on both platforms. Every build cloned `4b59f5b` with no local override.
+  - **knottyyoga: Windows 5382 passed. Linux 5382 passed**, with the same test names on both. Linux built both executables. Windows built the tests, `knottyyoga_database_helper` and `knottyyoga_test_helper` but not `knottyyoga_the_server`, because Mason's server was running from that file.
+  - **CommunityFinder: Windows 1916 passed. Linux 1916 passed**, with the same test names. Both platforms built every executable.
+  - **Mason:** commit the one-line `GIT_TAG` change in each app. In knottyyoga it goes in with the Phase 11 UI changes that are still uncommitted.
 
 ---
 
