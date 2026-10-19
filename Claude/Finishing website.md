@@ -1483,7 +1483,7 @@ Fact 12: this is built in the two honuware repos and then pinned here. **Nothing
 During development, knottyyoga builds against the local `server_components` checkout via `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the gitignored `CMakeUserPresets.json`, so both repos build together before anything is pushed.
 
 ### 11.1 Schema *(server_components: platform/db_schema)*
-- [ ] New framework table `password_reset_tokens`:
+- [x] New framework table `password_reset_tokens`:
   - `id`
   - `person_id` (FK → people, **UNIQUE**)
   - `token_hash`
@@ -1492,27 +1492,41 @@ During development, knottyyoga builds against the local `server_components` chec
   - `created_at`
 
   It has the same shape as `email_verifications` but is a separate table, because a pending verification and a pending reset must be able to coexist. Registered like `email_verifications`: schema only, **never** in the admin CRUD allow-lists, so no generic endpoint can read a token row.
-- [ ] Idempotent framework migration **`honuware/0002_password_reset_tokens`**, with a migration test.
-- [ ] `login_attempts` kind `password_reset`; `auth_events` kinds `password_reset_requested` and `password_reset_completed`.
+  - *As built:* every new database gets it from `CreateFrameworkTables`; the existing guard test checks that list against the schema. Its `token_hash` is also redacted for admins, as `email_verifications`' is. `CreateFrameworkTablesTest.PasswordResetTokensIsBuiltAndKeptOutOfTheAdminLists` checks all three lists the CRUD endpoints read (top-level, nested, allowed).
+- [x] Idempotent framework migration **`honuware/0002_password_reset_tokens`**, with a migration test.
+  - *As built:* the table has a foreign key onto `people`, so the migration describes every framework table (`MakeFrameworkTables`) and creates just this one. That is the framework version of memory trap #4: a schema holding only the one table can't type the key. The test drops the table, applies the migration, uses the table through its helper, checks the cascade on deleting the person, and applies it again.
+- [x] `login_attempts` kind `password_reset`; `auth_events` kinds `password_reset_requested` and `password_reset_completed`.
+  - *As built:* **two** `login_attempts` kinds, because the two caps count differently. `password_reset_request` counts every "send me a link" request, success or not, since a request always "succeeds". `password_reset` counts uses of a link, and only failures, as verify does. With one kind, failed resets would have eaten into the request cap. `password_reset_requested` is written only when the address has an account; there is no person to record otherwise.
 
 ### 11.2 Table helper *(server_components: platform/sql_util/table_helpers)*
-- [ ] `TableHelpers::PasswordResetTokens`: `ReplaceForPerson` (delete + insert, so a new request kills the old link), `GetForPerson`, `IncrementAttempts`, `DeleteForPerson`. Tests for each.
+- [x] `TableHelpers::PasswordResetTokens`: `ReplaceForPerson` (delete + insert, so a new request kills the old link), `GetForPerson`, `IncrementAttempts`, `DeleteForPerson`. Tests for each.
+  - *As built:* `IncrementAttempts` is one conditional `UPDATE … RETURNING`, the same claim `email_verifications` uses. It counts the attempt only on a link that hasn't expired and has tries left, and returns the row for the caller to compare, so two concurrent guesses can't both slip under the limit. 10 tests.
+  - *Also added, each tested:* `LoginAttempts::RecentAttemptCountForEmail` / `…ForIp`, which count every attempt and not just failures, for the request cap. And `People::ClearLoginLockout`, which zeroes the failure count and lifts `locked_until`, as a successful sign-in does.
 
 ### 11.3 Business logic *(server_components: platform/business_logic/auth)*
-- [ ] `Auth::PasswordResetHelper::RequestReset(transaction, secrets, mail, email)`:
+- [x] `Auth::PasswordResetHelper::RequestReset(transaction, secrets, mail, email)`:
   - Unknown email: does nothing, and sends no mail.
   - Known email:
     - a 32-byte secret, stored only as its hash (the same hashing `email_verifications` uses)
     - expires in 60 minutes (secret `auth_password_reset_ttl_minutes`, default 60)
     - sends the reset mail
-- [ ] Reset mail `password_reset_mail.{h,cpp}`, beside `person_verify_mail`:
+  - *As built:*
+    - It returns the account's person id (0 for an unknown address) so the endpoint can write the audit event.
+    - All the SQL runs inside the call; the mail itself is **queued on the ThreadPool** by the helper, keeping email in business logic. The queued task never touches the database, so the endpoint can still write afterwards. A failed send is logged as `[password_reset] event=mail_failed`.
+    - The mail goes to the address as **stored**: email is case-insensitive, so `ALICE@Example.com` finds the account but the mail is addressed `alice@example.com`.
+- [x] Reset mail `password_reset_mail.{h,cpp}`, beside `person_verify_mail`:
   - a `FormatString` template, wrapped in `NormalizeCrLf`
   - sender from `::Mail::LoadSenderAddress`
   - tenant branding
   - a link to the SPA's `reset-password` page with `email` and `secret` URL-encoded, built from `website_address_login` exactly as the verification link is
   - Subject: "Reset your {site name} password"
   - Body: who asked, the link, "expires in 60 minutes", and "If you didn't ask for this, ignore this email. Your password has not changed."
-- [ ] `Auth::PasswordResetHelper::CompleteReset(transaction, secrets, email, secret, newPassword)`:
+  - *As built:*
+    - The page the link opens is a new secret, `password_reset_link` (default `reset-password`), appended to `website_address_login` exactly as `activation_link` is for verification.
+    - The body reads: "Hello {first name}, Someone asked to reset the password for the {studio} account {email}." Then a **Reset your password** link, "This link expires in 60 minutes and works once.", and the plan's closing line.
+    - **The link percent-encodes everything but letters, digits and `- . _ ~`.** The verification link's encoder leaves `+` alone. The SPA's router reads an unencoded `+` as a space, so a plus-addressed email (`mason+test@…`) would arrive as `mason test@…` and the reset would fail. This was checked against Angular itself; see OQ-25 for the verification link, which has this bug today.
+    - 7 tests.
+- [x] `Auth::PasswordResetHelper::CompleteReset(transaction, secrets, email, secret, newPassword)`:
   - **Failure.** Missing, wrong or expired all collapse to one generic failure. Each wrong secret counts, and the fifth deletes the token.
   - **Password rules.** The same rules registration enforces.
   - **Success:**
@@ -1522,8 +1536,22 @@ During development, knottyyoga builds against the local `server_components` chec
     - set `email_verified_at` if empty, which also rescues an account whose verification link expired
     - delete the token
     - `LogoutPerson`, which ends every session and remember-me device token
-- [ ] `LoginGate::CheckBeforePasswordReset(transaction, secrets, email, ip)`: per-email and per-IP request caps (defaults 5 per hour per email and 20 per hour per IP, as secrets), so the button cannot be used to flood someone's inbox.
-- [ ] Tests:
+  - *As built:*
+    - It returns `Success`, `InvalidLink` (every bad case) or `PasswordRejected`.
+    - The password check (registration's only rule is "not empty") comes first, so it costs no try.
+    - An attempt is claimed **before** the secret is compared, so a correct secret also counts, and so does one that isn't even valid base64. The fifth wrong one deletes the link.
+    - Verifying an unverified email has to come **before** the password change, because `PersonHelper` only changes a verified account's password.
+- [x] `LoginGate::CheckBeforePasswordReset(transaction, secrets, email, ip)`: per-email and per-IP request caps (defaults 5 per hour per email and 20 per hour per IP, as secrets), so the button cannot be used to flood someone's inbox.
+  - *As built:* named **`CheckBeforeForgotPassword`**, beside a second check, **`CheckBeforeResetPassword(ip)`**, for 11.4's reset endpoint (30 failures per IP per 15 minutes, like verify). Six new framework secrets, all defaulted in `secret_values.cpp`:
+    - `auth_password_reset_ttl_minutes` = 60
+    - `…_max_requests_per_email` = 5
+    - `…_max_requests_per_ip` = 20
+    - `…_request_window_in_micros` = 1 hour
+    - `…_max_failures_per_ip` = 30
+    - `…_failure_window_in_micros` = 15 minutes
+
+    A database that predates them has no rows, and the code falls back to the same numbers.
+- [x] Tests:
   - an unknown email sends nothing
   - a known one sends exactly one mail whose link carries the secret, and the stored value is not the secret
   - a second request replaces the first, so the old link fails
@@ -1532,25 +1560,51 @@ During development, knottyyoga builds against the local `server_components` chec
   - success changes the password (the old fails and the new verifies, via `VerifyPassword`)
   - success clears must-change and the lockout, verifies the email, ends sessions and device tokens, and the link cannot be reused
   - the gate caps per email and per IP
+  - *As built:* 19 helper tests plus 9 new gate tests. Every outcome is read back through the code production uses:
+    - the password through `VerifyPassword` and `LoginPerson`
+    - the lockout through `LoginGate::CheckBeforeLogin`
+    - sign-outs through session lookup and remember-me
+    - verification through `IsPerson`
+    - whether a link still works through `CompleteReset` itself
+
+    The session checks first prove the session and the remember-me token work *before* the reset, so they can't pass vacuously. Also checked:
+    - the production Argon2 cost, from the hash's own parameters
+    - the mail goes to the stored address
+    - a pending verification and a reset coexist
 
 ### 11.4 Endpoints *(server_components: platform/endpoints)*
-- [ ] `POST /api/forgot_password` `{email}`:
+- [x] `POST /api/forgot_password` `{email}`:
   - **Always `200`** with the same body, whether or not the account exists.
   - Synchronous SQL first, then the mail send is queued on `ThreadPool` ([[feedback_sync_sql_before_threadpool_queue]]), so response time does not reveal whether the account exists either.
   - Gate denial → the generic 429.
-- [ ] `POST /api/reset_password` `{email, secret, new_password}`:
+  - *As built:* the body is empty, as `/api/verify`'s is. Every request is recorded (write-behind, last) toward the caps. An unexpected error answers the generic 500 and logs the detail; the endpoint never echoes it, because an error that only happened for a real account would give the account away.
+- [x] `POST /api/reset_password` `{email, secret, new_password}`:
   - `200` on success, or one generic `400` "reset link is invalid or expired"
   - per-IP gate as `/api/verify` has
   - attempt recorded async, last
   - `auth_events` row on success
-- [ ] Both are added to the auth-endpoint list in the honuware `ErrorInterceptor`, so a 401 there never bounces to the login page.
-- [ ] Endpoint tests:
+  - *As built:* a missing field is a 400 naming it (`new_password is required`), as register's are.
+- [x] **Found while building, not in the plan: both endpoints had to join the CSRF guard's exempt list.** The guard refuses any POST without a `csrft` cookie, and the cookie is only set at sign-in, so someone who can't sign in has none. Without the exemption, every forgot-password request from the SPA would have been refused 403. The endpoint tests can't see this, because `handle_full` skips the guard. It is now exempt the same way `/api/register` and `/api/verify` are, and that's safe for the same reasons:
+  - a forged `forgot_password` can only mail a link to that address's own inbox, and is capped
+  - a forged `reset_password` would need the secret from that mail
+
+  Two `CsrfGuardTest` cases pin it, and the end-to-end run (11.9) goes through the real guard.
+- [x] Both are added to the auth-endpoint list in the honuware `ErrorInterceptor`, so a 401 there never bounces to the login page. *(Done in 11.6, where the interceptor lives.)*
+- [x] Endpoint tests:
   - an unknown email gets 200 and no mail
   - a known email gets 200 and one mail
   - 429 when gated
   - reset happy path, then the same link a second time fails
   - a bad secret gets the generic 400
   - `ThreadPool::Shutdown()` right after each `handle_full`
+  - *As built:* 8 forgot + 7 reset tests. The reset tests get their link from a real `/api/forgot_password` request, read out of the mail it sent. They also cover:
+    - known and unknown addresses get byte-identical answers
+    - the per-IP cap on requests
+    - every request is recorded
+    - failures are recorded and successes aren't counted
+    - both auth events
+    - sign-out on success
+    - missing fields
 
 ### 11.5 Ship the server side
 - [ ] Gates on `server_components` (Linux `docker/build_and_test.sh` + Windows) and on knottyyoga against the local checkout; Claude reports both platforms.
@@ -1558,31 +1612,86 @@ During development, knottyyoga builds against the local `server_components` chec
 - [ ] Claude bumps `GIT_TAG` in knottyyoga's top-level `CMakeLists.txt` to that SHA, removes the local `FETCHCONTENT_SOURCE_DIR_HONUWARE` override, and re-runs the knottyyoga gates. CommunityFinder pins its own SHA and is untouched until it bumps.
 
 ### 11.6 Frontend library *(honuware-web-components: `@honuware/ui/auth`)*
-- [ ] `HonuwareAuthAccess` gains `forgotPassword(email)` and `resetPassword(email, secret, newPassword)`. `AUTH_ROUTES` gains `forgotPasswordPath: '/forgot-password'` and `resetPasswordPath: '/reset-password'`.
-- [ ] `LoginComponent`: a **Forgot password?** link beneath the password field.
-- [ ] `ForgotPasswordComponent`:
+- [x] `HonuwareAuthAccess` gains `forgotPassword(email)` and `resetPassword(email, secret, newPassword)`. `AUTH_ROUTES` gains `forgotPasswordPath: '/forgot-password'` and `resetPasswordPath: '/reset-password'`.
+  - *As built:* the interface is `AuthAccess`. Both methods are on it, on `AuthHttpAccess`, on the serializing `HonuwareAccessProxy`, on `AuthService`, and on the testing `MockAuthAccess`; the mock accepts any link for a known account and signs it out. Both route fields are **optional**, as `checkEmailPath` is, so an app's existing `AuthRoutes` object still compiles. With no `forgotPasswordPath`, the login page simply shows no link.
+- [x] `LoginComponent`: a **Forgot password?** link beneath the password field.
+  - *As built:* right-aligned under the field, above **Remember Me**, with a 44px tap target like the page's other links.
+- [x] `ForgotPasswordComponent`:
   - title **Reset your password**
   - **Email** field
   - **Send reset link** button
   - afterwards, always: "If an account exists for that email, we've sent a link to reset your password. Check your spam folder too." with **Back to log in**
-- [ ] `ResetPasswordComponent`:
+  - *As built:* a line above the field says what happens ("Enter the email address you sign in with and we'll send you a link to choose a new password."). The button is disabled while the request is out, and the form is replaced by the message so nobody sends twice by accident. **Back to log in** is there before and after.
+- [x] `ResetPasswordComponent`:
   - reads `email` and `secret` from the query string, as `VerifyComponent` does
   - **New Password** and **Confirm New Password**, with show/hide toggles
   - a **Set Password** button
   - success: toast "Your password has been changed. Please log in.", then the Log In page
   - failure: "This reset link is invalid or has expired." with a **Send a new link** button back to the forgot page
-- [ ] Specs:
+  - *As built:*
+    - Its title is **Choose a new password**.
+    - Like Verify, it scrubs the secret from the address bar the moment it opens, leaving `/reset-password`. The values stay in memory, so the secret isn't in browser history, or in a Referer, while the person types.
+    - A link missing its email or secret shows the failure state straight away, without calling the server.
+    - One eye button shows or hides both fields.
+    - "Passwords do not match." appears under the second field.
+- [x] Specs:
   - the link exists on Log In
   - forgot shows the same message for success and for any error
   - reset rejects mismatched passwords without calling the server
   - reset's success and failure paths
+  - *As built:* the library has **514** specs, up from 482 (32 new).
+    - Log In: 4 (the link, a remapped path, no link when unrouted, its tap target).
+    - Forgot: 8 (the message after 429, 500 and network failures as well as success; nothing sent without a valid email).
+    - Reset: 12 (URL scrub, missing parts, toggles, tap targets).
+    - Also `AuthHttpAccess` 2, the proxy 1, `AuthService` 1, the `ErrorInterceptor` 1 (no bounce to login on a 401 from either endpoint), and `MockAuthAccess` 3.
+
+    `npm run lint` and `npm run build` are clean.
 - [ ] Minor version bump in `projects/honuware-ui/package.json`. **Mason** commits, pushes, creates the tag and pushes the tag ([[reference_honuware_ui_release]]).
+  - *Done by Claude:* `0.2.0` → **`0.3.0`**, and the package README lists the two pages and how to route them. **Mason:** commit, push, `git tag v0.3.0`, `git push origin v0.3.0`.
+  - *CommunityFinder* pins `@honuware/ui` 0.1.2 and has its own `AuthAccess` implementation. When it moves to 0.3.0 it needs the two new methods; nothing changes for it until then.
 
 ### 11.7 Knottyyoga wiring *(ui/)*
 - [ ] `npm install @honuware/ui@X.Y.0 --save-exact`.
-- [ ] `ServerAccess` (+ network + mock + proxy) implements `forgotPassword` / `resetPassword`; `ServerAccess.mock.spec.ts` cases.
-- [ ] `auth.routes.ts`: `forgot-password` → `ForgotPasswordComponent`, `reset-password` → `ResetPasswordComponent`.
-- [ ] `ng test`, `tsc --noEmit`, `ng build`.
+  - *Waits on Mason's 0.3.0 release (11.6).* Until then, `ui/node_modules/@honuware/ui` holds Claude's **local build of 0.3.0**, so the app compiles and runs with the new pages for hand-testing. `package.json` and the lock file still say 0.2.0, and the installed 0.2.0 is backed up in Claude's scratch folder. After the release: `npm install @honuware/ui@0.3.0 --save-exact`, which replaces the local build with the published one; the code is identical.
+- [x] `ServerAccess` (+ network + mock + proxy) implements `forgotPassword` / `resetPassword`; `ServerAccess.mock.spec.ts` cases.
+  - *As built:* in local mode the mock accepts any request, and any reset link that has all its parts; a reset signs the mock session out. 4 mock spec cases.
+- [x] `auth.routes.ts`: `forgot-password` → `ForgotPasswordComponent`, `reset-password` → `ResetPasswordComponent`.
+  - *As built:* plus a new `auth.routes.spec.ts` (2 cases) pinning both routes to `DEFAULT_AUTH_ROUTES`' paths, which are where the login link and the reset mail send people. The mobile-audit route list gained both pages; its Karma guard fails on any unlisted route.
+- [x] `ng test`, `tsc --noEmit`, `ng build`.
+  - Against the local 0.3.0 build: **Angular 3614 passed** (3608 + 6). `tsc` is clean for both app and specs, `ng lint` is clean, and `ng build` is OK with the same six old budget warnings.
+
+### 11.8 Mutation check
+
+*(Filled in below when the run finishes.)*
+
+### 11.9 End to end
+
+*(Filled in below when the run finishes.)*
+
+### 11.10 Hand-testing walkthrough
+
+**Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug (local honuware checkout)** configuration (the server needs the new `server_components` code until 11.5's pin bump), and the site from `ng serve`; `node_modules` already holds the new library build (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
+
+**Asking for a link**
+
+1. Open **Log In**. Under the **Password** field, at its right, is **Forgot password?**. Click it.
+2. The page is **Reset your password**. Type `masonbendixen@gmail.com` in **Email** and click **Send reset link**. The form is replaced by: "If an account exists for that email, we've sent a link to reset your password. Check your spam folder too."
+3. Click **Back to log in**, then **Forgot password?** again. Send `nobody@example.com`. The page says exactly the same sentence.
+4. In the masonbendixen@gmail.com inbox, one new mail from **Knotty Yoga**, subject **Reset your Knotty Yoga password**. It reads "Hello Mason," and "This link expires in 60 minutes and works once."
+
+**Using it**
+
+5. Click **Reset your password** in the mail. The page **Choose a new password** opens, and the address bar shows only the page, with no email or secret.
+6. Type `newpass1` in **New Password** and `newpass2` in **Confirm New Password**. "Passwords do not match." appears, and **Set Password** does nothing.
+7. Make the second `newpass1`, and click the eye on either field: both passwords show. Click **Set Password**. A message says "Your password has been changed. Please log in." and the **Log In** page opens.
+8. Log in with password `pass`: refused, "The email or password you entered is incorrect". Log in with `newpass1`: you're in.
+9. Click the link in the same mail again, type `newpass2` twice, **Set Password**. The page says "This reset link is invalid or has expired." Click **Send a new link**: it opens **Reset your password**.
+
+**It signs you out everywhere**
+
+10. In a second browser (or a private window), log in as `masonbendixen@gmail.com` / `newpass1`.
+11. In the first browser, send yourself another link (steps 1–2), open the new mail's link, and set the password back to `pass`.
+12. In the second browser, reload the page: you're signed out, and logging in with `newpass1` is refused. Log in with `pass` to finish where you started.
 
 ---
 
@@ -1850,6 +1959,14 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Tiana herself can't trade a Tuesday: the request is refused with "You can only trade your own teaching shift", because only the lead holds the shift.
 - **Default:** leave it. Trades on the one co-taught class should be rare, and an admin substitution (which names whoever covers) is the workaround.
 - **Alternative:** when the lead asks to trade a co-taught date, record the co-instructors on that date too, so the trade replaces only the lead. That is a change to the shift-trade code, with tests.
+- Say which.
+
+**OQ-25 — A plus-addressed email can't activate its account.** *(Found implementing Phase 11, 10/18.)*
+- The activation mail's link writes the address with honuware's `URLEncode`, which leaves `+` as it is, so `mason+test@gmail.com` goes out as `?email=mason+test@gmail.com`.
+- The SPA's router reads a `+` in a query string as a space. Checked against Angular itself: that link arrives as `mason test@gmail.com`, `/api/verify` finds no such account, and the person sees "Verification failed or expired".
+- Plain addresses, which is nearly everyone, are unaffected. The new reset link (11.3) encodes `+` as `%2B` and works, so **Forgot password?** is the workaround: following its link verifies the account too.
+- **Default:** fix it in the honuware component the next time it is opened, by building the activation link with the reset mail's encoder, with a test for a `+` address. It is not part of Phase 11.
+- **Alternative:** fix it now, in the same `server_components` change as Phase 11 (one line plus a test), before Mason commits it.
 - Say which.
 
 ### Resolved
