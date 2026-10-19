@@ -2077,6 +2077,23 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 - → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
 
+**OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
+- After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
+  - The weekly schedule marks each row "Requires a membership" or "Prerequisite needed".
+  - Each class page now names what it needs (12.1).
+- **Default:** no badge on the cards. Every class needs a membership, so for a visitor or a non-member all six cards would carry the same badge. The class page, one click away, names the membership and the skill.
+- **Alternative:** the weekly schedule's badge on each card, worked out for the viewer. For example, a Silver member would see Beginner Knotty Yoga unmarked and the other five marked. The class list would then have to carry each viewer's access: a change to the server and to the page.
+- Say which.
+
+**OQ-27 — An unapproved Gold member reads "Members only: Gold membership".** *(Found implementing 12.1, 10/19.)*
+- The class page's **Pricing** says "Members only" whenever the viewer can't attend, whatever the reason.
+- So on Handstands, Aerial Rope and Intermediate Partner Acro, a Gold member whom no instructor has approved reads "Members only: Gold membership", though they already have Gold.
+  - Right below it, **Required Skills** shows the skill with a red mark, then "You're missing: Handstand" and "Talk to staff for evaluation."
+  - Before 12.1 the same member read "Members only" and "Upgrade your membership to attend.", so this isn't new.
+- **Default:** leave it. The Required Skills box says what is actually missing.
+- **Alternative:** when the viewer has the membership and lacks only the approval, **Pricing** says so instead, for example "Included with your membership once an instructor approves you". The server already tells the two apart (the schedule badge's "members only" versus "needs a skill"). It would have to pass that on, and the page would need a fourth wording.
+- Say which.
+
 ### Resolved
 
 *Newest first: 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
