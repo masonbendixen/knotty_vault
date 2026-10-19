@@ -1627,7 +1627,7 @@ During development, knottyyoga builds against the local `server_components` chec
   - *Done:* `GIT_TAG` is `4f723413ada4ac823ea71e280de0a40013fd5b1b` in **both** knottyyoga and CommunityFinder (Mason asked for both, 10/18). Nothing else changed in either repo.
   - The Windows build tree is back on the pin: `FETCHCONTENT_SOURCE_DIR_HONUWARE` is empty in its cache, and `_deps/honuware-src` is a clean clone at `4f72341`. Visual Studio's configuration is the plain **x64-Debug**, so it won't put the override back.
   - **knottyyoga, pinned, Linux: 5376 passed**, the same count as against the local checkout, and both executables build. The log says `pinned SHA (FetchContent will clone it)`.
-  - knottyyoga, pinned, Windows: *pending.*
+  - **knottyyoga, pinned, Windows: 5376 passed**, with the same 5376 test names as Linux. `knottyyoga_database_helper` and `knottyyoga_test_helper` build. `knottyyoga_the_server` wasn't relinked because Mason's copy was running; the Linux run builds it from the same sources.
   - **CommunityFinder, pinned, Linux: 1910 passed** (1840 at `cddb9cb`, plus the 70 new honuware tests), and both `communityfinder_database_helper` and `communityfinder_server` build. Its server now has both endpoints and the new table, but its UI stays on `@honuware/ui` 0.1.2, with no **Forgot password?** link, until it moves to 0.3.0.
   - CommunityFinder, pinned, Windows: *pending.*
 
