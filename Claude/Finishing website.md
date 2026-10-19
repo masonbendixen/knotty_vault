@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.18 (10/19/2026)** — **Mason answered OQ-23, 24 and 25; Phase 11 gains the activation-link fix.**
+  - OQ-23 and OQ-24: the defaults stand, with no code change. Both moved to *Resolved*.
+  - OQ-25: **fix it now.** New **11.11**: the activation link encodes the address the way the reset link does, so `mason+test@…` can activate. The encoder moved into foundation (`URLEncodeQueryValue` in `util/types.h`) and both mails use it. That is a second `server_components` change, so 11.11 ends with another commit, pin bump and gates in both apps.
+  - The Phase 11 release so far: `server_components` `4f72341` is pinned in knottyyoga and CommunityFinder (Windows 5376 and Linux 5376; Windows 1910 and Linux 1910), and `@honuware/ui` 0.3.0 is on npm and installed (3614 Angular specs).
 - **v0.17 (10/18/2026)** — **Phase 11 is built, in all three repos; some checks wait on memory.**
   - `server_components` has the table, the migration, the reset helper and mail, the gate checks, and the two endpoints. Windows 1889 passed, Linux 1889 passed, with the same names on both. knottyyoga built against it passes 5376 on Linux, and both of its programs build.
   - `@honuware/ui` 0.3.0 has the **Forgot password?** link and the two new pages: 514 specs, lint and build clean. knottyyoga is wired to them and passes 3614 Angular specs against a local build of 0.3.0.
@@ -1390,7 +1394,7 @@ That is the conservative reading, and each can widen later on its own.
   Where: the shared helper (7 cases, on real derived occurrences), the catalog (2), the calendar (2), the profile (2), My Classes and the teaching list (2), `ClassScheduleHelper` (8, including copy forward) and the load grid (1).
 - **Not changed, deliberately:**
   - **Past attendance history** (My Classes ▸ history) still names the lead and any staffing, not co-instructors. It is its own SQL report and wasn't on this phase's list.
-  - **Shift trades on a co-taught class.** See OQ-24.
+  - **Shift trades on a co-taught class.** See OQ-24: Mason kept the default (10/19), so this stays as is. An admin substitution is the workaround.
 
 ### 10.4 Endpoints
 - [x] `POST /api/admin/class_schedule_slots/{id}/co_instructors` and `DELETE …/{personId}`, gated on `manage_class_schedule`, thin over 10.3.
@@ -1535,7 +1539,7 @@ During development, knottyyoga builds against the local `server_components` chec
   - *As built:*
     - The page the link opens is a new secret, `password_reset_link` (default `reset-password`), appended to `website_address_login` exactly as `activation_link` is for verification.
     - The body reads: "Hello {first name}, Someone asked to reset the password for the {studio} account {email}." Then a **Reset your password** link, "This link expires in 60 minutes and works once.", and the plan's closing line.
-    - **The link percent-encodes everything but letters, digits and `- . _ ~`.** The verification link's encoder leaves `+` alone. The SPA's router reads an unencoded `+` as a space, so a plus-addressed email (`mason+test@…`) would arrive as `mason test@…` and the reset would fail. This was checked against Angular itself; see OQ-25 for the verification link, which has this bug today.
+    - **The link percent-encodes everything but letters, digits and `- . _ ~`.** The verification link's encoder leaves `+` alone. The SPA's router reads an unencoded `+` as a space, so a plus-addressed email (`mason+test@…`) would arrive as `mason test@…` and the reset would fail. This was checked against Angular itself. The verification link had this bug (OQ-25); 11.11 fixes it with the same encoder.
     - 7 tests.
 - [x] `Auth::PasswordResetHelper::CompleteReset(transaction, secrets, email, secret, newPassword)`:
   - **Failure.** Missing, wrong or expired all collapse to one generic failure. Each wrong secret counts, and the fifth deletes the token.
@@ -1737,7 +1741,7 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 11.10 Hand-testing walkthrough
 
-**Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug (local honuware checkout)** configuration (the server needs the new `server_components` code until 11.5's pin bump), and the site from `ng serve`; `node_modules` already holds the new library build (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
+**Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug** configuration once 11.11's pin bump has landed (before that, steps 1–12 already work on the current pin, and steps 13–15 need the 11.11 code), and the site from `ng serve`, restarted since `@honuware/ui` 0.3.0 was installed (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
 
 **Asking for a link**
 
@@ -1759,6 +1763,27 @@ During development, knottyyoga builds against the local `server_components` chec
 10. In a second browser (or a private window), log in as `masonbendixen@gmail.com` / `newpass1`.
 11. In the first browser, send yourself another link (steps 1–2), open the new mail's link, and set the password back to `pass`.
 12. In the second browser, reload the page: you're signed out, and logging in with `newpass1` is refused. Log in with `pass` to finish where you started.
+
+**A plus-addressed account activates (11.11)**
+
+13. Sign out. On **Log In**, click **Create an account**. Enter **Email** `masonbendixen+oq25@gmail.com`, **First name** `Plus`, **Last name** `Test`, and `pass` in both **Password** and **Reenter password**, then click **Register**. **Check your email** says "We've sent an activation link to **masonbendixen+oq25@gmail.com**."
+14. Gmail delivers `+` addresses to the main inbox, so the mail lands in masonbendixen@gmail.com: **Knotty Yoga Account Activation**, "Greetings Plus,". Click **Click here to activate your account.** The site says "Email verified — please log in." and opens **Log In**. Before the fix it said "Verification failed or expired. Please try again."
+15. Log in as `masonbendixen+oq25@gmail.com` / `pass`: you're in.
+
+### 11.11 Plus-addressed activation links (OQ-25, Mason: fix now)
+
+- [x] **Foundation** (`util/types.h`): `URLEncodeQueryValue(value)` percent-encodes everything but letters, digits and `- . _ ~`. It is the reset link's encoder (11.3), moved out of `password_reset_mail.cpp` so both mails share it. The reset link is unchanged.
+  - 4 tests in `types_test.cpp`: `+` and `@`; the unreserved set left alone; everything else, including UTF-8, as upper-case `%XX`; a round trip through `URLDecode`.
+- [x] **Business logic** (`business_logic/auth`): the activation-mail builder encodes the address itself with `URLEncodeQueryValue`, and `PersonHelper::PreliminaryRegisterPerson` now passes the stored address instead of `URLEncode`'s output. `mason+test@example.com` now goes out as `?email=mason%2Btest%40example.com`.
+  - `person_verify_mail_test`: the expected link now has `%40` for `@`. New `PlusAddressedEmailIsEncodedInTheLink`.
+  - `person_test`: new `PlusAddressedEmailActivatesFromItsLink`. It registers `mason+test@example.com`, reads the email and secret back out of the sent mail the way Angular does (a bare `+` becomes a space, then `%XX` is decoded), passes them to `VerifyPersonEmail`, and checks that the account is now verified.
+  - No change to `/api/verify`, the SPA or either app. The test utility that computes the expected activation mail goes through the same builder, so the existing activation tests in all three repos follow the change by themselves.
+- [ ] Gates: `server_components` on both platforms. *Running.*
+- [ ] Mutation check, 2 mutations:
+  - the builder going back to `URLEncode`
+  - the encoder leaving `+` unencoded
+- [ ] **Mason** commits and pushes `server_components`.
+- [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to that SHA and runs both apps' pinned gates on both platforms.
 
 ---
 
@@ -2014,21 +2039,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
 - → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
 
-**OQ-23 — Editing Caleb's hours removes his bookable times until Generate is pressed.** *(Found implementing Phase 7, 10/17.)*
-- On **Service Providers** → **Templates**, **Edit Template** saves by deleting the template and creating a new one. The delete takes every availability row generated from the old template with it (7.5). Right after an edit, **Book Now** offers no massage at all until **Generate Availability** is pressed on the new template. Bookings already made are untouched.
-- **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
-- **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
-- Say which.
-- Mason- I'll go with the default.
+### Resolved
 
-**OQ-24 — A shift trade on a co-taught class drops the co-instructor from that date.** *(Found implementing Phase 10, 10/18.)*
-- A shift trade works by writing who teaches one date onto that date, the same record a substitution writes. Phase 10's rule is that such a record replaces the slot's whole team, which is right for a substitution ("both are away, Mason covers").
-- For a trade it is not quite right. When Gifford asks to trade one Tuesday, the system records Gifford alone as teaching it, so from the moment he asks, that Tuesday shows only Gifford and Tiana disappears from it. Once someone takes the shift, it shows only them.
-- Tiana herself can't trade a Tuesday: the request is refused with "You can only trade your own teaching shift", because only the lead holds the shift.
-- **Default:** leave it. Trades on the one co-taught class should be rare, and an admin substitution (which names whoever covers) is the workaround.
-- **Alternative:** when the lead asks to trade a co-taught date, record the co-instructors on that date too, so the trade replaces only the lead. That is a change to the shift-trade code, with tests.
-- Say which.
-- Mason- Let's go with the default.
+*Newest first: 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
 
 **OQ-25 — A plus-addressed email can't activate its account.** *(Found implementing Phase 11, 10/18.)*
 - The activation mail's link writes the address with honuware's `URLEncode`, which leaves `+` as it is, so `mason+test@gmail.com` goes out as `?email=mason+test@gmail.com`.
@@ -2038,10 +2051,25 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** fix it now, in the same `server_components` change as Phase 11 (one line plus a test), before Mason commits it.
 - Say which.
 - Mason- Let's fix it now.
+- → Plan: **11.11**. Phase 11's first `server_components` change was already pushed (`4f72341`), so this is a second one with its own pin bump. The reset link's encoder moved into foundation as `URLEncodeQueryValue`, the activation mail uses it, and a test registers `mason+test@example.com` and activates it from the link the way the SPA reads it. Hand-test steps 13–15 in 11.10.
 
-### Resolved
+**OQ-24 — A shift trade on a co-taught class drops the co-instructor from that date.** *(Found implementing Phase 10, 10/18.)*
+- A shift trade works by writing who teaches one date onto that date, the same record a substitution writes. Phase 10's rule is that such a record replaces the slot's whole team, which is right for a substitution ("both are away, Mason covers").
+- For a trade it is not quite right. When Gifford asks to trade one Tuesday, the system records Gifford alone as teaching it, so from the moment he asks, that Tuesday shows only Gifford and Tiana disappears from it. Once someone takes the shift, it shows only them.
+- Tiana herself can't trade a Tuesday: the request is refused with "You can only trade your own teaching shift", because only the lead holds the shift.
+- **Default:** leave it. Trades on the one co-taught class should be rare, and an admin substitution (which names whoever covers) is the workaround.
+- **Alternative:** when the lead asks to trade a co-taught date, record the co-instructors on that date too, so the trade replaces only the lead. That is a change to the shift-trade code, with tests.
+- Say which.
+- Mason- Let's go with the default.
+- → Plan: no change. 10.3's "Not changed, deliberately" list says so.
 
-*Newest first: 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+**OQ-23 — Editing Caleb's hours removes his bookable times until Generate is pressed.** *(Found implementing Phase 7, 10/17.)*
+- On **Service Providers** → **Templates**, **Edit Template** saves by deleting the template and creating a new one. The delete takes every availability row generated from the old template with it (7.5). Right after an edit, **Book Now** offers no massage at all until **Generate Availability** is pressed on the new template. Bookings already made are untouched.
+- **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
+- **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
+- Say which.
+- Mason- I'll go with the default.
+- → Plan: no change. 15.4 keeps its "press **Generate Availability** straight away" step.
 
 **OQ-22 — Signed in, Our Classes hides every class you can't attend yet.** *(Found implementing Phase 6, 10/17.)*
 - Signed out, **Our Classes** → **All Classes** lists all six classes. Signed in, it lists only the classes the person may already attend (`ClassCatalogHelper::GetClassesVisibleToPerson`, a deliberate rule from the access redesign, P-1/M-6). Until Phase 6 every class was open, so nobody noticed.
