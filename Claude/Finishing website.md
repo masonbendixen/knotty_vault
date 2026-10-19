@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/19/2026
-Version: 0.19
+Version: 0.20
 tags: 
 ---
 # Overview
@@ -83,6 +83,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.20 (10/19/2026)** — **Phase 11 is complete.**
+  - Mason hand-tested forgot password and committed everything.
+  - The checks the low-memory stop had interrupted are now run against the committed code:
+    - **11.8:** all 22 C++ mutations and all 7 `@honuware/ui` mutations are caught.
+    - **11.9:** the end-to-end install pass passes 19 of 19 checks, and the migrate pass rebuilds the table on a pre-Phase-11 database.
+  - No code changed. The C++ mutation script's `+` case now points at `util/types.cpp`, where 11.11 moved the encoder. One library mutation was rewritten so it compiles.
 - **v0.19 (10/19/2026)** — **11.11 is pinned in both apps.** Mason pushed the activation-link fix as `server_components` `4b59f5b` (green in CI). Both apps now pin it: knottyyoga Windows 5382 and Linux 5382; CommunityFinder Windows 1916 and Linux 1916; same names on both platforms. Phase 11's code is complete. Still to do: Mason's commit of the two pin lines and the knottyyoga UI changes, his hand-test (11.10, now 15 steps), and the 11.8/11.9 runs stopped earlier by low memory.
 - **v0.18 (10/19/2026)** — **Mason answered OQ-23, 24 and 25; Phase 11 gains the activation-link fix.**
   - OQ-23 and OQ-24: the defaults stand, with no code change. Both moved to *Resolved*.
@@ -1691,7 +1697,7 @@ During development, knottyyoga builds against the local `server_components` chec
 
 ### 11.8 Mutation check
 
-- [ ] **C++ (honuware, Windows):** 22 mutations are scripted, one per safeguard. Among them:
+- [x] **C++ (honuware, Windows):** 22 mutations are scripted, one per safeguard. Among them:
   - storing the secret rather than its hash
   - a new request not replacing the old link
   - the fifth wrong secret not deleting it
@@ -1713,8 +1719,14 @@ During development, knottyyoga builds against the local `server_components` chec
   - mail to the typed address
   - the TTL secret ignored
 
-  **Not run yet:** held back after the memory reap; to run when Mason says.
-- [ ] **@honuware/ui:** 7 mutations are scripted:
+  **Run 10/19 against the committed `4b59f5b`: all 22 caught.** Each one failed at least one test written for that safeguard. A few examples:
+  - Storing the secret instead of its hash fails `OnlyAHashOfTheSecretIsStored` and 8 others.
+  - A used link surviving fails `TheLinkWorksOnce` and the endpoint's `TheLinkSetsANewPasswordAndThenStopsWorking`.
+  - The missing CSRF exemption fails `CsrfGuardTest.ForgotPasswordPathBypasses`.
+  - A new database without the table fails both `CreateFrameworkTablesTest` cases.
+
+  The `+` mutation now targets the encoder in `util/types.cpp`, where 11.11 moved it. It fails `TypesTest.URLEncodeQueryValueEncodesPlusAndAt` and `PasswordResetMailTest.LinkEncodesAPlusAddressedEmail`. Every file was restored byte for byte, and `server_components` shows no changes. The rebuilt suites pass clean: 149 tests in 12 suites.
+- [x] **@honuware/ui:** 7 mutations are scripted:
   - a failed request shows nothing
   - the secret stays in the address bar
   - mismatched passwords reach the server
@@ -1723,11 +1735,17 @@ During development, knottyyoga builds against the local `server_components` chec
   - a 401 from the reset endpoints bounces to Log In
   - the wrong JSON key
 
-  The run was reaped during the first mutation. Its file was put back by hand and checked, so the library source is as built. To re-run when Mason says.
+  **Run 10/19 against the committed `b7d77d4` (0.3.0): all 7 caught by a spec.** Some examples:
+  - The address-bar mutation fails "scrubs the secret from the URL as soon as the page opens".
+  - The mismatch mutation fails "rejects mismatched passwords without calling the server".
+  - The wrong-key mutation fails "resetPassword POSTs a snake_cased body to /api/reset_password".
+  - A wrong **Forgot password?** target fails all 3 of the link's specs.
+
+  The first version of the address-bar mutation didn't compile, so it proved nothing about the spec. It was rewritten to compile, and re-run. Every file was restored and checked by hash, and the library shows no changes.
 
 ### 11.9 End to end
 
-- [ ] Scripted, not run yet (held back with the rest). It runs against a throwaway `phase11_check` database through the real server, middleware included, with outgoing mail pointed at a closed local port so nothing leaves the container. It covers:
+- [x] It runs against a throwaway `phase11_check` database through the real server, middleware included, with outgoing mail pointed at a closed local port so nothing leaves the container. It covers:
   - a signed-out request getting through the CSRF guard
   - identical answers for known and unknown addresses
   - one hashed link stored
@@ -1740,7 +1758,18 @@ During development, knottyyoga builds against the local `server_components` chec
 
   A second mode drops the table and checks that `--migrate` brings it back.
 
+  **Run 10/19 on Linux, knottyyoga built at the pinned `4b59f5b`:**
+  - **Install pass: 19 of 19 checks passed** (a fresh `phase11_check`, then `--install_schema`).
+    - Every send failed at the closed port (`mail_failed … Server connecting failed.`), so no mail left the container.
+    - The server log's only errors are the six the checks asked for: two 400s for a bad link, a 401 for the ended session, a 401 for the old password, the 429, and the missing `new_password`.
+  - **Migrate pass: all checks passed.** This is a fresh install with `password_reset_tokens` dropped, like a site installed before Phase 11.
+    - `--migrate` reported `applied=13 skipped=0`, the table is back, and the ledger records `0002_password_reset_tokens`.
+    - A request then stored exactly one link.
+    - `phase11_check` was dropped afterwards.
+
 ### 11.10 Hand-testing walkthrough
+
+*Mason verified the forgot-password flow by hand on 10/19.*
 
 **Before you start.** Use a freshly recreated local database, the local server built from Visual Studio's **x64-Debug** configuration at 11.11's pin (`4b59f5b`; a server started before 10/19 is older, so stop it and rebuild it first: steps 13–15 fail on the old one), and the site from `ng serve`, restarted since `@honuware/ui` 0.3.0 was installed (11.7). Local mail must be set up (`HONUWARE_MAIL_APP_PASSWORD` at recreate time), because the steps read a real reset mail in the masonbendixen@gmail.com inbox. Start signed out.
 
