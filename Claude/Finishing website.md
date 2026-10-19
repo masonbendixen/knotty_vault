@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/18/2026
-Version: 0.17
+Last Updated: 10/19/2026
+Version: 0.18
 tags: 
 ---
 # Overview
@@ -1778,7 +1778,9 @@ During development, knottyyoga builds against the local `server_components` chec
   - `person_verify_mail_test`: the expected link now has `%40` for `@`. New `PlusAddressedEmailIsEncodedInTheLink`.
   - `person_test`: new `PlusAddressedEmailActivatesFromItsLink`. It registers `mason+test@example.com`, reads the email and secret back out of the sent mail the way Angular does (a bare `+` becomes a space, then `%XX` is decoded), passes them to `VerifyPersonEmail`, and checks that the account is now verified.
   - No change to `/api/verify`, the SPA or either app. The test utility that computes the expected activation mail goes through the same builder, so the existing activation tests in all three repos follow the change by themselves.
-- [ ] Gates: `server_components` on both platforms. *Running.*
+- [ ] Gates: `server_components` on both platforms.
+  - **Linux: 1895 passed** (1889 + the 6 new).
+  - Windows: *running.*
 - [ ] Mutation check, 2 mutations:
   - the builder going back to `URLEncode`
   - the encoder leaving `+` unencoded
