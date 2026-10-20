@@ -2019,8 +2019,13 @@ Uses Phase 1's files.
   - → Each component's spec checks the computed style (`50% 0%`).
 
 ### 13.4 Verification
-- [ ] knottyyoga: Windows: LINUX_PENDING passed. Linux: LINUX_PENDING passed. Same test names on both. Both programs build.
-- [ ] Angular (`ui/`): ANGULAR_PENDING passed; `tsc` for the app and the specs, `ng lint` and `ng build` clean.
+- [x] knottyyoga: **Windows: 5389 passed. Linux: 5389 passed.** Same test names on both, and both programs build. The count is unchanged because two tests were added and two retired (13.2).
+- [x] Angular (`ui/`): **3622 passed** (3618 plus the four crop specs). `tsc` for the app and the specs, `ng lint` and `ng build` are clean; the build's one warning is the existing size budget on the class check-in page.
+- [x] **End to end** (the gap no unit test covers is the bootstrap's own call order): `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
+  - The install log shows 2 profile photos, 5 headshots, 4 class pictures and 5 tier icons attached, and no `seed_image_missing`, `seed_image_failed` or `seed_lookup_missing` line.
+  - Signed out, the Instructors feed returns all five, each with `has_photo` and its bio character for character, "®" and "’" included. Each card's photo URL serves a JPEG 256 px tall.
+  - The four pictured classes serve their picture (Intermediate Partner Acro's at the new picture's proportions); Beginner Knotty Yoga and Aerial Rope answer 404.
+  - **Run again with the old order** (photos before instructors): all five headshots go missing, with five `seed_lookup_missing` lines, and the check fails 10 times. The file was then restored byte for byte.
 
 ### 13.5 Mutation check
 - [ ] Each change broken on purpose, one at a time, and the suite run against it. Every one must fail a test.
