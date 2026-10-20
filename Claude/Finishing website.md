@@ -405,7 +405,7 @@ Default: "Teaches Beginner Knotty Yoga on Wednesdays."
 ### Gifford Cheung
 Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Tiana Cheung."
 
-Tiana has been attending Knotty Yoga since 2012 and has been teaching since 2014.
+Tiana has been attending Knotty Yoga since 2012 and has been teaching since 2014. Gifford has a PhD from the University of Washington in computer science and works at Nintendo by day.
 
 ### Tiana Cheung
 Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Gifford Cheung."
