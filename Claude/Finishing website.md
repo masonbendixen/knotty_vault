@@ -400,7 +400,7 @@ Caleb has attended Knotty Yoga as a student since 2016 before assisting and teac
 ### Beth Cooper
 Default: "Teaches Beginner Knotty Yoga on Wednesdays."
 
-*(paste bio here)*
+Beth Cooper has 30 years of experience as a licensed physical therapist and is the owner a solo practice: The Body Creative, PLLC.  She is a certified teacher of the Feldenkrais Method® of Movement Education. She also has an extensive background as a performing artist and a student of many things movement-related. Beth came to the studio for intro workshop over a dozen years ago and it was love at first class! Beth’s classes emphasize increasing your awareness of unconscious movement habits and improving your self-organization to maximize success and decrease risk of injury. 
 
 ### Gifford Cheung
 Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Tiana Cheung."
