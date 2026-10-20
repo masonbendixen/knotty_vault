@@ -395,7 +395,7 @@ Mason founded Knotty Yoga in 2011 and had been teaching acrobatics since 2004. M
 ### Caleb Ault
 Default (today's seed): "Teaches Knotty Yoga and aerial work."
 
-Caleb has attended Knotty Yoga as a student since 2016 before assisting and teaching classes. Caleb became a licensed massage therapist at Bellevue Massage School in 
+Caleb has attended Knotty Yoga as a student since 2016 before assisting and teaching classes. Caleb became a licensed massage therapist at Bellevue Massage School in 2023 and has extensive training in Thai massage, cupping, and trigger point therapy. He is passionate about helping people eliminate pain and achieve their fitness goals.
 
 ### Beth Cooper
 Default: "Teaches Beginner Knotty Yoga on Wednesdays."
@@ -405,12 +405,12 @@ Default: "Teaches Beginner Knotty Yoga on Wednesdays."
 ### Gifford Cheung
 Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Tiana Cheung."
 
-*(paste bio here)*
+Tiana has been attending Knotty Yoga since 2012 and has been teaching since 2014.
 
 ### Tiana Cheung
 Default: "Co-teaches Beginner Knotty Yoga on Tuesdays with Gifford Cheung."
 
-*(paste bio here)*
+Tiana has been attending Knotty Yoga since 2008 and has been teaching since 2014.
 
 ---
 
