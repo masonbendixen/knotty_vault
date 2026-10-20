@@ -83,6 +83,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.22 (10/20/2026)** — **Phase 13 is built**, with the photos and bios Mason supplied. It is all in knottyyoga and not committed.
+  - Six photos are converted and in the seed: all five instructor headshots (Mason's and Caleb's replace the old ones) and Intermediate Partner Acro. No reshoots are needed (1.2). Four are still to come: Beginner Knotty Yoga, Aerial Rope, Massage and Studio (OQ-11).
+  - All five bios replace the one-line defaults (OQ-15, now resolved). Six slips in them were corrected; **OQ-28** lists each, default keep.
+  - Every seed picture now sits in one of four tables in `seed_app_data.h`, and the tests walk those same tables. The headshots moved off `PopulateInstructors`, and the bootstrap now attaches photos after the instructor rows exist.
+  - Added **13.3**: the new headshots are waist-up, and every page cut its square from the middle, taking off the top of the head. The four places a headshot appears now crop from the top.
+  - Results: RESULTS_PENDING. Hand-test steps are in 13.6.
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
