@@ -387,6 +387,8 @@ Every email the site sends comes from **"Knotty Yoga"**, not "Knotty Yoga and Sp
 
 *Whatever is under each name when Phase 5.5 is implemented is seeded **verbatim**. A name with nothing pasted gets the one-line default shown, so the Instructors page never shows an empty card. Bios can always be changed later under **Admin** → **Manage Products** → **Instructors**. If a bio arrives after the production rollout, edit it there rather than re-seeding.*
 
+*→ 10/20 (Phase 13): all five bios below are in the seed (`kSeedInstructors` in `seed_app_data.h`), replacing the defaults. Six slips were corrected on the way in, and the text below is left as pasted. The corrections are listed in **OQ-28**; say if any should go back.*
+
 ### Mason Bendixen
 Default (today's seed): "Teaches Knotty Yoga, handstands and partner acrobatics."
 
@@ -426,28 +428,33 @@ How the site crops each kind, so the subject survives the crop:
 - **Studio:** wide landscape. About ▸ Our Location crops to 16:10.
 - **Phone setting:** JPEG, not HEIC. On an iPhone that is Settings ▸ Camera ▸ Formats ▸ **Most Compatible**.
 
-- [ ] 1. Mason Bendixen headshot → `MasonInstructor.jpg` (replaces today's)
-- [ ] 2. Caleb Ault headshot → `CalebInstructor.jpg` (replaces today's)
-- [ ] 3. Beth Cooper headshot → `BethInstructor.jpg`
-- [ ] 4. Tiana Cheung headshot → `TianaInstructor.jpg`
-- [ ] 5. Gifford Cheung headshot → `GiffordInstructor.jpg`
-- [ ] 6. Beginner Knotty Yoga class → `BeginnerKnottyYoga.jpg`
-- [ ] 7. Knotty Yoga class → `KnottyYoga.jpg` (replaces today's, if reshot)
-- [ ] 8. Aerial Rope class → `AerialRope.jpg`
-- [ ] 9. Handstands class → `Handstand.jpg` (replaces today's, if reshot)
-- [ ] 10. Beginner Partner Acro class → `PartnerAcro.jpg` (replaces today's, if reshot)
-- [ ] 11. Intermediate Partner Acro class → `IntermediatePartnerAcro.jpg`
-- [ ] 12. Massage, shown on the Services card for Massage → `Massage.jpg`
-- [ ] 13. General studio, shown on About ▸ Our Location → `Studio.jpg`
+- [x] 1. Mason Bendixen headshot → `MasonInstructor.jpg` (replaces today's)
+- [x] 2. Caleb Ault headshot → `CalebInstructor.jpg` (replaces today's)
+- [x] 3. Beth Cooper headshot → `BethInstructor.jpg`
+- [x] 4. Tiana Cheung headshot → `TianaInstructor.jpg`
+- [x] 5. Gifford Cheung headshot → `GiffordInstructor.jpg`
+- [ ] 6. Beginner Knotty Yoga class → `BeginnerKnottyYoga.jpg` *(not in yet)*
+- [ ] 7. Knotty Yoga class → `KnottyYoga.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
+- [ ] 8. Aerial Rope class → `AerialRope.jpg` *(not in yet)*
+- [ ] 9. Handstands class → `Handstand.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
+- [ ] 10. Beginner Partner Acro class → `PartnerAcro.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
+- [x] 11. Intermediate Partner Acro class → `IntermediatePartnerAcro.jpg`
+- [ ] 12. Massage, shown on the Services card for Massage → `Massage.jpg` *(not in yet)*
+- [ ] 13. General studio, shown on About ▸ Our Location → `Studio.jpg` *(not in yet)*
 
 ### 1.2 Hand-off and conversion
-- [ ] Mason drops the originals into **`C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\`** (OQ-11 default), named as in 1.1. Any extension and any size is fine. That folder is outside the git repo, so phone-sized originals never get committed by accident.
-- [ ] Claude converts each into `server/knottyyoga_server/src/database_helper/img/` with **ffmpeg**:
+- [x] Mason drops the originals into **`C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\`** (OQ-11 default), named as in 1.1. Any extension and any size is fine. That folder is outside the git repo, so phone-sized originals never get committed by accident.
+  - → 10/20: they came in at `D:\Knotty Yoga\2026\Oct\JPG\` instead: six JPEGs, named as in 1.1. Only the six JPEGs were used; the five `.heic` files in the folder above it were left alone.
+- [x] Claude converts each into `server/knottyyoga_server/src/database_helper/img/` with **ffmpeg**:
   - JPEG, long edge 2000 px, `-q:v 3`, under about 1.5 MB.
   - Phone rotation applied.
   - **All metadata stripped** (`-map_metadata -1`), because phone photos carry GPS coordinates.
   - Never `convert`: on Windows that resolves to the FAT-to-NTFS disk converter.
-- [ ] Claude opens every converted file to check orientation and framing against 1.1, and lists anything that needs a reshoot in this phase before Phase 13 wires it.
+  - → 10/20: done, and none of the six carried GPS or a rotation flag to begin with. The results: the four phone headshots are 1500 × 2000 (110–175 KB), Beth's is 576 × 720 (127 KB; it came small and was not enlarged), and Intermediate Partner Acro is 2000 × 1818 (165 KB). What is left in each file is ffmpeg's encoder note and, in Beth's, her photographer's colour profile.
+- [x] Claude opens every converted file to check orientation and framing against 1.1, and lists anything that needs a reshoot in this phase before Phase 13 wires it.
+  - → 10/20: all six are upright, sharp and well lit. **No reshoots.** Two framing notes:
+    - **The four phone headshots are waist-up, not head-and-shoulders.** Every instructor picture is shown in a square cropped from the middle, which cut the top of the hair off Beth, Caleb, Gifford and Tiana. Rather than reshoot, those squares now crop from the top (13.3), which frames all five from the head down.
+    - **Intermediate Partner Acro is nearly square.** The class page frames pictures 4:3, so it trims a little off the top and bottom: the raised foot's toes and the bases' heels. Acceptable as is; a wider shot would avoid it if this one is ever retaken.
 
 ---
 
@@ -1967,25 +1974,66 @@ During development, knottyyoga builds against the local `server_components` chec
 
 Uses Phase 1's files.
 
+**Status: implemented 10/20/2026, not committed.** Six photos and all five bios are in. Four photos are still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
+
 ### 13.1 Table-driven photo attachment *(seed)*
-- [ ] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
+- [x] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
   - `instructors`, by person email
   - `classes`, by name
   - `products`, by code
   - `facilities`, by code
-- [ ] Instructor headshots move off `PopulateInstructors` into this table, so every picture is listed in one place.
+  - → As built: the tables are public in `seed_app_data.h`, so the tests walk them (D3): `kSeedPersonPhotos`, `kSeedInstructorPhotos`, `kSeedClassPhotos` and `kSeedProductPhotos`, one `SeedPhoto { key, file }` per row.
+  - → The stored type now follows the file's extension (`.svg` is a vector, anything else a JPEG). The product loop used to pass "svg" for every row, which would have mis-stored `Massage.jpg` when it joins.
+  - → **No facilities table yet.** Its only row is `Studio.jpg`, which isn't in. It arrives with that photo as a fifth table and loop; the header says so where the product table is.
+- [x] Instructor headshots move off `PopulateInstructors` into this table, so every picture is listed in one place.
+  - → `PopulateInstructors` now writes the rows and bios only. The bootstrap runs `PopulateSeedPhotos` **after** it (`create_database.cpp`); it used to run before, when the headshots didn't need instructor rows. A headshot's instructor row is found from the person's email.
 - [ ] Rows (files from 1.1):
-  - instructors: Mason, Caleb, Beth, Tiana, Gifford
-  - classes: all six
-  - product `massage` → `Massage.jpg`
-  - facility `knotty-yoga-studio` → `Studio.jpg`
-- [ ] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
-- [ ] Any photo still missing when this phase lands is left out of the table. It joins later as file + row + test expectation in one change (D10), and stays listed here unchecked until then.
+  - [x] instructors: Mason, Caleb, Beth, Tiana, Gifford
+  - [ ] classes: all six. **Four are in:** Knotty Yoga, Handstands and Beginner Partner Acro keep their pictures, and Intermediate Partner Acro is new. Beginner Knotty Yoga and Aerial Rope wait for their photos.
+  - [ ] product `massage` → `Massage.jpg` *(waiting for the photo)*
+  - [ ] facility `knotty-yoga-studio` → `Studio.jpg` *(waiting for the photo)*
+- [x] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
+  - → `MasonInstructor.jpg` and `CalebInstructor.jpg` are the new headshots, so each instructor picture now differs from that person's profile photo. Before, they were copies of each other.
+- [x] Any photo still missing when this phase lands is left out of the table. It joins later as file + row + test expectation in one change (D10), and stays listed here unchecked until then.
+  - → To add one: put the converted file in `src/database_helper/img/`, add its row to the table, and change the expected leftovers in `PopulateSeedPhotosPutsEachListedFileOnItsRow` (classes only). Massage also needs no new code; Studio needs the facilities loop.
+- [x] **Also: the instructors' bios** (OQ-15). All five replace the one-line defaults in `kSeedInstructors`, with OQ-28's corrections.
 
 ### 13.2 Tests
-- [ ] `EverySeedPhotoFileExists`: walks the same tables the seeder walks and asserts each file is in `SeedImageDirectory()`. This catches a renamed or deleted file.
-- [ ] Attachment by target type: each listed row has exactly one photo, and **classes not in the table have none** (the D5 wrong-row guard from the previous plan, kept).
-- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader.
+- [x] `EverySeedPhotoFileExists`: walks the same tables the seeder walks and asserts each file is in `SeedImageDirectory()`. This catches a renamed or deleted file.
+  - → It also requires each file to be non-empty: `AttachSeedPhoto` treats an empty file as a missing one.
+- [x] Attachment by target type: each listed row has exactly one photo, and **classes not in the table have none** (the D5 wrong-row guard from the previous plan, kept).
+  - → `PopulateSeedPhotosPutsEachListedFileOnItsRow`. "Exactly one" is guaranteed by the upload itself, which replaces a row's earlier photo. So the test checks something stronger: each listed row's stored picture is **byte for byte the listed file**, read back through the reader the photo endpoints serve from, with the right type. That is what catches two rows swapped.
+  - → The same test reads all five instructors through the Instructors page's own reader (`hasPhoto`). It also checks that the classes left out are exactly Beginner Knotty Yoga and Aerial Rope, and that neither has a picture.
+  - → Replaced: `PopulateSeedPhotosAttachesProfileAndClassPictures` and `PopulateInstructorsCreatesBothWithTheirOwnHeadshots`. `PopulateInstructorsSeedsAllFiveWithTheirBios` no longer checks photos; instead it checks that each bio names its instructor, which the one-line defaults didn't.
+- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader. *(With their photos.)*
+
+### 13.3 Headshots crop from the top *(ui; added 10/20)*
+- [x] Every instructor picture is shown in a square, `object-fit: cover`. The server only shrinks a picture to fit, so a 3:4 portrait reaches the page as 192 × 256, and the page cut the square from its **middle**. On the new waist-up headshots that cut the top of the hair off Beth, Caleb, Gifford and Tiana. 1.1 asked for head-and-shoulders; the cheaper fix than a reshoot is to crop from the **top**.
+  - → `object-position: top` on all four places a headshot appears: the **Instructors** cards, an instructor's own page, **Favorite Instructors** and the **Manage Instructors** thumbnails. A landscape or square picture is unaffected, and a portrait an instructor uploads later gets the same framing.
+  - → Each component's spec checks the computed style (`50% 0%`).
+
+### 13.4 Verification
+- [ ] knottyyoga: Windows: LINUX_PENDING passed. Linux: LINUX_PENDING passed. Same test names on both. Both programs build.
+- [ ] Angular (`ui/`): ANGULAR_PENDING passed; `tsc` for the app and the specs, `ng lint` and `ng build` clean.
+
+### 13.5 Mutation check
+- [ ] Each change broken on purpose, one at a time, and the suite run against it. Every one must fail a test.
+
+### 13.6 Hand-testing walkthrough
+
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Then rebuild and start the server, and restart `ng serve` (13.3 changed four style sheets). Use a wide window.
+
+1. Signed out: **About** → **Instructors**. Five cards, each with a headshot, and each head has room above it:
+   - **Mason Bendixen**: "Mason founded Knotty Yoga in 2011…"
+   - **Caleb Ault**: "Caleb has attended Knotty Yoga as a student since 2016…"
+   - **Beth Cooper**: "Beth Cooper has 30 years of experience…", with "Feldenkrais Method®" and "Beth’s classes" spelled as written
+   - **Gifford Cheung**: "Gifford has been attending Knotty Yoga since 2012…"
+   - **Tiana Cheung**: "Tiana has been attending Knotty Yoga since 2008…"
+2. Click **Tiana Cheung**. Her page shows the same headshot, top of the head included, and the same bio.
+3. **Our Classes** (page headed **All Classes**): **Intermediate Partner Acro** shows the partner acrobatics picture with four people. **Knotty Yoga**, **Handstands** and **Beginner Partner Acro** show their pictures as before. **Beginner Knotty Yoga** and **Aerial Rope** show the grey picture icon instead.
+4. Click the **Intermediate Partner Acro** card. The picture beside the description is the same one.
+5. **Sign In** as `masonbendixen@gmail.com` / `pass`. The small round picture beside your first name, top right, is your old profile photo, not the new headshot.
+6. **Admin** → **Manage Products** → **Instructors** tile: five rows, each with a round thumbnail showing the face, not the shirt.
 
 ---
 
@@ -2189,10 +2237,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
-
-**OQ-15 — Instructor bios.**
-- Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
-- → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
+- → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 14.3's steps 1 and 9 will find those four without a picture.
 
 **OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
 - After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
@@ -2211,9 +2256,27 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** when the viewer has the membership and lacks only the approval, **Pricing** says so instead, for example "Included with your membership once an instructor approves you". The server already tells the two apart (the schedule badge's "members only" versus "needs a skill"). It would have to pass that on, and the page would need a fourth wording.
 - Say which.
 
+**OQ-28 — Six slips corrected in the bios.** *(Phase 13, 10/20.)*
+- The plan says bios are seeded verbatim. Six things in the pasted text looked like slips, so the seed corrects them and the pasted text above is left as it was:
+  1. Mason: "Univesrity of Utah" → "**University** of Utah".
+  2. Mason: "many acrobatics teacher training" → "many acrobatics teacher **trainings**".
+  3. Beth: "is the owner a solo practice" → "is the owner **of** a solo practice".
+  4. Beth: "came to the studio for intro workshop" → "came to the studio for **an** intro workshop".
+  5. Beth: the double space after "PLLC." and the trailing space are removed.
+  6. Gifford: his bio began "**Tiana** has been attending Knotty Yoga since 2012…". Tiana's own bio says 2008, so this reads as Gifford's own line with the wrong name, and it now begins "**Gifford** has been attending Knotty Yoga since 2012…".
+- Left as written: everything else, including "had been teaching acrobatics since 2004", "Feldenkrais Method®" and the curly apostrophe in "Beth’s".
+- **Default:** keep the corrections.
+- **Alternative:** seed any of them back exactly as pasted. Each is one string in `kSeedInstructors`, or an edit under **Admin** → **Manage Products** → **Instructors** once deployed.
+- Say which, and especially whether 6 is right.
+
 ### Resolved
 
-*Newest first: 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+*Newest first: 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+
+**OQ-15 — Instructor bios.**
+- Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
+- → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
+- → 10/20: all five arrived and are in the seed (Phase 13), with OQ-28's corrections. 15.3's "paste late bios" step has nothing left to do unless one changes.
 
 **OQ-25 — A plus-addressed email can't activate its account.** *(Found implementing Phase 11, 10/18.)*
 - The activation mail's link writes the address with honuware's `URLEncode`, which leaves `+` as it is, so `mason+test@gmail.com` goes out as `?email=mason+test@gmail.com`.
