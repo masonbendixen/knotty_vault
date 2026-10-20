@@ -390,12 +390,12 @@ Every email the site sends comes from **"Knotty Yoga"**, not "Knotty Yoga and Sp
 ### Mason Bendixen
 Default (today's seed): "Teaches Knotty Yoga, handstands and partner acrobatics."
 
-*(paste bio here)*
+Mason founded Knotty Yoga in 2011 and had been teaching acrobatics since 2004. Mason completed the Ana Forrest yoga teacher training in 2006 and attended Bellevue Massage School in 2011 before training at three massage schools in Thailand. Mason has completed a TRX instructor training and many acrobatics teacher training. Mason has a degree in Computer Science from the Univesrity of Utah and has worked as a software engineer at Microsoft, Tableau, Google, and Meta.
 
 ### Caleb Ault
 Default (today's seed): "Teaches Knotty Yoga and aerial work."
 
-*(paste bio here)*
+Caleb has attended Knotty Yoga as a student since 2016 before assisting and teaching classes. Caleb became a licensed massage therapist at Bellevue Massage School in 
 
 ### Beth Cooper
 Default: "Teaches Beginner Knotty Yoga on Wednesdays."
