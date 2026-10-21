@@ -92,6 +92,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - **Later the same day — 13.7, sharp pictures.** Mason's hand-test found the headshots blurry and blocky. The cards were asking for pictures smaller than they show them, so the browser enlarged a crude server-side shrink. Every square headshot and class card now asks for three times its size. That is a page-only change; the server and seed are untouched.
   - **13.8, Our Providers.** Signed out, Caleb's provider card showed a broken image. It asked for his private account photo; it now shows his public instructor headshot, as its bio already did.
   - After both: knottyyoga Windows 5392 and Linux 5392, same names; Angular 3627; all 8 new mutations caught (13.9).
+  - **Ryan's edited headshots** replace Mason's, Caleb's, Gifford's and Tiana's, both in the seed and on the live local site, through the admin photo upload (1.2).
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -464,6 +465,10 @@ How the site crops each kind, so the subject survives the crop:
   - → 10/20: all six are upright, sharp and well lit. **No reshoots.** Two framing notes:
     - **The four phone headshots are waist-up, not head-and-shoulders.** Every instructor picture is shown in a square cropped from the middle, which cut the top of the hair off Beth, Caleb, Gifford and Tiana. Rather than reshoot, those squares now crop from the top (13.3), which frames all five from the head down.
     - **Intermediate Partner Acro is nearly square.** The class page frames pictures 4:3, so it trims a little off the top and bottom: the raised foot's toes and the bases' heels. Acceptable as is; a wider shot would avoid it if this one is ever retaken.
+  - → 10/20, evening: **Ryan's edited headshots** for Mason, Caleb, Gifford and Tiana (`D:\Knotty Yoga\2026\Oct\JPG\Edited\`) replace those four. They are tighter crops on a cleaner grey, 1401–1536 × 1771–1864 px and 111–175 KB each. They already carry no EXIF or GPS, so they were copied **byte for byte**, not re-encoded, which would only have lost quality. They are progressive JPEGs, which the server reads fine: it took all four and served them back at their true sizes. Beth's is unchanged.
+    - The live local site was updated as an admin would do it: the server's own photo upload, onto the four instructor records, with no database recreate. Each was then fetched back signed out at the Instructors card's size.
+    - The seed photo tests (9) pass against the new files on Windows and Linux.
+    - **Trap found on the way:** the `img/` copies beside the database helper and the test program are made by a CMake POST_BUILD step, which runs only when that program relinks. Replacing a picture relinks nothing, so both copies kept the old pictures, and a Windows `--recreate_database` would have seeded those. Both copies were refreshed by hand on both platforms. Production is unaffected: the release script copies straight from the source folder.
 
 ---
 
