@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/19/2026
-Version: 0.21
+Last Updated: 10/21/2026
+Version: 0.23
 tags: 
 ---
 # Overview
@@ -83,6 +83,20 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.23 (10/21/2026)** — **Ryan's review becomes Phases 14–17. Verification moves to 18, and the production rollout to 19.** This is planning only; no code changed except one test comment that names the rollout's step (now 19.4).
+
+  | Phase | What |
+  |---|---|
+  | **14** | Home page and footer: desktop-only and mobile-only sections, a centred photo strip, an editable intro strip (text and SVG badge), one font for the intro and "New here?", memberships off by default, "Come join the fun!" to Memberships, Facebook and Instagram only, brand icons |
+  | **15** | Two phone layout fixes: the squeezed calendar icons, and a month calendar that fits the screen |
+  | **16** | Paged lists, part 1: one shared pager, public pages and the user portal, checked with screenshots |
+  | **17** | Paged lists, part 2: the staff portal and Manage, and the Manage lists that silently stop at 100 or 1,000 rows |
+
+  - **Both layout bugs reproduced on the local site at 390 px**, signed in as Kit. The two icon reports are one bug in the shared `.empty-card` style. The month grid has a deliberate 800 px minimum, which an earlier mobile pass set and a Playwright test pins; 15.2 reverses it.
+  - **The paging inventory found about sixty lists.** Only four page today, and about ten Manage pages silently drop rows past a fixed cap. **Subscription Revenue**'s totals are among them.
+  - **One `server_components` change:** SVG uploads (14.1). The picker already offers SVGs and the server refuses them.
+  - Every reference to the old 14 and 15 now uses 18 and 19. As in v0.14, the notes below keep the numbers they were written with.
+  - New design decisions **D15** (lists page in the browser) and **D16** (desktop/mobile by window width, at 768 px). New open questions **OQ-29–35**, each with a default.
 - **v0.22 (10/20/2026)** — **Phase 13 is built**, with the photos and bios Mason supplied. It is all in knottyyoga and not committed.
   - Six photos are converted and in the seed: all five instructor headshots (Mason's and Caleb's replace the old ones) and Intermediate Partner Acro. No reshoots are needed (1.2). Four are still to come: Beginner Knotty Yoga, Aerial Rope, Massage and Studio (OQ-11).
   - All five bios replace the one-line defaults (OQ-15, now resolved). Six slips in them were corrected; **OQ-28** lists each, default keep.
@@ -226,8 +240,8 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
 2. **The access gate already exists and is the right tool.** A class's `class_requirement_groups` are AND-ed and each group's literals are OR-ed. A literal is a permission (closure-expanded) **or** a skill level (`ClassAccessHelper::CheckAccess`). "Silver or Gold" is one group with two literals. "Instructor approval" is a skill-level literal, which is exactly what skill levels are for: "Can kick up to handstand against a wall" is the schema's own example.
 3. **"Requires attending the preceding class" already exists**: `class_schedule_slots.predecessor_class_schedule_slot_id` (SL-11), seeded today for Handstands. Four slots need it now.
 4. ✅ **Fixed in Phase 10 (10/18/2026)**: a slot now carries co-instructors beside its lead, and Tuesday is Gifford's and Tiana's. What it said before: **A slot has exactly ONE instructor** (`class_schedule_slots.instructor_person_id`). Tuesday's Beginner Knotty Yoga has two (Gifford **and** Tiana). Per-session `event_session_staffing` can carry several, but only for materialized sessions, and only substitutions and shift trades write it. **Two instructors on a recurring slot is not expressible today**, which is why Phase 10 exists.
-5. **Nothing extends provider availability over time.** `ScheduleTemplateHelper::GenerateAvailability` is called only by the seed and by the admin **Generate Availability** button. The seed generates through the end of the following month. **Per OQ-8 that stays manual**: once a month someone presses Generate Availability on Caleb's template (15.4). The generator skips days that already exist, so overlapping ranges are harmless. It also ignores `effective_to_us`, so an open-ended template keeps working.
-6. **Production does not pick up seed changes.** Prod was installed with `--install_schema` on 9/23, and every later deploy runs `--migrate`, which evolves the schema and never re-seeds. Phase 15 is how this content reaches the live site.
+5. **Nothing extends provider availability over time.** `ScheduleTemplateHelper::GenerateAvailability` is called only by the seed and by the admin **Generate Availability** button. The seed generates through the end of the following month. **Per OQ-8 that stays manual**: once a month someone presses Generate Availability on Caleb's template (19.4). The generator skips days that already exist, so overlapping ranges are harmless. It also ignores `effective_to_us`, so an open-ended template keeps working.
+6. **Production does not pick up seed changes.** Prod was installed with `--install_schema` on 9/23, and every later deploy runs `--migrate`, which evolves the schema and never re-seeds. Phase 19 is how this content reaches the live site.
 7. **The test-only seed data collides with the real schedule.** The Intro Workshop (Sat 10–11) sits inside Saturday Knotty Yoga, the Aerial Series (Tue/Thu 19:00) sits on Thursday Intermediate Partner Acro, and Caleb's Mon–Fri 9–5 template duplicates his real hours. **Per OQ-12 all of it goes** (Phase 9). Caleb's template is promoted to real data with his real hours (Phase 7). After that `PopulateTestData` is empty, so the flag goes too (D14).
 8. **`ui/src/app/pages/public/services/homepage.service.ts` is dead code.** Only its own spec imports it, and it hardcodes the old six-class list. It gets deleted rather than updated.
 9. **Customers never see a requirement group's `inline_description`.** The admin field is labelled "Description (shown to members)", but no customer template renders it. A visitor sees only **"Members only — Upgrade your membership to attend."** on the class page, or the **"Requires a membership"** badge on Our Classes. Nothing tells them *which* membership. The skill side does render: the class page's **"Required Skills"** section lists each skill's name and description, and the **"Skill required"** dialog shows the same. That is why the approval criteria go into the skill descriptions (D6). Phase 12 closes the membership half.
@@ -285,7 +299,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
   - **Knotty Yoga's approval** (OQ-19) and the **Beginner Partner Acro solo-flyer rule** stay in the class descriptions and are checked at the door. The system has no notion of "solo", and Knotty Yoga was left off the skill list in the OQ-4 answer.
 - **D7 — Every non-beginner class requires `gold_member`** (OQ-3, confirmed). Without some membership group, a class is open and free to everyone (fact 2's corollary). Beginner Knotty Yoga takes Silver **or** Gold.
 - **D8 — Spa removal keeps the room-type vocabulary.** These all go: the four spa products, their variants, prices and product schedule windows, the `Spa` room, and its room schedule template. The `spa` / `swim_spa` **room types** stay: they are reference vocabulary, harmless when unused, and "we don't have the spa *yet*" says it is coming back. This also retires the `late-night-spa` → nonexistent `gold_fitness` permission bug recorded in [[Database helper initialization]]'s follow-ups.
-- **D9 — New people never get a password from source control.** Beth, Gifford and Tiana are created with a random, unrecorded password, generated at seed time and never logged. To let one of them in, Mason sets a **temporary password with the must-change flag** (Phase 5), and they choose their own at first sign-in. Once Phase 11 ships, **Forgot password?** works too, given a real email (OQ-1). The four existing accounts keep their committed dev passwords; Mason, Caleb and Kit change theirs on production at deploy time (OQ-10, 15.3).
+- **D9 — New people never get a password from source control.** Beth, Gifford and Tiana are created with a random, unrecorded password, generated at seed time and never logged. To let one of them in, Mason sets a **temporary password with the must-change flag** (Phase 5), and they choose their own at first sign-in. Once Phase 11 ships, **Forgot password?** works too, given a real email (OQ-1). The four existing accounts keep their committed dev passwords; Mason, Caleb and Kit change theirs on production at deploy time (OQ-10, 19.3).
 - **D10 — Photos come first, and the code never waits on them.** Mason shoots them in Phase 1, and Claude converts them and attaches them in Phase 13, just before Verification. `AttachSeedPhoto` already logs and skips a missing file, so one late picture blocks nothing: it lands later as file + table row + test expectation in one change.
 - **D11 — Production gets the content by reinstall, not by a data migration** (OQ-9: "Wipe away"). Prod is in preview on the Square sandbox. `--install_schema --force` plus the `set_secret` block is already verified end to end (Deploying to AWS 5.1 step 4). An in-place migration would have to delete spa products under purchases, rename classes under bookings and re-key slots, all for smoke-test data.
 - **D12 — Product display order is a server-side `sort_order` column** (OQ-13). The tiers then group Silver, Silver Couple's, Gold, Gold Couple's, Gold Family.
@@ -299,6 +313,15 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
   - Wrong guesses are capped per link, and requests are rate-limited per email and per IP.
   - A successful reset ends every session and remember-me token, clears must-change and the lockout counter, and marks the email verified, since clicking the link proves the inbox.
 - **D14 — The test-only seed is retired along with its flag** (OQ-12). With the Intro Workshop sessions and Aerial Series deleted and Caleb's template promoted to real data, `PopulateTestData` has nothing left. `--recreate_database_test` would be a second name for `--recreate_database`, so it goes, and every local database is what production gets. Hand-testing walkthroughs use plain `--recreate_database`; Kit stays a base-seed member (OQ-10).
+- **D15 — Lists page in the browser, over what the page already loads** (Phases 16–17, Ryan's review).
+  - Nearly every list already arrives whole, and many pages filter it in the browser. Paging on the server would mean moving every filter there too, since `get_filtered_table_rows` only matches exact values.
+  - The lists that already page on the server (**Blog**, **Attendance History**, **Blog Posts**) keep doing so, on the shared pager.
+  - The Manage lists that ask for "the first N rows" ask for all of them instead (17.1), so paging can reach every row.
+  - A person's own history (purchases, bookings) grows slowly, and dozens of rows load at once without trouble. Server paging is the follow-up if one ever gets slow.
+- **D16 — Desktop-only and mobile-only are decided by window width, in the browser** (14.5, Ryan's review).
+  - The line is **768 px** (OQ-35): the width at which the rest of the site switches to its phone layout (the `md` breakpoint), and where the calendar already decides between Day View and Month View.
+  - A small desktop window gets the phone sections, and a tablet held either way gets the desktop ones. An iPad mini held upright, at 744 px, gets the phone sections.
+  - It is decided in the browser with a live media query, not with CSS that merely hides. A hidden section is never drawn, so it fetches nothing and downloads no picture. Resizing a window switches sections without a reload.
 
 ---
 
@@ -429,7 +452,7 @@ Tiana has been attending Knotty Yoga since 2008 and has been teaching since 2014
 
 # Phase 1 — Take the photos (Mason)
 
-The later phases use these: Phase 13 attaches them and Phase 14's walkthrough looks for them. Nothing else blocks on them (D10), so the phases below can proceed while the shoot happens.
+The later phases use these: Phase 13 attaches them and Phase 18's walkthrough looks for them. Nothing else blocks on them (D10), so the phases below can proceed while the shoot happens.
 
 ### 1.1 Shot list
 
@@ -877,7 +900,7 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 # Phase 5 — People, roles and instructors
 
 **Implemented 10/16/2026 (evening Pacific).** Windows 5252 passed, Linux 5252 passed. The two runs executed the same 5252 test names; Phase 4's 5244 plus 8 new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. **Committed 10/17 as `5ebb942a`** ("Phase 5 — People, roles and instructors"), pushed, and master's pipeline is green.
-- **Not tagged, on purpose.** Production re-runs only `--migrate`, which never re-seeds (fact 6), so a `sandbox.11` would change nothing on the live site. The only shipped code is `set_password`, and it has nobody to act on until the reinstall creates the three instructors. Phase 5 reaches production with the one Phase 15 release (its first step).
+- **Not tagged, on purpose.** Production re-runs only `--migrate`, which never re-seeds (fact 6), so a `sandbox.11` would change nothing on the live site. The only shipped code is `set_password`, and it has nobody to act on until the reinstall creates the three instructors. Phase 5 reaches production with the one Phase 19 release (its first step).
 
 ### 5.1 Temporary password *(business logic; answers OQ-2)*
 - [x] New `business_logic/accounts/temporary_password.{h,cpp}` in `knotty_yoga_core`: `Accounts::SetTemporaryPassword(transaction, databaseHelper, secrets, email, password)`.
@@ -998,7 +1021,7 @@ From a fresh local database:
 
 # Phase 6 — Classes, approval skills, access rules and the weekly schedule
 
-**Implemented 10/17/2026; committed as `32c9235c`, not tagged.** Windows 5259 passed, Linux 5259 passed. The two runs executed the same 5259 test names: Phase 5's 5252, less the three per-class slot tests, plus ten new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Like the rest of the seed, it reaches production with the Phase 15 reinstall (fact 6).
+**Implemented 10/17/2026; committed as `32c9235c`, not tagged.** Windows 5259 passed, Linux 5259 passed. The two runs executed the same 5259 test names: Phase 5's 5252, less the three per-class slot tests, plus ten new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. Like the rest of the seed, it reaches production with the Phase 19 reinstall (fact 6).
 
 All four tables are in `seed_app_data.h`, each walked by one seeder and by its tests (D3):
 - `kSeedClasses`
@@ -1130,7 +1153,7 @@ From a fresh local database:
 
 # Phase 7 — Caleb as the massage provider
 
-**Implemented 10/17/2026; committed as `74af2aa8`, not tagged.** Windows 5267 passed, Linux 5267 passed. The two runs executed the same 5267 test names: Phase 6's 5259, less the two 9–5 template tests, plus ten new. The first attempt at the full runs was stopped part-way when the machine ran low on memory, so they were run again one at a time. Like the rest of the seed, it reaches production with the Phase 15 reinstall; 7.4's fix ships with the next release of the server.
+**Implemented 10/17/2026; committed as `74af2aa8`, not tagged.** Windows 5267 passed, Linux 5267 passed. The two runs executed the same 5267 test names: Phase 6's 5259, less the two 9–5 template tests, plus ten new. The first attempt at the full runs was stopped part-way when the machine ran low on memory, so they were run again one at a time. Like the rest of the seed, it reaches production with the Phase 19 reinstall; 7.4's fix ships with the next release of the server.
 
 The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the seeder and by its tests (D3).
 
@@ -1143,7 +1166,7 @@ The hours are one table, `kSeedMassageHours` in `seed_app_data.h`, walked by the
   - It is **open-ended** (`effective_to_us` NULL). Checked first: nothing reads a provider template's dates. The generator ignores them, and the Templates page neither shows them nor sends real ones (it creates templates with 0 and 0). NULL only says "no end".
   - It carries the five ISO entries above instead of Mon–Fri 9–5.
   - **Changed from the plan:** the ISO constants (`kIsoMonday` … `kIsoSunday = 7`, with the warning comment) sit in `seed_app_data.h` beside the table rather than inside the function, because the tests walk the same table.
-- [x] Availability is generated from today's local midnight through `Scheduling::EndOfFollowingMonthUs(nowUs)` in the studio facility. Beyond that it is extended by hand each month (15.4), which 7.4 makes safe to repeat.
+- [x] Availability is generated from today's local midnight through `Scheduling::EndOfFollowingMonthUs(nowUs)` in the studio facility. Beyond that it is extended by hand each month (19.4), which 7.4 makes safe to repeat.
 - [x] `PopulateTables` reads `now_us()` once and passes it in. It runs last, after `PopulateServiceProductLinks`, so the massage product is bookable before its provider has hours.
 - [x] `PopulateTestData` no longer adds a template; the old 9–5 one and `PopulateProviderSchedule` are gone.
 
@@ -1174,12 +1197,12 @@ All in `seed_app_data_test.cpp` unless named otherwise.
   The sources were restored byte for byte, with hashes checked in the container and again from Windows. Leaving the call out of `PopulateTables` is the one break no unit test can see, since nothing can run `PopulateTables`; the end-to-end run covers it.
 
 ### 7.4 Generate Availability is safe to press twice *(business_logic/scheduling)* — added
-Found while checking 15.4. `ScheduleTemplateHelper::GenerateAvailability` skipped only days with hand-entered or blocked hours. A second press over days the template had already generated added a second copy of them. 15.4's monthly press starts from today, so it always overlaps the last one: following it would have doubled every day already generated, and **Book Now** would have offered every time twice. 15.4 also said pressing twice was harmless.
+Found while checking 19.4. `ScheduleTemplateHelper::GenerateAvailability` skipped only days with hand-entered or blocked hours. A second press over days the template had already generated added a second copy of them. 19.4's monthly press starts from today, so it always overlaps the last one: following it would have doubled every day already generated, and **Book Now** would have offered every time twice. 19.4 also said pressing twice was harmless.
 - [x] A day **this** template already generated is now skipped and counted in `days_skipped`, so the Templates page's "Skipped N days (already existed)" is true. Hours from a different template on the same day are still added, since that is a split shift. The check reuses `ProviderAvailability::GetAvailabilityForProviderOnDate`, with no new SQL.
 - [x] Tests:
   - `schedule_template_helper_test.cpp`: `GenerateAvailabilityTwiceAddsNothingTheSecondTime`, `…OverAnOverlappingRangeAddsOnlyTheNewDays` and `…StillAddsAnotherTemplatesHoursToTheSameDay`.
   - `admin_schedule_templates_test.cpp`: `GenerateAvailabilityPressedTwiceSkipsTheGeneratedDays`, through the endpoint the Generate button calls.
-  - `seed_app_data_test.cpp`: `MonthlyGeneratePressExtendsCalebsHoursWithoutDuplicates`, which runs 15.4's press on the seeded template, from today through the end of the month after next.
+  - `seed_app_data_test.cpp`: `MonthlyGeneratePressExtendsCalebsHoursWithoutDuplicates`, which runs 19.4's press on the seeded template, from today through the end of the month after next.
 - [x] **Mutation-checked on Linux:**
   - With the new check removed (the old behaviour), four tests fail: the two "twice" tests, the overlapping-range test and the monthly-press test.
   - With the check counting **any** template's hours, `…StillAddsAnotherTemplatesHoursToTheSameDay` fails.
@@ -1192,7 +1215,7 @@ Found while checking 15.4. `ScheduleTemplateHelper::GenerateAvailability` skippe
   - Caleb's templates: one, "Massage hours", no end date, Mon/Tue/Thu/Fri 11:00 to 15:00 or 16:00 and Sun 13:30–16:00.
   - **Book Now**'s slots for the next eight days (Sun 10/18 – Sun 10/25): only Caleb, only on Sunday, Monday, Tuesday, Thursday and Friday. Sunday's first start is 1:30 PM and the others' 11:00 AM. Monday and Friday's last massage ends 2:50 PM, Tuesday and Thursday's 4:00 PM, Sunday's 3:40 PM.
   - Generate pressed twice through the real endpoint, from now through 70 days out: the first press `days_generated 18, days_skipped 32`, the second `0` and `50`. The booking slots before and after: 60 each, none offered twice.
-- [x] **Found: Edit Template wipes the generated hours.** The Templates page's **Edit Template** saves by deleting the template and creating a new one. The delete cascades: the template's entries **and every availability row generated from it** go with it. In the run above, all 32 days were gone afterwards. So after editing Caleb's hours, **Book Now** offers no massage until **Generate Availability** is pressed for the new template. Bookings already made are separate rows and are not touched. This is how the page has always worked; Phase 7 only makes it matter. OQ-23 has the default: a note in 15.4, and no code change.
+- [x] **Found: Edit Template wipes the generated hours.** The Templates page's **Edit Template** saves by deleting the template and creating a new one. The delete cascades: the template's entries **and every availability row generated from it** go with it. In the run above, all 32 days were gone afterwards. So after editing Caleb's hours, **Book Now** offers no massage until **Generate Availability** is pressed for the new template. Bookings already made are separate rows and are not touched. This is how the page has always worked; Phase 7 only makes it matter. OQ-23 has the default: a note in 19.4, and no code change.
 
 ### 7.6 Hand-testing walkthrough
 From a fresh local database:
@@ -1233,7 +1256,7 @@ From a fresh local database:
 
 # Phase 8 — About page copy, the location's text and the sender name
 
-**Implemented 10/18/2026; validated by hand and committed as `f12a4c69`.** Windows 5268 passed, Linux 5268 passed. The two runs executed the same 5268 test names: Phase 7's 5267 plus one new. Like the rest of the seed, it reaches production with the Phase 15 reinstall. That includes the sender name: it is a config-secret default, written once when a database is created, so the live site keeps "Knotty Yoga and Spa" until then.
+**Implemented 10/18/2026; validated by hand and committed as `f12a4c69`.** Windows 5268 passed, Linux 5268 passed. The two runs executed the same 5268 test names: Phase 7's 5267 plus one new. Like the rest of the seed, it reaches production with the Phase 19 reinstall. That includes the sender name: it is a config-secret default, written once when a database is created, so the live site keeps "Knotty Yoga and Spa" until then.
 
 ### 8.1 Seed
 - [x] `PopulateAboutSections`: the three bodies from the About page table, **verbatim**. Titles, ordinals and links unchanged. The "40 years … hootananny" and "climbing wall" placeholder copy is gone.
@@ -1244,7 +1267,7 @@ From a fresh local database:
   - **Checked:** `class_checkin_helper_test`'s subject is built from the sender name. honuware's `QuickAccountHelper` writes `"Welcome to " + branding.studioName + " - Your Account"`; there is no separate site-name slot. That test now builds the expected subject from the constant too.
 - [x] Not changed:
   - `ServerAccess.mock.ts`'s local-mode copies of the old location text and the old About blocks. They are fixture data, as the note closing Phase 12 says of the mock catalog.
-  - The `site_about_markdown` default in `app_secret_values.cpp`, which still carries the "40 years … hootananny" text. Nothing on this site has displayed it since Polish 7.3 replaced it with the About blocks. It still rides along unseen in the site-settings data the browser loads, and in theme bundles, which Phase 15 doesn't use (OQ-9). Say if you want it changed anyway.
+  - The `site_about_markdown` default in `app_secret_values.cpp`, which still carries the "40 years … hootananny" text. Nothing on this site has displayed it since Polish 7.3 replaced it with the About blocks. It still rides along unseen in the site-settings data the browser loads, and in theme bundles, which Phase 19 doesn't use (OQ-9). Say if you want it changed anyway.
 
 ### 8.2 Tests
 - [x] `PopulateAboutSectionsSeedsMasonsCopyInPageOrder` (new, `seed_app_data_test.cpp`), through the public About reader (the one behind `/api/about_sections`):
@@ -1298,7 +1321,7 @@ From a fresh local database:
 
 **The site's name**
 1. Scroll to the bottom of any page. The footer reads "© Copyright Knotty Yoga 2020 all rights reserved", without "and Spa". The "2020" is written into the page and is unchanged.
-2. The email sender is checked in Phase 14.3, step 26, which needs real mail.
+2. The email sender is checked in Phase 18.3, step 26, which needs real mail.
 
 ---
 
@@ -1366,7 +1389,7 @@ From a fresh local database:
 
 **Implemented 10/18/2026.** Windows 5306 passed, Linux 5306 passed. The two runs executed the same 5306 test names: Phase 9's 5260 plus 46 new. Angular: 3608 specs passed, `tsc --noEmit` (app and specs) and `ng build` clean.
 - On Windows, the server binary itself didn't relink: a running `knottyyoga_the_server.exe` held the file open. Everything else built, the tests included. The Linux run built and ran the server (10.8).
-- Production needs nothing beyond the Phase 15 reinstall. An upgraded database gets the table from `--migrate` (0011), which 10.8 checked.
+- Production needs nothing beyond the Phase 19 reinstall. An upgraded database gets the table from `--migrate` (0011), which 10.8 checked.
 
 Fact 4: a slot cannot carry two instructors today. OQ-7: "we should support multiple instructors."
 
@@ -1529,7 +1552,7 @@ That is the conservative reading, and each can widen later on its own.
 
 # Phase 11 — Forgot password (OQ-2)
 
-Fact 12: this is built in the two honuware repos and then pinned here. **Nothing else in this plan depends on it.** The production rollout (Phase 15) goes ahead with or without it; until it ships, instructors get in with 5.2's temporary password. It follows the same build → push → pin cycle Phase 4 establishes, and touches some of the same files, so it starts after Phase 4's pin bump rather than in parallel.
+Fact 12: this is built in the two honuware repos and then pinned here. **Nothing else in this plan depends on it.** The production rollout (Phase 19) goes ahead with or without it; until it ships, instructors get in with 5.2's temporary password. It follows the same build → push → pin cycle Phase 4 establishes, and touches some of the same files, so it starts after Phase 4's pin bump rather than in parallel.
 
 During development, knottyyoga builds against the local `server_components` checkout via `FETCHCONTENT_SOURCE_DIR_HONUWARE` in the gitignored `CMakeUserPresets.json`, so both repos build together before anything is pushed.
 
@@ -1868,7 +1891,7 @@ During development, knottyyoga builds against the local `server_components` chec
     - The list belongs to the class, so every viewer gets the same one.
   - **Found at 12.3's check and fixed here: Required Skills never appeared on any class page.**
     - `ClassDetail.requiredSkills` was declared "for Phase 3", and nothing ever filled it.
-    - The page's chips, held/missing marks and "You're missing" box were built and tested, but never had data. 6.6 step 6 and the 14.3 walkthrough both expect a **Handstand** chip.
+    - The page's chips, held/missing marks and "You're missing" box were built and tested, but never had data. 6.6 step 6 and the 18.3 walkthrough both expect a **Handstand** chip.
     - The same loop now fills the list with the skill names from every group that has no permission in it.
   - Tests in `class_catalog_helper_test`:
     - `GetClassDetailNamesTheMembershipAndTheSkillItNeeds`: a visitor and a Gold member get the same two lists.
@@ -2668,17 +2691,21 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 ---
 
-# Phase 14 — Verification
+# Phase 18 — Verification
 
-### 14.1 Build and test (Claude, both platforms; reported per platform)
+*Was Phase 14 until 10/21, when Ryan's review became Phases 14–17.*
+
+### 18.1 Build and test (Claude, both platforms; reported per platform)
 - [ ] knottyyoga: Linux gate (`server/docker/build_and_test.sh`) and Windows (`x64-Debug`). Also build `knottyyoga_database_helper` and `knottyyoga_test_helper` explicitly, since the gate builds neither `main.cpp`.
-- [ ] Phases 4 and 11 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
-- [ ] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`.
+- [ ] Phases 4, 11 and 14 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
+- [ ] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`, and the Playwright layout specs added in Phases 14–17.
 
-### 14.2 Local run
+### 18.2 Local run
 - [ ] `knottyyoga_database_helper --recreate_database` against the local dev database. This is destructive, so it is announced before running. Confirm no `seed_lookup_missing`, `*_skipped` or `seed_image_failed` lines in the log, other than any photos still outstanding from Phase 1.
 
-### 14.3 Hand-testing steps
+### 18.3 Hand-testing steps
+
+Phases 14–17 each have their own walkthrough (14.9, 15.5, 16.8, 17.7), which these steps don't repeat.
 
 Menu labels were checked against the templates on 10/14. `mockHeaderResponse.ts` **is** the production menu: `header.service.ts` always builds from it. Below 1280 px the top nav collapses into the hamburger, so use a wide window.
 
@@ -2804,34 +2831,37 @@ Then start the server and the Angular app. Accounts:
 
 ---
 
-# Phase 15 — Production rollout
+# Phase 19 — Production rollout
+
+*Was Phase 15 until 10/21.*
 
 Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of their own (4.6); this phase is the content reinstall. Everything here runs on the EC2 host following the Deploying to AWS conventions:
 - `--entrypoint` for helpers
 - `-v /etc/knottyyoga:/etc/knottyyoga:ro`
 - `--env-file /etc/knottyyoga/server.env`
 
-### 15.1 Before
-- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4).
+### 19.1 Before
+- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg`.
 - [ ] Manual RDS snapshot, named for this change. It is cheap insurance even though nothing is being kept.
 - [ ] Have the `set_secret` block from Deploying to AWS 5.1 step 6 ready, with `website_address_login` = the cloudfront URL until go-live. Check that `mail_app_password` is in it: forgot password and the instructor digest need working mail.
 
-### 15.2 Reinstall
+### 19.2 Reinstall
 - [ ] Stop `knottyyoga-helper` and `knottyyoga-server`.
 - [ ] Run `knottyyoga_database_helper --install_schema --force` with `HONUWARE_ALLOW_DESTRUCTIVE=1` (one-shot, on that command only) and `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from `server.env`.
 - [ ] `--migrate` records the migration ledger; expect `applied=N skipped=0`, as on 9/23.
 - [ ] Re-run the `set_secret` block.
 - [ ] Start the server, then the helper. Expect `/api/health` → `db:"ok"`, and the helper log shows `login_success`.
 
-### 15.3 After
+### 19.3 After
 - [ ] Mason, Caleb and Kit each sign in and change their password: first-name menu → **Profile** → **Change Password** (OQ-10). The seeded ones are in source control. This includes the `masonbendixen@hotmail.com` admin.
 - [ ] For each instructor who should sign in, either:
   - `knottyyoga_test_helper --command=set_password` (5.2), with the temporary password handed over in person, or
   - once Phase 11 is live and their real email is seeded, they click **Forgot password?** themselves
 - [ ] Paste any bios that arrived late under **Admin** → **Manage Products** → **Instructors** (OQ-15).
-- [ ] The public half of the Phase 14.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
+- [ ] Unless OQ-30's addresses made it into the seed: **Admin** → **Manage Products** → **Site Theme** → **Brand basics** → **Social links**, set the studio's real Facebook and Instagram pages.
+- [ ] The public half of the Phase 18.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
 
-### 15.4 Every month: extend Caleb's bookable hours (OQ-8)
+### 19.4 Every month: extend Caleb's bookable hours (OQ-8)
 - [ ] **Admin** → **Manage Products** → **Service Providers** → **Caleb Ault** → **Templates** → **Massage hours** → **Generate Availability**. Then:
   - **From Date**: today
   - **To Date**: the last day of next month
@@ -2849,7 +2879,8 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - "`late-night-spa` is gated on a permission that does not exist" (Phase 3, by removal) ✅
 - [[Photo plan for studio]]: the earlier shot list; Phase 1 supersedes it for these thirteen.
 - [[Permission-based class access redesign]]: the requirement-group model Phase 6 seeds.
-- [[Deploying to AWS]]: Phase 15's commands, and Phase 4.6's release. Go-live (the cert + alias records) remains separate.
+- [[Mobile UI Updates]]: its 2.5 made the month calendar scroll sideways on phones on purpose; 15.2 reverses that at Ryan's request.
+- [[Deploying to AWS]]: Phase 19's commands, and Phase 4.6's release. Go-live (the cert + alias records) remains separate.
 
 ---
 
@@ -2859,16 +2890,16 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 ### Still open
 
-**OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 11) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 15.
+**OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 11) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 19.
 - Mason- I sent a message to all my instructors asking which email to use.
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
-- → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 15. Until then the instructor digest and, after Phase 11, password-reset emails to these three go nowhere.
+- → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 19. Until then the instructor digest and, after Phase 11, password-reset emails to these three go nowhere.
 
 **OQ-11 — Where are the photos?**
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
-- → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 14.3's steps 1 and 9 will find those four without a picture.
+- → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
 
 **OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
 - After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
@@ -2900,14 +2931,65 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** seed any of them back exactly as pasted. Each is one string in `kSeedInstructors`, or an edit under **Admin** → **Manage Products** → **Instructors** once deployed.
 - Say which, and especially whether 6 is right.
 
+**OQ-29 — Which home page picture should centre?** *(Ryan's review, 10/21.)*
+- Ryan asked for "an option to have the image be centered" for banner images. On a wide screen, three home page pictures could be meant:
+  - The **"Come join the fun!" banner** is already centred, and fills its band.
+  - The **top picture** (hero) fills the full width. Its people stand on the left because the photo is composed that way, with the words on the dark right.
+  - The **photo carousel**: on 10/21, at 1400 and at 1920 px wide, its four photos sat at the left, ending at 1120 px, with the rest of the row empty.
+- **Default:** the carousel, the one picture visibly not centred. 14.2–14.5 add **Centre the photos when they don't fill the width** to a carousel row, and the seed turns it on.
+- **Alternative:** if Ryan meant the top picture, "centred" needs a description: the photo in the middle with the words over it, perhaps. Say what it should look like.
+- Say which.
+
+**OQ-30 — The studio's real Facebook and Instagram pages.**
+- The seeded links are the two sites' front pages (`https://facebook.com`, `https://instagram.com`), so today's icons lead nowhere in particular.
+- **Default:** keep them. After the reinstall, set the real addresses under **Site Theme** → **Brand basics** → **Social links** (19.3).
+- **Alternative:** paste the two addresses here, and the seed carries them.
+
+**OQ-31 — Which way should the two fonts match?** *(Ryan's review.)*
+- The intro strip's sentence is in the display font, Barlow semibold, at 24 px. The Get Started band's "New here? …" line is in the body font, Roboto regular, at about 16 px.
+- **Default:** the "New here?" line takes the intro strip's style (14.5).
+- **Alternatives:** the intro sentence takes the plain style instead; or both use the display font, each keeping its own size.
+- Say which.
+
+**OQ-32 — Paging: page sizes and the lists left alone.** *(Phases 16–17.)*
+- **Default sizes:** a page's main list shows 10, and a list inside a card or one of several sections on a page shows 5. The pager hides when a list fits on one page.
+- **Default exemptions**, with the reason for each, are in the table at the top of Phase 16. In short:
+  - calendars and lists already paged by date
+  - lists the studio orders with ↑ ↓
+  - home page teasers that already link to the full list
+  - cart and checkout
+  - search results and drop-downs that are already capped
+  - reports, and the check-in screens
+  - lists of edit forms (**Fonts**, **Locations**)
+  - **Manage Data**
+  - a price schedule's embedded table, a library control that already pages 20 at a time
+- **Alternative:** name any list above that should page anyway, or any list that should get 5 instead of 10.
+
+**OQ-33 — The week view still scrolls sideways on a phone.** *(15.2.)*
+- Ryan asked about the month view, and 15.2 fixes only that one. **Week View**'s seven columns of hours also need about 800 px, and still scroll sideways on a phone.
+- **Default:** leave it. Phones open on **Day View**, and a week of hourly columns can't be read at 50 px a day.
+- **Alternative:** the same treatment as the month: seven narrow columns with short names.
+
+**OQ-34 — Uploading the badge as an SVG needs a server_components release.** *(14.1.)*
+- An admin can't upload an SVG today: the framework's upload refuses it, although the picker offers it. So 14.1 changes `server_components`, with its own commit and push, then a pin bump and gates in both apps, as 11.11 did.
+- **Default:** do it. The badge is an SVG, Ryan asked for the SVG to be editable, and the same fix lets the Get Started artwork be replaced with another SVG.
+- **Alternative:** accept PNG and JPEG only for the badge. There is then no `server_components` change, and a new badge loses the sharpness a vector keeps at every size.
+
+**OQ-35 — Where "desktop" starts: 768 px?** *(D16.)*
+- **Default:** 768 px. That is the site's own phone line, and where the calendar already switches.
+- **Alternatives:**
+  - **1024 px.** Only big tablets get the desktop sections. Most tablets held upright (768–834 px) would get the phone ones.
+  - **A setting in Site Theme,** so the studio can move the line. That is one more control to explain.
+- Say which.
+
 ### Resolved
 
 *Newest first: 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
 
 **OQ-15 — Instructor bios.**
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
-- → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (15.3).
-- → 10/20: all five arrived and are in the seed (Phase 13), with OQ-28's corrections. 15.3's "paste late bios" step has nothing left to do unless one changes.
+- → Plan: the **Instructor bios** section above has a slot under each name. Whatever is there at Phase 5.5 is seeded verbatim, anything still empty gets its one-line default, and late ones go in through Manage after deploy (19.3).
+- → 10/20: all five arrived and are in the seed (Phase 13), with OQ-28's corrections. 19.3's "paste late bios" step has nothing left to do unless one changes.
 
 **OQ-25 — A plus-addressed email can't activate its account.** *(Found implementing Phase 11, 10/18.)*
 - The activation mail's link writes the address with honuware's `URLEncode`, which leaves `+` as it is, so `mason+test@gmail.com` goes out as `?email=mason+test@gmail.com`.
@@ -2931,16 +3013,16 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 **OQ-23 — Editing Caleb's hours removes his bookable times until Generate is pressed.** *(Found implementing Phase 7, 10/17.)*
 - On **Service Providers** → **Templates**, **Edit Template** saves by deleting the template and creating a new one. The delete takes every availability row generated from the old template with it (7.5). Right after an edit, **Book Now** offers no massage at all until **Generate Availability** is pressed on the new template. Bookings already made are untouched.
-- **Default:** no code change. 15.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
+- **Default:** no code change. 19.4 now says to press **Generate Availability** right after any edit. You will rarely edit the hours, and the fix costs one press.
 - **Alternative:** the Templates page generates for you after **Save Template**, from today through the end of next month. That is a front-end change, with tests.
 - Say which.
 - Mason- I'll go with the default.
-- → Plan: no change. 15.4 keeps its "press **Generate Availability** straight away" step.
+- → Plan: no change. 19.4 keeps its "press **Generate Availability** straight away" step.
 
 **OQ-22 — Signed in, Our Classes hides every class you can't attend yet.** *(Found implementing Phase 6, 10/17.)*
 - Signed out, **Our Classes** → **All Classes** lists all six classes. Signed in, it lists only the classes the person may already attend (`ClassCatalogHelper::GetClassesVisibleToPerson`, a deliberate rule from the access redesign, P-1/M-6). Until Phase 6 every class was open, so nobody noticed.
 - Now that all six need a membership, a signed-in **non-member sees an empty page**, a Silver member sees only Beginner Knotty Yoga, and **so do the staff**: Mason's and the instructors' accounts hold no membership. The weekly schedule is unaffected: it lists all 14 rows with their badges, signed in or out.
-- It also breaks 14.3 step 13, where a Silver Kit opens Knotty Yoga from **All Classes**.
+- It also breaks 18.3 step 13, where a Silver Kit opens Knotty Yoga from **All Classes**.
 - **Default:** signed-in visitors see every scheduled class, as signed-out ones do, and the class page and badges say what each one needs. New item 12.3. Say if a signed-in member should keep seeing only what they can book.
 - Mason- Let's go with the default.
 - → Plan: 12.3 stands as written. Everyone sees all six classes on **All Classes**, signed in or out, and the class page says what each one needs. Until 12.3 lands, a signed-in non-member or staff account still sees an empty **All Classes** page; 6.6's last step notes it.
@@ -2950,7 +3032,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: Phase 8, which now covers all three pieces of copy. The two follow-ups below were answered 10/15:
   - The mail sender name **"Knotty Yoga and Spa"** (`app_secret_values.cpp`). With the spa removed, would you like plain "Knotty Yoga"?
 	  - Mason- Let's just do Knotty Yoga
-	  - → Plan: 8.1. `kMailSenderNameValue` becomes "Knotty Yoga", and the eight tests that check the From name switch to the constant. Production picks it up with the Phase 15 reinstall.
+	  - → Plan: 8.1. `kMailSenderNameValue` becomes "Knotty Yoga", and the eight tests that check the From name switch to the constant. Production picks it up with the Phase 19 reinstall.
   - The location's description on **About ▸ Our Location**, which still mentions "a climbing wall" and "Street parking is free after 6pm". Send replacement text, or say "drop the climbing wall".
 	  - Mason- Let's say: "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes, plus a private room for massage and bodywork. Parking is abundant. Conveniently off the 520. Heading Eastbound on 520 take the first 148th exit and then the right sub exit labelled 152. Go "through" the first roundabout and then go "left" at the second. We in the last building (14) before the parking lot bends to the right. Space 2545 / Knotty Yoga."
 	  - → Plan: the **About ▸ Our Location** section under *Target content*, seeded in 8.1. One word was changed, "We in" → "We're in", which is flagged there; say if it should stay exactly as typed.
@@ -2962,7 +3044,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: no change; the plan was already written this way (D6, and the Class access table). Knotty Yoga is Gold-only, with approval checked at the door.
 
 **OQ-20 (new, from Phase 3) — Five tiers on a three-column grid.** On a desktop-width screen the membership cards sit three to a row. So Silver, Silver Couple's and Gold share the first row, and Gold Couple's and Gold Family sit alone on the second. Gold is split from its own tiers, and the second row is two-thirds full. This shows on the Memberships page, the home page band and the shop.
-- **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 14 walkthrough.
+- **Default:** leave it. The order is right; only the line break falls mid-Gold. You'll see it in the Phase 18 walkthrough.
 - **Alternatives:** (a) two to a row on desktop: Silver pair, Gold pair, then Gold Family alone. (b) one row per tier family: Silver row and Gold row. That needs the cards to know which family a tier is in, which the data does not say today.
 - Mason- Let's go with the default.
 - → Plan: no change. The cards stay three to a row in tier order.
@@ -2992,11 +3074,11 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 **OQ-8 — Rolling availability.**
 - Mason- no no no... let's not make this a new feature. We can just add slots with the template. The generate availability feature is pretty simple. Could also do this as a scheduled job pretty easily if need be. Let's not complicate the webserver more than necessary.
-- → Plan: the rolling-availability phase is deleted. Caleb's template is open-ended, the seed generates through the end of next month, and 15.4 is the monthly **Generate Availability** press with exact steps.
+- → Plan: the rolling-availability phase is deleted. Caleb's template is open-ended, the seed generates through the end of next month, and 19.4 is the monthly **Generate Availability** press with exact steps.
 
-**OQ-9 — Getting this onto the live site.** Mason- No, I'm just in preview mode and still using the Square sandbox. Wipe away. → D11, Phase 15. Theme export/import is dropped; the `set_secret` block stays, because it carries the Square sandbox and mail settings.
+**OQ-9 — Getting this onto the live site.** Mason- No, I'm just in preview mode and still using the Square sandbox. Wipe away. → D11, Phase 19. Theme export/import is dropped; the `set_secret` block stays, because it carries the Square sandbox and mail settings.
 
-**OQ-10 — Test accounts in the base seed.** Mason- I'll manually have the three of us change our passwords as we deploy. I'm not that concerned about this. → Kit and `masonbendixen@hotmail.com` stay in the base seed, unchanged (5.3). 15.3 is the password change for Mason (both accounts), Caleb and Kit.
+**OQ-10 — Test accounts in the base seed.** Mason- I'll manually have the three of us change our passwords as we deploy. I'm not that concerned about this. → Kit and `masonbendixen@hotmail.com` stay in the base seed, unchanged (5.3). 19.3 is the password change for Mason (both accounts), Caleb and Kit.
 
 **OQ-12 — Test-only data.** Mason- let's remove both of these. I'm getting ready to deploy and want the website to be as it will actually function. → Phase 9 and D14. With both gone and Caleb's template promoted to real data, nothing test-only remains, so `--recreate_database_test` is removed too.
 
