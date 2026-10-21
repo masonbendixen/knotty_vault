@@ -93,6 +93,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - **13.8, Our Providers.** Signed out, Caleb's provider card showed a broken image. It asked for his private account photo; it now shows his public instructor headshot, as its bio already did.
   - After both: knottyyoga Windows 5392 and Linux 5392, same names; Angular 3627; all 8 new mutations caught (13.9).
   - **Ryan's edited headshots** replace Mason's, Caleb's, Gifford's and Tiana's, both in the seed and on the live local site, through the admin photo upload (1.2).
+  - **13.10, Site Theme speed.** The admin Site Theme page took 22 s to open, and a keystroke could freeze it for 4 s. Its colour pickers built a new canvas for every colour on every screen update. Now it opens in 2.4 s and typing is instant (Angular 3630).
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -2126,6 +2127,40 @@ Mason: "The photo on the provider page isn't showing up." Signed out, **About** 
   | p3 | The query never finds the profile | that test and `OurProvidersShowsCalebsHeadshot` |
 
   Plus n1–n4 again (the crops), still caught. Every file was restored and the clean runs pass.
+
+### 13.10 Site Theme was frozen by its colour pickers *(ui; added 10/20 from Mason's report)*
+
+Mason: "The site theme page is really, really slow. Particularly the image carousels." (**Admin** → **Manage Products** → **Site Theme**, signed in as an admin.) Not caused by Phase 13, but found during it, so fixed here.
+
+**Measured** in a real browser on the local site, signed in as the admin:
+
+| Step | Before | After |
+|---|---|---|
+| Open Site Theme | 21.9 s, 17.5 s of it a frozen page | 2.4 s, mostly font downloads; 0.1 s frozen |
+| Open **Image carousels** | 12.5 s | 0.25 s |
+| Type 12 letters into a carousel's **Name** | 27.7 s; one keystroke froze 3.9 s | 0.76 s; worst keystroke 16 ms |
+| Type 12 letters into a **Brand basics** field | 12.2 s | 0.76 s |
+
+The server was never the problem: its requests total about 1.5 s either way.
+
+**Cause**, from a CPU profile of three keystrokes (10.7 s):
+- 5.9 s was the colour picker's `hexFor` → `resolveCssColor`, which created a **new canvas for every call**; 3.8 s more was garbage-collecting those canvases.
+- Every picker builds its named-colour menu (148 chips, each with a tooltip) up front, even closed, and every chip's colour is a template binding re-evaluated on each change detection.
+- The Colors tab holds dozens of pickers, and Material tabs build all their content at once. So one keystroke anywhere on the page, the carousels tab included, created thousands of canvases. Development mode then checks everything a second time, doubling it.
+
+**Fix**, both in `controls/color-picker`:
+- [x] `resolveCssColor` remembers each answer and reuses one canvas. A colour name's meaning never changes, so an answer once found stays right.
+- [x] The palette is wrapped in `<ng-template matMenuContent>`, so its chips are built when the menu opens, not with the picker.
+- Not changed: the other tabs still build up front. With the pickers cheap, they cost little, and lazy tabs would have meant rewriting the Site Theme specs that read those tabs without opening them.
+
+**Tests** (`color-picker.component.spec.ts`):
+- [x] A colour already resolved is answered without touching the canvas again.
+- [x] Resolving 50 new colours creates at most one canvas.
+- [x] With the menu closed no chip colour is computed; opening it builds them.
+
+**Mutation check:** all three caught: answers not remembered (c1), a canvas per lookup (c2), and the palette built eagerly again (c3, by hand). Every file was restored.
+
+**Results:** Angular **3630 passed**; `tsc`, `ng lint` and `ng build` clean. No server change.
 
 ---
 
