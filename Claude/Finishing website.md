@@ -2168,7 +2168,11 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - In the social links:
 	- Get rid of Twitter from the set of options (just Facebook and Instagram)
 	- Can you convert Facebook/Instagram/Twitter/Bluesky/tiktok can you convert them to the icons for each site instead of just showing Fa In Tw?
-- Can you systemically go through the site, including the user, staff, and admin portals and make sure anytime you build a data driven list, it is paginated? For instance, I know a lot of things in the user portal show purchases, booked sessions, or even the classes for each instructor card an
+- Can you systemically go through the site, including the user, staff, and admin portals and make sure anytime you build a data driven list, it is paginated? For instance, I know a lot of things in the user portal show purchases, booked sessions, or even the classes for each instructor card and a lot of these are unbounded lists. I really don't want more than ten items to show on a given page. For some of those where it is a nice to have, five items might be good. Please validate by doing screen captures in a test browser.
+- For the home page, for banner images, I'd like to have an option to have the image be centered.
+- For each home page item, I'd like to have checkboxes to show on desktop only and another to show on mobile only. If neither is checked, they show up anywhere (current behavior). I really want this to be based on a width though instead of mobile desktop and have desktop be above a given window width and mobile to be less than that so that a small window on desktop gets the same benefits (and a big tablet gets the desktop experience)
+- The upcoming classes on mobile with a logged in user has No upcoming classes but the calendar icon is clipped
+- Let's get rid of the 
 
 # Phase 14 — Verification
 
