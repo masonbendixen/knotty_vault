@@ -2179,6 +2179,495 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Can we have monthly calendar view shrink things down so that it fits without side scrolling?
 - If you click on my schedule in the user portal but don’t have a membership, No eligible classes overlaps with the calendar icon.
 
+*→ Plan (10/21/2026): Ryan's eleven points are Phases 14–17, grouped by the code they touch. Verification and the production rollout move down to **18** and **19**.*
+
+| Ryan's point | Where |
+|---|---|
+| Twitter out of the social links | 14.3 |
+| Brand icons instead of "Fa In Tw" | 14.6 |
+| Every data-driven list paged: at most 10 a page, 5 where that is enough, checked with screenshots | Phases 16 and 17 (D15, OQ-32) |
+| An option to centre the home page's banner images | 14.2, 14.4, 14.5 (OQ-29) |
+| Desktop-only and mobile-only home sections, decided by window width | 14.2, 14.4, 14.5 (D16, OQ-35) |
+| Upcoming classes on a phone: the calendar icon is clipped | 15.1 |
+| Memberships off the home page by default | 14.3 |
+| "Come join the fun" links to Memberships | 14.3 |
+| What is the intro strip? Make its picture and text editable | 14.1, 14.3–14.5 (OQ-34) |
+| One font for the intro strip and "New here?" | 14.5 (OQ-31) |
+| The month calendar fits without scrolling sideways | 15.2 (OQ-33) |
+| My Schedule without a membership: the text overlaps the calendar icon | 15.1 |
+
+**What the intro strip is.** It is the sentence under the top picture ("Knotty Yoga is an inclusive, high-level acrobatic fitness studio.") with the rainbow **SAFE SPACE** dumbbell badge under it.
+- Both can be edited today, just not where Ryan looked:
+  - the sentence is **Site Theme** ▸ **Copy** ▸ "Home intro sentence"
+  - the badge is a web address typed into **Site Theme** ▸ **Brand basics** ▸ "Home badge image URL"
+- The Page Content row only says where on the page the strip goes. Phase 14 moves both onto the row.
+
+---
+
+# Phase 14 — Home page and footer (Ryan's review)
+
+**Planned 10/21/2026.** One `server_components` change (14.1), with its own push and pin bump as in 11.11. The rest is knottyyoga.
+
+### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
+- [ ] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
+  - **Why.** The photo picker (`@honuware/ui/photos`) already offers SVG files and sends them as `svg`, and the server refuses them with "Unsupported image type. Must be 'jpeg' or 'png'". So today no admin can upload the intro badge (14.4), or replace the seeded Get Started artwork with another SVG.
+  - **The body must be SVG text.** After an optional byte-order mark, whitespace, an XML declaration and comments, its first element must be `<svg`. Anything else sent as `svg` is refused with 400, so a mislabelled PNG can't be stored as a vector.
+  - **Stored as it came, as a vector.** `ImageHelper::UploadAndAssociatePhoto` already accepts vectors, and `get_scaled_photo` already returns an SVG unscaled, with `nosniff`.
+  - **Safe under the existing SVG rule** (Polish 11.1, `get_scaled_photo.cpp:175`):
+    - every page draws these pictures with `<img>`, which runs nothing
+    - opened directly, production's site-wide CSP (`script-src 'self'`) blocks any script inside
+    - only someone who can already edit the row may upload (`RequireTableWriteAccess`)
+- [ ] Tests in `upload_photo_test.cpp`:
+  - an SVG uploads and reads back byte for byte, as `image/svg+xml`, through the scaled-photo endpoint
+  - PNG bytes labelled `svg` are refused, and nothing is stored
+  - `gif` is still refused
+- [ ] Ship as 11.11 did. Mason commits and pushes `server_components`. knottyyoga and CommunityFinder then pin the new SHA, and both apps' gates pass on both platforms.
+
+### 14.2 Three new switches on a home section *(knottyyoga: db_schema, migration, admin metadata)*
+- [ ] `home_sections` gains three booleans. All default to FALSE, so every existing row behaves as today. They are named like the four `hidden_when_*` flags beside them.
+
+  | Column | Editor label (14.4) | Meaning |
+  |---|---|---|
+  | `hidden_on_narrow_screens` | **Desktop only** | Hidden in windows narrower than 768 px (D16) |
+  | `hidden_on_wide_screens` | **Mobile only** | Hidden in windows 768 px wide and wider |
+  | `images_centered` | **Centre the photos when they don't fill the width** | A carousel row's photos sit in the middle (14.5) |
+
+- [ ] Migration `app/0012_home_sections_screen_width_and_centering`: `ADD COLUMN IF NOT EXISTS` for each column.
+  - Test, modelled on `HiddenWhenNotMemberAddsTheColumnAndIsIdempotent`: run it twice on a database without the columns, then once on a fresh one.
+- [ ] Admin metadata in `create_database.cpp`: `PopulateAdminColumnDataInfo` and `PopulateAdminColumnFriendlyNames` entries for all three.
+  - `home_sections` is already a top-level admin table, so the foreign keys hold. `create_database_test`'s metadata check covers it.
+- [ ] Read path. `GetActiveHomeSections` is `SELECT *`, so the columns reach `/api/home_sections` with no code change. Tests:
+  - in `home_sections_test.cpp`: a row written with each flag reads back with it
+  - in the endpoint's test: the three fields arrive as booleans
+
+### 14.3 Seed *(create_database.cpp `PopulateHomeSectionsImpl`; app_secret_values.cpp)*
+- [ ] **Membership tiers off by default.** The row is still seeded, with `active` false, so **Page Content** can turn it on with "Show this section on the home page".
+- [ ] **"Come join the fun!" links to Memberships.** The link becomes `/shop`, the page the top nav's **Memberships** opens, labelled **See memberships**. Today it is `/start`, labelled "Get started".
+- [ ] **The intro row carries its own content:**
+  - **Body:** the sentence, from the same constant as the `site_hero_headline` default, so the two can't differ.
+  - **Title:** "This studio is a designated safe space", the badge's description for screen readers. Today it is hardcoded in the template.
+  - **Photo:** `SafeSpace_icon.svg`, copied from `ui/src/assets/svg/` into `src/database_helper/img/` and attached as `svg`.
+- [ ] **The photo carousel row** is seeded with `images_centered` true (OQ-29). Its carousel is seeded empty, so this shows only once photos are added.
+- [ ] **Social links: Facebook and Instagram only** (`app_secret_values.cpp:61`). Their addresses are still the two sites' home pages (OQ-30).
+- [ ] Tests, through the readers the pages use (D4):
+  - `create_database_test`, after `PopulateHomeSections`: `GetActiveHomeSections` has no `membership` row, and the full list has it, inactive.
+  - The banner's link and label.
+  - The intro row's body and title, and its photo is the SVG byte for byte, typed `svg`, read through the photo reader.
+  - The carousel row is centred, and no other row is.
+  - The social-links value, read through the site-content reader: exactly two lines, Facebook and Instagram.
+
+### 14.4 Page Content editor *(ui: pages/manage/page-content)*
+- [ ] **Two more toggles** under the existing four. They are slide toggles like their neighbours, not checkboxes:
+  - **Desktop only — hidden in windows narrower than 768 px**
+  - **Mobile only — hidden in windows 768 px and wider**
+
+  With both on, a warning says nobody will ever see the section, as the membership pair already does. The row list shows **Desktop only** and **Mobile only** badges, as it shows **Signed-in only**.
+- [ ] **Carousel rows** get **Centre the photos when they don't fill the width**, under **Carousel**.
+- [ ] **Intro rows** become editable like a content block:
+  - an **Image** upload, labelled **Badge** (SVG, PNG or JPEG)
+  - **Body**, labelled **Text**
+  - **Title**, with the hint "Describes the badge for people using a screen reader."
+- [ ] **Each built-in kind says what it is.** One line under **Kind** describes the chosen kind, for example "Intro strip: a sentence with a badge under it". This answers Ryan's question in the editor itself. It is one map of eleven short lines, and the same opacity applies to every built-in kind.
+- [ ] **One place to edit the intro strip:**
+  - **Site Theme** loses "Home intro sentence" (**Copy**) and "Home badge image URL" (**Brand basics**).
+  - `SiteConfig` drops `heroHeadline`, `heroImageUrl` and `heroImageAsset`.
+  - The framework's `site_hero_*` keys stay: CommunityFinder shares them. They are simply unused here.
+- [ ] Specs:
+  - each new control shows for its kinds only, and saves its column
+  - the both-on warning, and the two badges
+  - the kind descriptions
+  - the two Site Theme fields are gone
+
+### 14.5 Home page *(ui: home-page and its sections)*
+- [ ] **Desktop only / Mobile only** (D16). `isVisible` drops `hidden_on_narrow_screens` rows below 768 px, and `hidden_on_wide_screens` rows from 768 px up.
+  - One `matchMedia('(width >= 768px)')` with a change listener decides it, so narrowing or widening a window switches the sections live.
+  - A hidden section is not drawn at all, so a desktop-only picture costs a phone nothing.
+  - The width is the calendar's (`BELOW_MD_MEDIA_QUERY`, `calendar.types.ts:32`). It moves to `shared/utils/` so both read one constant.
+- [ ] **Centred photos.** `app-image-carousel` gains a `centered` input.
+  - When every photo fits, the strip sits in the middle.
+  - When they don't fit, it scrolls from the left as today.
+  - The Gallery page doesn't set it, so it is unchanged.
+- [ ] **The intro strip** draws the row's **Text** and **Badge** instead of the two Site Theme settings. The badge's description is the row's **Title**. A row with no badge shows the sentence alone.
+- [ ] **One font** (OQ-31). The Get Started band's "New here? …" line takes the intro strip's style: the display font, semibold, at the intro's size. Both use one shared class, so they can't drift apart again.
+- [ ] Specs:
+  - visibility at each width, with `matchMedia` stubbed, including a live change
+  - the carousel centres only when nothing scrolls
+  - the intro strip draws the row's text and badge, with the badge's description
+  - both text lines compute to the same font family, weight and size
+- [ ] Playwright, new `e2e/mobile-audit/layout/home.spec.ts`, at 390 and 1280 px:
+  - a desktop-only row is absent on the phone and present on the desktop, and a mobile-only row the reverse
+  - the screenshots are kept for 14.9
+
+### 14.6 Brand icons in the footer *(ui: shared/components/footer)*
+- [ ] The footer draws each social link as its brand's icon instead of the first two letters of its label (`footer.component.ts:27`).
+  - Five networks are recognised by the link's address:
+
+    | Network | Addresses |
+    |---|---|
+    | Facebook | `facebook.com`, `fb.com` |
+    | Instagram | `instagram.com` |
+    | X (Twitter) | `x.com`, `twitter.com` |
+    | Bluesky | `bsky.app` |
+    | TikTok | `tiktok.com` |
+
+    Failing the address, the label decides.
+  - Anything else keeps its two letters, so an unknown network still shows something.
+  - A Twitter link shows X's mark, Twitter's current logo.
+- [ ] **Where the icons come from:** five SVG paths from Simple Icons, which is public domain, in one file, `social-icons.ts`.
+  - There is no new dependency: the package holds thousands of icons and this needs five.
+  - Drawn inline in `currentColor`, so the theme's colour reaches them. They are fixed strings in the code, not studio content, so drawing them inline is safe.
+  - Each link's `aria-label` stays its label, and the tap target stays 44 px.
+- [ ] Twitter comes off too:
+  - `site-config.service.ts`'s fallback list drops it, to match the seed.
+  - Two code comments that already claim "the footer maps known labels to icons" become true.
+- [ ] Specs:
+  - each of the five is recognised by its address, and by its label
+  - an unknown network falls back to two letters
+  - a recognised link draws its icon and shows no letters
+  - these replace the two specs that pin "Fa In Tw"
+
+### 14.7 Mutation check
+- [ ] Each change is broken on purpose, one at a time, and every one must fail a test. Planned:
+  - the upload accepting non-SVG bytes as `svg`, or refusing a real SVG
+  - the migration not adding a column
+  - the membership row seeded active
+  - the banner still linking to `/start`
+  - the intro row seeded without its photo
+  - Twitter back in the seed
+  - a desktop-only row shown on a phone, or a mobile-only row shown on a desktop
+  - the carousel centring when it should scroll
+  - the intro strip reading Site Theme again
+  - the two fonts differing
+  - a known network falling back to letters
+
+### 14.8 Verification
+- [ ] `server_components` gates on both platforms, then knottyyoga and CommunityFinder against the new pin: Windows and Linux, same test names.
+- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+- [ ] **End to end:** `--install_schema` into a throwaway database, then the real server.
+  - Signed out, the home feed has no membership row, and the banner points to `/shop`.
+  - The intro row's badge is served as an SVG.
+  - Signed in as an admin, an SVG uploaded through the endpoint comes back byte for byte.
+  - `--migrate` on a database from before Phase 14 adds the three columns.
+
+### 14.9 Hand-testing walkthrough
+
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a window at least 1280 px wide, and start signed out.
+
+**Signed out: the home page and footer**
+1. Home page. Under the top picture is "Knotty Yoga is an inclusive, high-level acrobatic fitness studio.", with the rainbow **SAFE SPACE** badge under it, as before.
+2. Scroll the whole page. There are no membership cards anywhere on it.
+3. The **Come join the fun!** picture's button reads **See memberships**. Click it: the page is headed **Memberships**.
+4. Back on the home page, the black **Get Started** band reads "New here? The Get Started guide walks through…" in the same lettering, weight and size as the sentence in step 1.
+5. Footer, under **Follow us on Social Media!**: exactly two icons, the Facebook "f" and the Instagram camera. There is no "Fa", "In" or "Tw", and no Twitter.
+
+**Signed in: editing the rows**
+
+6. **Sign In** as `masonbendixen@gmail.com` / `pass`. Go to **Admin** → **Manage Products** → **Page Content** tile, **Home sections** tab. The **Membership tiers** row carries a **Hidden** badge.
+7. Click the pencil on the row whose kind badge reads **Intro strip**.
+   - A line under **Kind** says what an intro strip is.
+   - **Badge** shows the SAFE SPACE picture, and **Text** holds the sentence.
+   - Change **Text** to `Knotty Yoga is an inclusive acrobatic fitness studio.`
+   - Under **Badge**, **choose file**: `server\knottyyoga_server\src\database_helper\img\tier_icon_family.svg`.
+   - Click **Save**.
+8. Home page: the new sentence, with the family icon under it in place of the badge.
+9. **Site Theme** tile → **Image carousels** tab → expand **Home page photos** → **Add a photo**. Choose any picture, for example from `D:\Knotty Yoga\2026\Oct\JPG\Edited`, then click **Add photo**. Repeat once more.
+10. Home page: the two photos sit in the middle of the page, not at its left edge.
+11. Back in **Page Content** → **Home sections**, edit **Why Knotty Yoga**: turn on **Desktop only** → **Save**. The row shows a **Desktop only** badge.
+12. Home page: **Why Knotty Yoga** is there. Narrow the window to about the width of a phone. It disappears without a reload. Widen the window again and it comes back.
+13. Edit **Types of classes**: turn on **Mobile only** → **Save**. On the home page it is gone at full width, and appears once the window is narrowed.
+14. Edit **Additional health services**: turn on both **Desktop only** and **Mobile only**. A warning says nobody will ever see the section. Click **Cancel**.
+
+---
+
+# Phase 15 — Two layout fixes on phones
+
+**Planned 10/21/2026.** All in `ui/`. Both were reproduced on the local site at 390 px on 10/21, signed in as Kit with no membership.
+
+### 15.1 Empty-state icons keep their size *(ui: assets/styles/_patterns.scss)*
+- **Cause.** The two reports are one bug.
+  - `.empty-card` is a flex row with no rule for its icon, so the long sentence beside it squeezes the 24 px `mat-icon` to a sliver.
+  - The icon's own `overflow: hidden` then cuts the glyph off.
+  - On the home page's **Upcoming classes** band it reads as clipped. On **My Schedule** the sentence sits over what is left of it.
+- [ ] **Fix:** `.empty-card mat-icon { @include icons.size(icons.$md); flex: none; }` in `_patterns.scss`. `.notice` already does this for its own icon (`_surfaces.scss:118`).
+  - It also fixes every other `.empty-card` with an icon: Today's Classes, Attendance History, Class Check-In (twice), Student Notes and the style guide's demo.
+- [ ] Specs:
+  - `style-guide.component.spec.ts`, for the global class: the `.empty-card` demo in a 260 px-wide host keeps a 24 × 24 icon, wholly to the left of the text.
+  - `upcoming-classes` and `my-schedule` specs: the same check on their own empty states, at phone width.
+- [ ] Playwright, at 390 px, as a signed-in customer with no eligible classes: the home band and My Schedule, with the audit's overlap check. Screenshots kept for 15.5.
+
+### 15.2 The month calendar fits the screen *(ui: pages/calendar/components/views/month-view)*
+- **Today.** The month grid has a fixed 800 px minimum width (`month-view.component.html:31`, `min-w-[50rem]`) inside a box that scrolls sideways. On 10/21 it measured 808 px wide at both 390 and 768 px.
+  - This was deliberate in the mobile pass (Mobile UI Updates 2.5, "Makeover OQ 19"), and `layout/calendar.spec.ts:21` asserts it. This item reverses it.
+- [ ] **No minimum width.** The seven columns share whatever width there is (`repeat(7, minmax(0, 1fr))`), at every size.
+- [ ] **Narrow day cells**, decided by a container query on the grid's own width so a spec can size it:
+  - each class chip shows the class name only, in small type, cut off with "…"
+  - the time and the status icons drop out; both are on **Day View** and on the class's own page
+  - cells are shorter
+  - up to three chips a day, then **+N more**, which opens that day in **Day View**
+- [ ] **Tapping a date number** opens that day in **Day View**. Today it only selects the day, for the next switch of view.
+- Unchanged:
+  - From 1024 px up nothing changes: cells there are already wider than the threshold.
+  - Phones still open on **Day View**. This is for someone who picks **Month View**.
+  - **Week View** still scrolls sideways on a phone (OQ-33).
+- [ ] Specs (Karma, month view):
+  - with the host 358 px wide, the grid is no wider than the host, and chips show the name only
+  - **+N more** appears after three chips, and opens **Day View** on that date
+  - with the host 1000 px wide, the chips show the time and icons as today
+- [ ] Playwright `layout/calendar.spec.ts`:
+  - the "scrolls sideways" test becomes "fits without scrolling", at every size
+  - the chip-icon test applies only where cells are wide
+  - screenshots kept for 15.5
+
+### 15.3 Mutation check
+- [ ] Planned:
+  - the icon rule removed
+  - `flex: none` dropped, keeping the size
+  - the 800 px minimum restored
+  - compact chips at every width
+  - **+N more** never shown
+  - **+N more** opening the wrong date
+
+### 15.4 Verification
+- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+- [ ] The Playwright layout specs at all seven audit sizes.
+- [ ] No server change.
+
+### 15.5 Hand-testing walkthrough
+
+**Setup.** A fresh database, the server and `ng serve` running. Use a phone, or narrow the browser window as far as it goes.
+
+1. **Sign In** as `kiteagle@gmail.com` / `kit`. Kit holds no membership on a fresh database.
+2. Home page, the **Upcoming classes** band: "No upcoming classes you're eligible for. Add some from "My Schedule" first.", with a whole calendar icon to its left, not a sliver.
+3. Click **Plan your weekly schedule →**. On **My Schedule**, **My Weekly Plan** reads "No eligible classes yet — talk to staff about a skill evaluation or upgrade your membership." The calendar icon is whole, and the text starts to its right without touching it.
+4. Open the menu (☰) → **Your Calendar**. It opens on **Day View**. Click **Full Schedule**, then the **Day View** menu → **Month View**.
+   - The whole month fits across the screen: Sunday through Saturday, with nothing to scroll sideways.
+   - Each class shows as a short name. No day in the real schedule has more than three classes, so **+N more** doesn't appear; the specs cover it.
+5. Tap a date number. **Day View** opens on that date.
+6. Widen the window to full desktop width. **Month View** looks as it did before this phase, with each class's time and icons.
+
+---
+
+# Phase 16 — Paged lists, part 1: the pager, public pages and the user portal
+
+**Planned 10/21/2026.** All in `ui/`, no server change (D15).
+
+**What exists** (inventoried 10/21):
+- Only four lists page today:
+  - **Blog**: 5 a page, paged on the server
+  - **Attendance History**: 25 a page, paged on the server
+  - **Admin** ▸ **Blog Posts**: 10 a page, paged on the server
+  - **Manage Data**: pages already
+- There is no shared pager. The first two are hand-written, and the third is a Material paginator.
+- About sixty lists show every row. Many Manage pages ask the server for "the first 100" (or 1,000, or 10,000) rows and silently drop the rest (Phase 17.1).
+
+**The rules** (OQ-32):
+- **Page size.** A page's main list shows **10** a page. A list inside a card, or one of several sections on a page, shows **5**.
+- **The pager hides when everything fits on one page**, so a short list looks exactly as it does today.
+- **Not paged**, each for a reason:
+
+  | Kind of list | Examples | Why |
+  |---|---|---|
+  | Calendars, and lists already paged by date | The calendar views; the weekly **Our Classes** list; provider and room week grids; **Who's Teaching What**; **Today's Classes**; Check-In's 90-minute window | Already paged by date |
+  | Ordered lists the studio arranges with ↑ ↓ | Page Content rows; Getting Started steps; carousel photos; product variants | Moving a row across a page boundary breaks, and these are short by nature |
+  | Home-page teasers that already show a few and link to the rest | "View All Events"; "All my bookings" | Already short, with a link to the rest |
+  | Content, transactions and pick lists | The About blocks; the cart, checkout and seat assignment; search results and drop-downs the server already caps (people search 10, attendance templates 25) | Not data lists to browse |
+  | Reports and working screens | **Schedule Grid**; **Enrollment Trends**; **Open-Seat Heatmap**; **Refund Effectiveness**; the pricing matrix; the class check-in roster | Paging gets in the way |
+  | Lists of edit forms | **Fonts**; **Locations** | Each row is a form |
+  | Already paged elsewhere | **Manage Data** | Already pages |
+
+### 16.1 The pager *(ui: shared/components/list-pager)*
+- [ ] `app-list-pager`: **‹ Previous** · "1–10 of 23" · **Next ›**, with 44 px buttons, hidden when the list fits on one page.
+- [ ] `pagedSlice(items, pageIndex, pageSize)` and a small `ListPaging` state:
+  - it keeps the page in range when the list shrinks: deleting the last row of page 3 goes to page 2
+  - it goes back to page 1 when a filter or search changes
+  - it brings the list's top into view on a page change, so a phone user isn't left at the bottom
+- [ ] `MAIN_LIST_PAGE_SIZE = 10` and `NESTED_LIST_PAGE_SIZE = 5`, in one place.
+- [ ] **Grouped lists**, such as days or a series' sessions, page over their items. A group cut by a page boundary repeats its heading on the next page.
+- [ ] **One look for every paged list.** The pager replaces the two hand-written ones (**Blog**, **Attendance History**) and **Blog Posts**' Material paginator.
+  - All three keep paging on the server.
+  - **Attendance History** asks for 10 a page instead of 25.
+- [ ] Specs:
+  - the helper: slices, the last partial page, an empty list, and clamping
+  - the component: its labels, the ends disabled, hidden on a single page, the event it emits
+  - at phone width, one row with no wrapped labels (count the label's lines, per the audit harness's note)
+
+### 16.2 Many-row mock data *(ui: ServerAccess.mock, e2e harness)*
+- [ ] `knottyyoga.mockManyRows=1` in local storage makes every list method the Phase 16 and 17 pages use return 23 rows. That is three pages at 10, and five at 5, so every page can be photographed mid-list. It is off by default, so no existing spec or audit changes. Tests in `ServerAccess.mock.spec.ts`.
+
+### 16.3 Public pages
+- [ ] Each of these gets the pager:
+
+  | Page | List | A page |
+  |---|---|---|
+  | **About** ▸ **Instructors** | Instructor cards | 10 |
+  | An instructor's page | **Classes**; **Upcoming sessions** | 5; 5 |
+  | **About** ▸ **Gallery** | Carousels | 10 |
+  | **About** ▸ **Our Location** | Locations | 10 |
+  | **About** ▸ **Our Providers** | Provider cards | 10 |
+  | **Our Classes** ▸ **All Classes** | Class cards (a tag filter goes back to page 1) | 10 |
+  | A class page | **Series Runs**; **Upcoming Sessions** (the pager replaces "Showing the next N dates") | 5; 5 |
+  | **Services** | Service cards | 10 |
+  | **Upcoming Events** | Event cards; the series & workshops list above them | 10; 5 |
+  | **Memberships** | Tier cards; other products | 10; 10 |
+  | A product's page | Variants | 10 |
+  | **Blog** | Posts (server-paged, new look) | 5 |
+  | Home page | **Series & workshops**; signed in, **Upcoming classes** | 5; 5 |
+
+### 16.4 The user portal
+- [ ] Each of these gets the pager:
+
+  | Page | List | A page |
+  |---|---|---|
+  | **My Purchases** | Purchases; inside each, items, entitlements and payments | 10; 5 |
+  | A purchase | Items; entitlements; payments | 5 each |
+  | **My Bookings** | **Upcoming**; **Past**; a series' sessions | 10; 10; 5 |
+  | **My Subscriptions** | Subscriptions; **Shared With Me** | 10; 5 |
+  | **Saved Cards** | Cards | 10 |
+  | **Purchase Sharing** | Each of its five sections | 5 |
+  | **Vouchers & Credits** | **Active**; **Past** | 10; 5 |
+  | **My Skills** | Skills | 10 |
+  | **My Schedule** ▸ **Upcoming** | Classes, grouped by day | 10 |
+  | **My Schedule** ▸ **My Weekly Plan** | "Kept on your schedule" (the week grid itself is a calendar) | 5 |
+  | **Attendance History** | Classes attended (server-paged) | 10 |
+  | **Workshops & Series** | Offerings | 10 |
+  | **Notifications** | Pending sign-up reminders | 5 |
+  | **Favorite Instructors** | Instructors | 10 |
+
+### 16.5 Screenshots (Ryan's check)
+- [ ] New `e2e/mobile-audit/layout/pagination.spec.ts` visits every page in 16.3 and 16.4 with many-row data, at 390 and 1280 px. On each it checks:
+  - no more rows than the page size
+  - the pager reads "1–10 of 23"
+  - **Next** moves on to "11–20", and the last page holds 3
+  - the audit's overlap and overflow checks pass
+- [ ] Page 1 and the last page of each are saved to `ui/e2e/mobile-audit/output/pagination/`. Claude reads every one, lists anything that looks wrong here, and keeps the folder for Mason and Ryan.
+
+### 16.6 Mutation check
+- [ ] Planned:
+  - the pager showing every row
+  - a page size of 25
+  - the pager showing on a single page
+  - a filter change not going back to page 1
+  - deleting a page's last row leaving an empty page
+  - a cut group not repeating its heading
+  - **Attendance History** asking for 25
+
+### 16.7 Verification
+- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
+- [ ] The pagination spec at both sizes.
+- [ ] No server change.
+
+### 16.8 Hand-testing walkthrough
+
+**Setup.** A fresh database, the server and `ng serve` running, with a window at least 1280 px wide.
+
+1. Signed out: **About** → **Instructors** shows five cards and no pager. **Our Classes** → **All Classes** shows six cards and no pager. A list that fits on one page looks as it did.
+2. **Sign In** as `kiteagle@gmail.com` / `kit`. Go to **Memberships** → **Knotty Yoga Silver Membership** → **Subscribe**.
+   - Leave **Start month** as it is.
+   - Enter the sandbox card `4111 1111 1111 1111`, any future expiry, CVV `111`.
+   - Click **Subscribe & Pay $160.00**.
+3. Home page → **Plan your weekly schedule →**. On **My Weekly Plan**, tick all five **Beginner Knotty Yoga** classes.
+4. **Upcoming** tab: ten classes, grouped by day, then the pager "1–10 of N", where N is about 20. Click **Next ›**: the rest, starting from the eleventh. A day split across the two pages shows its heading on both.
+5. Open `ui\e2e\mobile-audit\output\pagination\`: one phone and one desktop picture of page 1 and of the last page, for every list in 16.3 and 16.4.
+
+---
+
+# Phase 17 — Paged lists, part 2: the staff portal and Manage
+
+**Planned 10/21/2026.** All in `ui/`, on 16's pager, rules and many-row mock.
+
+### 17.1 The silent caps go *(ui)*
+- **Today**, each list below asks `get_filtered_table_rows` for one page of a fixed size and never reads the total, so anything past the cap never appears. For example, a 101st product is missing from **Products**, and the 1,001st event session from **Event Sessions**.
+
+  | Page | Cap |
+  |---|---|
+  | **Products** | 100 |
+  | **Price Schedules** | 100 |
+  | **Event Sessions** | 1,000 |
+  | **My Sessions** | 1,000 |
+  | **Subscriptions** | 1,000 |
+  | **Entitlements** | 500, and its two 5,000-row joins |
+  | **Event Payment Info** | 200 |
+  | A subscription's billing history | 200 |
+  | The pricing views | 100, 200 and 10,000 |
+  | **Subscription Revenue** | 10,000. It totals what it reads, so past the cap the totals are silently wrong |
+
+- [ ] Each asks for everything (page size 0, which the endpoint already treats as "all rows") and pages in the browser (D15).
+  - Not changed: a product page's **Event Sessions**, **Active Subscriptions** and **Recent Purchases**, which deliberately show the latest 10 with a **View All** link.
+- [ ] Specs: each page's request asks for everything, and its eleventh row is reachable on page 2.
+
+### 17.2 The staff portal
+- [ ] Each of these gets the pager:
+
+  | Page | List | A page |
+  |---|---|---|
+  | **Event Sessions** (**My Sessions**) | Session cards (the year and month filters go back to page 1) | 10 |
+  | Inside a session card | **Attendees**; **Staff**; price overrides | 10; 5; 5 |
+  | **Person Skills** | Current skills; history | 10; 10 |
+  | **Student Notes** | Notes | 10 |
+  | **My Service Bookings** | **Upcoming**; **Past** | 10; 10 |
+  | **Time Off Requests** | Requests | 10 |
+  | **Shift Requests** | Requests; each one's affected clients | 10; 5 |
+
+  **Check-In** and **Class Check-In** stay unpaged: they are working screens with their own search (OQ-32).
+
+### 17.3 Manage
+- [ ] Each of these gets the pager:
+
+  | Page | List | A page |
+  |---|---|---|
+  | **Manage Products** dashboard | **Requires Attention** alerts | 5 |
+  | **Products** | Products | 10 |
+  | A product | Booking windows; entitlement summary | 5; 5 |
+  | **Price Schedules** | Schedules | 10 |
+  | **Event Sessions** | Session cards (nested lists as in 17.2) | 10 |
+  | **Event Payment Info** | Bookings | 10 |
+  | **Subscriptions** | Subscriptions | 10 |
+  | A subscription | Billing history; Entitlement History | 10; 10 |
+  | **Entitlements** | Entitlements; each one's seat assignments | 10; 5 |
+  | **Service Providers** | Providers; a provider's availability blocks; schedule templates | 10; 10; 10 |
+  | **Time Off Requests** | Pending requests | 10 |
+  | **Scheduling Exceptions** | Exceptions, grouped | 10 |
+  | **Shift Requests** | Pending requests; affected bookings | 10; 5 |
+  | **Vouchers** | Vouchers; each one's redemptions | 10; 5 |
+  | **Coupons** | Coupons; redemptions | 10; 5 |
+  | **Bundles** | Bundles | 10 |
+  | **Class Schedules** | Instances; each one's schedules; each schedule's slots; specialty costs | 10; 5; 5; 5 |
+  | **Instructors** | Instructors | 10 |
+  | **Membership Tiers** | Permissions | 10 |
+  | **Skills** | Skills | 10 |
+  | **Class Tags** | Tags | 10 |
+  | **Attendance Templates** | A member's entries; exceptions | 10; 10 |
+  | **Room Schedules** | Date overrides; product overrides | 10; 10 |
+  | **Room Occupancy** | Rooms; each room's projections | 10; 5 |
+  | **Site Theme** ▸ **Image carousels** | Carousels (their photos are ordered, so not paged) | 10 |
+  | **Page Content** ▸ **Announcements** | Announcements | 10 |
+  | **Admin** ▸ **Blog Posts** | Posts (server-paged; 16.1 swapped its paginator) | 10 |
+
+- **Left as they are:**
+  - A price schedule's embedded prices table. It already pages, 20 a page, but its buttons jump to **Manage Data**. That is a library control, so it is noted here rather than changed (OQ-32).
+  - The two `/admin/event-session/…` pages. No link reaches them.
+
+### 17.4 Screenshots
+- [ ] 16.5's spec extends to every page in 17.2 and 17.3, with the same checks and the same folder. Claude reviews each picture.
+
+### 17.5 Mutation check
+- [ ] Planned:
+  - a cap restored (`page_size` 1000)
+  - **Subscription Revenue** reading 10,000 again
+  - a nested list at 10 instead of 5
+  - a session card's attendees unpaged
+  - the year and month filters not going back to page 1
+
+### 17.6 Verification
+- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
+- [ ] The pagination spec.
+- [ ] No server change.
+
+### 17.7 Hand-testing walkthrough
+- Written when 17 is built. It will use the Manage lists that have more than ten rows on a fresh database; the screenshots (17.4) cover the rest.
+
+---
+
 # Phase 14 — Verification
 
 ### 14.1 Build and test (Claude, both platforms; reported per platform)
