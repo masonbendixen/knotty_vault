@@ -89,6 +89,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - Every seed picture now sits in one of four tables in `seed_app_data.h`, and the tests walk those same tables. The headshots moved off `PopulateInstructors`, and the bootstrap now attaches photos after the instructor rows exist.
   - Added **13.3**: the new headshots are waist-up, and every page cut its square from the middle, taking off the top of the head. The four places a headshot appears now crop from the top.
   - Results: knottyyoga Windows 5389 and Linux 5389, with the same names on both; Angular 3622; all 11 mutations caught. End to end, a fresh install attaches every listed picture and serves every bio intact (13.4). Hand-test steps are in 13.6.
+  - **Later the same day — 13.7, sharp pictures.** Mason's hand-test found the headshots blurry and blocky. The cards were asking for pictures smaller than they show them, so the browser enlarged a crude server-side shrink. Every square headshot and class card now asks for three times its size. That is a page-only change; the server and seed are untouched.
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -2056,6 +2057,32 @@ Uses Phase 1's files.
 4. Click the **Intermediate Partner Acro** card. The picture beside the description is the same one.
 5. **Sign In** as `masonbendixen@gmail.com` / `pass`. The small round picture beside your first name, top right, is your old profile photo, not the new headshot.
 6. **Admin** → **Manage Products** → **Instructors** tile: five rows, each with a round thumbnail showing the face, not the shirt.
+7. *(13.7)* Back on **About** → **Instructors**, every headshot is as sharp as the photo itself: crisp edges and a readable "KNOTTY YOGA" on the shirts, with no blockiness. The same goes for the pictures on **Our Classes**.
+
+### 13.7 Sharp pictures *(ui; added 10/20 after Mason's hand-test)*
+
+Mason's review of 13.6, step 1: the headshots "look like they have been converted to a low res image and then blown up." **They had been.**
+- The card asked the server for a picture fitting a **256 × 256** box. The server only shrinks a picture to fit, so a 3:4 headshot came back **192 × 256**. The card then stretched it to 256 wide, and a 125% display stretched it again, to 320.
+- The server's resampler reaches 192 × 256 from 1500 × 2000 with plain bilinear sampling. At an 8× reduction that reads a few source pixels and skips the rest, which is what made the edges and the shirt lettering jagged.
+- The old headshots hid both: they were smaller and closer to square.
+- Ruled out: every served JPEG is a whole multiple of 1 KB, which looked like truncation. It is Boost GIL padding its last output block after the JPEG's end marker, and each file decodes cleanly.
+
+Tried on the live local server before changing anything: asking it for a **768** box and letting the browser shrink the result to the card is indistinguishable from a careful resize of the original. So the fix is on the page alone, with nothing needed in `server_components`:
+- [x] New `shared/utils/cover-photo-url.ts`: `coverPhotoUrl(table, id, squarePx)` asks for a box **three times** the square the picture fills. That leaves the short side of anything up to 3:2 at twice the square, which is enough for a 2× screen, and the browser does the rest of the shrinking. Its spec checks the factor against a 3:4 and a 3:2 picture.
+- [x] Used everywhere a picture fills a square with `object-fit: cover`:
+
+  | Where | Shown at | Was | Now |
+  |---|---|---|---|
+  | **Instructors** card | 256 | 256 box | 768 box |
+  | An instructor's page | 192 | 256 box | 768 box (the card's own URL, so its download is reused) |
+  | **Favorite Instructors** | 96 | 256 box | 288 box |
+  | **Manage Instructors** thumbnail | 56 | 64 box | 168 box |
+  | **Our Classes** (All Classes) cards | 180 | 256 box (256 × 171 for a 3:2 class photo) | 540 box |
+
+- [x] Each component's spec now checks the new URL; Favorite Instructors gained one.
+- Size: a 576 × 768 headshot is about 190 KB, so the Instructors page now downloads about 1 MB of pictures. The server keeps each size after it is first made, so only the first visitor waits for the resize.
+- Not changed: the server's resampler (`ImageResize` in `server_components`). With the bigger boxes its shrinks are about 2.6×, where bilinear is fine. The header's 32 px profile avatar still asks for a 32 box; it is the old profile photo and too small to notice.
+- No database change, so no recreate: restarting `ng serve` is enough. The new URLs are new files to the browser, so nothing stale is shown.
 
 ---
 
