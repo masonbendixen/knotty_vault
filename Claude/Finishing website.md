@@ -2164,6 +2164,12 @@ The server was never the problem: its requests total about 1.5 s either way.
 
 ---
 
+Mason- Please add new phases and push the existing stuff down. I met with Ryan to get the photos and look at the website and he had some suggestions he would like to see. Please organize these into a phase or phases with related work.
+- In the social links:
+	- Get rid of Twitter from the set of options (just Facebook and Instagram)
+	- Can you convert Facebook/Instagram/Twitter/Bluesky/tiktok can you convert them to the icons for each site instead of just showing Fa In Tw?
+- Can you systemically go through the site, including the user, staff, and admin portals and make sure anytime you build a data driven list, it is paginated? For instance, I know a lot of things in the user portal show purchases, booked sessions, or even the classes for each instructor card an
+
 # Phase 14 — Verification
 
 ### 14.1 Build and test (Claude, both platforms; reported per platform)
