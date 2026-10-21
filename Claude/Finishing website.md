@@ -90,6 +90,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - Added **13.3**: the new headshots are waist-up, and every page cut its square from the middle, taking off the top of the head. The four places a headshot appears now crop from the top.
   - Results: knottyyoga Windows 5389 and Linux 5389, with the same names on both; Angular 3622; all 11 mutations caught. End to end, a fresh install attaches every listed picture and serves every bio intact (13.4). Hand-test steps are in 13.6.
   - **Later the same day — 13.7, sharp pictures.** Mason's hand-test found the headshots blurry and blocky. The cards were asking for pictures smaller than they show them, so the browser enlarged a crude server-side shrink. Every square headshot and class card now asks for three times its size. That is a page-only change; the server and seed are untouched.
+  - **13.8, Our Providers.** Signed out, Caleb's provider card showed a broken image. It asked for his private account photo; it now shows his public instructor headshot, as its bio already did.
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -2058,6 +2059,7 @@ Uses Phase 1's files.
 5. **Sign In** as `masonbendixen@gmail.com` / `pass`. The small round picture beside your first name, top right, is your old profile photo, not the new headshot.
 6. **Admin** → **Manage Products** → **Instructors** tile: five rows, each with a round thumbnail showing the face, not the shirt.
 7. *(13.7)* Back on **About** → **Instructors**, every headshot is as sharp as the photo itself: crisp edges and a readable "KNOTTY YOGA" on the shirts, with no blockiness. The same goes for the pictures on **Our Classes**.
+8. *(13.8)* Sign out. **About** → **Our Providers**: **Caleb Ault**'s card shows his headshot, head at the top, the same picture as on Instructors.
 
 ### 13.7 Sharp pictures *(ui; added 10/20 after Mason's hand-test)*
 
@@ -2083,6 +2085,22 @@ Tried on the live local server before changing anything: asking it for a **768**
 - Size: a 576 × 768 headshot is about 190 KB, so the Instructors page now downloads about 1 MB of pictures. The server keeps each size after it is first made, so only the first visitor waits for the resize.
 - Not changed: the server's resampler (`ImageResize` in `server_components`). With the bigger boxes its shrinks are about 2.6×, where bilinear is fine. The header's 32 px profile avatar still asks for a 32 box; it is the old profile photo and too small to notice.
 - No database change, so no recreate: restarting `ng serve` is enough. The new URLs are new files to the browser, so nothing stale is shown.
+
+### 13.8 Our Providers shows the headshot *(server + ui; added 10/20 after Mason's hand-test)*
+
+Mason: "The photo on the provider page isn't showing up." Signed out, **About** → **Our Providers** showed Caleb's card with a broken image.
+- The card asked for Caleb's **account** photo (`people`). Account photos are deliberately not on the server's public photo list (`PublicPhotoTables` in `main.cpp`), because anyone could then fetch any member's photo by number. So a signed-out visitor got **401 Login required**.
+- The page's own comment claimed `people` was public; it never was. Not caused by Phase 13: Caleb's account photo is the file it always was.
+- The card's bio already came from Caleb's staff profile (`instructors`), which *is* public. The fix takes the picture from the same place: **his instructor headshot**.
+
+- [x] Server: the directory query also returns the profile's id (`instructor_id`, 0 without one). `PublicProviderInfo.hasPhoto` now means that profile has a headshot, and the feed carries `instructor_id`. A provider with no staff profile shows the placeholder.
+- [x] Page: `providerPhotoUrl` builds the headshot's URL at the Instructors card's size (13.7), so it is the file a visitor may already have. The card's square crops from the top (13.3).
+- [x] Tests:
+  - `ProviderDirectoryHelperTest.ThePictureIsTheInstructorHeadshotNotTheAccountPhoto`: an account photo alone shows nothing; a profile gives its id; its headshot is what shows.
+  - `SeedAppDataTest.OurProvidersShowsCalebsHeadshot`, through the page's reader on the real seed.
+  - The feed conversion and the endpoint carry `instructor_id`.
+  - The page's spec checks the URL and the crop, and the local-mode mock carries the id.
+- Account photos stay private: the end-to-end run checks the old URL still answers 401.
 
 ---
 
