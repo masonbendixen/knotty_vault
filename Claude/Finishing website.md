@@ -91,6 +91,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - Results: knottyyoga Windows 5389 and Linux 5389, with the same names on both; Angular 3622; all 11 mutations caught. End to end, a fresh install attaches every listed picture and serves every bio intact (13.4). Hand-test steps are in 13.6.
   - **Later the same day — 13.7, sharp pictures.** Mason's hand-test found the headshots blurry and blocky. The cards were asking for pictures smaller than they show them, so the browser enlarged a crude server-side shrink. Every square headshot and class card now asks for three times its size. That is a page-only change; the server and seed are untouched.
   - **13.8, Our Providers.** Signed out, Caleb's provider card showed a broken image. It asked for his private account photo; it now shows his public instructor headshot, as its bio already did.
+  - After both: knottyyoga Windows 5392 and Linux 5392, same names; Angular 3627; all 8 new mutations caught (13.9).
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -2101,6 +2102,25 @@ Mason: "The photo on the provider page isn't showing up." Signed out, **About** 
   - The feed conversion and the endpoint carry `instructor_id`.
   - The page's spec checks the URL and the crop, and the local-mode mock carries the id.
 - Account photos stay private: the end-to-end run checks the old URL still answers 401.
+
+### 13.9 Verification of 13.7 and 13.8
+- [x] knottyyoga: **Windows: 5392 passed. Linux: 5392 passed.** Same names on both; both programs build on Linux. On Windows every target but the server was built, because Mason's server was running; Linux builds the server.
+- [x] Angular: **3627 passed** (3622, plus 2 for `coverPhotoUrl`, 1 for Favorite Instructors' URL, 1 for the provider card's crop and 1 for the mock's provider id). `tsc`, `ng lint` and `ng build` are clean.
+- [x] End to end, signed out on a fresh install: Our Providers lists Caleb with his profile id and `has_photo`, and his headshot is served at the card's URL. His account photo's URL still answers 401.
+- [x] Every one of the 8 new mutations is caught:
+
+  | # | Broken on purpose | Caught by |
+  |---|---|---|
+  | n5 | Pictures requested at the size they are shown | `coverPhotoUrl` spec |
+  | n6 | The Instructors card asks for a 256 box again | `InstructorsComponent` spec |
+  | n7 | The provider card asks for the account photo again | `ProvidersComponent` spec |
+  | n8 | The provider card crops from the middle | `ProvidersComponent` spec |
+  | n9 | Local mode loses the provider's profile id | `ServerAccessMock` spec |
+  | p1 | The directory checks the account photo again | `ThePictureIsTheInstructorHeadshotNotTheAccountPhoto` |
+  | p2 | The feed drops `instructor_id` | `PublicProviderInfoToKeyValueTable` |
+  | p3 | The query never finds the profile | that test and `OurProvidersShowsCalebsHeadshot` |
+
+  Plus n1–n4 again (the crops), still caught. Every file was restored and the clean runs pass.
 
 ---
 
