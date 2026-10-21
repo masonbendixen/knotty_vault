@@ -2172,7 +2172,12 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - For the home page, for banner images, I'd like to have an option to have the image be centered.
 - For each home page item, I'd like to have checkboxes to show on desktop only and another to show on mobile only. If neither is checked, they show up anywhere (current behavior). I really want this to be based on a width though instead of mobile desktop and have desktop be above a given window width and mobile to be less than that so that a small window on desktop gets the same benefits (and a big tablet gets the desktop experience)
 - The upcoming classes on mobile with a logged in user has No upcoming classes but the calendar icon is clipped
-- Let's get rid of the 
+- Let's get turn off showing memberships on the home page by default (leave the option to manually turn them off later in the admin UI -- this is just the default population of the database)
+- Let's change the Come join the fun section on the home page to link to the memberships page instead of getting started (since we are removing memberships from the homepage by default)
+- What is intro strip? Right now it is just an opaque option to choose for a home page section that shows text and the pride dumbbell. I'd like to have the SVG and text for this editable.
+- It’d like the font for the intro strip text and the New Here? The Get Started… to be the same.
+- Can we have monthly calendar view shrink things down so that it fits without side scrolling?
+- If you click on my schedule in the user portal but don’t have a membership, No eligible classes overlaps with the calendar icon.
 
 # Phase 14 — Verification
 
