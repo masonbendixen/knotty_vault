@@ -88,7 +88,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - All five bios replace the one-line defaults (OQ-15, now resolved). Six slips in them were corrected; **OQ-28** lists each, default keep.
   - Every seed picture now sits in one of four tables in `seed_app_data.h`, and the tests walk those same tables. The headshots moved off `PopulateInstructors`, and the bootstrap now attaches photos after the instructor rows exist.
   - Added **13.3**: the new headshots are waist-up, and every page cut its square from the middle, taking off the top of the head. The four places a headshot appears now crop from the top.
-  - Results: RESULTS_PENDING. Hand-test steps are in 13.6.
+  - Results: knottyyoga Windows 5389 and Linux 5389, with the same names on both; Angular 3622; all 11 mutations caught. End to end, a fresh install attaches every listed picture and serves every bio intact (13.4). Hand-test steps are in 13.6.
 - **v0.21 (10/19/2026)** — **Phase 12 is built.** It is all in knottyyoga and not committed.
   - Each class page names the membership it needs ("Members only: Silver or Gold membership").
   - Signed in, **All Classes** lists all six classes for everyone.
@@ -2028,7 +2028,18 @@ Uses Phase 1's files.
   - **Run again with the old order** (photos before instructors): all five headshots go missing, with five `seed_lookup_missing` lines, and the check fails 10 times. The file was then restored byte for byte.
 
 ### 13.5 Mutation check
-- [ ] Each change broken on purpose, one at a time, and the suite run against it. Every one must fail a test.
+- [x] Each change broken on purpose, one at a time, and the suite run against it. Every one must fail a test. **All 11 caught**, plus the bootstrap-order swap, which only the end-to-end run can see (13.4). Each file was restored and the clean runs pass.
+
+  | # | Broken on purpose | Caught by |
+  |---|---|---|
+  | m1 | No instructor gets a headshot | `PopulateSeedPhotosPutsEachListedFileOnItsRow` |
+  | m2 | Every instructor gets Mason's headshot | `PopulateSeedPhotosPutsEachListedFileOnItsRow` |
+  | m3 | The tier icons are stored as JPEGs | that test and `PopulateSeedPhotosGivesEachMembershipTierItsIcon` |
+  | m4 | The photographs are stored as vectors | `PopulateSeedPhotosPutsEachListedFileOnItsRow` |
+  | m5 | Every class picture lands on Aerial Rope | that test and `PopulateSeedPhotosSkipsPeopleThatDoNotExist` |
+  | m6 | A listed file that isn't in `img/` | `EverySeedPhotoFileExists` (and the attachment test) |
+  | m7 | Tiana's bio goes back to the one-line default | `PopulateInstructorsSeedsAllFiveWithTheirBios` |
+  | n1–n4 | Each of the four headshot squares crops from the middle again | that component's "crops … from the top" spec |
 
 ### 13.6 Hand-testing walkthrough
 
