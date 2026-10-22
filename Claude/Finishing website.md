@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/22/2026
-Version: 0.28
+Version: 0.29
 tags: 
 ---
 # Overview
@@ -83,6 +83,14 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.29 (10/22/2026)** — **Phase 16 is built**, and not committed. All in `ui/`.
+  - **The pager:** one pager, "‹ Previous · 1–10 of 23 · Next ›", now on 48 lists across 27 pages. It replaces the three earlier ones: Blog, Attendance History (now 10 a page) and the admin Blog Posts' Material paginator.
+  - **Many-rows mock:** `knottyyoga.mockManyRows` gives every one of those lists 23 rows.
+  - **Screenshots:** `layout/pagination.spec.ts` photographs page 1 and the last page of each list at 390 and 1280 px, 192 pictures in all. Every one was read. Two problems found there are fixed:
+    - the pager's buttons moved as its label widened
+    - several booked sessions sat border to border
+  - **Results:** Angular **3786** passed; Playwright: pagination 54 and the other layout specs 256 passed; 9 of 9 mutations caught.
+  - **New open questions:** OQ-36 (two pagers close together on My Bookings) and OQ-37 (ten a page in three-column grids).
 - **v0.28 (10/22/2026)** — **Phase 15 is built**, and not committed. All in `ui/`.
   - **15.1:** an empty state's calendar icon keeps its 24 px and sits wholly left of the sentence, on the home page band, My Schedule and every other `.empty-card`.
   - **15.2:** the month calendar fits the screen. Below an 800 px grid, a day shows short class names, three at most, then **+N more**. Tapping a date number opens **Day View** on that date.
@@ -2795,6 +2803,14 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Planned 10/21/2026.** All in `ui/`, no server change (D15).
 
+**Implemented 10/22/2026, not committed.** The pager is on all 48 lists in 16.3 and 16.4, plus "Your booked sessions" (see 16.4).
+- Angular: **3786 passed**. `tsc` for the app, the specs and the Playwright specs, `ng lint` and `ng build` are clean, with the same six size-budget warnings.
+- Playwright: `pagination.spec.ts` **54 passed**, 27 pages at two sizes. The other layout specs at all seven sizes, **256 passed**.
+- Mutations: **9 of 9 caught**.
+- Screenshots: all **192** read, with the findings in 16.5.
+
+**Still to do:** Mason commits, answers OQ-36 and OQ-37 if he wants a change, and hand-tests 16.8.
+
 **What exists** (inventoried 10/21):
 - Only four lists page today:
   - **Blog**: 5 a page, paged on the server
@@ -2820,26 +2836,49 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   | Already paged elsewhere | **Manage Data** | Already pages |
 
 ### 16.1 The pager *(ui: shared/components/list-pager)*
-- [ ] `app-list-pager`: **‹ Previous** · "1–10 of 23" · **Next ›**, with 44 px buttons, hidden when the list fits on one page.
-- [ ] `pagedSlice(items, pageIndex, pageSize)` and a small `ListPaging` state:
+- [x] `app-list-pager`: **‹ Previous** · "1–10 of 23" · **Next ›**, with 44 px buttons, hidden when the list fits on one page.
+  - *As built:* `shared/components/list-pager/`.
+    - **Two ways to drive it:** a list paged in the browser passes its `ListPaging` and its row count; a list paged on the server passes `pageIndex`, `pageSize` and the server's total, and fetches on `pageChange`.
+    - **The label** has a fixed minimum width with even-width digits, so the buttons stay put from page to page (found in the 16.5 screenshots).
+- [x] `pagedSlice(items, pageIndex, pageSize)` and a small `ListPaging` state:
   - it keeps the page in range when the list shrinks: deleting the last row of page 3 goes to page 2
   - it goes back to page 1 when a filter or search changes
   - it brings the list's top into view on a page change, so a phone user isn't left at the bottom
-- [ ] `MAIN_LIST_PAGE_SIZE = 10` and `NESTED_LIST_PAGE_SIZE = 5`, in one place.
-- [ ] **Grouped lists**, such as days or a series' sessions, page over their items. A group cut by a page boundary repeats its heading on the next page.
-- [ ] **One look for every paged list.** The pager replaces the two hand-written ones (**Blog**, **Attendance History**) and **Blog Posts**' Material paginator.
+  - *As built:*
+    - **Shrinking lists:** `ListPaging` stores the page asked for and clamps on every read, so a list that shrinks needs no code of its own, and nothing changes during change detection.
+    - **Filters:** a filter calls `reset()`.
+    - **Scrolling:** the list's top comes back into view only when it has scrolled above the screen.
+- [x] `MAIN_LIST_PAGE_SIZE = 10` and `NESTED_LIST_PAGE_SIZE = 5`, in one place (`list-paging.ts`).
+- [x] **Grouped lists**, such as days or a series' sessions, page over their items. A group cut by a page boundary repeats its heading on the next page.
+  - *As built:* `ListPaging.groups()` and `groupedItemCount()`. A series inside **My Bookings** is one row of that list, with its own pager over its sessions.
+- [x] **One look for every paged list.** The pager replaces the two hand-written ones (**Blog**, **Attendance History**) and **Blog Posts**' Material paginator.
   - All three keep paging on the server.
   - **Attendance History** asks for 10 a page instead of 25.
-- [ ] Specs:
+  - *As built:* Blog no longer shows two disabled buttons when everything fits on one page. Like every list, it shows no pager at all.
+- [x] Specs:
   - the helper: slices, the last partial page, an empty list, and clamping
   - the component: its labels, the ends disabled, hidden on a single page, the event it emits
   - at phone width, one row with no wrapped labels (count the label's lines, per the audit harness's note)
+  - *As built:* `list-paging.spec.ts` (10 tests) and `list-pager.component.spec.ts` (9). The pager's also cover:
+    - a list that shrinks under it
+    - server mode
+    - bringing the list's top back into view
+    - the buttons staying put
+  - **Every paged list's own spec**, 48 lists, checks:
+    - with 23 rows: a page of rows, "1–N of 23", Next and the last page
+    - with a short list: no pager
+    - where a list has them: a filter going back to page 1, and a removal on the last page showing the page before
 
 ### 16.2 Many-row mock data *(ui: ServerAccess.mock, e2e harness)*
-- [ ] `knottyyoga.mockManyRows=1` in local storage makes every list method the Phase 16 and 17 pages use return 23 rows. That is three pages at 10, and five at 5, so every page can be photographed mid-list. It is off by default, so no existing spec or audit changes. Tests in `ServerAccess.mock.spec.ts`.
+- [x] `knottyyoga.mockManyRows=1` in local storage makes every list method the Phase 16 and 17 pages use return 23 rows. That is three pages at 10, and five at 5, so every page can be photographed mid-list. It is off by default, so no existing spec or audit changes. Tests in `ServerAccess.mock.spec.ts`.
+  - *As built:* `MOCK_MANY_ROWS_STORAGE_KEY` (`MANY_ROWS_KEY` in `harness.ts`, documented in the audit README).
+    - **How the rows are made:** `seedManyRows()` grows each list from its seeded rows, with numbered names that sort in order. Lists the mock builds on read (an instructor's classes, upcoming classes, sign-up offerings, shared memberships) check the flag in their own method.
+    - **Audit data:** it is meant to be used without the audit data, whose records would add to some counts.
+    - **Test:** one test counts all 41 list methods at 23 with the flag, and checks two stay short without it.
+    - **Phase 17's lists** join it then.
 
 ### 16.3 Public pages
-- [ ] Each of these gets the pager:
+- [x] Each of these gets the pager:
 
   | Page | List | A page |
   |---|---|---|
@@ -2857,8 +2896,16 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   | **Blog** | Posts (server-paged, new look) | 5 |
   | Home page | **Series & workshops**; signed in, **Upcoming classes** | 5; 5 |
 
+  - *As built*, in each list's own spec:
+    - **Shared components:** the "Series & workshops" card and the tier cards page inside their shared components, so `/classes`, `/shop/subscriptions` and the home page get the same pager.
+    - **Series & workshops** goes back to page 1 only when its list really changes: its hosts pass a new array on every screen update.
+    - **All Classes:** a tag filter goes back to page 1.
+    - **A class page:** both lists go back to page 1 when the page moves to another class. The five-date cap and its "Showing the next N dates" note are gone: every date can be reached, five a page.
+    - **A product's page:** a variant chosen on page 2 stays chosen.
+  - *Found:* an instructor's page doesn't reload when the address changes from one instructor to another. That predates Phase 16 and isn't changed here.
+
 ### 16.4 The user portal
-- [ ] Each of these gets the pager:
+- [x] Each of these gets the pager:
 
   | Page | List | A page |
   |---|---|---|
@@ -2877,16 +2924,54 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   | **Notifications** | Pending sign-up reminders | 5 |
   | **Favorite Instructors** | Instructors | 10 |
 
+  - *As built:*
+    - **Added:** "Your booked sessions", the list above **Upcoming** on **My Schedule** and on the home band, also pages, at 5. With many bookings it was a long unpaged list on both. It is one of several sections, so it takes 5 (OQ-32).
+    - **"Booked for Someone Else"** on **My Purchases** stays unpaged, as planned.
+    - **Paging survives a reload:** each purchase's and each series' paging is kept by its id, so it survives the page reloading its data after a cancel or a seat change. A series' open or closed state survives paging away and back.
+    - **Removing a row:** on **Saved Cards**, **My Bookings**, **Notifications** and **Favorite Instructors**, removing the only row on the last page shows the page before (each has a spec).
+    - **New spec file:** **Saved Cards** had none, so `card-management.component.spec.ts` is new.
+    - **Purchase dividers:** a purchase's entitlements used `:last-child` to drop the last divider. The pager is now the card's last child, so it is `:last-of-type`, with a test.
+
 ### 16.5 Screenshots (Ryan's check)
-- [ ] New `e2e/mobile-audit/layout/pagination.spec.ts` visits every page in 16.3 and 16.4 with many-row data, at 390 and 1280 px. On each it checks:
+- [x] New `e2e/mobile-audit/layout/pagination.spec.ts` visits every page in 16.3 and 16.4 with many-row data, at 390 and 1280 px. On each it checks:
   - no more rows than the page size
   - the pager reads "1–10 of 23"
   - **Next** moves on to "11–20", and the last page holds 3
   - the audit's overlap and overflow checks pass
-- [ ] Page 1 and the last page of each are saved to `ui/e2e/mobile-audit/output/pagination/`. Claude reads every one, lists anything that looks wrong here, and keeps the folder for Mason and Ryan.
+  - *As built:*
+    - **What it covers:** 27 pages and 48 lists, plus **Blog Posts** ("of 25": its four seeded posts too).
+    - **How it finds each list:** by its `data-paged-list` key, its rows by `data-paged-row`, and its pager as that element's own child, so a nested list is never confused with its parent.
+    - **Each list from a fresh load**, since the one before it is left on its last page.
+    - **The audit's checks** run from the top of the page, as the audit itself does.
+- [x] Page 1 and the last page of each are saved to `ui/e2e/mobile-audit/output/pagination/`. Claude reads every one, lists anything that looks wrong here, and keeps the folder for Mason and Ryan.
+  - *As built:* **192 pictures, all read.**
+    - **Capture:** the first take was blank below the first screenful, because the app scrolls inside its own frame. Each picture is now taken with the window as tall as the page, the pointer off the rows, and a 16 px margin. Every pager shows, on one row, with its disabled button greyed.
+  - **Fixed here**, each with a test:
+    1. **The pager's buttons moved** as the label widened from "1–5 of 23" to "21–23 of 23". The label now keeps one width.
+    2. **Several booked sessions sat border to border**, the first against its heading. They now have the 8 px gap a day's classes have.
+  - **Left for OQ-36 and OQ-37:**
+    - two pagers close together on **My Bookings**
+    - one card alone on the last row of the three-column grids
+  - **Pager details**, cosmetic and left as they are:
+    - **Centred under left-aligned content:** the pager is centred under the list, so under content that doesn't fill the width it sits off to the right: an instructor's class chips, the Gallery's album tiles (narrow because their photos don't load in the mock), and a product's variants.
+    - **The gap above the pager** is about 16 px on most lists and 32–50 px where the rows carry their own bottom margin (**Our Providers**, **Upcoming classes**, **Workshops & Series**, Gallery, **Our Location**).
+    - **Enabled looks quieter than disabled:** the enabled buttons use the site's grey "quiet" style and the disabled ones a plain outline (the global button design, unchanged).
+  - **Seen on the pages, unrelated to paging** (they predate Phase 16):
+    - **Blog Posts on a phone:** the table is wider than the screen, with the status badges cut off and the date and action columns off-screen. On a desktop its edit and delete icons stack, and its columns change width from page to page.
+    - **Narrow text breaks on a phone:**
+      - a number split from its unit ("90 / minutes")
+      - "AM" alone on a line in entitlement dates
+      - "Main / Room"
+      - "VISA •••• 4002 |" ending in a lone bar
+      - a series' title squeezed into two columns on **My Bookings**
+    - **Faint expand chevrons** on **My Bookings** and **My Purchases**.
+    - **Uneven card heights:** cards without a photo stretch to match one with a photo (**Services**, **Upcoming Events**), and **Our Providers**' "View profile" buttons sit at different heights.
+    - **Saved Cards:** the default card's pencil sits where the others' star is.
+    - **My Schedule:** day headings start at the band's edge, while the cards below are indented.
+    - **Our Location on a desktop:** maps for locations without a photo are full-width and about 730 px tall.
 
 ### 16.6 Mutation check
-- [ ] Planned:
+- [x] Planned:
   - the pager showing every row
   - a page size of 25
   - the pager showing on a single page
@@ -2894,11 +2979,18 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - deleting a page's last row leaving an empty page
   - a cut group not repeating its heading
   - **Attendance History** asking for 25
+  - *As built:* **all seven caught**, plus two for the 16.5 fixes: the label's fixed width, and the booked sessions' gap. That is 9 of 9.
+    - The tests that caught each: the helper's and the pager's specs, and the **Instructors**, **All Classes**, **Saved Cards**, **Upcoming classes** and **Attendance History** specs.
+    - A clean run passed 112.
 
 ### 16.7 Verification
-- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
-- [ ] The pagination spec at both sizes.
-- [ ] No server change.
+- [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
+  - *As built:* `ng test` **3786 passed** (3669 + 117). `tsc` for the Playwright specs too. All clean, with the same six size-budget warnings.
+  - **One test changed** on the way: 14.10's headline sweep built 57 iframes and outran Jasmine's 5-second limit in the full suite. It now reads one iframe resized per width, through the new `acrossViewports()` in `shared/testing/in-viewport-of.ts`, which has its own spec.
+- [x] The pagination spec at both sizes.
+  - *As built:* **54 passed**. The other layout specs at all seven sizes: **256 passed**.
+  - Both ran against a dev server started by hand, as in 15.4.
+- [x] No server change.
 
 ### 16.8 Hand-testing walkthrough
 
@@ -3220,6 +3312,19 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 - → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
+
+**OQ-36 — Two pagers close together on My Bookings.** *(16.5's screenshots, 10/22.)*
+- A series on **My Bookings** pages its own sessions, five at a time. When the series is the last row of the page, its pager ("1–5 of 23") sits about 40 px above the list's own pager ("21–23 of 23"). Both look the same, so it is easy to press the wrong one.
+- This only happens with a series of more than five sessions on the last page of more than ten bookings.
+- **Default:** leave it. Each pager is inside the box it moves.
+- **Alternative:** a pager inside a card names what it counts, "Sessions 1–5 of 23". Every other pager stays as it is.
+- Say which.
+
+**OQ-37 — Ten a page in a three-column grid.** *(16.5's screenshots, 10/22.)*
+- On a desktop, the card grids of **Memberships** (tiers, other products), **Upcoming Events**, **My Skills** and **Services** have three columns, so a full page of ten leaves one card alone on a fourth row.
+- **Default:** keep ten everywhere (OQ-32). One rule is easier to explain than a size per layout.
+- **Alternative:** nine or twelve a page for those grids only. Every page then ends on a full row on a desktop, but a phone (one column) sees a different count from the other lists.
+- Say which.
 
 ### Resolved
 
