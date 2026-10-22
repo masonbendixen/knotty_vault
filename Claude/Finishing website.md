@@ -2908,6 +2908,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** no badge on the cards. Every class needs a membership, so for a visitor or a non-member all six cards would carry the same badge. The class page, one click away, names the membership and the skill.
 - **Alternative:** the weekly schedule's badge on each card, worked out for the viewer. For example, a Silver member would see Beginner Knotty Yoga unmarked and the other five marked. The class list would then have to carry each viewer's access: a change to the server and to the page.
 - Say which.
+- Mason- The default is fine.
 
 **OQ-27 — An unapproved Gold member reads "Members only: Gold membership".** *(Found implementing 12.1, 10/19.)*
 - The class page's **Pricing** says "Members only" whenever the viewer can't attend, whatever the reason.
@@ -2917,6 +2918,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** leave it. The Required Skills box says what is actually missing.
 - **Alternative:** when the viewer has the membership and lacks only the approval, **Pricing** says so instead, for example "Included with your membership once an instructor approves you". The server already tells the two apart (the schedule badge's "members only" versus "needs a skill"). It would have to pass that on, and the page would need a fourth wording.
 - Say which.
+- Mason- I like the alternative idea better.
 
 **OQ-28 — Six slips corrected in the bios.** *(Phase 13, 10/20.)*
 - The plan says bios are seeded verbatim. Six things in the pasted text looked like slips, so the seed corrects them and the pasted text above is left as it was:
