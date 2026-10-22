@@ -2957,6 +2957,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** the "New here?" line takes the intro strip's style (14.5).
 - **Alternatives:** the intro sentence takes the plain style instead; or both use the display font, each keeping its own size.
 - Say which.
+- Mason- Roboto
 
 **OQ-32 — Paging: page sizes and the lists left alone.** *(Phases 16–17.)*
 - **Default sizes:** a page's main list shows 10, and a list inside a card or one of several sections on a page shows 5. The pager hides when a list fits on one page.
@@ -2971,16 +2972,19 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **Manage Data**
   - a price schedule's embedded table, a library control that already pages 20 at a time
 - **Alternative:** name any list above that should page anyway, or any list that should get 5 instead of 10.
+- Mason- I'm fine with the default
 
 **OQ-33 — The week view still scrolls sideways on a phone.** *(15.2.)*
 - Ryan asked about the month view, and 15.2 fixes only that one. **Week View**'s seven columns of hours also need about 800 px, and still scroll sideways on a phone.
 - **Default:** leave it. Phones open on **Day View**, and a week of hourly columns can't be read at 50 px a day.
 - **Alternative:** the same treatment as the month: seven narrow columns with short names.
+- Mason- I'm okay with the default.
 
 **OQ-34 — Uploading the badge as an SVG needs a server_components release.** *(14.1.)*
 - An admin can't upload an SVG today: the framework's upload refuses it, although the picker offers it. So 14.1 changes `server_components`, with its own commit and push, then a pin bump and gates in both apps, as 11.11 did.
 - **Default:** do it. The badge is an SVG, Ryan asked for the SVG to be editable, and the same fix lets the Get Started artwork be replaced with another SVG.
 - **Alternative:** accept PNG and JPEG only for the badge. There is then no `server_components` change, and a new badge loses the sharpness a vector keeps at every size.
+- Mason
 
 **OQ-35 — Where "desktop" starts: 768 px?** *(D16.)*
 - **Default:** 768 px. That is the site's own phone line, and where the calendar already switches.
