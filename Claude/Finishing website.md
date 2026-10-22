@@ -2932,6 +2932,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** keep the corrections.
 - **Alternative:** seed any of them back exactly as pasted. Each is one string in `kSeedInstructors`, or an edit under **Admin** → **Manage Products** → **Instructors** once deployed.
 - Say which, and especially whether 6 is right.
+- Mason- Keep the corrections.
 
 **OQ-29 — Which home page picture should centre?** *(Ryan's review, 10/21.)*
 - Ryan asked for "an option to have the image be centered" for banner images. On a wide screen, three home page pictures could be meant:
@@ -2940,7 +2941,8 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - The **photo carousel**: on 10/21, at 1400 and at 1920 px wide, its four photos sat at the left, ending at 1120 px, with the rest of the row empty.
 - **Default:** the carousel, the one picture visibly not centred. 14.2–14.5 add **Centre the photos when they don't fill the width** to a carousel row, and the seed turns it on.
 - **Alternative:** if Ryan meant the top picture, "centred" needs a description: the photo in the middle with the words over it, perhaps. Say what it should look like.
-- Say which.
+- Mason- We have a banner image with the text Get into the best shape of your life. Things we want changed:
+	- I don't want THE RIGHT WAY. on a separate line / section. Just move that text appended to the GET INTO THE BEST SHAPE
 
 **OQ-30 — The studio's real Facebook and Instagram pages.**
 - The seeded links are the two sites' front pages (`https://facebook.com`, `https://instagram.com`), so today's icons lead nowhere in particular.
