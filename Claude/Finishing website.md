@@ -2425,11 +2425,13 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - a centred top picture puts its headline under the picture at desktop width, and asks for the taller box; an uncentred one keeps the headline over it
   - the intro strip draws the row's text and badge, with the badge's description
   - both text lines compute to the same font family and weight, and the family is the body font
-- [ ] Playwright, new `e2e/mobile-audit/layout/home.spec.ts`, at 390 and 1280 px:
+- [x] Playwright, new `e2e/mobile-audit/layout/home.spec.ts`, at 390 and 1280 px:
   - a desktop-only row is absent on the phone and present on the desktop, and a mobile-only row the reverse
   - exactly one top picture shows at each width: the desktop one at 1280 px, and the mobile one at 390 px
   - the screenshots are kept for 14.9
-  - *As built:* the spec is written, at 390, 768 and 1280 px, plus a window resized across the line. 768 checks that "wide" starts at exactly 768. Screenshots go to `e2e/mobile-audit/output/home/`.
+  - *As built:* at 390, 768 and 1280 px, plus a window resized across the line. 768 checks that "wide" starts at exactly 768.
+    - The mock app has no pictures, so the spec serves the seed's own files.
+    - Screenshots of the band and of the whole page are in `ui\e2e\mobile-audit\output\home\`.
 
 ### 14.6 Brand icons in the footer *(ui: shared/components/footer)*
 - [x] The footer draws each social link as its brand's icon instead of the first two letters of its label (`footer.component.ts:27`).
@@ -2483,13 +2485,26 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 ### 14.8 Verification
 - [ ] `server_components` gates on both platforms, then knottyyoga and CommunityFinder against the new pin: Windows and Linux, same test names.
+  - [x] **`server_components`: Windows 1900 passed. Linux 1900 passed.** That is 1895 plus the 5 new tests.
+  - [x] **knottyyoga, before the pin bump.**
+    - **Linux: 5404 passed**, built against the local `server_components` checkout, with both executables built.
+    - **Windows: 5399 passed**, on the pinned SHA. The server executable wasn't rebuilt there because it was running; the tests, the database helper and the test helper were.
+    - The names match except for the five new `server_components` tests, which only the local checkout has. Windows picks them up with the pin bump.
+  - [ ] After Mason pushes `server_components`: bump the pin in knottyyoga and CommunityFinder, and run both apps' pinned gates on both platforms.
 - [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
-- [ ] **End to end:** `--install_schema` into a throwaway database, then the real server.
+  - [x] `tsc` (app, specs and the Playwright specs), `ng lint` and `ng build` are clean, with the same six size-budget warnings as before.
+  - [x] Playwright, on a dev server that had built cleanly: `home.spec.ts`, `public-tap-targets.spec.ts` and `header.spec.ts` at every size, **28 passed**. The home spec serves the seed's own pictures to the page, so "the headline is over the picture" is checked against a real picture.
+  - *Found on the way:* `ui/.angular/cache` held a stale stylesheet with no `xl:` classes, so the header could not switch to its desktop bar. That broke `header.spec.ts` on a dev server Playwright started itself. Clearing the cache and starting a fresh server fixed it, and none of it was Phase 14's code. If the header ever looks wrong under `ng serve`, clear that folder.
+- [x] **End to end:** `--install_schema` into a throwaway database, then the real server. *Both passes PASS (scratchpad `phase14_e2e.sh`).*
   - Signed out, the home feed has no membership row, and the banner points to `/shop`.
-  - It has two hero rows. The mobile-only one's picture is served at 2048 × 969 when asked for in the 2048 × 2048 box.
+  - It has two hero rows. The mobile-only one's picture is served whole when asked for in the 2048 × 2048 box.
+    - *As built:* it is served at 800 × 379: the server's 800 px cap, in the photo's own shape. The band's 2048 × 624 box would have served it at 513 × 243.
+    - The desktop hero is served at 800 × 243 under the same cap, so on a wide screen it is shown at about one and a half times that width. That predates Phase 14 and is not changed here.
   - The intro row's badge is served as an SVG.
   - Signed in as an admin, an SVG uploaded through the endpoint comes back byte for byte.
+    - *As built:* through the real middleware, CSRF included. PNG bytes labelled `svg` get a 400, and the stored badge is unchanged.
   - `--migrate` on a database from before Phase 14 adds the three columns.
+    - *As built:* the three columns are dropped from a fresh install, then `--migrate` reports success, adds all three back and records 0012 in the ledger. Every row in the feed then carries the three, all off.
 
 ### 14.9 Hand-testing walkthrough
 
