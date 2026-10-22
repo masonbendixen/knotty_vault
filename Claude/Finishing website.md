@@ -2299,7 +2299,9 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 **Planned 10/21/2026; updated 10/22** with Mason's answers to OQ-29, 30 and 31. One `server_components` change (14.1), with its own push and pin bump as in 11.11. The rest is knottyyoga.
 
 ### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
-- [ ] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
+- [x] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
+  - *As built:* the "is it really an SVG" check is `ImageHelper::IsSvgDocument`, and `UploadAndAssociatePhoto` applies it to every vector upload. It runs in the business layer rather than the endpoint, so no other path can store a raster labelled `svg` either; the endpoint turns its refusal into the 400.
+  - It also skips a `<!DOCTYPE>`, including Illustrator's "with entities" form, whose internal subset carries `>` characters of its own. The seeded badge's own head, an XML declaration then an Illustrator comment, passes.
   - **Why.** The photo picker (`@honuware/ui/photos`) already offers SVG files and sends them as `svg`, and the server refuses them with "Unsupported image type. Must be 'jpeg' or 'png'". So today no admin can upload the intro badge (14.4), or replace the seeded Get Started artwork with another SVG.
   - **The body must be SVG text.** After an optional byte-order mark, whitespace, an XML declaration and comments, its first element must be `<svg`. Anything else sent as `svg` is refused with 400, so a mislabelled PNG can't be stored as a vector.
   - **Stored as it came, as a vector.** `ImageHelper::UploadAndAssociatePhoto` already accepts vectors, and `get_scaled_photo` already returns an SVG unscaled, with `nosniff`.
@@ -2307,14 +2309,15 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     - every page draws these pictures with `<img>`, which runs nothing
     - opened directly, production's site-wide CSP (`script-src 'self'`) blocks any script inside
     - only someone who can already edit the row may upload (`RequireTableWriteAccess`)
-- [ ] Tests in `upload_photo_test.cpp`:
+- [x] Tests in `upload_photo_test.cpp`:
   - an SVG uploads and reads back byte for byte, as `image/svg+xml`, through the scaled-photo endpoint
   - PNG bytes labelled `svg` are refused, and nothing is stored
   - `gif` is still refused
+  - *As built:* the first two are new (`UploadPhotoSvgReadsBackByteForByte`, `UploadPhotoPngLabelledSvgIsRefused`), and the existing `UploadPhotoUnsupportedType` already covers `gif`. Three more are in `image_helper_test.cpp`: what may come before the root, what is refused (a PNG, a JPEG, an HTML page with an inline SVG, `<svgfoo`, unterminated constructs), and the upload path refusing a PNG labelled `svg` with nothing stored.
 - [ ] Ship as 11.11 did. Mason commits and pushes `server_components`. knottyyoga and CommunityFinder then pin the new SHA, and both apps' gates pass on both platforms.
 
 ### 14.2 Three new switches on a home section *(knottyyoga: db_schema, migration, admin metadata)*
-- [ ] `home_sections` gains three booleans. All default to FALSE, so every existing row behaves as today. They are named like the four `hidden_when_*` flags beside them.
+- [x] `home_sections` gains three booleans. All default to FALSE, so every existing row behaves as today. They are named like the four `hidden_when_*` flags beside them.
 
   | Column | Editor label (14.4) | Meaning |
   |---|---|---|
@@ -2322,32 +2325,37 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   | `hidden_on_wide_screens` | **Mobile only** | Hidden in windows 768 px wide and wider |
   | `image_centered` | **Centre the picture** | A top-picture row is laid out around the middle: its headline goes under the picture, centred, at every width (14.5, OQ-29) |
 
-- [ ] Migration `app/0012_home_sections_screen_width_and_centering`: `ADD COLUMN IF NOT EXISTS` for each column.
+- [x] Migration `app/0012_home_sections_screen_width_and_centering`: `ADD COLUMN IF NOT EXISTS` for each column.
   - Test, modelled on `HiddenWhenNotMemberAddsTheColumnAndIsIdempotent`: run it twice on a database without the columns, then once on a fresh one.
-- [ ] Admin metadata in `create_database.cpp`: `PopulateAdminColumnDataInfo` and `PopulateAdminColumnFriendlyNames` entries for all three.
+  - *As built:* `HomeSectionsScreenWidthAndCenteringAddsTheColumnsAndIsIdempotent` also checks that a row already there gets `f` for all three, and writes a row with all three on and reads it back through the home page's reader.
+- [x] Admin metadata in `create_database.cpp`: `PopulateAdminColumnDataInfo` and `PopulateAdminColumnFriendlyNames` entries for all three.
   - `home_sections` is already a top-level admin table, so the foreign keys hold. `create_database_test`'s metadata check covers it.
-- [ ] Read path. `GetActiveHomeSections` is `SELECT *`, so the columns reach `/api/home_sections` with no code change. Tests:
+- [x] Read path. `GetActiveHomeSections` is `SELECT *`, so the columns reach `/api/home_sections` with no code change. Tests:
   - in `home_sections_test.cpp`: a row written with each flag reads back with it
-  - in the endpoint's test: the three fields arrive as booleans
+  - in the endpoint's test: the three fields arrive, each on its own row. Like the four flags beside them they cross the wire as `t`/`f`; the page's network layer turns them into booleans.
+- [x] **Added: `HomeSectionExtras` carries the three, and the page-content bundle exports and imports them.** Without that, a theme export and re-import would have lost **Desktop only** from both seeded heroes. Test: `PageContentBundleSectionTest.ScreenWidthAndCenteringRoundTrip`.
+- [x] **Added: `HomeSections::SetHomeSectionActive`**, which switches a row on or off without touching anything else on it. The seed needs it for the membership row (14.3), because `AddHomeSection` always creates an active row. Test: `SetHomeSectionActiveRetiresAndRestoresOnlyThatRow`.
 
 ### 14.3 Seed *(create_database.cpp `PopulateHomeSectionsImpl`; app_secret_values.cpp)*
-- [ ] **Membership tiers off by default.** The row is still seeded, with `active` false, so **Page Content** can turn it on with "Show this section on the home page".
-- [ ] **"Come join the fun!" links to Memberships.** The link becomes `/shop`, the page the top nav's **Memberships** opens, labelled **See memberships**. Today it is `/start`, labelled "Get started".
-- [ ] **Two top pictures, one for each width** (OQ-29).
+- [x] **Membership tiers off by default.** The row is still seeded, with `active` false, so **Page Content** can turn it on with "Show this section on the home page".
+- [x] **"Come join the fun!" links to Memberships.** The link becomes `/shop`, the page the top nav's **Memberships** opens, labelled **See memberships**. Today it is `/start`, labelled "Get started".
+- [x] **Two top pictures, one for each width** (OQ-29).
   - **One headline.** "The right way." stops being a separate red line. The title is "Get into the best shape of your life, the right way." and the body is empty. Both rows take it from one constant, so they can't differ.
   - **Today's row becomes desktop only** (`hidden_on_narrow_screens`). It keeps `home_hero.jpg`, with the people on the left, and is not centred.
   - **A new row, mobile only,** at ordinal 25, so it sits in the same place on the page. It has `hidden_on_wide_screens` and `image_centered`.
     - Its picture is Mason's new photo, `C:\Users\mason\Downloads\bd1ac730-677f-4471-8cfd-0b1080081126.jpg`: the same two people, standing in the middle of a grey background.
     - It is copied in as `src/database_helper/img/home_hero_mobile.jpg`. At 2048 × 969 and 77 KB it needs no conversion.
     - The whole `img/` folder is already copied beside the executables, so there is no CMake change. The copy only happens on a relink, though, so copy the file there by hand too ([[gotcha_seed_img_copy_is_post_build]]).
-- [ ] **The intro row carries its own content:**
+    - *As built:* the copy is byte for byte, checked by hash. Both executables relinked in this phase, so their `img/` copies have it.
+- [x] **The intro row carries its own content:**
   - **Body:** the sentence, from the same constant as the `site_hero_headline` default, so the two can't differ.
   - **Title:** "This studio is a designated safe space", the badge's description for screen readers. Today it is hardcoded in the template.
   - **Photo:** `SafeSpace_icon.svg`, copied from `ui/src/assets/svg/` into `src/database_helper/img/` and attached as `svg`.
-- [ ] **Social links: Facebook and Instagram only, at the studio's own pages** (`app_secret_values.cpp:61`, OQ-30):
+  - *As built:* the seed file is named `safe_space_badge.svg`, after the img folder's snake_case names. The shared constant is `App::kSiteHeroHeadlineValue`, moved into `app_secret_values.h`.
+- [x] **Social links: Facebook and Instagram only, at the studio's own pages** (`app_secret_values.cpp:61`, OQ-30):
   - `Facebook|https://www.facebook.com/KnottyYoga/`
   - `Instagram|https://www.instagram.com/knottyyoga`
-- [ ] Tests, through the readers the pages use (D4):
+- [x] Tests, through the readers the pages use (D4):
   - `create_database_test`, after `PopulateHomeSections`: `GetActiveHomeSections` has no `membership` row, and the full list has it, inactive.
   - The banner's link and label.
   - The intro row's body and title, and its photo is the SVG byte for byte, typed `svg`, read through the photo reader.
@@ -2357,49 +2365,62 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     - the other is mobile-only and centred, with `home_hero_mobile.jpg` byte for byte
     - no other row is desktop-only, mobile-only or centred
   - The social-links value, read through the site-content reader: exactly the two lines above.
+  - *As built:* the home rows are one test, `CreateDatabaseTest.SeededHomePageCarriesRyansReview`. The existing order test now expects two heroes in second and third place. The social links are `AppSecretValuesTest.SocialLinksAreTheStudiosFacebookAndInstagramPages`, read through `Branding::LoadSiteContent`.
 
 ### 14.4 Page Content editor *(ui: pages/manage/page-content)*
-- [ ] **Two more toggles** under the existing four. They are slide toggles like their neighbours, not checkboxes:
+- [x] **Two more toggles** under the existing four. They are slide toggles like their neighbours, not checkboxes:
   - **Desktop only — hidden in windows narrower than 768 px**
   - **Mobile only — hidden in windows 768 px and wider**
 
   With both on, a warning says nobody will ever see the section, as the membership pair already does. The row list shows **Desktop only** and **Mobile only** badges, as it shows **Signed-in only**.
-- [ ] **Hero band rows** get a **Centre the picture** toggle, with the hint "For a picture whose subject stands in the middle: the headline goes under it, centred."
-- [ ] **Intro rows** become editable like a content block:
+  - *As built:* the width pair has a warning of its own, which says why: every window is either narrower than 768 px or not.
+- [x] **Hero band rows** get a **Centre the picture** toggle, with the hint "For a picture whose subject stands in the middle: the headline goes under it, centred."
+  - *As built:* saving any other kind writes `image_centered` false, so the flag can't sit set on a row where nothing reads it.
+- [x] **Intro rows** become editable like a content block:
   - an **Image** upload, labelled **Badge** (SVG, PNG or JPEG)
   - **Body**, labelled **Text**
   - **Title**, with the hint "Describes the badge for people using a screen reader."
-- [ ] **Each built-in kind says what it is.** One line under **Kind** describes the chosen kind, for example "Intro strip: a sentence with a badge under it". This answers Ryan's question in the editor itself. It is one map of eleven short lines, and the same opacity applies to every built-in kind.
-- [ ] **One place to edit the intro strip:**
+  - *As built:* no link fields, since the strip has no button.
+- [x] **Each built-in kind says what it is.** One line under **Kind** describes the chosen kind, for example "Intro strip: a sentence with a badge under it". This answers Ryan's question in the editor itself. It is one map of eleven short lines, and the same opacity applies to every built-in kind.
+  - *As built:* twelve lines, one per kind, content blocks included.
+- [x] **One place to edit the intro strip:**
   - **Site Theme** loses "Home intro sentence" (**Copy**) and "Home badge image URL" (**Brand basics**).
   - `SiteConfig` drops `heroHeadline`, `heroImageUrl` and `heroImageAsset`.
   - The framework's `site_hero_*` keys stay: CommunityFinder shares them. They are simply unused here.
-- [ ] Specs:
+  - *As built:* the two keys join `site_about_markdown` in Site Theme's `NOT_EDITABLE_HERE` list, which the slot-coverage spec reads.
+  - `ui/src/assets/svg/SafeSpace_icon.svg` is left in place, though nothing reads it now.
+- [x] Specs:
   - each new control shows for its kinds only, and saves its column
   - the both-on warning, and the two badges
   - the kind descriptions
   - the two Site Theme fields are gone
 
 ### 14.5 Home page *(ui: home-page and its sections)*
-- [ ] **Desktop only / Mobile only** (D16). `isVisible` drops `hidden_on_narrow_screens` rows below 768 px, and `hidden_on_wide_screens` rows from 768 px up.
+- [x] **Desktop only / Mobile only** (D16). `isVisible` drops `hidden_on_narrow_screens` rows below 768 px, and `hidden_on_wide_screens` rows from 768 px up.
   - One `matchMedia('(width >= 768px)')` with a change listener decides it, so narrowing or widening a window switches the sections live.
   - A hidden section is not drawn at all, so a desktop-only picture costs a phone nothing.
   - The width is the calendar's (`BELOW_MD_MEDIA_QUERY`, `calendar.types.ts:32`). It moves to `shared/utils/` so both read one constant.
-- [ ] **A centred top picture** (`home-hero-section`, OQ-29). With `image_centered` on:
+  - *As built:* `shared/utils/breakpoints.ts`, which `calendar.types.ts` re-exports, so the calendar's imports are unchanged.
+- [x] **A centred top picture** (`home-hero-section`, OQ-29). With `image_centered` on:
   - the picture still spans the band
   - the headline goes under it, centred, at every width
   - the picture is requested in a 2048 × 2048 box rather than the 2048 × 624 band, so a taller picture like the mobile one isn't shrunk to the band's height ([[gotcha_scaled_photo_box_size]])
+  - *As built:* the server caps every scaled picture at 800 × 800 (`image_max_public_scaled_width`/`_height`), so the mobile picture comes back 800 × 379. Fitted to the band's box it would have been about 515 × 244.
 
   With it off, nothing changes: from 768 px up the headline sits over the picture's right half, and below that it sits under it, aligned left.
   - **Why the headline moves.** A centred subject leaves no empty side for the words, so over the picture they would cover the people.
   - The photo strip is unchanged. OQ-29's default had guessed it was the picture meant.
-- [ ] **The intro strip** draws the row's **Text** and **Badge** instead of the two Site Theme settings. The badge's description is the row's **Title**. A row with no badge shows the sentence alone.
-- [ ] **One font** (OQ-31: Roboto).
+- [x] **The intro strip** draws the row's **Text** and **Badge** instead of the two Site Theme settings. The badge's description is the row's **Title**. A row with no badge shows the sentence alone.
+  - *As built:* the badge is asked for at three times its 142 px width. A badge that fails to load is removed, rather than left as a broken-image mark.
+- [x] **One font** (OQ-31: Roboto).
   - The intro strip's sentence takes the "New here? …" line's lettering: the body font (`--font-body`, which is Roboto in the seed), at regular weight. Until now it used the display font, semibold.
   - One shared class sets both lines, so they can't drift apart again.
   - Each line keeps its own size. The intro sentence stays larger, as it is the strip's only text.
-- [ ] **The local-mode mock's home rows match the seed**: the two top pictures, one desktop-only and one mobile-only.
-- [ ] Specs:
+  - *As built:* the shared class is the existing global `.din`, which the "New here?" line already used.
+- [x] **The local-mode mock's home rows match the seed**: the two top pictures, one desktop-only and one mobile-only.
+  - *As built:* the rest of 14.3 too: the intro row's copy, the banner's link and the membership row switched off.
+  - So the Playwright tap-target spec now finds one "View all" link on the home page, not two.
+- [x] Specs:
   - visibility at each width, with `matchMedia` stubbed, including a live change
   - a centred top picture puts its headline under the picture at desktop width, and asks for the taller box; an uncentred one keeps the headline over it
   - the intro strip draws the row's text and badge, with the badge's description
@@ -2408,9 +2429,10 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - a desktop-only row is absent on the phone and present on the desktop, and a mobile-only row the reverse
   - exactly one top picture shows at each width: the desktop one at 1280 px, and the mobile one at 390 px
   - the screenshots are kept for 14.9
+  - *As built:* the spec is written, at 390, 768 and 1280 px, plus a window resized across the line. 768 checks that "wide" starts at exactly 768. Screenshots go to `e2e/mobile-audit/output/home/`.
 
 ### 14.6 Brand icons in the footer *(ui: shared/components/footer)*
-- [ ] The footer draws each social link as its brand's icon instead of the first two letters of its label (`footer.component.ts:27`).
+- [x] The footer draws each social link as its brand's icon instead of the first two letters of its label (`footer.component.ts:27`).
   - Five networks are recognised by the link's address:
 
     | Network | Addresses |
@@ -2424,18 +2446,24 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     Failing the address, the label decides.
   - Anything else keeps its two letters, so an unknown network still shows something.
   - A Twitter link shows X's mark, Twitter's current logo.
-- [ ] **Where the icons come from:** five SVG paths from Simple Icons, which is public domain, in one file, `social-icons.ts`.
+- [x] **Where the icons come from:** five SVG paths from Simple Icons, which is public domain, in one file, `social-icons.ts`.
   - There is no new dependency: the package holds thousands of icons and this needs five.
   - Drawn inline in `currentColor`, so the theme's colour reaches them. They are fixed strings in the code, not studio content, so drawing them inline is safe.
   - Each link's `aria-label` stays its label, and the tap target stays 44 px.
-- [ ] Twitter comes off too:
+  - *As built:* the paths are copied from Simple Icons 13.0.0 (CC0), fetched from the npm package's published icons.
+    - A host matches exactly or as a subdomain, so `www.facebook.com` counts and `notfacebook.com` doesn't.
+    - Labels compare as letters only, so "Tik Tok" is TikTok.
+    - The icon is `aria-hidden`; the link's label already names it.
+- [x] Twitter comes off too:
   - `site-config.service.ts`'s fallback list drops it, to match the seed.
   - Two code comments that already claim "the footer maps known labels to icons" become true.
-- [ ] Specs:
+  - *As built:* the fallback list carries the studio's two real addresses, like the seed.
+- [x] Specs:
   - each of the five is recognised by its address, and by its label
   - an unknown network falls back to two letters
   - a recognised link draws its icon and shows no letters
   - these replace the two specs that pin "Fa In Tw"
+  - *As built:* also, the address beats a label that names a different network.
 
 ### 14.7 Mutation check
 - [ ] Each change is broken on purpose, one at a time, and every one must fail a test. Planned:
@@ -2466,6 +2494,8 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 ### 14.9 Hand-testing walkthrough
 
 **Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a window at least 1280 px wide, and start signed out.
+
+**Uploading an SVG (step 10) needs 14.1 shipped:** your `server_components` push, then the pin bump. Until then your Windows build uses the pinned copy, which refuses an SVG. To check everything else first, choose any JPEG in step 10 instead, for example one from `D:\Knotty Yoga\2026\Oct\JPG\Edited`.
 
 **Signed out: the home page and footer**
 1. Home page, at full width. The top picture is today's, with the two people on the left. Over its dark right half is one white headline: **GET INTO THE BEST SHAPE OF YOUR LIFE, THE RIGHT WAY.** There is no separate red "THE RIGHT WAY." line.
