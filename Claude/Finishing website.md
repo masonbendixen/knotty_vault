@@ -87,6 +87,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - **"THE RIGHT WAY." could still land on a line of its own.** The red line was gone, but the headline wrapped wherever the window put it: at 1680 px it broke right after "YOUR LIFE,". Now the headline's lines are balanced, and "life, the right way." is never split, at any width.
   - **The desktop top picture was pixelated.** The server served it 800 px wide (honuware's cap on every scaled picture) and the page stretched it 2–3×. The seed now raises the cap to 2048, so both top pictures come back at their files' full size.
   - A top picture no longer draws its body, and Page Content no longer offers a **Body** field for one.
+  - **Results:** knottyyoga Windows 5405 passed and Linux 5405 passed, with the same test names. Angular 3656; Playwright 29; 8 of 8 mutations caught; end to end PASS.
 - **v0.26 (10/22/2026)** — **14.1 is pinned in both apps.** Mason pushed `server_components` `920f18a` (green in CI). knottyyoga and CommunityFinder now pin it.
   - knottyyoga: Windows 5404 passed, Linux 5404 passed.
   - CommunityFinder: Windows 1921 passed, Linux 1921 passed.
@@ -2672,7 +2673,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - [x] Playwright: home, header and tap targets, **29 passed**.
   - The header spec failed again on a dev server Playwright started itself. It passed on one started by hand, as in 14.8.
 - [x] **knottyyoga Linux: 5405 passed** (pinned `920f18a`; 5404 plus the new test), with both executables built.
-- [ ] **knottyyoga Windows:** running.
+- [x] **knottyyoga Windows: 5405 passed**, the same test names as Linux. `knottyyoga_the_server` wasn't rebuilt because it was running; every other target was.
 
 ---
 
