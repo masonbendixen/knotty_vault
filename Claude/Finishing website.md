@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/22/2026
-Version: 0.25
+Version: 0.26
 tags: 
 ---
 # Overview
@@ -83,6 +83,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.26 (10/22/2026)** — **14.1 is pinned in both apps.** Mason pushed `server_components` `920f18a` (green in CI). knottyyoga and CommunityFinder now pin it.
+  - knottyyoga: Windows 5404 passed, Linux 5404 passed.
+  - CommunityFinder: Windows 1921 passed, Linux 1921 passed.
+  - The test names are the same on both platforms, and the five new framework tests now run on Windows too.
+  - Still to do: Mason's commit of the two pin lines and the knottyyoga Phase 14 changes, and his hand-test (14.9).
 - **v0.25 (10/22/2026)** — **Phase 14 is built**, and not committed. Still waiting: Mason's `server_components` push, then the pin bump.
   - **`server_components` (14.1):** an upload labelled `svg` is accepted when its bytes really are an SVG document. The check is in `ImageHelper`, so no other path can store a raster under the vector label.
   - **knottyyoga:**
@@ -2318,9 +2323,13 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Angular: 3654 passed. Playwright: 28 passed.
 - All 27 mutations were caught. Both end-to-end passes PASS.
 
+**Pinned 10/22/2026.** Mason pushed `server_components` `920f18a`, and both apps now pin it.
+- knottyyoga: Windows 5404 passed, Linux 5404 passed.
+- CommunityFinder: Windows 1921 passed, Linux 1921 passed.
+
 **Still to do:**
-- Mason commits and pushes `server_components` (14.1). Claude then bumps the pin in both apps and runs the pinned gates.
-- Mason hand-tests 14.9. Its SVG upload step needs the pin bump first.
+- Mason commits the two pin lines and the knottyyoga changes.
+- Mason hand-tests 14.9.
 
 ### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
 - [x] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
@@ -2530,13 +2539,18 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - a known network falling back to letters
 
 ### 14.8 Verification
-- [ ] `server_components` gates on both platforms, then knottyyoga and CommunityFinder against the new pin: Windows and Linux, same test names.
+- [x] `server_components` gates on both platforms, then knottyyoga and CommunityFinder against the new pin: Windows and Linux, same test names.
   - [x] **`server_components`: Windows 1900 passed. Linux 1900 passed.** That is 1895 plus the 5 new tests.
   - [x] **knottyyoga, before the pin bump.**
     - **Linux: 5404 passed**, built against the local `server_components` checkout, with both executables built.
     - **Windows: 5399 passed**, on the pinned SHA. The server executable wasn't rebuilt there because it was running; the tests, the database helper and the test helper were.
     - The names match except for the five new `server_components` tests, which only the local checkout has. Windows picks them up with the pin bump.
-  - [ ] After Mason pushes `server_components`: bump the pin in knottyyoga and CommunityFinder, and run both apps' pinned gates on both platforms.
+  - [x] After Mason pushes `server_components`: bump the pin in knottyyoga and CommunityFinder, and run both apps' pinned gates on both platforms.
+    - Mason pushed `920f18a`. `GIT_TAG` now names it in `knottyyoga_server/CMakeLists.txt` and `communityfinder_server/CMakeLists.txt`.
+    - **knottyyoga: Windows 5404 passed. Linux 5404 passed.**
+    - **CommunityFinder: Windows 1921 passed. Linux 1921 passed.** That is 1916 plus the five new framework tests.
+    - Both platforms ran the same test names, and each build's cloned copy is at `920f18a`.
+    - On Linux both apps' executables were built. On Windows, `knottyyoga_the_server` wasn't rebuilt because it was running; every other target was.
 - [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
   - [x] **`ng test`: 3654 passed.** That is 3630 plus 24 new specs; the final run was on the restored sources, after the mutation check.
   - [x] `tsc` (app, specs and the Playwright specs), `ng lint` and `ng build` are clean, with the same six size-budget warnings as before.
@@ -2561,7 +2575,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a window at least 1280 px wide, and start signed out.
 
-**Uploading an SVG (step 10) needs 14.1 shipped:** your `server_components` push, then the pin bump. Until then your Windows build uses the pinned copy, which refuses an SVG. To check everything else first, choose any JPEG in step 10 instead, for example one from `D:\Knotty Yoga\2026\Oct\JPG\Edited`.
+**Uploading an SVG (step 10) is ready.** 14.1 is pinned (`920f18a`). Your running server predates the pin, so stop it, build `knottyyoga_the_server`, and start it again before you begin.
 
 **Signed out: the home page and footer**
 1. Home page, at full width. The top picture is today's, with the two people on the left. Over its dark right half is one white headline: **GET INTO THE BEST SHAPE OF YOUR LIFE, THE RIGHT WAY.** There is no separate red "THE RIGHT WAY." line.
