@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/22/2026
-Version: 0.24
+Version: 0.25
 tags: 
 ---
 # Overview
@@ -83,6 +83,20 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.25 (10/22/2026)** — **Phase 14 is built**, and not committed. Still waiting: Mason's `server_components` push, then the pin bump.
+  - **`server_components` (14.1):** an upload labelled `svg` is accepted when its bytes really are an SVG document. The check is in `ImageHelper`, so no other path can store a raster under the vector label.
+  - **knottyyoga:**
+    - the three switches (migration 0012, admin metadata, the page-content bundle)
+    - the seed: two top pictures, the intro row's own content, memberships off, the banner to `/shop`, and the studio's Facebook and Instagram
+    - the editor, the home page and the footer icons
+  - **Results:**
+    - `server_components`: Windows 1900, Linux 1900.
+    - knottyyoga: Linux 5404 against the local checkout; Windows 5399 on the pinned SHA, the same names less the five new framework tests.
+    - Angular 3654; Playwright 28.
+    - 27 of 27 mutations caught; both end-to-end passes PASS.
+  - **Found on the way:**
+    - The server caps every scaled picture at 800 px. The new mobile picture is served at 800 × 379, and the desktop one at 800 × 243, which is shown about one and a half times that size on a wide screen. Nothing is changed for that here (14.8).
+    - A stale `ui/.angular/cache` had dropped every `xl:` class from the stylesheet, so the header couldn't switch to its desktop bar. Clearing the cache fixed it (14.8).
 - **v0.24 (10/22/2026)** — **Mason answered OQ-26 to OQ-35.** Planning only; no code changed.
   - **Four answers change the plan:**
     - **OQ-27:** a Gold member who lacks only an instructor's approval reads **Included with your membership once an instructor approves you** under **Pricing**. New item **12.7**, a server and page change, not built yet.
@@ -2298,6 +2312,16 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Planned 10/21/2026; updated 10/22** with Mason's answers to OQ-29, 30 and 31. One `server_components` change (14.1), with its own push and pin bump as in 11.11. The rest is knottyyoga.
 
+**Implemented 10/22/2026, not committed.**
+- `server_components`: Windows 1900 passed, Linux 1900 passed.
+- knottyyoga: Linux 5404 passed against the local `server_components`. Windows 5399 passed on the pinned SHA, which is the same names less the five new `server_components` tests.
+- Angular: 3654 passed. Playwright: 28 passed.
+- All 27 mutations were caught. Both end-to-end passes PASS.
+
+**Still to do:**
+- Mason commits and pushes `server_components` (14.1). Claude then bumps the pin in both apps and runs the pinned gates.
+- Mason hand-tests 14.9. Its SVG upload step needs the pin bump first.
+
 ### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
 - [x] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
   - *As built:* the "is it really an SVG" check is `ImageHelper::IsSvgDocument`, and `UploadAndAssociatePhoto` applies it to every vector upload. It runs in the business layer rather than the endpoint, so no other path can store a raster labelled `svg` either; the endpoint turns its refusal into the 400.
@@ -2468,7 +2492,29 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - *As built:* also, the address beats a label that names a different network.
 
 ### 14.7 Mutation check
-- [ ] Each change is broken on purpose, one at a time, and every one must fail a test. Planned:
+- [x] **27 mutations, all caught**: 4 in `server_components`, 10 in knottyyoga's C++ and 13 in Angular. Every file was restored byte for byte, and a clean run of the same tests passes afterwards. The script is the scratchpad's `phase14_mutations.ps1`.
+  - **`server_components`** (the Windows build, `ImageHelperTest` and `UploadPhotoTest`): an upload labelled `svg` stored whatever its bytes; the endpoint refusing a real SVG; `<svgfoo` taken for an `<svg>` root; a comment before the root not skipped, which refuses the studio's Illustrator badge.
+  - **knottyyoga C++** (Windows):
+    - migration 0012 not adding `image_centered`
+    - the membership row seeded active
+    - the banner linking to `/start`
+    - the intro row seeded without its badge
+    - the mobile hero seeded without **Mobile only**, or with the desktop photo
+    - the headline cut back to "…of your life,"
+    - Twitter back in the social links, or Facebook's front page
+    - a bundle import dropping **Centre the picture**
+  - **Angular**:
+    - a desktop-only row on a phone, a mobile-only row on a desktop, and a resize that doesn't switch
+    - a centred hero keeping its headline over the picture, or asking for the band's box
+    - the intro strip ignoring its row
+    - the two lines in different fonts
+    - a known network falling back to letters, or the address ignored
+    - **Mobile only** never saved
+    - **Centre the picture** saved on a non-hero
+    - the intro strip with no badge upload
+    - Site Theme offering the old intro sentence
+  - *Not mutated:* the network layer's `t`/`f` conversion of the new flags. That file has no spec in this repo, as 12.1 noted, so `tsc` is its only check.
+- Planned:
   - the upload accepting non-SVG bytes as `svg`, or refusing a real SVG
   - the migration not adding a column
   - the membership row seeded active
@@ -2491,10 +2537,15 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     - **Windows: 5399 passed**, on the pinned SHA. The server executable wasn't rebuilt there because it was running; the tests, the database helper and the test helper were.
     - The names match except for the five new `server_components` tests, which only the local checkout has. Windows picks them up with the pin bump.
   - [ ] After Mason pushes `server_components`: bump the pin in knottyyoga and CommunityFinder, and run both apps' pinned gates on both platforms.
-- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+- [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+  - [x] **`ng test`: 3654 passed.** That is 3630 plus 24 new specs; the final run was on the restored sources, after the mutation check.
   - [x] `tsc` (app, specs and the Playwright specs), `ng lint` and `ng build` are clean, with the same six size-budget warnings as before.
   - [x] Playwright, on a dev server that had built cleanly: `home.spec.ts`, `public-tap-targets.spec.ts` and `header.spec.ts` at every size, **28 passed**. The home spec serves the seed's own pictures to the page, so "the headline is over the picture" is checked against a real picture.
-  - *Found on the way:* `ui/.angular/cache` held a stale stylesheet with no `xl:` classes, so the header could not switch to its desktop bar. That broke `header.spec.ts` on a dev server Playwright started itself. Clearing the cache and starting a fresh server fixed it, and none of it was Phase 14's code. If the header ever looks wrong under `ng serve`, clear that folder.
+  - *Found on the way: the build had dropped every `xl:` class.*
+    - Without those classes the header can't switch to its desktop bar, so `header.spec.ts` failed and the screenshots showed the phone menu laid out open at every width.
+    - `ng build` produced the classes only after `ui/.angular/cache` was cleared. One more dev server started by Playwright still failed; one started after that passed.
+    - It is not Phase 14's code: Tailwind run directly on the same sources and config produces the classes.
+    - If the header ever looks wrong under `ng serve`, clear that folder and restart.
 - [x] **End to end:** `--install_schema` into a throwaway database, then the real server. *Both passes PASS (scratchpad `phase14_e2e.sh`).*
   - Signed out, the home feed has no membership row, and the banner points to `/shop`.
   - It has two hero rows. The mobile-only one's picture is served whole when asked for in the 2048 × 2048 box.
