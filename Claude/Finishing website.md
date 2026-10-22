@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/22/2026
-Version: 0.27
+Version: 0.28
 tags: 
 ---
 # Overview
@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.28 (10/22/2026)** — **Phase 15 is built**, and not committed. All in `ui/`.
+  - **15.1:** an empty state's calendar icon keeps its 24 px and sits wholly left of the sentence, on the home page band, My Schedule and every other `.empty-card`.
+  - **15.2:** the month calendar fits the screen. Below an 800 px grid, a day shows short class names, three at most, then **+N more**. Tapping a date number opens **Day View** on that date.
+  - **Results:** Angular 3669 passed; Playwright layout specs at all seven sizes, 256 passed; 9 of 9 mutations caught. No server change.
 - **v0.27 (10/22/2026)** — **14.10: two fixes from Mason's first look at Phase 14.** No `server_components` change.
   - **"THE RIGHT WAY." could still land on a line of its own.** The red line was gone, but the headline wrapped wherever the window put it: at 1680 px it broke right after "YOUR LIFE,". Now the headline's lines are balanced, and "life, the right way." is never split, at any width.
   - **The desktop top picture was pixelated.** The server served it 800 px wide (honuware's cap on every scaled picture) and the page stretched it 2–3×. The seed now raises the cap to 2048, so both top pictures come back at their files' full size.
@@ -2681,54 +2685,96 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Planned 10/21/2026.** All in `ui/`. Both were reproduced on the local site at 390 px on 10/21, signed in as Kit with no membership.
 
+**Implemented 10/22/2026, not committed.** No server change, so no C++ build or gate was needed.
+- Angular: `ng test` **3669 passed**, 13 more than after Phase 14. `tsc` for the app, the specs and the Playwright specs, `ng lint` and `ng build` are clean, with the same six size-budget warnings.
+- Playwright: every layout spec at all seven audit sizes, **256 passed**. The 332 skipped are size-specific tests.
+- Mutations: 9 of 9 caught by the specs, and both new Playwright specs fail against a broken build.
+
+**Still to do:** Mason commits, then hand-tests 15.5.
+
 ### 15.1 Empty-state icons keep their size *(ui: assets/styles/_patterns.scss)*
 - **Cause.** The two reports are one bug.
   - `.empty-card` is a flex row with no rule for its icon, so the long sentence beside it squeezes the 24 px `mat-icon` to a sliver.
   - The icon's own `overflow: hidden` then cuts the glyph off.
   - On the home page's **Upcoming classes** band it reads as clipped. On **My Schedule** the sentence sits over what is left of it.
-- [ ] **Fix:** `.empty-card mat-icon { @include icons.size(icons.$md); flex: none; }` in `_patterns.scss`. `.notice` already does this for its own icon (`_surfaces.scss:118`).
+- [x] **Fix:** `.empty-card mat-icon { @include icons.size(icons.$md); flex: none; }` in `_patterns.scss`. `.notice` already does this for its own icon (`_surfaces.scss:118`).
   - It also fixes every other `.empty-card` with an icon: Today's Classes, Attendance History, Class Check-In (twice), Student Notes and the style guide's demo.
-- [ ] Specs:
+- [x] Specs:
   - `style-guide.component.spec.ts`, for the global class: the `.empty-card` demo in a 260 px-wide host keeps a 24 × 24 icon, wholly to the left of the text.
   - `upcoming-classes` and `my-schedule` specs: the same check on their own empty states, at phone width.
-- [ ] Playwright, at 390 px, as a signed-in customer with no eligible classes: the home band and My Schedule, with the audit's overlap check. Screenshots kept for 15.5.
+  - *As built:* the two page checks are at 358 px, a 390 px phone less the page gutter.
+- [x] Playwright, at 390 px, as a signed-in customer with no eligible classes: the home band and My Schedule, with the audit's overlap check. Screenshots kept for 15.5.
+  - *As built:* new `layout/empty-states.spec.ts`, at all four phone sizes. Each checks:
+    - a 24 × 24 icon wholly left of the text
+    - no audit finding of text clipped, crammed or drawn over in that component
+  - Screenshots are `output/empty-states/home-upcoming-classes.png` and `my-schedule.png`, at 390 px.
+  - The mock had no member without classes, so a new mock switch, `knottyyoga.mockNoEligibleClasses` (`NO_ELIGIBLE_CLASSES_KEY` in `harness.ts`), empties the eligible classes and with them today's and upcoming ones. It has its own `ServerAccess.mock.spec` test, and the audit README lists it.
 
 ### 15.2 The month calendar fits the screen *(ui: pages/calendar/components/views/month-view)*
 - **Today.** The month grid has a fixed 800 px minimum width (`month-view.component.html:31`, `min-w-[50rem]`) inside a box that scrolls sideways. On 10/21 it measured 808 px wide at both 390 and 768 px.
   - This was deliberate in the mobile pass (Mobile UI Updates 2.5, "Makeover OQ 19"), and `layout/calendar.spec.ts:21` asserts it. This item reverses it.
-- [ ] **No minimum width.** The seven columns share whatever width there is (`repeat(7, minmax(0, 1fr))`), at every size.
-- [ ] **Narrow day cells**, decided by a container query on the grid's own width so a spec can size it:
+- [x] **No minimum width.** The seven columns share whatever width there is (`repeat(7, minmax(0, 1fr))`), at every size.
+  - *As built:* the 800 px box and its sideways scroll are gone. The weekday row's `ml-2` became `pl-2`: on a full-width row it would have pushed Saturday 8 px past the edge.
+- [x] **Narrow day cells**, decided by a container query on the grid's own width so a spec can size it:
   - each class chip shows the class name only, in small type, cut off with "…"
   - the time and the status icons drop out; both are on **Day View** and on the class's own page
   - cells are shorter
   - up to three chips a day, then **+N more**, which opens that day in **Day View**
-- [ ] **Tapping a date number** opens that day in **Day View**. Today it only selects the day, for the next switch of view.
+  - *As built:*
+    - **Threshold:** the cells turn compact when the grid is narrower than 800 px, the width it used to be held at. That covers phones (a 358 px grid at 390) and the 768 px tablet (704 px). A 1024 px window gets an 896 px grid and keeps today's cells.
+    - **Type:** the small type is a new token, `--text-2xs` (11 px), since a phone's day is about 50 px wide. `design-tokens.spec.ts` lists it in the type scale.
+    - **Height:** compact cells are 6.5 rem (104 px), against 128 px.
+- [x] **Tapping a date number** opens that day in **Day View**. Today it only selects the day, for the next switch of view.
+  - *As built:* `openDay` remembers the date, as a tap on the day already did, and switches to `?view=day`, which opens on it.
+  - The number keeps its 24 px circle, with a 44 px touch area around it, the way Material sizes its own buttons. So it is easy to hit on a phone, and the audit doesn't flag it.
+  - A tap elsewhere in the day still only selects it.
 - Unchanged:
   - From 1024 px up nothing changes: cells there are already wider than the threshold.
   - Phones still open on **Day View**. This is for someone who picks **Month View**.
   - **Week View** still scrolls sideways on a phone (OQ-33; Mason kept that default).
-- [ ] Specs (Karma, month view):
+- [x] Specs (Karma, month view):
   - with the host 358 px wide, the grid is no wider than the host, and chips show the name only
   - **+N more** appears after three chips, and opens **Day View** on that date
   - with the host 1000 px wide, the chips show the time and icons as today
-- [ ] Playwright `layout/calendar.spec.ts`:
+  - *As built*, also:
+    - at 1000 px every class is listed, with no **+N more**
+    - a compact day is shorter than a wide one
+    - the date number opens **Day View** on its date, while a tap elsewhere only selects the day
+    - the date number's tap area is at least 44 × 44
+  - The old test that pinned the 800 px scroll box now checks only that the header sits outside the grid.
+- [x] Playwright `layout/calendar.spec.ts`:
   - the "scrolls sideways" test becomes "fits without scrolling", at every size
   - the chip-icon test applies only where cells are wide
   - screenshots kept for 15.5
+  - *As built:*
+    - **Fits:** Saturday's right edge is on screen, and neither the grid nor the page around it scrolls sideways.
+    - **New, below 1024 px:** every visible chip is inside its day, ends in "…" and shows no time or icon.
+    - **New, at 390 and 1280 px:** tapping the 20th opens **Day View** on October 20, 2026.
+    - **Screenshots:** `output/calendar/month-phone.png`, `month-tablet.png` and `month-desktop.png`.
 
 ### 15.3 Mutation check
-- [ ] Planned:
+- [x] Planned:
   - the icon rule removed
   - `flex: none` dropped, keeping the size
   - the 800 px minimum restored
   - compact chips at every width
   - **+N more** never shown
   - **+N more** opening the wrong date
+  - *As built: all six caught, plus three more:*
+    - the date number only selecting the day
+    - the touch area shrunk to the circle
+    - the mock ignoring its new switch
+  - *Each failed the spec written for it, and a clean run passed 744.*
+  - *Against a live dev server, two of them were also tried on the new Playwright specs:*
+    - the icon rule removed: 8 failures in `empty-states.spec.ts`
+    - the 800 px minimum restored: 10 failures in `calendar.spec.ts`
 
 ### 15.4 Verification
-- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
-- [ ] The Playwright layout specs at all seven audit sizes.
-- [ ] No server change.
+- [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+  - *As built:* `ng test` **3669 passed**, 3656 + 13. `tsc` for the Playwright specs too. All clean, with the same six size-budget warnings.
+- [x] The Playwright layout specs at all seven audit sizes.
+  - *As built:* **256 passed**, with 332 size-specific tests skipped. They ran against a dev server started by hand, since one Playwright starts itself has twice served a stylesheet with no `xl:` classes ([[gotcha_angular_cache_drops_tailwind]]).
+- [x] No server change.
 
 ### 15.5 Hand-testing walkthrough
 
