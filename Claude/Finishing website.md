@@ -2620,6 +2620,60 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 14. Edit **Types of classes**: turn on **Mobile only** → **Save**. On the home page it is gone at full width, and appears once the window is narrowed.
 15. Edit **Additional health services**: turn on both **Desktop only** and **Mobile only**. A warning says nobody will ever see the section. Click **Cancel**.
 
+### 14.10 Mason's first look: the headline and the picture *(knottyyoga: ui home-hero-section, page-content; database_helper seed)*
+
+**Added and implemented 10/22/2026.** Mason, after recreating the database:
+- "I said that I don't want GET INTO THE BEST SHAPE OF YOUR LIFE, and THE RIGHT WAY to be split."
+- "The image for the GET INTO THE BEST SHAPE OF YOUR LIFE is very, very pixelated despite the source being very high res."
+
+**What was wrong**, measured on his local site:
+- **The break wandered with the window.** The red line was gone (14.3, 14.5), but the browser filled each line as far as it would go. At 1680 px that put the break right after "YOUR LIFE,", leaving **THE RIGHT WAY.** alone on the second line, which looks like the old separate line. At 1920 px it left **RIGHT WAY.** alone.
+- **The desktop picture came back 800 × 243 at every width.** honuware caps every scaled picture at 800 × 800 (the stored settings `image_max_public_scaled_width`/`_height`), and the page stretched that 1.6× at 1280 px and 3.2× at 2560 px. More on a high-density screen. The file itself is 2048 × 624.
+
+**The fixes:**
+- [x] **Balanced lines** (`home-hero-section.component.scss`, `text-wrap: balance`). A headline that needs two lines splits into two about equal ones, "GET INTO THE BEST SHAPE OF / YOUR LIFE, THE RIGHT WAY.", rather than one long line and a short one.
+- [x] **"life, the right way." is never split** (`keepClosingClauseTogether`, `home-hero-section.component.ts`).
+  - Balancing alone isn't enough. On a screen narrow enough for three lines, the most even split can be "…THE BEST / SHAPE OF YOUR LIFE, / THE RIGHT WAY.".
+  - So a short closing clause, at most three words after the headline's last comma, is joined to the word before the comma with no-break spaces.
+  - A longer clause is left alone, since one unbreakable run that long could be wider than a phone. A screen reader reads the no-break spaces as ordinary spaces.
+- [x] **A top picture has no body.** `home-hero-section` draws only the title, so a row that still carries the old "The right way." body can't bring the red line back. Page Content no longer offers **Body** on a hero row. The `db_schema/home_sections.h` comment that described the accent line now says it is gone.
+- [x] **The picture size limit is 2048** (`Seed::PopulatePublicPhotoSizeLimit`, `seed_app_data.cpp`).
+  - The seed writes 2048 over honuware's 800 for both settings, after the framework's defaults, the way `PopulateSiteAssets` writes the tagline slot.
+  - 2048 is the box the top picture asks for and the width of both seeded top-picture files.
+  - It reaches production with the Phase 19 reinstall, like the rest of the seed (D11).
+  - A larger box is still capped, so nobody can make the server produce an arbitrarily large picture.
+- *Not changed:* the seeded desktop file is 2048 × 624 (50 KB). On a screen wider than 2048 device pixels, a high-density laptop for instance, it is still stretched a little. A sharper result there needs a larger original. Uploading one under **Page Content** → the desktop hero's **Image** would also need the limit raised to match.
+
+**Tests:**
+- [x] Karma, `home-content-sections.component.spec.ts`:
+  - the headline renders whole, with its clause held together
+  - a hero row with a body never draws it
+  - `keepClosingClauseTogether`: the seeded headline; only the last comma's clause; no comma, or one at the end; a four-word clause left alone
+  - the lines are balanced
+  - in real viewports from 320 to 2560 px, every 40 px: "life, the right way." always shares one line
+- [x] Karma, `page-content.component.spec.ts`: a hero row offers no **Body**, and a feature row still does.
+- [x] Playwright, `layout/home.spec.ts`: with the real typeface, at 18 widths from 320 to 2560 px (both top pictures), "life, the right way." always shares one line. Screenshots `top-picture-360.png`, `-1680.png` and `-1920.png`.
+- [x] C++, `SeedAppDataTest.PopulatePublicPhotoSizeLimitRaisesTheFrameworkCap`: starting from honuware's own defaults (taken from the framework, and checked to be 800), both settings read 2048 through `SecretsHelper`, the reader `/api/get_scaled_photo` clamps with.
+- [x] End to end (scratchpad `phase14_e2e.sh install`), the real server on a fresh `--install_schema`: the desktop top picture comes back 2048 × 624, the mobile one 2048 × 969, and a 4096 box is still capped at 2048. *PASS, 17 of 17 checks.* The SVG upload checks pass against the pinned `920f18a` too.
+
+**Results:**
+- [x] Mutations: 8 of 8 caught.
+  - UI, 5:
+    - no balancing
+    - the accent line drawn again
+    - **Body** offered on a hero again
+    - the raw title printed instead of the joined one
+    - a four-word limit instead of three
+  - Server, 3:
+    - the seed writes 800
+    - only the width is raised
+    - the install never calls the step, which only the end-to-end run catches: its three picture checks fail
+- [x] Angular: `ng test` **3656 passed**. `tsc` for the app, the specs and the Playwright specs, `ng lint` and `ng build` are clean, with the same six size-budget warnings.
+- [x] Playwright: home, header and tap targets, **29 passed**.
+  - The header spec failed again on a dev server Playwright started itself. It passed on one started by hand, as in 14.8.
+- [x] **knottyyoga Linux: 5405 passed** (pinned `920f18a`; 5404 plus the new test), with both executables built.
+- [ ] **knottyyoga Windows:** running.
+
 ---
 
 # Phase 15 — Two layout fixes on phones
