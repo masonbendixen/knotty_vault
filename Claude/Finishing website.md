@@ -2942,12 +2942,15 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** the carousel, the one picture visibly not centred. 14.2–14.5 add **Centre the photos when they don't fill the width** to a carousel row, and the seed turns it on.
 - **Alternative:** if Ryan meant the top picture, "centred" needs a description: the photo in the middle with the words over it, perhaps. Say what it should look like.
 - Mason- We have a banner image with the text Get into the best shape of your life. Things we want changed:
-	- I don't want THE RIGHT WAY. on a separate line / section. Just move that text appended to the GET INTO THE BEST SHAPE
+	- I don't want THE RIGHT WAY. on a separate line / section. Just move that text appended to the GET INTO THE BEST SHAPE OF YOUR LIFE,
+	- We want the current one to be only shown on desktop and then copy it but use this image centered on mobile: C:\Users\mason\Downloads\bd1ac730-677f-4471-8cfd-0b1080081126.jpg
+	- Don't center the image on the desktop version
 
 **OQ-30 — The studio's real Facebook and Instagram pages.**
 - The seeded links are the two sites' front pages (`https://facebook.com`, `https://instagram.com`), so today's icons lead nowhere in particular.
 - **Default:** keep them. After the reinstall, set the real addresses under **Site Theme** → **Brand basics** → **Social links** (19.3).
 - **Alternative:** paste the two addresses here, and the seed carries them.
+- Mason- https://www.facebook.com/KnottyYoga/ and https://www.instagram.com/knottyyoga
 
 **OQ-31 — Which way should the two fonts match?** *(Ryan's review.)*
 - The intro strip's sentence is in the display font, Barlow semibold, at 24 px. The Get Started band's "New here? …" line is in the body font, Roboto regular, at about 16 px.
