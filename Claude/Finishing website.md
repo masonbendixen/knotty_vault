@@ -2984,7 +2984,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - An admin can't upload an SVG today: the framework's upload refuses it, although the picker offers it. So 14.1 changes `server_components`, with its own commit and push, then a pin bump and gates in both apps, as 11.11 did.
 - **Default:** do it. The badge is an SVG, Ryan asked for the SVG to be editable, and the same fix lets the Get Started artwork be replaced with another SVG.
 - **Alternative:** accept PNG and JPEG only for the badge. There is then no `server_components` change, and a new badge loses the sharpness a vector keeps at every size.
-- Mason
+- Mason- Let's make the change.
 
 **OQ-35 — Where "desktop" starts: 768 px?** *(D16.)*
 - **Default:** 768 px. That is the site's own phone line, and where the calendar already switches.
@@ -2992,6 +2992,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **1024 px.** Only big tablets get the desktop sections. Most tablets held upright (768–834 px) would get the phone ones.
   - **A setting in Site Theme,** so the studio can move the line. That is one more control to explain.
 - Say which.
+- Mason- Let's go with the default.
 
 ### Resolved
 
