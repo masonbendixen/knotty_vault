@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/22/2026
-Version: 0.26
+Version: 0.27
 tags: 
 ---
 # Overview
@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.27 (10/22/2026)** — **14.10: two fixes from Mason's first look at Phase 14.** No `server_components` change.
+  - **"THE RIGHT WAY." could still land on a line of its own.** The red line was gone, but the headline wrapped wherever the window put it: at 1680 px it broke right after "YOUR LIFE,". Now the headline's lines are balanced, and "life, the right way." is never split, at any width.
+  - **The desktop top picture was pixelated.** The server served it 800 px wide (honuware's cap on every scaled picture) and the page stretched it 2–3×. The seed now raises the cap to 2048, so both top pictures come back at their files' full size.
+  - A top picture no longer draws its body, and Page Content no longer offers a **Body** field for one.
 - **v0.26 (10/22/2026)** — **14.1 is pinned in both apps.** Mason pushed `server_components` `920f18a` (green in CI). knottyyoga and CommunityFinder now pin it.
   - knottyyoga: Windows 5404 passed, Linux 5404 passed.
   - CommunityFinder: Windows 1921 passed, Linux 1921 passed.
@@ -2327,9 +2331,11 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - knottyyoga: Windows 5404 passed, Linux 5404 passed.
 - CommunityFinder: Windows 1921 passed, Linux 1921 passed.
 
+**Reopened 10/22/2026 for 14.10**, after Mason's first look: the headline could still break before "THE RIGHT WAY.", and the desktop top picture was pixelated.
+
 **Still to do:**
 - Mason commits the two pin lines and the knottyyoga changes.
-- Mason hand-tests 14.9.
+- Mason hand-tests 14.9, after recreating the database again for 14.10's picture limit.
 
 ### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
 - [x] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
@@ -2439,6 +2445,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - the headline goes under it, centred, at every width
   - the picture is requested in a 2048 × 2048 box rather than the 2048 × 624 band, so a taller picture like the mobile one isn't shrunk to the band's height ([[gotcha_scaled_photo_box_size]])
   - *As built:* the server caps every scaled picture at 800 × 800 (`image_max_public_scaled_width`/`_height`), so the mobile picture comes back 800 × 379. Fitted to the band's box it would have been about 515 × 244.
+  - *14.10 raised that limit to 2048, so the mobile picture now comes back at its full 2048 × 969.*
 
   With it off, nothing changes: from 768 px up the headline sits over the picture's right half, and below that it sits under it, aligned left.
   - **Why the headline moves.** A centred subject leaves no empty side for the words, so over the picture they would cover the people.
@@ -2565,6 +2572,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - It has two hero rows. The mobile-only one's picture is served whole when asked for in the 2048 × 2048 box.
     - *As built:* it is served at 800 × 379: the server's 800 px cap, in the photo's own shape. The band's 2048 × 624 box would have served it at 513 × 243.
     - The desktop hero is served at 800 × 243 under the same cap, so on a wide screen it is shown at about one and a half times that width. That predates Phase 14 and is not changed here.
+    - *Mason saw it pixelated on his screen, so 14.10 raised the cap to 2048. Both top pictures now come back at full size.*
   - The intro row's badge is served as an SVG.
   - Signed in as an admin, an SVG uploaded through the endpoint comes back byte for byte.
     - *As built:* through the real middleware, CSRF included. PNG bytes labelled `svg` get a 400, and the stored badge is unchanged.
@@ -2577,8 +2585,12 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Uploading an SVG (step 10) is ready.** 14.1 is pinned (`920f18a`). Your running server predates the pin, so stop it, build `knottyyoga_the_server`, and start it again before you begin.
 
+**After 14.10, do the setup again:** stop the server, recreate the database, then rebuild and start the server, and restart `ng serve`. The new picture size limit is written when the database is created. Then reload the home page with **Ctrl+F5**, so the browser fetches the pictures again.
+
 **Signed out: the home page and footer**
 1. Home page, at full width. The top picture is today's, with the two people on the left. Over its dark right half is one white headline: **GET INTO THE BEST SHAPE OF YOUR LIFE, THE RIGHT WAY.** There is no separate red "THE RIGHT WAY." line.
+   - The picture is sharp, not blocky, even on your widest screen.
+   - Slowly narrow the window from as wide as it goes down to about the width of a phone, watching the headline. Its lines are about even, and **LIFE, THE RIGHT WAY.** always stays together on the last line. "THE RIGHT WAY." never starts a line.
 2. Narrow the window to about the width of a phone. Without a reload, the top picture changes to the new one: the same two people in the middle of a grey background. The same headline sits under the picture, centred. Widen the window again, and the first picture comes back.
 3. Under the top picture is "Knotty Yoga is an inclusive, high-level acrobatic fitness studio.", with the rainbow **SAFE SPACE** badge under it, as before.
 4. Scroll the whole page. There are no membership cards anywhere on it.
@@ -2595,7 +2607,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 8. **Sign In** as `masonbendixen@gmail.com` / `pass`. Go to **Admin** → **Manage Products** → **Page Content** tile, **Home sections** tab.
    - The **Membership tiers** row carries a **Hidden** badge.
    - There are two rows whose kind badge reads **Hero band**. One carries a **Desktop only** badge, and the other a **Mobile only** badge.
-9. Click the pencil on the **Mobile only** hero band. **Mobile only** and **Centre the picture** are both on, and **Image** shows the new photo. Click **Cancel**. On the **Desktop only** one, **Centre the picture** is off.
+9. Click the pencil on the **Mobile only** hero band. **Mobile only** and **Centre the picture** are both on, and **Image** shows the new photo. There is a **Title** field holding the whole headline, and no **Body** field. Click **Cancel**. On the **Desktop only** one, **Centre the picture** is off.
 10. Click the pencil on the row whose kind badge reads **Intro strip**.
     - A line under **Kind** says what an intro strip is.
     - **Badge** shows the SAFE SPACE picture, and **Text** holds the sentence.
