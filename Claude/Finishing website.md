@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/21/2026
-Version: 0.23
+Last Updated: 10/22/2026
+Version: 0.24
 tags: 
 ---
 # Overview
@@ -83,6 +83,18 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.24 (10/22/2026)** — **Mason answered OQ-26 to OQ-35.** Planning only; no code changed.
+  - **Four answers change the plan:**
+    - **OQ-27:** a Gold member who lacks only an instructor's approval reads **Included with your membership once an instructor approves you** under **Pricing**. New item **12.7**, a server and page change, not built yet.
+    - **OQ-29:** "centred" means the top picture, not the photo strip.
+      - Its headline becomes one line, "Get into the best shape of your life, the right way.", with no separate red line.
+      - Today's picture becomes desktop-only, and is not centred.
+      - A second top-picture row, mobile-only, uses Mason's new photo with **Centre the picture** on.
+      - The photo strip is left as it is. The changes are in 14.2–14.5, 14.7–14.9 and 19.1.
+    - **OQ-30:** the seed carries the studio's real Facebook and Instagram pages (14.3), so 19.3 no longer needs a step to set them.
+    - **OQ-31:** the intro sentence moves to the body font, Roboto, the "New here?" line's lettering (14.5).
+  - **Defaults confirmed, so nothing changes:** OQ-26, 28, 32, 33, 34 and 35.
+  - All ten answered questions move to *Resolved*. OQ-1 and OQ-11 are still open.
 - **v0.23 (10/21/2026)** — **Ryan's review becomes Phases 14–17. Verification moves to 18, and the production rollout to 19.** This is planning only; no code changed except one test comment that names the rollout's step (now 19.4).
 
   | Phase | What |
@@ -319,7 +331,7 @@ What exists today, so the plan says what CHANGES. All seed data lives in `src/da
   - The Manage lists that ask for "the first N rows" ask for all of them instead (17.1), so paging can reach every row.
   - A person's own history (purchases, bookings) grows slowly, and dozens of rows load at once without trouble. Server paging is the follow-up if one ever gets slow.
 - **D16 — Desktop-only and mobile-only are decided by window width, in the browser** (14.5, Ryan's review).
-  - The line is **768 px** (OQ-35): the width at which the rest of the site switches to its phone layout (the `md` breakpoint), and where the calendar already decides between Day View and Month View.
+  - The line is **768 px** (OQ-35, confirmed): the width at which the rest of the site switches to its phone layout (the `md` breakpoint), and where the calendar already decides between Day View and Month View.
   - A small desktop window gets the phone sections, and a tablet held either way gets the desktop ones. An iPad mini held upright, at 744 px, gets the phone sections.
   - It is decided in the browser with a live media query, not with CSS that merely hides. A hidden section is never drawn, so it fetches nothing and downloads no picture. Resizing a window switches sections without a reload.
 
@@ -421,7 +433,7 @@ Every email the site sends comes from **"Knotty Yoga"**, not "Knotty Yoga and Sp
 
 *Whatever is under each name when Phase 5.5 is implemented is seeded **verbatim**. A name with nothing pasted gets the one-line default shown, so the Instructors page never shows an empty card. Bios can always be changed later under **Admin** → **Manage Products** → **Instructors**. If a bio arrives after the production rollout, edit it there rather than re-seeding.*
 
-*→ 10/20 (Phase 13): all five bios below are in the seed (`kSeedInstructors` in `seed_app_data.h`), replacing the defaults. Six slips were corrected on the way in, and the text below is left as pasted. The corrections are listed in **OQ-28**; say if any should go back.*
+*→ 10/20 (Phase 13): all five bios below are in the seed (`kSeedInstructors` in `seed_app_data.h`), replacing the defaults. Six slips were corrected on the way in, and the text below is left as pasted. The corrections are listed in **OQ-28**; on 10/22 Mason kept all six.*
 
 ### Mason Bendixen
 Default (today's seed): "Teaches Knotty Yoga, handstands and partner acrobatics."
@@ -1879,7 +1891,7 @@ During development, knottyyoga builds against the local `server_components` chec
 
 # Phase 12 — The class page names the membership; cleanup
 
-**Implemented 10/19/2026, not committed.** It is all in knottyyoga, with no `server_components` change and no pin bump.
+**Implemented 10/19/2026 and committed.** It is all in knottyyoga, with no `server_components` change and no pin bump. **12.7 was added on 10/22 from OQ-27 and is not built yet.**
 - **knottyyoga: Windows 5389 passed. Linux 5389 passed.** That is Phase 11's 5382 plus 7 new tests, with the same names on both platforms.
 - **Angular: 3618 passed.** That is 3614, less the deleted service's one spec, plus 5 new.
 - All 12 mutations were caught.
@@ -1936,7 +1948,7 @@ During development, knottyyoga builds against the local `server_components` chec
 - [x] Check in the front end: the class page already shows **Members only** and **Required Skills** for a class the viewer can't attend. Whether an **All Classes** card should carry a badge too is checked at implementation; the weekly schedule's badges are the model.
   - **Members only:** yes.
   - **Required Skills:** no. It never had data, and is fixed in 12.1.
-  - **A badge on the All Classes cards:** not added; that is **OQ-26**, with "no badge" as the default.
+  - **A badge on the All Classes cards:** not added. That was **OQ-26**, and on 10/22 Mason kept the default of no badge.
 
 *(Not in scope: `ServerAccess.mock.ts`'s local-mode catalog still has the old classes. It is fixture data for `ng serve -c local` and for dozens of specs; changing it is churn with no user-visible effect.)*
 
@@ -2003,6 +2015,61 @@ During development, knottyyoga builds against the local `server_components` chec
     - **Handstands**, **Aerial Rope** and **Intermediate Partner Acro** still carry **Prerequisite needed**.
 
     This phase changed the class list, not the schedule.
+
+### 12.7 Pricing when only the approval is missing *(added 10/22 from OQ-27; not built)*
+
+**What changes.** Take a viewer who already holds the class's membership and lacks only an instructor's approval. Today **Pricing** tells them "Members only: Gold membership". It will read **Included with your membership once an instructor approves you** instead.
+- The **Required Skills** box under it already names the missing skill and says "Talk to staff for evaluation."
+- Everyone else reads what they read today: a visitor, a non-member, and a Silver member on a Gold class. 18.3 step 16 stays as written.
+
+- [ ] **Business logic** (`ClassCatalogHelper::GetClassDetail`). A new `ClassPriceInfo.awaitsApproval` is set when all of these hold:
+  - the access gate refuses the viewer
+  - every group they fail is an approval, meaning a group with no permission in it (12.1's rule)
+  - the class is recurring
+  - **How:** compare the gate's `failedGroupIds` with the groups that `GetClassRequirements` already returned earlier in the same function. That needs no new query.
+  - **Recurring only.** For a recurring class, passing the gate means "included". A workshop or series whose only gap is an approval still has a price to settle, so it keeps today's wording. No seeded class is one.
+  - **Not `Annotate`.** It reports "needs a skill" whenever any skill group fails, even when the membership is missing too, so it can't tell that the approval is the only gap.
+  - Tests in `class_catalog_helper_test`:
+    - A viewer who holds the class's permission but not its skill: set.
+    - A viewer lacking both: not set.
+    - A viewer lacking only the permission: not set.
+    - A failed "permission or skill" group: not set, because it counts as a membership.
+    - A viewer who passes: not set, and the class still reads as included.
+    - A workshop whose only failed group is a skill: not set.
+  - Through the seeded rules, in `seed_app_data_test`:
+    - A Gold member with no approvals: set on Handstands, Aerial Rope and Intermediate Partner Acro.
+    - A Silver member on Handstands: not set.
+- [ ] **Key-value table and endpoint.**
+  - `ClassDetailToKeyValueTable` writes `price_awaits_approval` beside `price_is_available`, and `/api/classes/<id>` carries it as a boolean, always present.
+  - Tests in `scheduling_key_value_table_test` and `get_class_detail_test`.
+- [ ] **Frontend** (`class-detail`).
+  - `ClassDetail.price_awaits_approval` is added. The network layer and the mock default it to false.
+  - `pricingState` gains `'awaits_approval'`, checked before `'members_only'`. It shows the one line above, with no "Members only".
+  - Specs:
+    - the new line appears, and "Members only" does not
+    - a members-only class without the flag is unchanged
+    - the mock's default, in `ServerAccess.mock.spec.ts`
+- [ ] **Mutation check**, planned:
+  - the flag set when the membership is missing too
+  - the flag set for a workshop
+  - the key-value table or endpoint dropping it
+  - the page ignoring it
+- [ ] **Verification.**
+  - knottyyoga on Windows and Linux, with the same test names on both.
+  - Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
+
+**Hand-testing walkthrough.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, then restart `ng serve`. Use a window at least 1280 px wide.
+1. **Sign In** as `kiteagle@gmail.com` / `kit`. Kit holds no membership on a fresh database.
+2. **Our Classes** → **All Classes** → **Handstands**. **Pricing** reads **Members only: Gold membership**, as before.
+3. **Memberships** → **Knotty Yoga Gold Membership** → **Subscribe**.
+   - Leave **Start month** as it is.
+   - Enter the sandbox card `4111 1111 1111 1111`, any future expiry, CVV `111`.
+   - Click **Subscribe & Pay $200.00**.
+4. **Our Classes** → **All Classes** → **Handstands**.
+   - **Pricing** reads **Included with your membership once an instructor approves you**, with no "Members only".
+   - **Required Skills** shows the **Handstand** chip with a red mark, and "You're missing: Handstand".
+5. **All Classes** → **Knotty Yoga**. It needs no approval, so **Pricing** reads **Included with your membership**, then "Just show up — staff will check you in."
+6. Sign out: **Kit** (the name menu) → **Sign Out**, then **Log Out** in the dialog. Signed out, **Handstands** reads **Members only: Gold membership** again.
 
 ---
 
@@ -2209,7 +2276,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 | Twitter out of the social links | 14.3 |
 | Brand icons instead of "Fa In Tw" | 14.6 |
 | Every data-driven list paged: at most 10 a page, 5 where that is enough, checked with screenshots | Phases 16 and 17 (D15, OQ-32) |
-| An option to centre the home page's banner images | 14.2, 14.4, 14.5 (OQ-29) |
+| An option to centre the home page's banner images | 14.2–14.5 (OQ-29: the top picture, with a second, mobile-only one) |
 | Desktop-only and mobile-only home sections, decided by window width | 14.2, 14.4, 14.5 (D16, OQ-35) |
 | Upcoming classes on a phone: the calendar icon is clipped | 15.1 |
 | Memberships off the home page by default | 14.3 |
@@ -2229,7 +2296,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 # Phase 14 — Home page and footer (Ryan's review)
 
-**Planned 10/21/2026.** One `server_components` change (14.1), with its own push and pin bump as in 11.11. The rest is knottyyoga.
+**Planned 10/21/2026; updated 10/22** with Mason's answers to OQ-29, 30 and 31. One `server_components` change (14.1), with its own push and pin bump as in 11.11. The rest is knottyyoga.
 
 ### 14.1 Accept SVG uploads *(server_components: platform/endpoints/upload_photo)*
 - [ ] `/api/upload_photo/<table>/<id>/svg` is accepted alongside `jpeg` and `png` (`upload_photo.cpp:75`).
@@ -2253,7 +2320,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   |---|---|---|
   | `hidden_on_narrow_screens` | **Desktop only** | Hidden in windows narrower than 768 px (D16) |
   | `hidden_on_wide_screens` | **Mobile only** | Hidden in windows 768 px wide and wider |
-  | `images_centered` | **Centre the photos when they don't fill the width** | A carousel row's photos sit in the middle (14.5) |
+  | `image_centered` | **Centre the picture** | A top-picture row is laid out around the middle: its headline goes under the picture, centred, at every width (14.5, OQ-29) |
 
 - [ ] Migration `app/0012_home_sections_screen_width_and_centering`: `ADD COLUMN IF NOT EXISTS` for each column.
   - Test, modelled on `HiddenWhenNotMemberAddsTheColumnAndIsIdempotent`: run it twice on a database without the columns, then once on a fresh one.
@@ -2266,18 +2333,30 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 ### 14.3 Seed *(create_database.cpp `PopulateHomeSectionsImpl`; app_secret_values.cpp)*
 - [ ] **Membership tiers off by default.** The row is still seeded, with `active` false, so **Page Content** can turn it on with "Show this section on the home page".
 - [ ] **"Come join the fun!" links to Memberships.** The link becomes `/shop`, the page the top nav's **Memberships** opens, labelled **See memberships**. Today it is `/start`, labelled "Get started".
+- [ ] **Two top pictures, one for each width** (OQ-29).
+  - **One headline.** "The right way." stops being a separate red line. The title is "Get into the best shape of your life, the right way." and the body is empty. Both rows take it from one constant, so they can't differ.
+  - **Today's row becomes desktop only** (`hidden_on_narrow_screens`). It keeps `home_hero.jpg`, with the people on the left, and is not centred.
+  - **A new row, mobile only,** at ordinal 25, so it sits in the same place on the page. It has `hidden_on_wide_screens` and `image_centered`.
+    - Its picture is Mason's new photo, `C:\Users\mason\Downloads\bd1ac730-677f-4471-8cfd-0b1080081126.jpg`: the same two people, standing in the middle of a grey background.
+    - It is copied in as `src/database_helper/img/home_hero_mobile.jpg`. At 2048 × 969 and 77 KB it needs no conversion.
+    - The whole `img/` folder is already copied beside the executables, so there is no CMake change. The copy only happens on a relink, though, so copy the file there by hand too ([[gotcha_seed_img_copy_is_post_build]]).
 - [ ] **The intro row carries its own content:**
   - **Body:** the sentence, from the same constant as the `site_hero_headline` default, so the two can't differ.
   - **Title:** "This studio is a designated safe space", the badge's description for screen readers. Today it is hardcoded in the template.
   - **Photo:** `SafeSpace_icon.svg`, copied from `ui/src/assets/svg/` into `src/database_helper/img/` and attached as `svg`.
-- [ ] **The photo carousel row** is seeded with `images_centered` true (OQ-29). Its carousel is seeded empty, so this shows only once photos are added.
-- [ ] **Social links: Facebook and Instagram only** (`app_secret_values.cpp:61`). Their addresses are still the two sites' home pages (OQ-30).
+- [ ] **Social links: Facebook and Instagram only, at the studio's own pages** (`app_secret_values.cpp:61`, OQ-30):
+  - `Facebook|https://www.facebook.com/KnottyYoga/`
+  - `Instagram|https://www.instagram.com/knottyyoga`
 - [ ] Tests, through the readers the pages use (D4):
   - `create_database_test`, after `PopulateHomeSections`: `GetActiveHomeSections` has no `membership` row, and the full list has it, inactive.
   - The banner's link and label.
   - The intro row's body and title, and its photo is the SVG byte for byte, typed `svg`, read through the photo reader.
-  - The carousel row is centred, and no other row is.
-  - The social-links value, read through the site-content reader: exactly two lines, Facebook and Instagram.
+  - The two top-picture rows:
+    - both carry the one-line headline and an empty body
+    - one is desktop-only, with `home_hero.jpg`
+    - the other is mobile-only and centred, with `home_hero_mobile.jpg` byte for byte
+    - no other row is desktop-only, mobile-only or centred
+  - The social-links value, read through the site-content reader: exactly the two lines above.
 
 ### 14.4 Page Content editor *(ui: pages/manage/page-content)*
 - [ ] **Two more toggles** under the existing four. They are slide toggles like their neighbours, not checkboxes:
@@ -2285,7 +2364,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - **Mobile only — hidden in windows 768 px and wider**
 
   With both on, a warning says nobody will ever see the section, as the membership pair already does. The row list shows **Desktop only** and **Mobile only** badges, as it shows **Signed-in only**.
-- [ ] **Carousel rows** get **Centre the photos when they don't fill the width**, under **Carousel**.
+- [ ] **Hero band rows** get a **Centre the picture** toggle, with the hint "For a picture whose subject stands in the middle: the headline goes under it, centred."
 - [ ] **Intro rows** become editable like a content block:
   - an **Image** upload, labelled **Badge** (SVG, PNG or JPEG)
   - **Body**, labelled **Text**
@@ -2306,19 +2385,28 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - One `matchMedia('(width >= 768px)')` with a change listener decides it, so narrowing or widening a window switches the sections live.
   - A hidden section is not drawn at all, so a desktop-only picture costs a phone nothing.
   - The width is the calendar's (`BELOW_MD_MEDIA_QUERY`, `calendar.types.ts:32`). It moves to `shared/utils/` so both read one constant.
-- [ ] **Centred photos.** `app-image-carousel` gains a `centered` input.
-  - When every photo fits, the strip sits in the middle.
-  - When they don't fit, it scrolls from the left as today.
-  - The Gallery page doesn't set it, so it is unchanged.
+- [ ] **A centred top picture** (`home-hero-section`, OQ-29). With `image_centered` on:
+  - the picture still spans the band
+  - the headline goes under it, centred, at every width
+  - the picture is requested in a 2048 × 2048 box rather than the 2048 × 624 band, so a taller picture like the mobile one isn't shrunk to the band's height ([[gotcha_scaled_photo_box_size]])
+
+  With it off, nothing changes: from 768 px up the headline sits over the picture's right half, and below that it sits under it, aligned left.
+  - **Why the headline moves.** A centred subject leaves no empty side for the words, so over the picture they would cover the people.
+  - The photo strip is unchanged. OQ-29's default had guessed it was the picture meant.
 - [ ] **The intro strip** draws the row's **Text** and **Badge** instead of the two Site Theme settings. The badge's description is the row's **Title**. A row with no badge shows the sentence alone.
-- [ ] **One font** (OQ-31). The Get Started band's "New here? …" line takes the intro strip's style: the display font, semibold, at the intro's size. Both use one shared class, so they can't drift apart again.
+- [ ] **One font** (OQ-31: Roboto).
+  - The intro strip's sentence takes the "New here? …" line's lettering: the body font (`--font-body`, which is Roboto in the seed), at regular weight. Until now it used the display font, semibold.
+  - One shared class sets both lines, so they can't drift apart again.
+  - Each line keeps its own size. The intro sentence stays larger, as it is the strip's only text.
+- [ ] **The local-mode mock's home rows match the seed**: the two top pictures, one desktop-only and one mobile-only.
 - [ ] Specs:
   - visibility at each width, with `matchMedia` stubbed, including a live change
-  - the carousel centres only when nothing scrolls
+  - a centred top picture puts its headline under the picture at desktop width, and asks for the taller box; an uncentred one keeps the headline over it
   - the intro strip draws the row's text and badge, with the badge's description
-  - both text lines compute to the same font family, weight and size
+  - both text lines compute to the same font family and weight, and the family is the body font
 - [ ] Playwright, new `e2e/mobile-audit/layout/home.spec.ts`, at 390 and 1280 px:
   - a desktop-only row is absent on the phone and present on the desktop, and a mobile-only row the reverse
+  - exactly one top picture shows at each width: the desktop one at 1280 px, and the mobile one at 390 px
   - the screenshots are kept for 14.9
 
 ### 14.6 Brand icons in the footer *(ui: shared/components/footer)*
@@ -2356,9 +2444,11 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - the membership row seeded active
   - the banner still linking to `/start`
   - the intro row seeded without its photo
-  - Twitter back in the seed
+  - the mobile top picture seeded without **Mobile only**, or without its picture
+  - "The right way." seeded back as a separate line
+  - Twitter back in the seed, or a front-page address in place of the studio's own
   - a desktop-only row shown on a phone, or a mobile-only row shown on a desktop
-  - the carousel centring when it should scroll
+  - a centred top picture keeping its headline over the picture
   - the intro strip reading Site Theme again
   - the two fonts differing
   - a known network falling back to letters
@@ -2368,6 +2458,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint` and `ng build`.
 - [ ] **End to end:** `--install_schema` into a throwaway database, then the real server.
   - Signed out, the home feed has no membership row, and the banner points to `/shop`.
+  - It has two hero rows. The mobile-only one's picture is served at 2048 × 969 when asked for in the 2048 × 2048 box.
   - The intro row's badge is served as an SVG.
   - Signed in as an admin, an SVG uploaded through the endpoint comes back byte for byte.
   - `--migrate` on a database from before Phase 14 adds the three columns.
@@ -2377,28 +2468,35 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 **Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a window at least 1280 px wide, and start signed out.
 
 **Signed out: the home page and footer**
-1. Home page. Under the top picture is "Knotty Yoga is an inclusive, high-level acrobatic fitness studio.", with the rainbow **SAFE SPACE** badge under it, as before.
-2. Scroll the whole page. There are no membership cards anywhere on it.
-3. The **Come join the fun!** picture's button reads **See memberships**. Click it: the page is headed **Memberships**.
-4. Back on the home page, the black **Get Started** band reads "New here? The Get Started guide walks through…" in the same lettering, weight and size as the sentence in step 1.
-5. Footer, under **Follow us on Social Media!**: exactly two icons, the Facebook "f" and the Instagram camera. There is no "Fa", "In" or "Tw", and no Twitter.
+1. Home page, at full width. The top picture is today's, with the two people on the left. Over its dark right half is one white headline: **GET INTO THE BEST SHAPE OF YOUR LIFE, THE RIGHT WAY.** There is no separate red "THE RIGHT WAY." line.
+2. Narrow the window to about the width of a phone. Without a reload, the top picture changes to the new one: the same two people in the middle of a grey background. The same headline sits under the picture, centred. Widen the window again, and the first picture comes back.
+3. Under the top picture is "Knotty Yoga is an inclusive, high-level acrobatic fitness studio.", with the rainbow **SAFE SPACE** badge under it, as before.
+4. Scroll the whole page. There are no membership cards anywhere on it.
+5. The **Come join the fun!** picture's button reads **See memberships**. Click it: the page is headed **Memberships**.
+6. Back on the home page, look at the black **Get Started** band's "New here? The Get Started guide walks through…".
+   - It is in the same lettering as the sentence in step 3: the same plain, not-bold typeface. The step 3 sentence is larger.
+   - Neither uses the tall, narrow lettering of the top picture's headline.
+7. Footer, under **Follow us on Social Media!**: exactly two icons, the Facebook "f" and the Instagram camera. There is no "Fa", "In" or "Tw", and no Twitter.
+   - Click the Facebook icon. It opens Knotty Yoga's own Facebook page, not Facebook's front page.
+   - Back on the site, the Instagram icon likewise opens Knotty Yoga's Instagram page.
 
 **Signed in: editing the rows**
 
-6. **Sign In** as `masonbendixen@gmail.com` / `pass`. Go to **Admin** → **Manage Products** → **Page Content** tile, **Home sections** tab. The **Membership tiers** row carries a **Hidden** badge.
-7. Click the pencil on the row whose kind badge reads **Intro strip**.
-   - A line under **Kind** says what an intro strip is.
-   - **Badge** shows the SAFE SPACE picture, and **Text** holds the sentence.
-   - Change **Text** to `Knotty Yoga is an inclusive acrobatic fitness studio.`
-   - Under **Badge**, **choose file**: `server\knottyyoga_server\src\database_helper\img\tier_icon_family.svg`.
-   - Click **Save**.
-8. Home page: the new sentence, with the family icon under it in place of the badge.
-9. **Site Theme** tile → **Image carousels** tab → expand **Home page photos** → **Add a photo**. Choose any picture, for example from `D:\Knotty Yoga\2026\Oct\JPG\Edited`, then click **Add photo**. Repeat once more.
-10. Home page: the two photos sit in the middle of the page, not at its left edge.
-11. Back in **Page Content** → **Home sections**, edit **Why Knotty Yoga**: turn on **Desktop only** → **Save**. The row shows a **Desktop only** badge.
-12. Home page: **Why Knotty Yoga** is there. Narrow the window to about the width of a phone. It disappears without a reload. Widen the window again and it comes back.
-13. Edit **Types of classes**: turn on **Mobile only** → **Save**. On the home page it is gone at full width, and appears once the window is narrowed.
-14. Edit **Additional health services**: turn on both **Desktop only** and **Mobile only**. A warning says nobody will ever see the section. Click **Cancel**.
+8. **Sign In** as `masonbendixen@gmail.com` / `pass`. Go to **Admin** → **Manage Products** → **Page Content** tile, **Home sections** tab.
+   - The **Membership tiers** row carries a **Hidden** badge.
+   - There are two rows whose kind badge reads **Hero band**. One carries a **Desktop only** badge, and the other a **Mobile only** badge.
+9. Click the pencil on the **Mobile only** hero band. **Mobile only** and **Centre the picture** are both on, and **Image** shows the new photo. Click **Cancel**. On the **Desktop only** one, **Centre the picture** is off.
+10. Click the pencil on the row whose kind badge reads **Intro strip**.
+    - A line under **Kind** says what an intro strip is.
+    - **Badge** shows the SAFE SPACE picture, and **Text** holds the sentence.
+    - Change **Text** to `Knotty Yoga is an inclusive acrobatic fitness studio.`
+    - Under **Badge**, **choose file**: `server\knottyyoga_server\src\database_helper\img\tier_icon_family.svg`.
+    - Click **Save**.
+11. Home page: the new sentence, with the family icon under it in place of the badge.
+12. Back in **Page Content** → **Home sections**, edit **Why Knotty Yoga**: turn on **Desktop only** → **Save**. The row shows a **Desktop only** badge.
+13. Home page: **Why Knotty Yoga** is there. Narrow the window to about the width of a phone. It disappears without a reload. Widen the window again and it comes back.
+14. Edit **Types of classes**: turn on **Mobile only** → **Save**. On the home page it is gone at full width, and appears once the window is narrowed.
+15. Edit **Additional health services**: turn on both **Desktop only** and **Mobile only**. A warning says nobody will ever see the section. Click **Cancel**.
 
 ---
 
@@ -2431,7 +2529,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Unchanged:
   - From 1024 px up nothing changes: cells there are already wider than the threshold.
   - Phones still open on **Day View**. This is for someone who picks **Month View**.
-  - **Week View** still scrolls sideways on a phone (OQ-33).
+  - **Week View** still scrolls sideways on a phone (OQ-33; Mason kept that default).
 - [ ] Specs (Karma, month view):
   - with the host 358 px wide, the grid is no wider than the host, and chips show the name only
   - **+N more** appears after three chips, and opens **Day View** on that date
@@ -2483,7 +2581,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - There is no shared pager. The first two are hand-written, and the third is a Material paginator.
 - About sixty lists show every row. Many Manage pages ask the server for "the first 100" (or 1,000, or 10,000) rows and silently drop the rest (Phase 17.1).
 
-**The rules** (OQ-32):
+**The rules** (OQ-32, confirmed by Mason on 10/22):
 - **Page size.** A page's main list shows **10** a page. A list inside a card, or one of several sections on a page, shows **5**.
 - **The pager hides when everything fits on one page**, so a short list looks exactly as it does today.
 - **Not paged**, each for a reason:
@@ -2841,7 +2939,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - `--env-file /etc/knottyyoga/server.env`
 
 ### 19.1 Before
-- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg`.
+- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg` and `home_hero_mobile.jpg`.
 - [ ] Manual RDS snapshot, named for this change. It is cheap insurance even though nothing is being kept.
 - [ ] Have the `set_secret` block from Deploying to AWS 5.1 step 6 ready, with `website_address_login` = the cloudfront URL until go-live. Check that `mail_app_password` is in it: forgot password and the instructor digest need working mail.
 
@@ -2858,7 +2956,6 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - `knottyyoga_test_helper --command=set_password` (5.2), with the temporary password handed over in person, or
   - once Phase 11 is live and their real email is seeded, they click **Forgot password?** themselves
 - [ ] Paste any bios that arrived late under **Admin** → **Manage Products** → **Instructors** (OQ-15).
-- [ ] Unless OQ-30's addresses made it into the seed: **Admin** → **Manage Products** → **Site Theme** → **Brand basics** → **Social links**, set the studio's real Facebook and Instagram pages.
 - [ ] The public half of the Phase 18.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
 
 ### 19.4 Every month: extend Caleb's bookable hours (OQ-8)
@@ -2901,6 +2998,10 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 - → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
 
+### Resolved
+
+*Newest first by date: 10/22 (OQ-26 to 35, in number order), then 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+
 **OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
 - After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
   - The weekly schedule marks each row "Requires a membership" or "Prerequisite needed".
@@ -2909,6 +3010,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** the weekly schedule's badge on each card, worked out for the viewer. For example, a Silver member would see Beginner Knotty Yoga unmarked and the other five marked. The class list would then have to carry each viewer's access: a change to the server and to the page.
 - Say which.
 - Mason- The default is fine.
+- → Plan: no change. The cards stay without a badge.
 
 **OQ-27 — An unapproved Gold member reads "Members only: Gold membership".** *(Found implementing 12.1, 10/19.)*
 - The class page's **Pricing** says "Members only" whenever the viewer can't attend, whatever the reason.
@@ -2919,6 +3021,10 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** when the viewer has the membership and lacks only the approval, **Pricing** says so instead, for example "Included with your membership once an instructor approves you". The server already tells the two apart (the schedule badge's "members only" versus "needs a skill"). It would have to pass that on, and the page would need a fourth wording.
 - Say which.
 - Mason- I like the alternative idea better.
+- → Plan: new item **12.7**, not built yet.
+  - The class page tells a viewer whose only gap is an approval: **Included with your membership once an instructor approves you**.
+  - The server works it out from the groups the viewer fails. If every one is an approval (no permission in it), it says so with a new `price_awaits_approval` flag. The page then shows the fourth wording.
+  - Recurring classes only: a workshop or series still has a price to settle.
 
 **OQ-28 — Six slips corrected in the bios.** *(Phase 13, 10/20.)*
 - The plan says bios are seeded verbatim. Six things in the pasted text looked like slips, so the seed corrects them and the pasted text above is left as it was:
@@ -2933,6 +3039,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** seed any of them back exactly as pasted. Each is one string in `kSeedInstructors`, or an edit under **Admin** → **Manage Products** → **Instructors** once deployed.
 - Say which, and especially whether 6 is right.
 - Mason- Keep the corrections.
+- → Plan: no change. The seed keeps all six.
 
 **OQ-29 — Which home page picture should centre?** *(Ryan's review, 10/21.)*
 - Ryan asked for "an option to have the image be centered" for banner images. On a wide screen, three home page pictures could be meant:
@@ -2945,12 +3052,20 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 	- I don't want THE RIGHT WAY. on a separate line / section. Just move that text appended to the GET INTO THE BEST SHAPE OF YOUR LIFE,
 	- We want the current one to be only shown on desktop and then copy it but use this image centered on mobile: C:\Users\mason\Downloads\bd1ac730-677f-4471-8cfd-0b1080081126.jpg
 	- Don't center the image on the desktop version
+- → Plan: it is the top picture (the hero band), not the photo strip. The strip stays as it is.
+  - **One line.** The headline is "Get into the best shape of your life, the right way.", and the separate red line is gone (14.3).
+    - That puts the whole headline in white. The red belonged to the separate line.
+  - **Desktop:** today's row becomes **Desktop only**, with its picture as now and not centred (14.3).
+  - **Mobile:** a second top-picture row, **Mobile only**, uses your new photo, copied in as `home_hero_mobile.jpg`, with **Centre the picture** on (14.2–14.5).
+  - **What "centred" does.** The new photo already has the people in the middle. So centring means the headline goes under the picture, centred, at any width, rather than over a side the photo doesn't leave empty. On a phone, the headline was already under the picture and now also sits in the middle.
+  - Hand-test steps 1, 2, 8 and 9 in 14.9 cover it. The photo-strip steps are gone.
 
 **OQ-30 — The studio's real Facebook and Instagram pages.**
 - The seeded links are the two sites' front pages (`https://facebook.com`, `https://instagram.com`), so today's icons lead nowhere in particular.
 - **Default:** keep them. After the reinstall, set the real addresses under **Site Theme** → **Brand basics** → **Social links** (19.3).
 - **Alternative:** paste the two addresses here, and the seed carries them.
 - Mason- https://www.facebook.com/KnottyYoga/ and https://www.instagram.com/knottyyoga
+- → Plan: the seed carries both (14.3), and a test pins the two lines. 19.3's step to set them by hand is gone. 14.9 step 7 clicks each icon.
 
 **OQ-31 — Which way should the two fonts match?** *(Ryan's review.)*
 - The intro strip's sentence is in the display font, Barlow semibold, at 24 px. The Get Started band's "New here? …" line is in the body font, Roboto regular, at about 16 px.
@@ -2958,6 +3073,10 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternatives:** the intro sentence takes the plain style instead; or both use the display font, each keeping its own size.
 - Say which.
 - Mason- Roboto
+- → Plan (14.5):
+  - The intro sentence moves to the body font, which is Roboto in the seed, at regular weight, matching the "New here?" line.
+  - It is set through the theme's body-font setting, so a studio that changes its body font changes both lines.
+  - Each line keeps its own size, and the intro sentence stays the larger.
 
 **OQ-32 — Paging: page sizes and the lists left alone.** *(Phases 16–17.)*
 - **Default sizes:** a page's main list shows 10, and a list inside a card or one of several sections on a page shows 5. The pager hides when a list fits on one page.
@@ -2973,18 +3092,21 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - a price schedule's embedded table, a library control that already pages 20 at a time
 - **Alternative:** name any list above that should page anyway, or any list that should get 5 instead of 10.
 - Mason- I'm fine with the default
+- → Plan: no change. Phases 16–17 stand as written.
 
 **OQ-33 — The week view still scrolls sideways on a phone.** *(15.2.)*
 - Ryan asked about the month view, and 15.2 fixes only that one. **Week View**'s seven columns of hours also need about 800 px, and still scroll sideways on a phone.
 - **Default:** leave it. Phones open on **Day View**, and a week of hourly columns can't be read at 50 px a day.
 - **Alternative:** the same treatment as the month: seven narrow columns with short names.
 - Mason- I'm okay with the default.
+- → Plan: no change. Only the month view is reworked (15.2).
 
 **OQ-34 — Uploading the badge as an SVG needs a server_components release.** *(14.1.)*
 - An admin can't upload an SVG today: the framework's upload refuses it, although the picker offers it. So 14.1 changes `server_components`, with its own commit and push, then a pin bump and gates in both apps, as 11.11 did.
 - **Default:** do it. The badge is an SVG, Ryan asked for the SVG to be editable, and the same fix lets the Get Started artwork be replaced with another SVG.
 - **Alternative:** accept PNG and JPEG only for the badge. There is then no `server_components` change, and a new badge loses the sharpness a vector keeps at every size.
 - Mason- Let's make the change.
+- → Plan: no change. 14.1 stands, with its own `server_components` push and pin bump.
 
 **OQ-35 — Where "desktop" starts: 768 px?** *(D16.)*
 - **Default:** 768 px. That is the site's own phone line, and where the calendar already switches.
@@ -2993,10 +3115,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **A setting in Site Theme,** so the studio can move the line. That is one more control to explain.
 - Say which.
 - Mason- Let's go with the default.
-
-### Resolved
-
-*Newest first: 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+- → Plan: no change. D16 and 14.5 stay at 768 px.
 
 **OQ-15 — Instructor bios.**
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
