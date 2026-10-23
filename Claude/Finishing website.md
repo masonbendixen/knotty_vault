@@ -3049,12 +3049,29 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   | The pricing views | 100, 200 and 10,000 |
   | **Subscription Revenue** | 10,000. It totals what it reads, so past the cap the totals are silently wrong |
 
-- [ ] Each asks for everything (page size 0, which the endpoint already treats as "all rows") and pages in the browser (D15).
+- [x] Each asks for everything (page size 0, which the endpoint already treats as "all rows") and pages in the browser (D15).
   - Not changed: a product page's **Event Sessions**, **Active Subscriptions** and **Recent Purchases**, which deliberately show the latest 10 with a **View All** link.
-- [ ] Specs: each page's request asks for everything, and its eleventh row is reachable on page 2.
+  - *As built:*
+    - **Page size 0 is "every row"** in the server's SQL (`LIMIT NULLIF($1, 0)`, honuware's `GetRowsByValues`). The mock now does the same, with a test.
+    - **Every cap in the table is gone:** Products, Price Schedules, Event Sessions, My Sessions, Subscriptions, Entitlements and its two joins, Event Payment Info, a subscription's billing history, the pricing views and Subscription Revenue.
+    - **Found on the way, same kind:**
+      - a session card's attendees (100) and its price overrides (100)
+      - the product filters of Event Sessions (100), Subscriptions (100) and Entitlements (200)
+      - the pricing views' variants (1,000)
+      - a product page's prices, schedules, variants and active entitlements (100 each)
+    - **A second kind of request:** three lists read through `get_rows_by_column`, whose SQL is `LIMIT $1`, so 0 there means no rows at all. They now use `get_filtered_table_rows` with no filter:
+      - the pricing views' prices (10,000) and permissions (100)
+      - a product page's permissions, which its booking windows page over (100)
+    - **Left alone:** one-row lookups, and the three latest-10 lists. Only an event product's **Event Sessions** has a **View All**; the other two have none (OQ-39).
+- [x] Specs: each page's request asks for everything, and its eleventh row is reachable on page 2.
+  - *As built:*
+    - **Every changed request** has a spy checking page size 0.
+    - **Products:** a 101st product appears.
+    - **The pricing views:** a 201st product, a 101st schedule and a 10,001st price all reach the view.
+    - **Subscription Revenue:** a 10,001st charge counts in the total, and a 10,001st subscription in the past-due count.
 
 ### 17.2 The staff portal
-- [ ] Each of these gets the pager:
+- [x] Each of these gets the pager:
 
   | Page | List | A page |
   |---|---|---|
@@ -3068,8 +3085,17 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
   **Check-In** and **Class Check-In** stay unpaged: they are working screens with their own search (OQ-32).
 
+  - *As built*, each list with its own specs:
+    - **The session card** is one shared component, so **My Sessions** and **Manage** ▸ **Event Sessions** get the same three pagers.
+    - **Filters:** on both session pages the year and month filters go back to page 1. On **Event Sessions**, so do status, product and instructor.
+    - **Person Skills:** choosing another person puts both lists back on page 1. Both lists stay at 10 a page, as the table says.
+    - **My Service Bookings:** the provider schedule links to one booking, and the list now opens on that booking's page, expanded. Without this, a booking on page 2 would open out of sight.
+    - **Student Notes** is the page the dashboard tile of that name opens ("Notes from your students").
+    - **Shift Requests:** the client rows' last divider used `:last-child`, which the pager now breaks, so it is `:last-of-type`, with a test.
+    - **Not paged:** the booking lists that appear only after **Accept** or **Submit** on **Shift Requests** (staff) or **Review** (Manage). The plan named only the affected clients and bookings.
+
 ### 17.3 Manage
-- [ ] Each of these gets the pager:
+- [x] Each of these gets the pager:
 
   | Page | List | A page |
   |---|---|---|
@@ -3104,17 +3130,80 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - **Left as they are:**
   - A price schedule's embedded prices table. It already pages, 20 a page, but its buttons jump to **Manage Data**. That is a library control, so it is noted here rather than changed (OQ-32).
   - The two `/admin/event-session/…` pages. No link reaches them.
+- *As built*, each list with its own specs:
+  - **Not paged, against the table:**
+    - **Announcements** are ordered with ↑ ↓, like the Page Content rows, so OQ-32 leaves them unpaged.
+    - **The pricing views** are a report (OQ-32). Only their caps went (17.1).
+  - **Scheduling Exceptions** page over their cards, ten a page. Each card is one run of blocked dates, and the page shows no group headings, so there is no heading to repeat.
+  - **Tables:** **Products** and **Price Schedules** are Material tables. Each is given one page of rows, cut once per change, so the table doesn't redraw on every check.
+  - **Adding and editing:**
+    - On **Instructors**, **Skills** and **Class Tags**, an edit or a cancelled **Add** comes back to the page it left.
+    - On **Membership Tiers**, a toggle keeps the page.
+    - On **Image carousels**, a new carousel's page is shown, with its photo panel open.
+  - **Filters go back to page 1:**
+    - **Subscriptions:** status, year and month
+    - **Entitlements:** status, search and year
+    - **Vouchers** and **Coupons:** search, and the date filters
+    - **Class Schedules:** another class
+    - **Room Schedules:** another room or product
+    - **Attendance Templates:** another member
+    - **Opening another record:** another subscription, or another voucher's or coupon's redemptions, starts at page 1.
+  - **Removals:** on every list where a row can go (a delete, an approval or a denial, an unblock, a dismissed alert), removing the only row on the last page shows the page before.
+  - **Room Occupancy** refreshes every 30 seconds and keeps its page.
+  - **New spec file:** Room Occupancy had none.
 
 ### 17.4 Screenshots
-- [ ] 16.5's spec extends to every page in 17.2 and 17.3, with the same checks and the same folder. Claude reviews each picture.
+- [x] 16.5's spec extends to every page in 17.2 and 17.3, with the same checks and the same folder. Claude reviews each picture.
+  - *As built:*
+    - **Many-row data:** the many-rows mock (16.2) now fills every Phase 17 list with 23 rows, one seeding method per group of pages. Each group has a test in `ServerAccess.mock.spec.ts` that counts its lists at 23. Those tests also check that every Phase 16 list is still 23.
+    - **Totals other than 23:**
+      - **Vouchers** read 46: the voucher list holds My Vouchers' 23 active and 23 spent.
+      - **Image carousels** read 24: the three seeded and the Gallery's albums.
+    - **What the spec covers:** 33 pages and 53 lists. The session card's attendees and staff are checked on both session pages.
+    - **Steps before a list shows:** some lists need one first, such as choosing a person, opening a card or a tab, or showing inactive schedules. The spec does them, moving the pinned clock on after a typed search.
+    - **All 212 pictures were read**, by four reviewers.
+  - **Fixed here**, each with a test:
+    1. **Shift Requests** (Manage): a request's notice, "Approving will reassign these bookings…", sat 8 px under the bookings' pager, which then read as part of the notice. It now keeps the pager's own 16 px when the pager shows.
+    2. **My Service Bookings:** the **Past** heading sat against the Upcoming pager. The template's 24 px had never applied (the component's own margin beat it), so before paging it touched the last card.
+  - **Left for OQ-38:** the columns of **Products**, **Membership Tiers** and a session card's **Staff** table shift by 25–175 px between pages. Each table sizes its columns to the rows it shows. **Blog Posts** has done the same since Phase 16.
+  - **Seen on the pages, unrelated to paging** (they predate Phase 17, and are not changed):
+    - **Cut off on a phone:**
+      - **Entitlements:** the rows' text is squeezed into narrow columns and clipped top and bottom ("60-/Minute/Massage").
+      - **Class Schedules:** the instance, schedule and slot headers have a fixed height, so names and times lose their first and last lines, an icon is drawn over another, and a slot's delete icon is missing.
+      - **A session card's Staff table** is wider than the card, with **Notes** cut off; unlike the other tables, it doesn't scroll sideways.
+      - **My Service Bookings:** past bookings' titles are clipped by the panel header.
+    - **Squeezed on a phone:**
+      - the text on **Image carousels**, **Student Notes** and **Event Sessions** (where the date runs into the booked count: "6:00 PM0 / 20")
+      - the buttons on **Vouchers** ("View Redemptions") and a provider's templates, which wrap and fill the button
+      - **Scheduling Exceptions:** the badge breaks as "STUDIO- / WIDE"
+      - the info and warning icons on both **Shift Requests** pages, and the calendar icon on the session cards
+    - **Run together:** on **Shift Requests** (staff), a client's service and email ("Massageclient1@example.com").
+    - **Alignment:**
+      - the session cards touch each other (each card's `:last-child` rule matches itself)
+      - availability blocks' times, and a session's price-override boxes, don't line up from row to row
+      - the **Requires Attention** alerts sit centred in their cards (the page's `.alert-card` shares the global class's name)
+      - in several tables only the first header cell is tinted, and on **Membership Tiers** the pinned first column paints over the green of an offered tier
+      - dates in phone tables break mid-range ("Mar 1, 2025 – Mar / 31, 2025")
+    - **Behaviour:**
+      - **Event Payment Info** never finishes loading when none of a session's bookings has a purchase item.
+      - **Room Schedules** shows the previous room's product overrides until the new ones arrive.
+      - **Subscription Revenue**'s past-due and cancelled "revenue" fields hold counts, not cents.
 
 ### 17.5 Mutation check
-- [ ] Planned:
+- [x] Planned:
   - a cap restored (`page_size` 1000)
   - **Subscription Revenue** reading 10,000 again
   - a nested list at 10 instead of 5
   - a session card's attendees unpaged
   - the year and month filters not going back to page 1
+  - *As built:* **all caught**, plus the year and month filters on both session pages and the two 17.4 fixes. That is **8 of 8**:
+    - **My Sessions** asking for 1,000 again: its page-size-0 test.
+    - **Subscription Revenue** reading 10,000 charges: two tests, including the 10,001st charge in the total.
+    - A session card's staff at 10 a page: three tests.
+    - Its attendees unpaged: two tests.
+    - The year and month filters keeping the page: one test each on **My Sessions** and **Event Sessions**.
+    - The notice's 16 px under the pager, and the **Past** heading's 24 px: one test each. Without the fix the heading measured 0 px from the pager.
+    - Every file was restored byte for byte afterwards.
 
 ### 17.6 Verification
 - [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
@@ -3122,7 +3211,22 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - [ ] No server change.
 
 ### 17.7 Hand-testing walkthrough
-- Written when 17 is built. It will use the Manage lists that have more than ten rows on a fresh database; the screenshots (17.4) cover the rest.
+
+**Setup.** A fresh database, the server and `ng serve` running, with a window at least 1280 px wide. On a fresh database only three of Phase 17's lists are long enough to page; the screenshots cover the rest.
+
+1. **Sign In** as `masonbendixen@gmail.com` / `pass`. **Admin** → **Manage Products** → **Membership Tiers** tile.
+   - The table shows ten permissions, then "‹ Previous · 1–10 of 13 · Next ›" under it.
+   - Click **Next ›**: "11–13 of 13", with **silver_member**, **staff_access** and **view_admin_instructor_load**. **Next ›** is greyed.
+   - Tick **Offered for pricing** on one of the three. The page stays on "11–13 of 13".
+   - Untick it again, so the database is as it was.
+2. **Admin** → **Manage Products** → **Service Providers** tile → **Availability** on **Caleb Ault**'s card.
+   - **Provider Availability** shows ten blocks and "1–10 of N". N is about 28; it depends on the day the database was made, since the seed fills from that day to the end of next month.
+   - **Next ›** moves on to "11–20 of N".
+3. **Admin** → **Manage Products** → **Room Occupancy** tile. On the **Main Gym** card, **Projected occupancy:** shows five rows and "1–5 of 9".
+   - Click **Next ›**: "6–9 of 9".
+   - Wait 30 seconds for the page's refresh: it stays on "6–9 of 9".
+4. **Admin** → **Manage Products** → **Instructors** tile: five instructors and no pager. A list that fits on one page looks as it did.
+5. Open `ui\e2e\mobile-audit\output\pagination\`. The pictures whose names start `staff-` and `manage-` are one phone and one desktop picture of page 1 and of the last page, for every list in 17.2 and 17.3.
 
 ---
 
@@ -3334,6 +3438,25 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 - → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
+
+**OQ-38 — Table columns that shift from page to page.** *(17.4's screenshots, 10/23.)*
+- A table sizes its columns to the rows it shows. Now that a page shows ten rows, a long value on one page widens its column there and not on the next. On a desktop, the columns move between pages by:
+  - **Products:** 25–55 px
+  - **Membership Tiers:** about 80 px
+  - a session card's **Staff** table: up to 175 px
+- **Blog Posts** has done the same since Phase 16. Nothing overflows or is cut off, and phones are hardly affected.
+- **Default:** leave it.
+- **Alternative:** fixed column widths on those four tables. The columns then stay put, but a long name wraps in its fixed column instead of widening it.
+- Say which.
+
+**OQ-39 — A product page's latest-10 lists have no View All.** *(17.1, 10/23.)*
+- The plan said a product page's **Event Sessions**, **Active Subscriptions** and **Recent Purchases** show the latest 10 with a **View All** link, so 17.1 left them alone. Only an event product's **Event Sessions** has that link.
+- For other products, the 11th subscription or purchase can't be reached from the product page.
+  - **Manage** ▸ **Subscriptions** with its **Product** filter lists every subscription of a product.
+  - No page lists one product's purchases.
+- **Default:** leave them as they are.
+- **Alternative:** page **Active Subscriptions** and **Recent Purchases** five at a time, like the page's other lists, so every row can be reached there.
+- Say which.
 
 ### Resolved
 
