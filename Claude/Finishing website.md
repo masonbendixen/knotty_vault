@@ -3448,7 +3448,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
 - → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 19. Until then the instructor digest and, after Phase 11, password-reset emails to these three go nowhere.
 - Mason- Here are the remaining emails:
-	- 
+	- Beth Cooper - bethismoving@gmail.com
+	- Gifford Cheung - giffordcheung@gmail.com
+	- Tiana Cheung - tianabun@hotmail.com
 
 **OQ-11 — Where are the photos?**
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
