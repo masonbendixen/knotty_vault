@@ -572,6 +572,7 @@ How the site crops each kind, so the subject survives the crop:
   - → 10/23: the second batch is in `D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG\`: six JPEGs, named as in 1.1.
     - `IntermediatePartnerAcro.jpg` there is byte for byte the 10/20 original, so it changes nothing.
     - The twelve `.heic` files in the folder above it are left alone, as before.
+    - → 10/23, later: a seventh, `Class.jpg`, joined them for the home page's **Types of classes** (13.12). Upright, 4:3, no EXIF or GPS.
 - [x] Claude converts each into `server/knottyyoga_server/src/database_helper/img/` with **ffmpeg**:
   - JPEG, long edge 2000 px, `-q:v 3`, under about 1.5 MB.
   - Phone rotation applied.
@@ -2198,6 +2199,7 @@ Uses Phase 1's files.
 
 **Status: implemented 10/20/2026, and committed as `13a7d74d`.** Six photos and all five bios are in. Four photos were still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
 - → 10/23: Beginner Knotty Yoga, Aerial Rope and Massage are in, with new Handstands and Beginner Partner Acro photos. **13.11** attaches them: built 10/23, not committed. Only the studio picture is still to come (OQ-11).
+- → 10/23, later: the home page's **Types of classes** and **Additional health services** show `Class.jpg` and `Massage.jpg` in place of the design's stand-ins. **13.12**, built 10/23, not committed.
 
 ### 13.1 Table-driven photo attachment *(seed)*
 - [x] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
@@ -2458,6 +2460,48 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
 2. Click the **Aerial Rope** card. The picture beside the description is the whole photo: both people, the ropes and the floor.
 3. **Services** (page headed **Our Services**). The **Massage** card's picture shows both Caleb's face and his elbow on the client's back.
 4. Make the window as narrow as it goes. The Massage picture still shows both.
+
+### 13.12 The home page's two feature photos *(seed; added 10/23 from Mason's request; built 10/23, not committed)*
+
+Mason, 10/23: "On the home page, for the Additional health services photo, please use Massage.jpg. For the Types of classes photo, please use `D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG\Class.jpg`."
+
+| Home section | Was | Now |
+|---|---|---|
+| **Types of classes** | `home_class_types.jpg`, the design's stand-in | `Class.jpg`: a class stretching in the red aerial fabrics |
+| **Additional health services** | `home_health_services.jpg`, the design's stand-in | `Massage.jpg`, the same file as the **Services** card (13.11) |
+
+**Files**
+- [x] Convert `Class.jpg` into `src/database_helper/img/` as 13.11 did: ffmpeg, long edge 2000 px, `-q:v 3`, all metadata stripped.
+  - *As built:* 2000 × 1500, 397 KB. The original (5712 × 4284) carries no EXIF, GPS or rotation flag. It was opened after conversion: upright, the whole class in frame.
+- [x] Neither picture is cropped. A home feature shows its picture whole, at the picture's own shape (`feature-section`: full column width, height auto). Both are 4:3, so these two blocks stand a little taller than the design's 1.58:1 stand-ins. "Why Knotty Yoga" keeps its picture.
+- [x] The two stand-ins are deleted from `img/`: nothing else referenced them. Git still has them.
+
+**Seed** *(create_database.cpp `PopulateHomeSectionsImpl`)*
+- [x] **Types of classes** → `Class.jpg`; **Additional health services** → `Massage.jpg`. Both are still stored as JPEGs.
+- Not changed: the page's request for a feature picture (a 944 × 598 box). A 4:3 picture fits it at 797 × 598, wider than the 708-pixel stand-ins it replaces.
+
+**Tests** *(create_database_test.cpp)*
+- [ ] New `SeededHomeFeaturesShowTheStudiosOwnPhotos`: reads the rows through the home page's feed (`GetActiveHomeSections`) and each picture through the photo reader behind `/api/get_scaled_photo`. Each row's picture is its file byte for byte, a JPEG, and 4:3.
+  - The expected file is named in the test, not read from the seed, so two rows given one file fail.
+
+**Mutation check**
+- [ ] Planned:
+  - **Types of classes** back on its stand-in
+  - **Additional health services** back on its stand-in
+  - **Additional health services** given `Class.jpg`
+  - `Class.jpg` replaced by a 1.58:1 picture beside the test program. The seed and the test read the same copy, so only the 4:3 check can see this one.
+
+**Verification**
+- [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
+- [ ] `Class.jpg` and `Massage.jpg` hash-checked beside the database helper and the test program on both platforms.
+- [ ] End to end: `--install_schema` into a throwaway database, then the real server. Signed out, the home page's feed lists both rows, and each picture comes back at the page's own request size.
+
+**Hand-testing walkthrough**
+
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a wide window, signed out.
+1. **Home**. Scroll past **Why Knotty Yoga**. **Types of classes** shows a class stretching in red aerial fabrics, in an orange room, with the picture on the right.
+2. Under it, **Additional health services** shows Caleb giving a massage, his elbow on the client's back, with the picture on the left.
+3. Make the window as narrow as it goes. Each picture sits above its words, and is still whole.
 
 ---
 
