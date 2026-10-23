@@ -2427,9 +2427,14 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
 - [ ] knottyyoga, Windows and Linux, with the same test names on both; Angular `ng test` on both, `tsc`, `ng lint`, `ng build`, and the Playwright layout specs. The desktop compare will report **Services** as taller, which is expected.
   - *As built,* Angular and Playwright: see 17.8, which ran with this. **Windows: 3992 passed. Linux: 3992 passed.** Layout specs 378 passed, none failed.
   - The desktop audit of **Services**: 1280 × 800 → 1280 × 807, taller as expected. The mock's one pictured service now has a 376 × 282 frame where the strip was 160 px tall. The other pages the compare lists were already different from Phase 0's baseline before this change.
-- [ ] End to end: `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
+- [x] End to end: `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
   - The log attaches six class pictures and the massage picture, with no `seed_image_missing`.
   - Signed out, all six classes serve a picture, and the Services feed has Massage with `has_photo`.
+  - *As built,* on Linux, into a throwaway `knottyyoga_e2e_1311`, dropped afterwards:
+    - The install log attaches all six class pictures and `Massage.jpg`. There is no `seed_image_missing`, `seed_image_failed` or `seed_lookup_missing` line.
+    - Signed out, each class serves its picture at the **All Classes** card's request. The four new files come back 540 × 405. Intermediate Partner Acro (540 × 490) and Knotty Yoga (540 × 361) are as before.
+    - `/api/catalog_products` lists Massage with `has_photo` true. The Services card's own request comes back **1152 × 863**: 4:3, and twice the widest card.
+    - The server refuses to start with an empty mail password, so the install was given a dummy one. Nothing was mailed: the run only reads, signed out.
 
 **Hand-testing walkthrough**
 
