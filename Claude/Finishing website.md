@@ -985,6 +985,7 @@ Defence in depth for 4.0's cause. 4.1 alone already turns it into one reconnect 
 
 **Implemented 10/16/2026 (evening Pacific).** Windows 5252 passed, Linux 5252 passed. The two runs executed the same 5252 test names; Phase 4's 5244 plus 8 new. The Linux database helper, server and test helper all build, and the log says `honuware : pinned SHA`. **Committed 10/17 as `5ebb942a`** ("Phase 5 — People, roles and instructors"), pushed, and master's pipeline is green.
 - **Not tagged, on purpose.** Production re-runs only `--migrate`, which never re-seeds (fact 6), so a `sandbox.11` would change nothing on the live site. The only shipped code is `set_password`, and it has nobody to act on until the reinstall creates the three instructors. Phase 5 reaches production with the one Phase 19 release (its first step).
+- → 10/23: **5.8** (the instructors' real addresses) built, not committed.
 
 ### 5.1 Temporary password *(business logic; answers OQ-2)*
 - [x] New `business_logic/accounts/temporary_password.{h,cpp}` in `knotty_yoga_core`: `Accounts::SetTemporaryPassword(transaction, databaseHelper, secrets, email, password)`.
@@ -1114,7 +1115,8 @@ Mason sent them on 10/23:
 - [x] `kBethEmail`, `kGiffordEmail` and `kTianaEmail` in `seed_app_data.h` become these. Every seeder and test already goes through the three constants, so nothing else in the seed changes.
   - *As built:* the three lines and their comment, which now says these are real mailboxes. Nothing else in the repo named the placeholders.
 - **One more effect: the three can be found by staff.** The staff people search, behind **Search for a person** on **Person Skills**, hides every address ending in `@knottyyoga.local`, the scheduler account's domain. So under the placeholders none of the three could be found there. With their real addresses they can.
-- [ ] Test: each of the three is found by the staff people search, through the endpoint **Person Skills** calls. Under the placeholders it finds none of them.
+- [x] Test: each of the three is found by the staff people search, through the endpoint **Person Skills** calls. Under the placeholders it finds none of them.
+  - *As built:* `StaffSearchFindsTheNewInstructorsByName` seeds the real people, signs in as a staff member, and searches as the page does. "Cooper" offers exactly Beth's address; "Cheung" offers exactly Gifford's and Tiana's.
 - [ ] Mutation: one constant put back to its placeholder fails that test.
 - [ ] Verification: knottyyoga, Windows and Linux, with the same test names on both.
 - **From now on a local database holds three real people's addresses.** A local run that mails an instructor reaches them, for example a **Forgot password?** asked for under one of their addresses. The walkthroughs send mail only to `masonbendixen@gmail.com`.
@@ -2175,7 +2177,7 @@ During development, knottyyoga builds against the local `server_components` chec
 Uses Phase 1's files.
 
 **Status: implemented 10/20/2026, and committed as `13a7d74d`.** Six photos and all five bios are in. Four photos were still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
-- → 10/23: Beginner Knotty Yoga, Aerial Rope and Massage are in, with new Handstands and Beginner Partner Acro photos. **13.11** attaches them; not built yet. Only the studio picture is still to come (OQ-11).
+- → 10/23: Beginner Knotty Yoga, Aerial Rope and Massage are in, with new Handstands and Beginner Partner Acro photos. **13.11** attaches them: built 10/23, not committed. Only the studio picture is still to come (OQ-11).
 
 ### 13.1 Table-driven photo attachment *(seed)*
 - [x] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
@@ -2190,8 +2192,8 @@ Uses Phase 1's files.
   - → `PopulateInstructors` now writes the rows and bios only. The bootstrap runs `PopulateSeedPhotos` **after** it (`create_database.cpp`); it used to run before, when the headshots didn't need instructor rows. A headshot's instructor row is found from the person's email.
 - [ ] Rows (files from 1.1):
   - [x] instructors: Mason, Caleb, Beth, Tiana, Gifford
-  - [ ] classes: all six. **Four are in:** Knotty Yoga, Handstands and Beginner Partner Acro keep their pictures, and Intermediate Partner Acro is new. Beginner Knotty Yoga and Aerial Rope wait for their photos. *(→ 10/23: both are in; 13.11.)*
-  - [ ] product `massage` → `Massage.jpg` *(→ 10/23: in; 13.11)*
+  - [x] classes: all six. **Four are in:** Knotty Yoga, Handstands and Beginner Partner Acro keep their pictures, and Intermediate Partner Acro is new. Beginner Knotty Yoga and Aerial Rope wait for their photos. *(→ 10/23: all six, with new Handstands and Beginner Partner Acro pictures; 13.11.)*
+  - [x] product `massage` → `Massage.jpg` *(→ 10/23: 13.11)*
   - [ ] facility `knotty-yoga-studio` → `Studio.jpg` *(waiting for the photo)*
 - [x] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
   - → `MasonInstructor.jpg` and `CalebInstructor.jpg` are the new headshots, so each instructor picture now differs from that person's profile photo. Before, they were copies of each other.
@@ -2206,7 +2208,7 @@ Uses Phase 1's files.
   - → `PopulateSeedPhotosPutsEachListedFileOnItsRow`. "Exactly one" is guaranteed by the upload itself, which replaces a row's earlier photo. So the test checks something stronger: each listed row's stored picture is **byte for byte the listed file**, read back through the reader the photo endpoints serve from, with the right type. That is what catches two rows swapped.
   - → The same test reads all five instructors through the Instructors page's own reader (`hasPhoto`). It also checks that the classes left out are exactly Beginner Knotty Yoga and Aerial Rope, and that neither has a picture.
   - → Replaced: `PopulateSeedPhotosAttachesProfileAndClassPictures` and `PopulateInstructorsCreatesBothWithTheirOwnHeadshots`. `PopulateInstructorsSeedsAllFiveWithTheirBios` no longer checks photos; instead it checks that each bio names its instructor, which the one-line defaults didn't.
-- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader. *(With their photos. → 10/23: massage's is in 13.11.)*
+- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader. *(With their photos. → 10/23: massage's is done in 13.11, `ServicesShowsTheMassagePhoto`; the studio's waits for its photo.)*
 
 ### 13.3 Headshots crop from the top *(ui; added 10/20)*
 - [x] Every instructor picture is shown in a square, `object-fit: cover`. The server only shrinks a picture to fit, so a 3:4 portrait reaches the page as 192 × 256, and the page cut the square from its **middle**. On the new waist-up headshots that cut the top of the hair off Beth, Caleb, Gifford and Tiana. 1.1 asked for head-and-shoulders; the cheaper fix than a reshoot is to crop from the **top**.
@@ -2382,10 +2384,16 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
   - *As built:* the widest the card gets is just under 576 px: one column, just before the grid splits in two. The square passed is 384, so the 3× box is 1152 px, twice that width. A desktop card (376 px) gets three times its width.
 
 **Tests**
-- [ ] `PopulateSeedPhotosPutsEachListedFileOnItsRow`: no class is left without a picture, so its expected leftovers become none. It already compares each stored picture byte for byte with its listed file, which covers the two replaced files.
-- [ ] Massage through its public reader (13.2's open item): the **Services** feed's Massage product has `has_photo`, and its picture is `Massage.jpg` byte for byte.
-- [ ] `EverySeedPhotoFileExists` covers the new files without a change.
-- [ ] The Services card's spec: the picture is 4:3 at the card's width, and its address is `coverPhotoUrl`'s.
+- [x] `PopulateSeedPhotosPutsEachListedFileOnItsRow`: no class is left without a picture, so its expected leftovers become none. It already compares each stored picture byte for byte with its listed file, which covers the two replaced files.
+  - *As built:* every class is checked, and a class has a picture exactly when the table lists it.
+  - **Added: each class's picture is a different one**, read back through the same reader. The byte comparison alone can't see one file listed against two classes: each row then matches its own listing. That is the planned "Aerial Rope given Beginner Knotty Yoga's file" mutation, which nothing caught until this check.
+- [x] Massage through its public reader (13.2's open item): the **Services** feed's Massage product has `has_photo`, and its picture is `Massage.jpg` byte for byte.
+  - *As built:* `ServicesShowsTheMassagePhoto` reads the public catalog, the feed the **Services** page reads. Massage is there as a bookable service, with `has_photo`.
+  - Its stored picture is the file byte for byte, as a JPEG, and **4:3**. That last check is what pins the crop: an upright file fails it.
+- [x] `EverySeedPhotoFileExists` covers the new files without a change.
+- [x] The Services card's spec: the picture is 4:3 at the card's width, and its address is `coverPhotoUrl`'s.
+  - *As built:* measured with the page 320 and 560 px wide: the picture fills the card inside its border, and its height is three quarters of its width. A fixed height can't pass at both.
+  - A second spec checks that the box asked for is at least twice the widest card.
 
 **Mutation check**
 - [ ] Planned:
@@ -3153,7 +3161,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Screenshots: all **212** read, with the findings in 17.4.
 - **New open questions:** OQ-38 (table columns that shift from page to page) and OQ-39 (a product page's latest-10 lists have no **View All**).
 
-**Still to do:** Mason commits and hand-tests 17.7. On 10/23 he kept OQ-38's default and chose OQ-39's alternative, which is new item **17.8**, not built yet.
+**Still to do:** Mason commits and hand-tests 17.7 and 17.8. On 10/23 he kept OQ-38's default and chose OQ-39's alternative, which is new item **17.8**, built the same day and not committed.
 
 ### 17.1 The silent caps go *(ui)*
 - **Today**, each list below asks `get_filtered_table_rows` for one page of a fixed size and never reads the total, so anything past the cap never appears. For example, a 101st product is missing from **Products**, and the 1,001st event session from **Event Sessions**.
@@ -3185,7 +3193,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
       - the pricing views' prices (10,000) and permissions (100)
       - a product page's permissions, which its booking windows page over (100)
     - **Left alone:** one-row lookups, and the three latest-10 lists. Only an event product's **Event Sessions** has a **View All**; the other two have none (OQ-39).
-      - → 10/23, Mason: page those two. That is **17.8**.
+      - → 10/23, Mason: page those two. That is **17.8**, now built.
 - [x] Specs: each page's request asks for everything, and its eleventh row is reachable on page 2.
   - *As built:*
     - **Every changed request** has a spy checking page size 0.
@@ -3372,14 +3380,27 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
 - Not changed:
   - An event product's **Event Sessions** keeps its latest 10 and **View All Event Sessions**.
   - **Active Subscriptions** still lists every status, each with its badge.
-- [ ] Specs:
+- [x] Specs:
   - Each request asks for everything.
   - The sixth row is on page 2.
   - With 23 subscriptions, page 1 looks up five names, **Next ›** looks up the next five, and **‹ Previous** looks up nothing.
-- [ ] Screenshots: the many-rows mock gives a membership and a one-time product 23 rows each. The pagination spec photographs both lists, with 17.4's checks.
-- [ ] Mutation check, planned:
+  - *As built,* in the product page's spec, eight in all:
+    - both requests ask for page size 0; the two latest-10 specs they replace said 10
+    - each list: page 1, the sixth row first on page 2, the last three on page 5, and no pager at five rows
+    - the lookups: the people asked for are exactly 101–105, then 101–110, and still 10 after **‹ Previous**; the charges likewise
+    - a subscription on page 2 gets its entitlement ("6 seats"), and one on page 3 has been looked up for nothing
+    - the last card has no margin under it, and the others do
+- [x] Screenshots: the many-rows mock gives a membership and a one-time product 23 rows each. The pagination spec photographs both lists, with 17.4's checks.
+  - *As built:* the mock's 23 subscriptions were already all product 3's, **Monthly Membership**. Product 2, **60-Minute Massage**, gets 23 purchases in a `purchase_items` table, which the mock never had. The mock's spec counts both.
+  - The pagination spec photographs product 2's **Recent Purchases** with its other lists, and product 3's **Active Subscriptions** as a new page.
+- [x] Mutation check, planned:
   - the 10-row cap back
   - every row's name looked up at once
+  - *As built:* **4 of 4 caught**, each on its own run, and each file restored byte for byte:
+    - **Active Subscriptions** asking for 10: its page-size-0 spec
+    - **Recent Purchases** asking for 10: its page-size-0 spec
+    - every subscription enriched at load: the lookup spec and the page-3 spec
+    - the last card's margin by `:last-child` again: the margin spec
 - [ ] Verification: Angular `ng test` on Windows and Linux, `tsc`, `ng lint`, `ng build`, and the pagination spec. No server change.
 
 **Hand-testing walkthrough.** On a fresh database neither list has more than one row, so the screenshots show the paging. This checks by hand that the names and entitlements still arrive. A fresh database, the server and `ng serve` running, a wide window:
@@ -3607,6 +3628,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **Still to come: the studio picture** (1.1 item 13, `Studio.jpg`), for **About** ▸ **Our Location**. It needs the facilities loop as well as the file (13.1). Until it arrives, 18.3's step 9 finds Our Location without a picture.
   - **Knotty Yoga** keeps today's picture.
   - The massage photo's framing is OQ-40.
+- → 10/23, later: **13.11 is built.** All six classes and the Massage card have their pictures. Only `Studio.jpg` is still to come.
 
 **OQ-40 — The massage photo is upright; the Services card shows a wide strip.** *(Found checking the new photos, 10/23.)*
 - The **Services** card shows its picture across the top of the card, 160 px tall. That strip is about 2.3 times as wide as it is tall on a desktop (about 375 × 160), and 2.2 times on a phone.
@@ -3619,6 +3641,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - The **Services** card shows its picture at 4:3, about 375 × 280 on a desktop, instead of the 160 px strip. A picture uploaded later for any service gets the same 4:3 frame.
 - **Alternative:** keep the 160 px strip and crop the photo to Caleb's face and fist. Or a landscape reshoot.
 - Say which.
+- → 10/23: **13.11 is built with the default**, so the walkthrough there shows it. One difference from the plan: the photo can't run from above his head to his elbow at 4:3. The crop keeps his face, his fist and the elbow on the client's back, and cuts the top of his hair (13.11, Files). The alternative is still a small change: the card's CSS and a re-crop.
 
 ### Resolved
 
