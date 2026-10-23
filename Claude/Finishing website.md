@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/22/2026
-Version: 0.29
+Last Updated: 10/23/2026
+Version: 0.30
 tags: 
 ---
 # Overview
@@ -83,6 +83,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.30 (10/23/2026)** — **OQ-36 and OQ-37 answered, and Phase 16 checked on Linux.**
+  - **OQ-36 and OQ-37:** Mason kept both defaults, and both are moved to Resolved. My Bookings keeps its two pagers, and the three-column grids keep ten a page.
+  - **Linux:** `ng test` as CI runs it failed one test: 14.10's headline sweep at 320 px. That test is in the Phase 14 commit already. The runner has neither Barlow nor Arial, and in its wider font the clause doesn't fit the line. The sweep now checks first whether the clause can fit, and lets off only widths under 360 px. No change to the page (16.7).
+  - **Results:** Windows 3786 passed, Linux 3786 passed.
 - **v0.29 (10/22/2026)** — **Phase 16 is built**, and not committed. All in `ui/`.
   - **The pager:** one pager, "‹ Previous · 1–10 of 23 · Next ›", now on 48 lists across 27 pages. It replaces the three earlier ones: Blog, Attendance History (now 10 a page) and the admin Blog Posts' Material paginator.
   - **Many-rows mock:** `knottyyoga.mockManyRows` gives every one of those lists 23 rows.
@@ -2664,6 +2668,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - `keepClosingClauseTogether`: the seeded headline; only the last comma's clause; no comma, or one at the end; a four-word clause left alone
   - the lines are balanced
   - in real viewports from 320 to 2560 px, every 40 px: "life, the right way." always shares one line
+    - *Fixed in 16.7 (10/22):* this failed on Linux, as CI runs it, at 320 px only. The runner has neither Barlow nor Arial, and in its wider fallback font the clause doesn't fit a 288 px line. Each width now checks first whether the clause fits in the font the browser has, and only a width under 360 px may be let off.
 - [x] Karma, `page-content.component.spec.ts`: a hero row offers no **Body**, and a feature row still does.
 - [x] Playwright, `layout/home.spec.ts`: with the real typeface, at 18 widths from 320 to 2560 px (both top pictures), "life, the right way." always shares one line. Screenshots `top-picture-360.png`, `-1680.png` and `-1920.png`.
 - [x] C++, `SeedAppDataTest.PopulatePublicPhotoSizeLimitRaisesTheFrameworkCap`: starting from honuware's own defaults (taken from the framework, and checked to be 800), both settings read 2048 through `SecretsHelper`, the reader `/api/get_scaled_photo` clamps with.
@@ -2809,7 +2814,9 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Mutations: **9 of 9 caught**.
 - Screenshots: all **192** read, with the findings in 16.5.
 
-**Still to do:** Mason commits, answers OQ-36 and OQ-37 if he wants a change, and hand-tests 16.8.
+**Linux, as CI runs it:** **3786 passed**, after one fix to a 14.10 test (16.7). OQ-36 and OQ-37 kept their defaults, so nothing changed for them.
+
+**Still to do:** Mason commits and hand-tests 16.8.
 
 **What exists** (inventoried 10/21):
 - Only four lists page today:
@@ -2987,6 +2994,13 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
   - *As built:* `ng test` **3786 passed** (3669 + 117). `tsc` for the Playwright specs too. All clean, with the same six size-budget warnings.
   - **One test changed** on the way: 14.10's headline sweep built 57 iframes and outran Jasmine's 5-second limit in the full suite. It now reads one iframe resized per width, through the new `acrossViewports()` in `shared/testing/in-viewport-of.ts`, which has its own spec.
+- [x] **Linux, as CI runs it** (10/22, after OQ-36 and OQ-37): `ng test` in `node:22-bookworm` with Chromium.
+  - *As built:* the first run failed **one** test, 14.10's headline sweep at 320 px.
+    - **Why:** that version is already in the Phase 14 commit, so CI has probably been failing it since then. The runner has neither Barlow nor Arial, and in its wider fallback font "LIFE, THE RIGHT WAY." is wider than the 288 px line, so it split "WAY." mid-word.
+    - **On a real phone:** in Barlow or Arial the clause is about 264 px and fits.
+    - **The fix:** each width now first checks whether the clause fits on one line in the browser's font, and only widths under 360 px (the narrowest phone the audit checks) may be let off. No change to the page.
+    - **Mutation checks:** a phone headline too large for the clause now fails at 360 px and up instead of being let off. With both fixes removed (no-break spaces and balanced lines), the sweep fails at 40 widths. Each fix alone keeps the clause together, so removing one is caught by its own one-line test.
+  - **Windows: 3786 passed. Linux: 3786 passed.**
 - [x] The pagination spec at both sizes.
   - *As built:* **54 passed**. The other layout specs at all seven sizes: **256 passed**.
   - Both ran against a dev server started by hand, as in 15.4.
