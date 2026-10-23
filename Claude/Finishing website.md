@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/23/2026
-Version: 0.30
+Version: 0.31
 tags: 
 ---
 # Overview
@@ -83,6 +83,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.31 (10/23/2026)** — **Phase 17 is built**, and not committed. All in `ui/`.
+  - **The silent caps are gone (17.1).** Every list that asked for 100 to 10,000 rows and dropped the rest now asks for every row. Page size 0 already meant that on the server. More turned up than the plan listed, such as a session card's attendees and the product filters (17.1). **Subscription Revenue**'s totals now count every charge.
+  - **The pager is on 51 more lists**, across 33 staff and Manage pages.
+    - Not paged: **Announcements**, which are ordered with ↑ ↓, and the pricing views, which are a report.
+  - **Screenshots:** 212 pictures, all read. Two things the pager made worse are fixed:
+    - a request's notice crowding the pager on **Shift Requests**
+    - the **Past** heading against the pager on **My Service Bookings**
+  - **Results:** Windows 3786 → 3984 passed, Linux 3984 passed. Playwright: 376 passed (the pagination spec's 120 included). 8 of 8 mutations caught.
+  - **New open questions:** OQ-38 (table columns that shift from page to page) and OQ-39 (a product page's latest-10 lists have no **View All**).
 - **v0.30 (10/23/2026)** — **OQ-36 and OQ-37 answered, and Phase 16 checked on Linux.**
   - **OQ-36 and OQ-37:** Mason kept both defaults, and both are moved to Resolved. My Bookings keeps its two pagers, and the three-column grids keep ten a page.
   - **Linux:** `ng test` as CI runs it failed one test: 14.10's headline sweep at 320 px. That test is in the Phase 14 commit already. The runner has neither Barlow nor Arial, and in its wider font the clause doesn't fit the line. The sweep now checks first whether the clause can fit, and lets off only widths under 360 px. No change to the page (16.7).
@@ -3206,9 +3215,15 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     - Every file was restored byte for byte afterwards.
 
 ### 17.6 Verification
-- [ ] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
-- [ ] The pagination spec.
-- [ ] No server change.
+- [x] Angular: `ng test`, `tsc` for the app and the specs, `ng lint`, `ng build`.
+  - *As built:* **Windows: 3984 passed. Linux: 3984 passed** (3786 + 198). Linux ran as CI does: `ng test` in `node:22-bookworm` with Chromium.
+  - `tsc` for the app, the specs and the Playwright specs, and `ng lint`, are clean. `ng build` has the same six size-budget warnings.
+- [x] The pagination spec.
+  - *As built:* **120 passed**, Phase 16's 27 pages and Phase 17's 33, at both sizes.
+  - With the other layout specs at all seven sizes: **376 passed**, 632 skipped, none failed. The other specs' 256 are the same as in Phase 16.
+  - Run against a dev server started by hand, as in 15.4.
+- [x] No server change.
+  - *As built:* page size 0 already meant "every row" on the server (17.1), so nothing changed there.
 
 ### 17.7 Hand-testing walkthrough
 
