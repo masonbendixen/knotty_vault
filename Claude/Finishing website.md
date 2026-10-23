@@ -3349,6 +3349,36 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 4. **Admin** → **Manage Products** → **Instructors** tile: five instructors and no pager. A list that fits on one page looks as it did.
 5. Open `ui\e2e\mobile-audit\output\pagination\`. The pictures whose names start `staff-` and `manage-` are one phone and one desktop picture of page 1 and of the last page, for every list in 17.2 and 17.3.
 
+### 17.8 A product page's subscriptions and purchases, five at a time *(ui; added 10/23 from OQ-39; not built)*
+
+Today a product page's **Active Subscriptions** (a membership's page) and **Recent Purchases** (a one-time product's page) show the latest 10, with no way to reach the 11th. Mason chose to page them.
+- [ ] Both ask for every row (page size 0), newest first as today, and page **5** at a time on the shared pager, like the page's other nested lists (booking windows, the entitlement summary).
+- [ ] **Active Subscriptions** looks up each row's name, latest charge and entitlement only for the five rows shown, when their page is shown, and keeps what it found.
+  - Today it does that for every row it loads, up to three requests a row. Over every subscription of a busy membership, that would be hundreds of requests at once.
+- Not changed:
+  - An event product's **Event Sessions** keeps its latest 10 and **View All Event Sessions**.
+  - **Active Subscriptions** still lists every status, each with its badge.
+- [ ] Specs:
+  - Each request asks for everything.
+  - The sixth row is on page 2.
+  - With 23 subscriptions, page 1 looks up five names, **Next ›** looks up the next five, and **‹ Previous** looks up nothing.
+- [ ] Screenshots: the many-rows mock gives a membership and a one-time product 23 rows each. The pagination spec photographs both lists, with 17.4's checks.
+- [ ] Mutation check, planned:
+  - the 10-row cap back
+  - every row's name looked up at once
+- [ ] Verification: Angular `ng test` on Windows and Linux, `tsc`, `ng lint`, `ng build`, and the pagination spec. No server change.
+
+**Hand-testing walkthrough.** On a fresh database neither list has more than one row, so the screenshots show the paging. This checks by hand that the names and entitlements still arrive. A fresh database, the server and `ng serve` running, a wide window:
+1. **Sign In** as `kiteagle@gmail.com` / `kit`. **Memberships** → **Knotty Yoga Silver Membership** → **Subscribe**. Leave **Start month** as it is, enter the sandbox card `4111 1111 1111 1111` (any future expiry, CVV `111`), and click **Subscribe & Pay $160.00**.
+2. Kit's first-name menu → **Sign Out** → **Log Out**. Sign in as `masonbendixen@gmail.com` / `pass`.
+3. **Admin** → **Manage Products** → **Products** → **Knotty Yoga Silver Membership**. **Active Subscriptions** shows one card:
+   - **Kit Williams**, marked **active**
+   - **Next Billing** with a date
+   - **Entitlement** "1 seat", **Valid** with two dates, and **Entitlement Status** **active**
+
+   There is no pager.
+4. Open `ui\e2e\mobile-audit\output\pagination\`. The pictures whose names start `manage-product-` include both lists, page 1 and the last page.
+
 ---
 
 # Phase 18 — Verification
@@ -3415,7 +3445,7 @@ Then start the server and the Angular app. Accounts:
    - **Massage** is listed with its photo.
    - **Early Bird Spa, Non-Peak Spa, Peak Spa and Late Night Spa are gone.**
    - **About** → **Our Providers** shows **Caleb Ault** only (not Mason).
-   - **About** → **Our Location** shows the studio photo, and text beginning "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes…" with the 520 directions. No climbing wall, no "Street parking is free after 6pm".
+   - **About** → **Our Location** shows the studio photo (once `Studio.jpg` is in; OQ-11), and text beginning "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes…" with the 520 directions. No climbing wall, no "Street parking is free after 6pm".
 
 **Silver member: Silver opens Beginner Knotty Yoga and nothing else**
 
@@ -3458,8 +3488,8 @@ Then start the server and the Angular app. Accounts:
 
 **Temporary password (Phase 5)**
 
-23. In `knottyyoga_test_helper` (REPL), run `set_password --email=<Beth's email from OQ-1> --password=Welcome-2026`, or `sp` with the same arguments. It reports that Beth must choose a new password at next sign-in.
-24. Sign out. **Sign In** as Beth with `Welcome-2026`. The site goes straight to **Change Password**, and clicking **My Classes** comes back to it. Fill in:
+23. In `knottyyoga_test_helper` (REPL), run `set_password --email=bethismoving@gmail.com --password=Welcome-2026`, or `sp` with the same arguments. It reports that Beth must choose a new password at next sign-in. (It sends no mail.)
+24. Sign out. **Sign In** as Beth: `bethismoving@gmail.com` with `Welcome-2026`. The site goes straight to **Change Password**, and clicking **My Classes** comes back to it. Fill in:
     - **Old Password**: `Welcome-2026`
     - **Reenter Old Password**: `Welcome-2026`
     - **New Password**: one of your choosing
@@ -3501,7 +3531,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - `--env-file /etc/knottyyoga/server.env`
 
 ### 19.1 Before
-- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg` and `home_hero_mobile.jpg`.
+- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg` and `home_hero_mobile.jpg`, and 13.11's `BeginnerKnottyYoga.jpg`, `AerialRope.jpg` and `Massage.jpg`.
 - [ ] Manual RDS snapshot, named for this change. It is cheap insurance even though nothing is being kept.
 - [ ] Have the `set_secret` block from Deploying to AWS 5.1 step 6 ready, with `website_address_login` = the cloudfront URL until go-live. Check that `mail_app_password` is in it: forgot password and the instructor digest need working mail.
 
@@ -3516,7 +3546,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - [ ] Mason, Caleb and Kit each sign in and change their password: first-name menu → **Profile** → **Change Password** (OQ-10). The seeded ones are in source control. This includes the `masonbendixen@hotmail.com` admin.
 - [ ] For each instructor who should sign in, either:
   - `knottyyoga_test_helper --command=set_password` (5.2), with the temporary password handed over in person, or
-  - once Phase 11 is live and their real email is seeded, they click **Forgot password?** themselves
+  - once Phase 11 is live and their real email is seeded (5.8), they click **Forgot password?** themselves
 - [ ] Paste any bios that arrived late under **Admin** → **Manage Products** → **Instructors** (OQ-15).
 - [ ] The public half of the Phase 18.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
 
@@ -3549,6 +3579,37 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 
 ### Still open
 
+**OQ-11 — Where are the photos?**
+- Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
+- → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
+- → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
+- → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
+- Mason- I put more of the missing / replacement photos at: D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG
+- → 10/23: five photos there are new to the plan, and all five are usable (1.2):
+  - new: **Beginner Knotty Yoga**, **Aerial Rope** and **Massage**
+  - replacements: **Handstands** and **Beginner Partner Acro**
+  - `IntermediatePartnerAcro.jpg` is byte for byte the one already in, so it changes nothing.
+  - New item **13.11** converts and attaches them, not built yet. After it every class has its own picture.
+  - **Still to come: the studio picture** (1.1 item 13, `Studio.jpg`), for **About** ▸ **Our Location**. It needs the facilities loop as well as the file (13.1). Until it arrives, 18.3's step 9 finds Our Location without a picture.
+  - **Knotty Yoga** keeps today's picture.
+  - The massage photo's framing is OQ-40.
+
+**OQ-40 — The massage photo is upright; the Services card shows a wide strip.** *(Found checking the new photos, 10/23.)*
+- The **Services** card shows its picture across the top of the card, 160 px tall. That strip is about 2.3 times as wide as it is tall on a desktop (about 375 × 160), and 2.2 times on a phone.
+- The massage photo is upright (3:4), so the strip keeps only a third of it:
+  - **From the middle**, as the card crops today: Caleb's forearm and the client's back, without his face.
+  - **From higher up:** his face and raised fist, without the massage.
+- 1.1 asked for landscape only for the class photos, so this one wasn't covered.
+- **Default:** two changes, both in 13.11.
+  - The photo is cropped to landscape (4:3) when it is converted, from just above Caleb's head down to his elbow on the client's back.
+  - The **Services** card shows its picture at 4:3, about 375 × 280 on a desktop, instead of the 160 px strip. A picture uploaded later for any service gets the same 4:3 frame.
+- **Alternative:** keep the 160 px strip and crop the photo to Caleb's face and fist. Or a landscape reshoot.
+- Say which.
+
+### Resolved
+
+*Newest first by date: 10/23 (OQ-1, 38, 39), then 10/22 (OQ-26 to 37, in number order), then 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+
 **OQ-1 — Emails for Beth Cooper, Gifford Cheung and Tiana Cheung.** `people.email` is required and unique, and the instructor digest and (after Phase 11) password resets go to it. **Default:** placeholders `beth.cooper@knottyyoga.local` (likewise for the other two), undeliverable like the scheduler account, so the code can land. Real ones are swapped in before Phase 19.
 - Mason- I sent a message to all my instructors asking which email to use.
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
@@ -3557,13 +3618,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 	- Beth Cooper - bethismoving@gmail.com
 	- Gifford Cheung - giffordcheung@gmail.com
 	- Tiana Cheung - tianabun@hotmail.com
-
-**OQ-11 — Where are the photos?**
-- Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
-- → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
-- → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
-- → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
-- Mason- I put more of the missing / replacement photos at: D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG
+- → Plan: new item **5.8**, not built yet. The three constants become these addresses.
+  - It also makes the three findable under **Search for a person**. That search hides every `@knottyyoga.local` address, the scheduler account's domain, so it never found the placeholders.
+  - 18.3's steps 23–24 now name Beth's address.
 
 **OQ-38 — Table columns that shift from page to page.** *(17.4's screenshots, 10/23.)*
 - A table sizes its columns to the rows it shows. Now that a page shows ten rows, a long value on one page widens its column there and not on the next. On a desktop, the columns move between pages by:
@@ -3575,6 +3632,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** fixed column widths on those four tables. The columns then stay put, but a long name wraps in its fixed column instead of widening it.
 - Say which.
 - Mason- We can go with the default
+- → Plan: no change. Each table's columns keep sizing to the rows on its page.
 
 **OQ-39 — A product page's latest-10 lists have no View All.** *(17.1, 10/23.)*
 - The plan said a product page's **Event Sessions**, **Active Subscriptions** and **Recent Purchases** show the latest 10 with a **View All** link, so 17.1 left them alone. Only an event product's **Event Sessions** has that link.
@@ -3585,10 +3643,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** page **Active Subscriptions** and **Recent Purchases** five at a time, like the page's other lists, so every row can be reached there.
 - Say which.
 - Mason- Let's go with the alternative.
-
-### Resolved
-
-*Newest first by date: 10/22 (OQ-26 to 37, in number order), then 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+- → Plan: new item **17.8**, not built yet.
+  - Both lists ask for every row and page five at a time, like the page's other nested lists.
+  - **Active Subscriptions** looks up names and entitlements only for the five rows shown. Today it looks them up for every row it loads.
 
 **OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
 - After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
