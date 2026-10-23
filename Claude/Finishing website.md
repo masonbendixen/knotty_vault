@@ -1101,7 +1101,7 @@ From a fresh local database:
 1. Sign out: **Beth** (the name menu) → **Sign Out**, then **Log Out** in the dialog.
 2. **Sign In** as `kiteagle@gmail.com` / `kit`. There is no **Staff** in the top menu.
 
-### 5.8 The instructors' real email addresses *(seed; added 10/23 from OQ-1; not built)*
+### 5.8 The instructors' real email addresses *(seed; added 10/23 from OQ-1; built 10/23, not committed)*
 
 Mason sent them on 10/23:
 
@@ -1111,7 +1111,8 @@ Mason sent them on 10/23:
 | Gifford Cheung | `giffordcheung@gmail.com` |
 | Tiana Cheung | `tianabun@hotmail.com` |
 
-- [ ] `kBethEmail`, `kGiffordEmail` and `kTianaEmail` in `seed_app_data.h` become these. Every seeder and test already goes through the three constants, so nothing else in the seed changes.
+- [x] `kBethEmail`, `kGiffordEmail` and `kTianaEmail` in `seed_app_data.h` become these. Every seeder and test already goes through the three constants, so nothing else in the seed changes.
+  - *As built:* the three lines and their comment, which now says these are real mailboxes. Nothing else in the repo named the placeholders.
 - **One more effect: the three can be found by staff.** The staff people search, behind **Search for a person** on **Person Skills**, hides every address ending in `@knottyyoga.local`, the scheduler account's domain. So under the placeholders none of the three could be found there. With their real addresses they can.
 - [ ] Test: each of the three is found by the staff people search, through the endpoint **Person Skills** calls. Under the placeholders it finds none of them.
 - [ ] Mutation: one constant put back to its placeholder fails that test.
@@ -2347,7 +2348,7 @@ The server was never the problem: its requests total about 1.5 s either way.
 
 **Results:** Angular **3630 passed**; `tsc`, `ng lint` and `ng build` clean. No server change.
 
-### 13.11 The second batch of photos *(seed + ui; added 10/23 from OQ-11 and OQ-40; not built)*
+### 13.11 The second batch of photos *(seed + ui; added 10/23 from OQ-11 and OQ-40; built 10/23, not committed)*
 
 Five photos from Mason's 10/22 shoot, checked in 1.2:
 
@@ -2360,17 +2361,25 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
 | `Massage.jpg` | new | the Massage card on **Services** |
 
 **Files**
-- [ ] Convert each into `src/database_helper/img/` as 1.2 did: ffmpeg, long edge 2000 px, `-q:v 3`, all metadata stripped. The four class photos come out 2000 × 1500.
-- [ ] **Massage** is first cropped to 4:3 (OQ-40's default): the full width, from just above Caleb's head down to his elbow on the client's back. It also comes out 2000 × 1500.
-- [ ] Copy the new files by hand into the `img/` folders beside the database helper and the test program, on both platforms, and hash-check them. Replacing a picture relinks nothing, so the build's own copy never runs (the trap in 1.2).
+- [x] Convert each into `src/database_helper/img/` as 1.2 did: ffmpeg, long edge 2000 px, `-q:v 3`, all metadata stripped. The four class photos come out 2000 × 1500.
+  - *As built:* all four are 2000 × 1500: Beginner Knotty Yoga 469 KB, Aerial Rope 428 KB, Handstands 220 KB, Beginner Partner Acro 289 KB. All four were opened after conversion: upright, as framed in 1.2.
+  - None carries EXIF, GPS or a colour profile. All that's left is ffmpeg's encoder note.
+- [x] **Massage** is first cropped to 4:3 (OQ-40's default): the full width, from just above Caleb's head down to his elbow on the client's back. It also comes out 2000 × 1500.
+  - *As built:* both ends don't fit. At the full width, 4:3 keeps 3213 of the original's 5712 rows, and his hair to his elbow spans about 3590. Three offsets were tried: 450, 625 and 800 px from the top. **800** won: his face and glasses, the raised fist, and the elbow pressing into the client's back, with the client's shoulders below it. Only the top of his hair is cut. 178 KB.
+- [x] Copy the new files by hand into the `img/` folders beside the database helper and the test program, on both platforms, and hash-check them. Replacing a picture relinks nothing, so the build's own copy never runs (the trap in 1.2).
+  - *As built:* Windows by hand, all five hashes matching the source. Linux needed no hand copy: this change edits the seed and its test, so both programs relink and the build's own copy runs. The hashes were checked there too (13.11 Verification).
 
 **Seed**
-- [ ] `kSeedClassPhotos` gains Beginner Knotty Yoga and Aerial Rope, so all six classes have a picture. Handstands and Beginner Partner Acro keep their rows; only their files change.
-- [ ] `kSeedProductPhotos` gains `massage` → `Massage.jpg`. The stored type follows the extension (13.1), so it is stored as a JPEG.
+- [x] `kSeedClassPhotos` gains Beginner Knotty Yoga and Aerial Rope, so all six classes have a picture. Handstands and Beginner Partner Acro keep their rows; only their files change.
+  - *As built:* the table is in the weekly schedule's class order now, and its header no longer says two are missing.
+- [x] `kSeedProductPhotos` gains `massage` → `Massage.jpg`. The stored type follows the extension (13.1), so it is stored as a JPEG.
+  - *As built:* keyed by `kMassageProductCode`, like the rest of the seed's massage rows.
 
 **Services card** *(ui: `shop/service-catalog`; OQ-40's default)*
-- [ ] The card's picture is 4:3 instead of a 160 px strip, still the card's full width: about 375 × 280 on a desktop.
-- [ ] It asks for its picture through `coverPhotoUrl`, like the class cards (13.7), so it stays sharp on a 2× screen. Today it asks for an 800 × 450 box.
+- [x] The card's picture is 4:3 instead of a 160 px strip, still the card's full width: about 375 × 280 on a desktop.
+  - *As built:* `aspect-ratio: 4 / 3` with `object-fit: cover`, so a picture of another shape uploaded later is cropped to the same frame.
+- [x] It asks for its picture through `coverPhotoUrl`, like the class cards (13.7), so it stays sharp on a 2× screen. Today it asks for an 800 × 450 box.
+  - *As built:* the widest the card gets is just under 576 px: one column, just before the grid splits in two. The square passed is 384, so the 3× box is 1152 px, twice that width. A desktop card (376 px) gets three times its width.
 
 **Tests**
 - [ ] `PopulateSeedPhotosPutsEachListedFileOnItsRow`: no class is left without a picture, so its expected leftovers become none. It already compares each stored picture byte for byte with its listed file, which covers the two replaced files.
@@ -3349,12 +3358,17 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 4. **Admin** → **Manage Products** → **Instructors** tile: five instructors and no pager. A list that fits on one page looks as it did.
 5. Open `ui\e2e\mobile-audit\output\pagination\`. The pictures whose names start `staff-` and `manage-` are one phone and one desktop picture of page 1 and of the last page, for every list in 17.2 and 17.3.
 
-### 17.8 A product page's subscriptions and purchases, five at a time *(ui; added 10/23 from OQ-39; not built)*
+### 17.8 A product page's subscriptions and purchases, five at a time *(ui; added 10/23 from OQ-39; built 10/23, not committed)*
 
 Today a product page's **Active Subscriptions** (a membership's page) and **Recent Purchases** (a one-time product's page) show the latest 10, with no way to reach the 11th. Mason chose to page them.
-- [ ] Both ask for every row (page size 0), newest first as today, and page **5** at a time on the shared pager, like the page's other nested lists (booking windows, the entitlement summary).
-- [ ] **Active Subscriptions** looks up each row's name, latest charge and entitlement only for the five rows shown, when their page is shown, and keeps what it found.
+- [x] Both ask for every row (page size 0), newest first as today, and page **5** at a time on the shared pager, like the page's other nested lists (booking windows, the entitlement summary).
+  - *As built:* the lists are keyed `product-subscriptions` and `product-purchases` for the specs. Each goes back to page 1 when the product loads.
+  - The last subscription card kept a 12 px gap under it once the pager followed it: its "no margin on the last card" rule matched only the last child. It now matches the last card.
+- [x] **Active Subscriptions** looks up each row's name, latest charge and entitlement only for the five rows shown, when their page is shown, and keeps what it found.
   - Today it does that for every row it loads, up to three requests a row. Over every subscription of a busy membership, that would be hundreds of requests at once.
+  - *As built:* the page's spinner stays up until page 1 has its names, as before. On a later page a card shows "Loading…" for its name until the lookup answers.
+  - A subscriber with several subscriptions is looked up once, and two subscriptions sharing an entitlement fetch it once.
+  - A row whose lookups fail shows "Unknown", as before.
 - Not changed:
   - An event product's **Event Sessions** keeps its latest 10 and **View All Event Sessions**.
   - **Active Subscriptions** still lists every status, each with its badge.
