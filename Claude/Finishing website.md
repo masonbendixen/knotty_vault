@@ -2481,15 +2481,20 @@ Mason, 10/23: "On the home page, for the Additional health services photo, pleas
 - Not changed: the page's request for a feature picture (a 944 × 598 box). A 4:3 picture fits it at 797 × 598, wider than the 708-pixel stand-ins it replaces.
 
 **Tests** *(create_database_test.cpp)*
-- [ ] New `SeededHomeFeaturesShowTheStudiosOwnPhotos`: reads the rows through the home page's feed (`GetActiveHomeSections`) and each picture through the photo reader behind `/api/get_scaled_photo`. Each row's picture is its file byte for byte, a JPEG, and 4:3.
+- [x] New `SeededHomeFeaturesShowTheStudiosOwnPhotos`: reads the rows through the home page's feed (`GetActiveHomeSections`) and each picture through the photo reader behind `/api/get_scaled_photo`. Each row's picture is its file byte for byte, a JPEG, and 4:3.
   - The expected file is named in the test, not read from the seed, so two rows given one file fail.
+  - *As built:* it also fails if either row is missing from the feed.
 
 **Mutation check**
-- [ ] Planned:
+- [x] Planned:
   - **Types of classes** back on its stand-in
   - **Additional health services** back on its stand-in
   - **Additional health services** given `Class.jpg`
   - `Class.jpg` replaced by a 1.58:1 picture beside the test program. The seed and the test read the same copy, so only the 4:3 check can see this one.
+  - *As built:* **4 of 4 caught** by the new test, each on its own Linux run, and the source and the test's `img/` copy were restored byte for byte.
+    - The two stand-ins: "does not show `Class.jpg`" / "does not show `Massage.jpg`", and "708 x 447 is not 4:3". The deleted stand-ins were still in the build's `img/` copy, which never deletes a file, so these rows really got the old pictures.
+    - `Class.jpg` on both rows: "Additional health services does not show `Massage.jpg`".
+    - The 1.58:1 `Class.jpg`: "708 x 447 is not 4:3", the only check that could see it.
 
 **Verification**
 - [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
