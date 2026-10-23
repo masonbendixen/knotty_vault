@@ -3025,6 +3025,14 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 
 **Planned 10/21/2026.** All in `ui/`, on 16's pager, rules and many-row mock.
 
+**Implemented 10/23/2026, not committed.** The pager is on 51 lists across 33 pages (17.2 and 17.3), and every silent cap in 17.1 is gone.
+- Two lists in the tables below are not paged, each for a reason given in 17.3: **Announcements** and the pricing views.
+- Results: see 17.6.
+- Screenshots: all **212** read, with the findings in 17.4.
+- **New open questions:** OQ-38 (table columns that shift from page to page) and OQ-39 (a product page's latest-10 lists have no **View All**).
+
+**Still to do:** Mason commits, answers OQ-38 and OQ-39 if he wants a change, and hand-tests 17.7.
+
 ### 17.1 The silent caps go *(ui)*
 - **Today**, each list below asks `get_filtered_table_rows` for one page of a fixed size and never reads the total, so anything past the cap never appears. For example, a 101st product is missing from **Products**, and the 1,001st event session from **Event Sessions**.
 
