@@ -1131,7 +1131,9 @@ Mason sent them on 10/23:
   - *As built:* `StaffSearchFindsTheNewInstructorsByName` seeds the real people, signs in as a staff member, and searches as the page does. "Cooper" offers exactly Beth's address; "Cheung" offers exactly Gifford's and Tiana's.
 - [x] Mutation: one constant put back to its placeholder fails that test.
   - *As built:* Beth's put back: `StaffSearchFindsTheNewInstructorsByName` fails, the only test that does. The header was restored byte for byte.
-- [ ] Verification: knottyyoga, Windows and Linux, with the same test names on both.
+- [x] Verification: knottyyoga, Windows and Linux, with the same test names on both.
+  - *As built,* run with 13.11: **Windows: 5407 passed. Linux: 5407 passed.** That is 5405 plus the two new seed tests, and the two runs executed the same 5407 names. On Linux the database helper, server and test helper all build, against the pinned honuware.
+  - Mason's server was running on Windows, so the Windows server program wasn't rebuilt there. `main.cpp` didn't change; Linux built it.
 - **From now on a local database holds three real people's addresses.** A local run that mails an instructor reaches them, for example a **Forgot password?** asked for under one of their addresses. The walkthroughs send mail only to `masonbendixen@gmail.com`.
 
 **Hand-testing walkthrough.** From a fresh database (`knottyyoga_database_helper --recreate_database`), with the server and the Angular app running:
