@@ -2949,7 +2949,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
   - **Fixed here**, each with a test:
     1. **The pager's buttons moved** as the label widened from "1–5 of 23" to "21–23 of 23". The label now keeps one width.
     2. **Several booked sessions sat border to border**, the first against its heading. They now have the 8 px gap a day's classes have.
-  - **Left for OQ-36 and OQ-37:**
+  - **Left as they are** (Mason kept the defaults of OQ-36 and OQ-37):
     - two pagers close together on **My Bookings**
     - one card alone on the last row of the three-column grids
   - **Pager details**, cosmetic and left as they are:
@@ -3313,22 +3313,9 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 - → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
 
-**OQ-36 — Two pagers close together on My Bookings.** *(16.5's screenshots, 10/22.)*
-- A series on **My Bookings** pages its own sessions, five at a time. When the series is the last row of the page, its pager ("1–5 of 23") sits about 40 px above the list's own pager ("21–23 of 23"). Both look the same, so it is easy to press the wrong one.
-- This only happens with a series of more than five sessions on the last page of more than ten bookings.
-- **Default:** leave it. Each pager is inside the box it moves.
-- **Alternative:** a pager inside a card names what it counts, "Sessions 1–5 of 23". Every other pager stays as it is.
-- Say which.
-
-**OQ-37 — Ten a page in a three-column grid.** *(16.5's screenshots, 10/22.)*
-- On a desktop, the card grids of **Memberships** (tiers, other products), **Upcoming Events**, **My Skills** and **Services** have three columns, so a full page of ten leaves one card alone on a fourth row.
-- **Default:** keep ten everywhere (OQ-32). One rule is easier to explain than a size per layout.
-- **Alternative:** nine or twelve a page for those grids only. Every page then ends on a full row on a desktop, but a phone (one column) sees a different count from the other lists.
-- Say which.
-
 ### Resolved
 
-*Newest first by date: 10/22 (OQ-26 to 35, in number order), then 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
+*Newest first by date: 10/22 (OQ-26 to 37, in number order), then 10/20 (OQ-15), then 10/19 (OQ-25, 24, 23), then 10/17 (OQ-22), then 10/15 (OQ-16, 19, 20, 21), then the 10/14 answers.*
 
 **OQ-26 — A badge on the All Classes cards?** *(12.3's front-end check, 10/19.)*
 - After 12.3 everyone sees all six classes on **Our Classes** → **All Classes**. Each card shows the name, description, tags and session count, but not whether you can attend.
@@ -3444,6 +3431,23 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Say which.
 - Mason- Let's go with the default.
 - → Plan: no change. D16 and 14.5 stay at 768 px.
+
+**OQ-36 — Two pagers close together on My Bookings.** *(16.5's screenshots, 10/22.)*
+- A series on **My Bookings** pages its own sessions, five at a time. When the series is the last row of the page, its pager ("1–5 of 23") sits about 40 px above the list's own pager ("21–23 of 23"). Both look the same, so it is easy to press the wrong one.
+- This only happens with a series of more than five sessions on the last page of more than ten bookings.
+- **Default:** leave it. Each pager is inside the box it moves.
+- **Alternative:** a pager inside a card names what it counts, "Sessions 1–5 of 23". Every other pager stays as it is.
+- Say which.
+- Mason- Default is fine.
+- → Plan: no change. Every pager keeps the same label, "1–5 of 23".
+
+**OQ-37 — Ten a page in a three-column grid.** *(16.5's screenshots, 10/22.)*
+- On a desktop, the card grids of **Memberships** (tiers, other products), **Upcoming Events**, **My Skills** and **Services** have three columns, so a full page of ten leaves one card alone on a fourth row.
+- **Default:** keep ten everywhere (OQ-32). One rule is easier to explain than a size per layout.
+- **Alternative:** nine or twelve a page for those grids only. Every page then ends on a full row on a desktop, but a phone (one column) sees a different count from the other lists.
+- Say which.
+- Mason- Default is fine.
+- → Plan: no change. The grids keep ten a page, like every main list.
 
 **OQ-15 — Instructor bios.**
 - Mason- I asked my instructors to write bios. Leave a place for me to put them as they send them to me. Worst case, I manually add them once deployed but hopefully they get them to me before then.
