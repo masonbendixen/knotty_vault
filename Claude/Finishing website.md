@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/23/2026
-Version: 0.31
+Version: 0.32
 tags: 
 ---
 # Overview
@@ -83,6 +83,18 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.32 (10/23/2026)** — **Mason answered OQ-1, OQ-38 and OQ-39, and sent five more photos (OQ-11).** Planning only; no code changed.
+  - **OQ-1:** the three instructors' real addresses. New item **5.8** puts them in the seed.
+    - It also makes the three findable under **Search for a person**. That search hides the placeholders' `@knottyyoga.local` domain, the scheduler account's.
+  - **OQ-11:** five photos are in.
+    - New: **Beginner Knotty Yoga**, **Aerial Rope** and **Massage**.
+    - Replacements: **Handstands** and **Beginner Partner Acro**.
+    - New item **13.11** converts and attaches them, so every class gets a picture.
+    - Still to come: the studio picture for **About** ▸ **Our Location**. OQ-11 stays open for that alone.
+  - **OQ-38:** the default. Each table's columns keep sizing to the rows on its page.
+  - **OQ-39:** the alternative. New item **17.8** pages a product page's **Active Subscriptions** and **Recent Purchases** five at a time.
+  - **New open question, OQ-40:** the massage photo is upright, and the **Services** card shows a wide strip. **Default:** crop the photo to 4:3 and show the card's picture at 4:3 (13.11).
+  - **Left to build before Verification:** 5.8, 12.7, 13.11 and 17.8.
 - **v0.31 (10/23/2026)** — **Phase 17 is built**, and not committed. All in `ui/`.
   - **The silent caps are gone (17.1).** Every list that asked for 100 to 10,000 rows and dropped the rest now asks for every row. Page size 0 already meant that on the server. More turned up than the plan listed, such as a session card's attendees and the product filters (17.1). **Subscription Revenue**'s totals now count every charge.
   - **The pager is on 51 more lists**, across 33 staff and Manage pages.
@@ -528,18 +540,21 @@ How the site crops each kind, so the subject survives the crop:
 - [x] 3. Beth Cooper headshot → `BethInstructor.jpg`
 - [x] 4. Tiana Cheung headshot → `TianaInstructor.jpg`
 - [x] 5. Gifford Cheung headshot → `GiffordInstructor.jpg`
-- [ ] 6. Beginner Knotty Yoga class → `BeginnerKnottyYoga.jpg` *(not in yet)*
+- [x] 6. Beginner Knotty Yoga class → `BeginnerKnottyYoga.jpg` *(in 10/23; attached in 13.11)*
 - [ ] 7. Knotty Yoga class → `KnottyYoga.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
-- [ ] 8. Aerial Rope class → `AerialRope.jpg` *(not in yet)*
-- [ ] 9. Handstands class → `Handstand.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
-- [ ] 10. Beginner Partner Acro class → `PartnerAcro.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
+- [x] 8. Aerial Rope class → `AerialRope.jpg` *(in 10/23; attached in 13.11)*
+- [x] 9. Handstands class → `Handstand.jpg` (replaces today's, if reshot) *(reshot, in 10/23; replaced in 13.11)*
+- [x] 10. Beginner Partner Acro class → `PartnerAcro.jpg` (replaces today's, if reshot) *(reshot, in 10/23; replaced in 13.11)*
 - [x] 11. Intermediate Partner Acro class → `IntermediatePartnerAcro.jpg`
-- [ ] 12. Massage, shown on the Services card for Massage → `Massage.jpg` *(not in yet)*
+- [x] 12. Massage, shown on the Services card for Massage → `Massage.jpg` *(in 10/23; upright, so see OQ-40; attached in 13.11)*
 - [ ] 13. General studio, shown on About ▸ Our Location → `Studio.jpg` *(not in yet)*
 
 ### 1.2 Hand-off and conversion
 - [x] Mason drops the originals into **`C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\`** (OQ-11 default), named as in 1.1. Any extension and any size is fine. That folder is outside the git repo, so phone-sized originals never get committed by accident.
   - → 10/20: they came in at `D:\Knotty Yoga\2026\Oct\JPG\` instead: six JPEGs, named as in 1.1. Only the six JPEGs were used; the five `.heic` files in the folder above it were left alone.
+  - → 10/23: the second batch is in `D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG\`: six JPEGs, named as in 1.1.
+    - `IntermediatePartnerAcro.jpg` there is byte for byte the 10/20 original, so it changes nothing.
+    - The twelve `.heic` files in the folder above it are left alone, as before.
 - [x] Claude converts each into `server/knottyyoga_server/src/database_helper/img/` with **ffmpeg**:
   - JPEG, long edge 2000 px, `-q:v 3`, under about 1.5 MB.
   - Phone rotation applied.
@@ -550,6 +565,14 @@ How the site crops each kind, so the subject survives the crop:
   - → 10/20: all six are upright, sharp and well lit. **No reshoots.** Two framing notes:
     - **The four phone headshots are waist-up, not head-and-shoulders.** Every instructor picture is shown in a square cropped from the middle, which cut the top of the hair off Beth, Caleb, Gifford and Tiana. Rather than reshoot, those squares now crop from the top (13.3), which frames all five from the head down.
     - **Intermediate Partner Acro is nearly square.** The class page frames pictures 4:3, so it trims a little off the top and bottom: the raised foot's toes and the bases' heels. Acceptable as is; a wider shot would avoid it if this one is ever retaken.
+  - → 10/23, the second batch, checked on the originals (13.11 converts them): all five are upright, sharp and well lit. None carries GPS or a rotation flag. **No reshoots.** Two notes:
+    - **The four class photos are 4:3**, the class page's own frame, so the class page shows each one whole. **All Classes**' square cards cut the sides:
+      - **Aerial Rope:** both flyers lose a foot at the edges.
+      - **Beginner Partner Acro:** the two outer flyers lose a hand.
+      - **Handstands:** the person at the left edge is cut.
+
+      Acceptable as is.
+    - **Massage is upright** (3:4). 1.1 asked for landscape only for the class photos. The **Services** card shows its picture as a wide strip, which would keep only a third of this one: **OQ-40**.
   - → 10/20, evening: **Ryan's edited headshots** for Mason, Caleb, Gifford and Tiana (`D:\Knotty Yoga\2026\Oct\JPG\Edited\`) replace those four. They are tighter crops on a cleaner grey, 1401–1536 × 1771–1864 px and 111–175 KB each. They already carry no EXIF or GPS, so they were copied **byte for byte**, not re-encoded, which would only have lost quality. They are progressive JPEGs, which the server reads fine: it took all four and served them back at their true sizes. Beth's is unchanged.
     - The live local site was updated as an admin would do it: the server's own photo upload, onto the four instructor records, with no database recreate. Each was then fetched back signed out at the Instructors card's size.
     - The seed photo tests (9) pass against the new files on Windows and Linux.
@@ -1077,6 +1100,28 @@ From a fresh local database:
 **A customer sees none of it**
 1. Sign out: **Beth** (the name menu) → **Sign Out**, then **Log Out** in the dialog.
 2. **Sign In** as `kiteagle@gmail.com` / `kit`. There is no **Staff** in the top menu.
+
+### 5.8 The instructors' real email addresses *(seed; added 10/23 from OQ-1; not built)*
+
+Mason sent them on 10/23:
+
+| Instructor | Email |
+|---|---|
+| Beth Cooper | `bethismoving@gmail.com` |
+| Gifford Cheung | `giffordcheung@gmail.com` |
+| Tiana Cheung | `tianabun@hotmail.com` |
+
+- [ ] `kBethEmail`, `kGiffordEmail` and `kTianaEmail` in `seed_app_data.h` become these. Every seeder and test already goes through the three constants, so nothing else in the seed changes.
+- **One more effect: the three can be found by staff.** The staff people search, behind **Search for a person** on **Person Skills**, hides every address ending in `@knottyyoga.local`, the scheduler account's domain. So under the placeholders none of the three could be found there. With their real addresses they can.
+- [ ] Test: each of the three is found by the staff people search, through the endpoint **Person Skills** calls. Under the placeholders it finds none of them.
+- [ ] Mutation: one constant put back to its placeholder fails that test.
+- [ ] Verification: knottyyoga, Windows and Linux, with the same test names on both.
+- **From now on a local database holds three real people's addresses.** A local run that mails an instructor reaches them, for example a **Forgot password?** asked for under one of their addresses. The walkthroughs send mail only to `masonbendixen@gmail.com`.
+
+**Hand-testing walkthrough.** From a fresh database (`knottyyoga_database_helper --recreate_database`), with the server and the Angular app running:
+1. **Sign In** as `masonbendixen@gmail.com` / `pass`.
+2. **Staff** → **Person Skills** card → **Search for a person**: type `Cooper`. **Beth Cooper** is offered. Before 5.8 nothing was.
+3. Clear the box and type `Cheung`. **Gifford Cheung** and **Tiana Cheung** are both offered.
 
 ---
 
@@ -2128,7 +2173,8 @@ During development, knottyyoga builds against the local `server_components` chec
 
 Uses Phase 1's files.
 
-**Status: implemented 10/20/2026, not committed.** Six photos and all five bios are in. Four photos are still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
+**Status: implemented 10/20/2026, and committed as `13a7d74d`.** Six photos and all five bios are in. Four photos were still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
+- → 10/23: Beginner Knotty Yoga, Aerial Rope and Massage are in, with new Handstands and Beginner Partner Acro photos. **13.11** attaches them; not built yet. Only the studio picture is still to come (OQ-11).
 
 ### 13.1 Table-driven photo attachment *(seed)*
 - [x] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
@@ -2143,8 +2189,8 @@ Uses Phase 1's files.
   - → `PopulateInstructors` now writes the rows and bios only. The bootstrap runs `PopulateSeedPhotos` **after** it (`create_database.cpp`); it used to run before, when the headshots didn't need instructor rows. A headshot's instructor row is found from the person's email.
 - [ ] Rows (files from 1.1):
   - [x] instructors: Mason, Caleb, Beth, Tiana, Gifford
-  - [ ] classes: all six. **Four are in:** Knotty Yoga, Handstands and Beginner Partner Acro keep their pictures, and Intermediate Partner Acro is new. Beginner Knotty Yoga and Aerial Rope wait for their photos.
-  - [ ] product `massage` → `Massage.jpg` *(waiting for the photo)*
+  - [ ] classes: all six. **Four are in:** Knotty Yoga, Handstands and Beginner Partner Acro keep their pictures, and Intermediate Partner Acro is new. Beginner Knotty Yoga and Aerial Rope wait for their photos. *(→ 10/23: both are in; 13.11.)*
+  - [ ] product `massage` → `Massage.jpg` *(→ 10/23: in; 13.11)*
   - [ ] facility `knotty-yoga-studio` → `Studio.jpg` *(waiting for the photo)*
 - [x] Mason's and Caleb's **profile** photos (`Mason.jpg`, `Caleb.jpg` on `people`) are unchanged. New instructors upload their own profile pictures.
   - → `MasonInstructor.jpg` and `CalebInstructor.jpg` are the new headshots, so each instructor picture now differs from that person's profile photo. Before, they were copies of each other.
@@ -2159,7 +2205,7 @@ Uses Phase 1's files.
   - → `PopulateSeedPhotosPutsEachListedFileOnItsRow`. "Exactly one" is guaranteed by the upload itself, which replaces a row's earlier photo. So the test checks something stronger: each listed row's stored picture is **byte for byte the listed file**, read back through the reader the photo endpoints serve from, with the right type. That is what catches two rows swapped.
   - → The same test reads all five instructors through the Instructors page's own reader (`hasPhoto`). It also checks that the classes left out are exactly Beginner Knotty Yoga and Aerial Rope, and that neither has a picture.
   - → Replaced: `PopulateSeedPhotosAttachesProfileAndClassPictures` and `PopulateInstructorsCreatesBothWithTheirOwnHeadshots`. `PopulateInstructorsSeedsAllFiveWithTheirBios` no longer checks photos; instead it checks that each bio names its instructor, which the one-line defaults didn't.
-- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader. *(With their photos.)*
+- [ ] Massage and studio through their public readers: the catalog product's `has_photo`, and the facility's photo on the location reader. *(With their photos. → 10/23: massage's is in 13.11.)*
 
 ### 13.3 Headshots crop from the top *(ui; added 10/20)*
 - [x] Every instructor picture is shown in a square, `object-fit: cover`. The server only shrinks a picture to fit, so a 3:4 portrait reaches the page as 192 × 256, and the page cut the square from its **middle**. On the new waist-up headshots that cut the top of the hair off Beth, Caleb, Gifford and Tiana. 1.1 asked for head-and-shoulders; the cheaper fix than a reshoot is to crop from the **top**.
@@ -2300,6 +2346,64 @@ The server was never the problem: its requests total about 1.5 s either way.
 **Mutation check:** all three caught: answers not remembered (c1), a canvas per lookup (c2), and the palette built eagerly again (c3, by hand). Every file was restored.
 
 **Results:** Angular **3630 passed**; `tsc`, `ng lint` and `ng build` clean. No server change.
+
+### 13.11 The second batch of photos *(seed + ui; added 10/23 from OQ-11 and OQ-40; not built)*
+
+Five photos from Mason's 10/22 shoot, checked in 1.2:
+
+| File | | Where it shows |
+|---|---|---|
+| `BeginnerKnottyYoga.jpg` | new | Beginner Knotty Yoga's card and class page |
+| `AerialRope.jpg` | new | Aerial Rope's card and class page |
+| `Handstand.jpg` | replaces today's | Handstands' card and class page |
+| `PartnerAcro.jpg` | replaces today's | Beginner Partner Acro's card and class page |
+| `Massage.jpg` | new | the Massage card on **Services** |
+
+**Files**
+- [ ] Convert each into `src/database_helper/img/` as 1.2 did: ffmpeg, long edge 2000 px, `-q:v 3`, all metadata stripped. The four class photos come out 2000 × 1500.
+- [ ] **Massage** is first cropped to 4:3 (OQ-40's default): the full width, from just above Caleb's head down to his elbow on the client's back. It also comes out 2000 × 1500.
+- [ ] Copy the new files by hand into the `img/` folders beside the database helper and the test program, on both platforms, and hash-check them. Replacing a picture relinks nothing, so the build's own copy never runs (the trap in 1.2).
+
+**Seed**
+- [ ] `kSeedClassPhotos` gains Beginner Knotty Yoga and Aerial Rope, so all six classes have a picture. Handstands and Beginner Partner Acro keep their rows; only their files change.
+- [ ] `kSeedProductPhotos` gains `massage` → `Massage.jpg`. The stored type follows the extension (13.1), so it is stored as a JPEG.
+
+**Services card** *(ui: `shop/service-catalog`; OQ-40's default)*
+- [ ] The card's picture is 4:3 instead of a 160 px strip, still the card's full width: about 375 × 280 on a desktop.
+- [ ] It asks for its picture through `coverPhotoUrl`, like the class cards (13.7), so it stays sharp on a 2× screen. Today it asks for an 800 × 450 box.
+
+**Tests**
+- [ ] `PopulateSeedPhotosPutsEachListedFileOnItsRow`: no class is left without a picture, so its expected leftovers become none. It already compares each stored picture byte for byte with its listed file, which covers the two replaced files.
+- [ ] Massage through its public reader (13.2's open item): the **Services** feed's Massage product has `has_photo`, and its picture is `Massage.jpg` byte for byte.
+- [ ] `EverySeedPhotoFileExists` covers the new files without a change.
+- [ ] The Services card's spec: the picture is 4:3 at the card's width, and its address is `coverPhotoUrl`'s.
+
+**Mutation check**
+- [ ] Planned:
+  - Massage's row removed
+  - Aerial Rope given Beginner Knotty Yoga's file
+  - Aerial Rope's row removed
+  - the card's picture back to a 160 px strip
+  - the card asking for 800 × 450 again
+
+**Verification**
+- [ ] knottyyoga, Windows and Linux, with the same test names on both; Angular `ng test` on both, `tsc`, `ng lint`, `ng build`, and the Playwright layout specs. The desktop compare will report **Services** as taller, which is expected.
+- [ ] End to end: `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
+  - The log attaches six class pictures and the massage picture, with no `seed_image_missing`.
+  - Signed out, all six classes serve a picture, and the Services feed has Massage with `has_photo`.
+
+**Hand-testing walkthrough**
+
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve`. Use a wide window.
+1. Signed out: **Our Classes** (page headed **All Classes**). All six cards have a photo, and none shows the grey picture icon:
+   - **Beginner Knotty Yoga:** a class standing in red aerial fabrics, arms out
+   - **Aerial Rope:** two people hanging upside down on ropes
+   - **Handstands:** handstands with spotters, against a white wall
+   - **Beginner Partner Acro:** five people balanced on the feet of five lying on the floor
+   - **Intermediate Partner Acro** and **Knotty Yoga:** the same pictures as before
+2. Click the **Aerial Rope** card. The picture beside the description is the whole photo: both people, the ropes and the floor.
+3. **Services** (page headed **Our Services**). The **Massage** card's picture shows both Caleb's face and his elbow on the client's back.
+4. Make the window as narrow as it goes. The Massage picture still shows both.
 
 ---
 
@@ -3040,7 +3144,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
 - Screenshots: all **212** read, with the findings in 17.4.
 - **New open questions:** OQ-38 (table columns that shift from page to page) and OQ-39 (a product page's latest-10 lists have no **View All**).
 
-**Still to do:** Mason commits, answers OQ-38 and OQ-39 if he wants a change, and hand-tests 17.7.
+**Still to do:** Mason commits and hand-tests 17.7. On 10/23 he kept OQ-38's default and chose OQ-39's alternative, which is new item **17.8**, not built yet.
 
 ### 17.1 The silent caps go *(ui)*
 - **Today**, each list below asks `get_filtered_table_rows` for one page of a fixed size and never reads the total, so anything past the cap never appears. For example, a 101st product is missing from **Products**, and the 1,001st event session from **Event Sessions**.
@@ -3072,6 +3176,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
       - the pricing views' prices (10,000) and permissions (100)
       - a product page's permissions, which its booking windows page over (100)
     - **Left alone:** one-row lookups, and the three latest-10 lists. Only an event product's **Event Sessions** has a **View All**; the other two have none (OQ-39).
+      - → 10/23, Mason: page those two. That is **17.8**.
 - [x] Specs: each page's request asks for everything, and its eleventh row is reachable on page 2.
   - *As built:*
     - **Every changed request** has a spy checking page size 0.
@@ -3175,6 +3280,7 @@ Mason- Please add new phases and push the existing stuff down. I met with Ryan t
     1. **Shift Requests** (Manage): a request's notice, "Approving will reassign these bookings…", sat 8 px under the bookings' pager, which then read as part of the notice. It now keeps the pager's own 16 px when the pager shows.
     2. **My Service Bookings:** the **Past** heading sat against the Upcoming pager. The template's 24 px had never applied (the component's own margin beat it), so before paging it touched the last card.
   - **Left for OQ-38:** the columns of **Products**, **Membership Tiers** and a session card's **Staff** table shift by 25–175 px between pages. Each table sizes its columns to the rows it shows. **Blog Posts** has done the same since Phase 16.
+    - → 10/23, Mason: leave it.
   - **Seen on the pages, unrelated to paging** (they predate Phase 17, and are not changed):
     - **Cut off on a phone:**
       - **Entitlements:** the rows' text is squeezed into narrow columns and clipped top and bottom ("60-/Minute/Massage").
