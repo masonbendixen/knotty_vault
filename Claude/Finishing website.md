@@ -3447,6 +3447,8 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Mason- I sent a message to all my instructors asking which email to use.
 - → Plan: waiting. Paste the three addresses here when they arrive; they are one constant each in `seed_app_data.h`.
 - → 10/16: Phase 5 shipped with the placeholders, so nothing waits on this. Swap them in before Phase 19. Until then the instructor digest and, after Phase 11, password-reset emails to these three go nowhere.
+- Mason- Here are the remaining emails:
+	- 
 
 **OQ-11 — Where are the photos?**
 - Mason- Taking the photos IS a phase. Please list this as an early phase that the later phases will use. I'll try to take the photos tonight.
@@ -3463,6 +3465,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** leave it.
 - **Alternative:** fixed column widths on those four tables. The columns then stay put, but a long name wraps in its fixed column instead of widening it.
 - Say which.
+- Mason- We can go with the default
 
 **OQ-39 — A product page's latest-10 lists have no View All.** *(17.1, 10/23.)*
 - The plan said a product page's **Event Sessions**, **Active Subscriptions** and **Recent Purchases** show the latest 10 with a **View All** link, so 17.1 left them alone. Only an event product's **Event Sessions** has that link.
@@ -3472,6 +3475,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Default:** leave them as they are.
 - **Alternative:** page **Active Subscriptions** and **Recent Purchases** five at a time, like the page's other lists, so every row can be reached there.
 - Say which.
+- Mason- Let's go with the alternative.
 
 ### Resolved
 
