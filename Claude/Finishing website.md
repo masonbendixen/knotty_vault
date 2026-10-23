@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/23/2026
-Version: 0.33
+Version: 0.34
 tags: 
 ---
 # Overview
@@ -83,6 +83,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.34 (10/23/2026)** — **13.12 is built**, and not committed. On the home page, **Types of classes** now shows `Class.jpg` (Mason's 10/22 shoot) and **Additional health services** shows `Massage.jpg`, the same file as the **Services** card. Both replace the design's stand-ins.
+  - Neither is cropped: a home feature shows its picture whole, so these two blocks are 4:3 and a little taller than the design's 1.58:1. The two stand-ins are deleted from `img/`.
+  - **Results:** knottyyoga Windows 5408 passed, Linux 5408 passed, the same names on both. Mutations: 4 of 4 caught. End to end, signed out, both pictures are served at 797 × 598 at the page's own request.
 - **v0.33 (10/23/2026)** — **5.8, 13.11 and 17.8 are built**, and not committed.
   - **5.8:** the three instructors' real addresses are in the seed. A new test finds all three through the staff people search.
   - **13.11:** the five photos are converted and attached, so every class and the Massage card have a picture.
@@ -2497,9 +2500,14 @@ Mason, 10/23: "On the home page, for the Additional health services photo, pleas
     - The 1.58:1 `Class.jpg`: "708 x 447 is not 4:3", the only check that could see it.
 
 **Verification**
-- [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
-- [ ] `Class.jpg` and `Massage.jpg` hash-checked beside the database helper and the test program on both platforms.
-- [ ] End to end: `--install_schema` into a throwaway database, then the real server. Signed out, the home page's feed lists both rows, and each picture comes back at the page's own request size.
+- [x] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
+  - *As built:* **Windows: 5408 passed. Linux: 5408 passed**, the same 5408 names on both: 13.11's 5407 and the new test. On Linux the database helper, the server and the test helper all build. On Windows only the test program and the database helper were rebuilt, because Mason's server was running; the server's own code didn't change.
+- [x] `Class.jpg` and `Massage.jpg` hash-checked beside the database helper and the test program on both platforms.
+  - *As built:* all eight copies match. Both programs relinked, so the build's own copy ran; no hand copy was needed.
+- [x] End to end: `--install_schema` into a throwaway database, then the real server. Signed out, the home page's feed lists both rows, and each picture comes back at the page's own request size.
+  - *As built,* on Linux, into a throwaway `knottyyoga_e2e_1312`, dropped afterwards. The install log attaches `Class.jpg` to row 10 and `Massage.jpg` to row 11, and every other home picture as before, with no `seed_image_missing` or `seed_image_failed`.
+  - Signed out, at the page's own 944 × 598 request: **Types of classes** and **Additional health services** both come back **797 × 598**, and **Why Knotty Yoga** 708 × 449 as before.
+  - As in 13.11, the install was given a dummy mail password, since the server refuses to start without one. Nothing was mailed.
 
 **Hand-testing walkthrough**
 
