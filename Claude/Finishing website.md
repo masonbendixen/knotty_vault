@@ -92,7 +92,12 @@ Please create a plan with phases of implementation. Within each phase, please re
   - **Found on the way:**
     - The planned "two classes share a file" mutation wasn't caught by any test. The photo test now checks that each class shows a different picture.
     - `ClassCatalogHelperTest.GetClassDetailUpcomingSessionsExcludeCancelled` failed on Linux. It added seven days of hours to a "now"-relative class start, which is an hour off in the week before daylight saving time ends on 11/1. Only the test was wrong. Unfixed, it would have failed CI until then.
-  - **Results:** RESULTS-PLACEHOLDER
+  - **Results:**
+    - knottyyoga: Windows 5407 passed, Linux 5407 passed, the same names on both.
+    - Angular: Windows 3992 passed, Linux 3992 passed.
+    - Playwright layout specs: 378 passed.
+    - Mutations: 11 of 11 caught (5.8: 1, 13.11: 6, 17.8: 4).
+    - End to end on a throwaway database: all six class pictures and the Massage picture served signed out.
   - **New open question, OQ-41:** on a phone, a product page's subscription cards wrap the name and the billing period. It predates 17.8. **Default:** leave it.
   - **Left to build before Verification:** 12.7.
 - **v0.32 (10/23/2026)** — **Mason answered OQ-1, OQ-38 and OQ-39, and sent five more photos (OQ-11).** Planning only; no code changed.
@@ -2426,7 +2431,10 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
     - the card asking for 800 × 450: the card's address spec
 
 **Verification**
-- [ ] knottyyoga, Windows and Linux, with the same test names on both; Angular `ng test` on both, `tsc`, `ng lint`, `ng build`, and the Playwright layout specs. The desktop compare will report **Services** as taller, which is expected.
+- [x] knottyyoga, Windows and Linux, with the same test names on both; Angular `ng test` on both, `tsc`, `ng lint`, `ng build`, and the Playwright layout specs. The desktop compare will report **Services** as taller, which is expected.
+  - *As built,* knottyyoga: **Windows: 5407 passed. Linux: 5407 passed**, the same names on both (5.8 has the details).
+    - The first Linux run failed one test, `ClassCatalogHelperTest.GetClassDetailUpcomingSessionsExcludeCancelled`, a date bug in the test and not in this change. It expected a class a week after one starting 10/25 at "the first start plus seven days of hours". Across the end of daylight saving time on 11/1 that lands at 9:00, while the page correctly shows 10:00. The test now finds the second start the way it found the first, as 10:00 at the studio on that date. Unfixed, it would have failed every run, CI included, until 11/1.
+    - The new `img/` files were hash-checked beside both programs on both platforms.
   - *As built,* Angular and Playwright: see 17.8, which ran with this. **Windows: 3992 passed. Linux: 3992 passed.** Layout specs 378 passed, none failed.
   - The desktop audit of **Services**: 1280 × 800 → 1280 × 807, taller as expected. The mock's one pictured service now has a 376 × 282 frame where the strip was 160 px tall. The other pages the compare lists were already different from Phase 0's baseline before this change.
 - [x] End to end: `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
