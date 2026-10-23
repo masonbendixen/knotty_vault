@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/23/2026
-Version: 0.32
+Version: 0.33
 tags: 
 ---
 # Overview
@@ -83,6 +83,18 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.33 (10/23/2026)** — **5.8, 13.11 and 17.8 are built**, and not committed.
+  - **5.8:** the three instructors' real addresses are in the seed. A new test finds all three through the staff people search.
+  - **13.11:** the five photos are converted and attached, so every class and the Massage card have a picture.
+    - The **Services** card shows its picture at 4:3 (OQ-40's default).
+    - The massage photo couldn't run from above Caleb's head to his elbow at 4:3. The crop keeps his face, his fist and the elbow on the client's back, and cuts the top of his hair.
+  - **17.8:** **Active Subscriptions** and **Recent Purchases** list every row, five a page. Names and entitlements are looked up only for the rows on screen.
+  - **Found on the way:**
+    - The planned "two classes share a file" mutation wasn't caught by any test. The photo test now checks that each class shows a different picture.
+    - `ClassCatalogHelperTest.GetClassDetailUpcomingSessionsExcludeCancelled` failed on Linux. It added seven days of hours to a "now"-relative class start, which is an hour off in the week before daylight saving time ends on 11/1. Only the test was wrong. Unfixed, it would have failed CI until then.
+  - **Results:** RESULTS-PLACEHOLDER
+  - **New open question, OQ-41:** on a phone, a product page's subscription cards wrap the name and the billing period. It predates 17.8. **Default:** leave it.
+  - **Left to build before Verification:** 12.7.
 - **v0.32 (10/23/2026)** — **Mason answered OQ-1, OQ-38 and OQ-39, and sent five more photos (OQ-11).** Planning only; no code changed.
   - **OQ-1:** the three instructors' real addresses. New item **5.8** puts them in the seed.
     - It also makes the three findable under **Search for a person**. That search hides the placeholders' `@knottyyoga.local` domain, the scheduler account's.
@@ -1117,7 +1129,8 @@ Mason sent them on 10/23:
 - **One more effect: the three can be found by staff.** The staff people search, behind **Search for a person** on **Person Skills**, hides every address ending in `@knottyyoga.local`, the scheduler account's domain. So under the placeholders none of the three could be found there. With their real addresses they can.
 - [x] Test: each of the three is found by the staff people search, through the endpoint **Person Skills** calls. Under the placeholders it finds none of them.
   - *As built:* `StaffSearchFindsTheNewInstructorsByName` seeds the real people, signs in as a staff member, and searches as the page does. "Cooper" offers exactly Beth's address; "Cheung" offers exactly Gifford's and Tiana's.
-- [ ] Mutation: one constant put back to its placeholder fails that test.
+- [x] Mutation: one constant put back to its placeholder fails that test.
+  - *As built:* Beth's put back: `StaffSearchFindsTheNewInstructorsByName` fails, the only test that does. The header was restored byte for byte.
 - [ ] Verification: knottyyoga, Windows and Linux, with the same test names on both.
 - **From now on a local database holds three real people's addresses.** A local run that mails an instructor reaches them, for example a **Forgot password?** asked for under one of their addresses. The walkthroughs send mail only to `masonbendixen@gmail.com`.
 
@@ -2396,15 +2409,24 @@ Five photos from Mason's 10/22 shoot, checked in 1.2:
   - A second spec checks that the box asked for is at least twice the widest card.
 
 **Mutation check**
-- [ ] Planned:
+- [x] Planned:
   - Massage's row removed
   - Aerial Rope given Beginner Knotty Yoga's file
   - Aerial Rope's row removed
   - the card's picture back to a 160 px strip
   - the card asking for 800 × 450 again
+  - *As built:* **6 of 6 caught**, the planned five and one more, each on its own run, and each file restored byte for byte. The seed ones ran on Linux:
+    - Massage's row removed: `ServicesShowsTheMassagePhoto`
+    - Aerial Rope given Beginner Knotty Yoga's file: `PopulateSeedPhotosPutsEachListedFileOnItsRow`, by its new "each class its own picture" check. Without that check nothing caught it (Tests, above).
+    - Aerial Rope's row removed: the same test
+    - **Added:** `Massage.jpg` uncropped, the upright original, in place of the 4:3 file: `ServicesShowsTheMassagePhoto` ("1500 x 2000 is not 4:3")
+    - the card's picture a 160 px strip again: the card's 4:3 spec
+    - the card asking for 800 × 450: the card's address spec
 
 **Verification**
 - [ ] knottyyoga, Windows and Linux, with the same test names on both; Angular `ng test` on both, `tsc`, `ng lint`, `ng build`, and the Playwright layout specs. The desktop compare will report **Services** as taller, which is expected.
+  - *As built,* Angular and Playwright: see 17.8, which ran with this. **Windows: 3992 passed. Linux: 3992 passed.** Layout specs 378 passed, none failed.
+  - The desktop audit of **Services**: 1280 × 800 → 1280 × 807, taller as expected. The mock's one pictured service now has a 376 × 282 frame where the strip was 160 px tall. The other pages the compare lists were already different from Phase 0's baseline before this change.
 - [ ] End to end: `knottyyoga_database_helper --install_schema` into a throwaway database, then the real server.
   - The log attaches six class pictures and the massage picture, with no `seed_image_missing`.
   - Signed out, all six classes serve a picture, and the Services feed has Massage with `has_photo`.
@@ -3393,6 +3415,10 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
 - [x] Screenshots: the many-rows mock gives a membership and a one-time product 23 rows each. The pagination spec photographs both lists, with 17.4's checks.
   - *As built:* the mock's 23 subscriptions were already all product 3's, **Monthly Membership**. Product 2, **60-Minute Massage**, gets 23 purchases in a `purchase_items` table, which the mock never had. The mock's spec counts both.
   - The pagination spec photographs product 2's **Recent Purchases** with its other lists, and product 3's **Active Subscriptions** as a new page.
+  - All eight pictures read: each list shows "1–5 of 23", then "21–23 of 23" with three rows.
+    - The last page of subscriptions includes the cancelled one, with its badge.
+    - On a phone, **Recent Purchases** scrolls sideways inside its own box, as the page's other tables do.
+    - **Found:** on a phone, a subscription card's header wraps the name and the billing period onto two lines each. It predates 17.8: **OQ-41**.
 - [x] Mutation check, planned:
   - the 10-row cap back
   - every row's name looked up at once
@@ -3401,7 +3427,11 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
     - **Recent Purchases** asking for 10: its page-size-0 spec
     - every subscription enriched at load: the lookup spec and the page-3 spec
     - the last card's margin by `:last-child` again: the margin spec
-- [ ] Verification: Angular `ng test` on Windows and Linux, `tsc`, `ng lint`, `ng build`, and the pagination spec. No server change.
+- [x] Verification: Angular `ng test` on Windows and Linux, `tsc`, `ng lint`, `ng build`, and the pagination spec. No server change.
+  - *As built,* run together with 13.11's card:
+    - **Windows: 3992 passed. Linux: 3992 passed** (3984 + 8). Linux ran as CI does: `ng test` in `node:22-bookworm` with Chromium.
+    - `tsc` for the app, the specs and the Playwright specs, and `ng lint`, are clean. `ng build` has the same six size-budget warnings.
+    - Playwright: all the layout specs at all seven sizes, **378 passed**, 637 skipped, none failed. The pagination spec is 122 of them (120 + the new membership page at both sizes). Run against a dev server started by hand, as in 15.4.
 
 **Hand-testing walkthrough.** On a fresh database neither list has more than one row, so the screenshots show the paging. This checks by hand that the names and entitlements still arrive. A fresh database, the server and `ng serve` running, a wide window:
 1. **Sign In** as `kiteagle@gmail.com` / `kit`. **Memberships** → **Knotty Yoga Silver Membership** → **Subscribe**. Leave **Start month** as it is, enter the sandbox card `4111 1111 1111 1111` (any future expiry, CVV `111`), and click **Subscribe & Pay $160.00**.
@@ -3642,6 +3672,16 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **Alternative:** keep the 160 px strip and crop the photo to Caleb's face and fist. Or a landscape reshoot.
 - Say which.
 - → 10/23: **13.11 is built with the default**, so the walkthrough there shows it. One difference from the plan: the photo can't run from above his head to his elbow at 4:3. The crop keeps his face, his fist and the elbow on the client's back, and cuts the top of his hair (13.11, Files). The alternative is still a small change: the card's CSS and a re-crop.
+
+**OQ-41 — On a phone, a product page's subscription cards crowd their header.** *(17.8's screenshots, 10/23.)*
+- Each card under **Active Subscriptions** puts three things on one row: the subscriber's name, the status badge and the billing period. At 390 px wide the name and the period each wrap onto two lines, with the badge between them:
+  - "Member / 04"
+  - "February 2025 - / March 2025"
+- It was like this before 17.8. It shows now because the screenshots cover this list for the first time.
+- Nothing overflows or overlaps, and a desktop shows each header on one line.
+- **Default:** leave it. Manage is mostly used on a desktop.
+- **Alternative:** on a phone, the period moves to its own line under the name and badge.
+- Say which.
 
 ### Resolved
 
