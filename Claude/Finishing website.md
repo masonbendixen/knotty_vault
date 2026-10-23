@@ -3457,6 +3457,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - → Plan: Phase 1 is the shoot, with a shot list, framing notes and checkboxes. **Default hand-off:** drop the originals into `C:\Users\mason\Documents\Obsidian\Knotty Yoga\Photos\` named as in 1.1 (any format or size); Claude converts and checks them (1.2). Say if you'd rather use another folder.
 - → 10/18: the photos aren't in yet, so attaching them moved from Phase 9 to **Phase 13**, just before Verification. Phases 9–12 don't use them and go first.
 - → 10/20: six are in (all five headshots and Intermediate Partner Acro, from `D:\Knotty Yoga\2026\Oct\JPG\`) and attached in Phase 13. **Still to come:** Beginner Knotty Yoga, Aerial Rope, Massage and Studio (1.1 items 6, 8, 12, 13). Drop each in the same folder under its 1.1 name; it joins as file + row + test (13.1). Until then Phase 18.3's steps 1 and 9 will find those four without a picture.
+- Mason- I put more of the missing / replacement photos at: D:\Knotty Yoga\2026\Oct\Oct 22 Website Shoot\JPG
 
 **OQ-38 — Table columns that shift from page to page.** *(17.4's screenshots, 10/23.)*
 - A table sizes its columns to the rows it shows. Now that a page shows ten rows, a long value on one page widens its column there and not on the next. On a desktop, the columns move between pages by:
