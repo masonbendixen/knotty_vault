@@ -2565,6 +2565,20 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
 - [x] Spec: the fallback address, and a new one checking that a 3:4 and a 4:3 picture both come back 900 wide from the box.
 - Not changed: the square class pictures (the **All Classes** cards, the weekly schedule's rows). Their boxes are square, which an upright picture fills.
 
+**Found by the Angular run: two pages lose a day across the 11/1 clock change** *(ui; added 10/27)*
+
+The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only in a week that contains a daylight-saving change, so they were green last week and would have failed CI all this week. This is the same trap as 13.11's C++ test and the provider schedule's earlier fix. This time one of the two is a real bug visitors would see.
+- [x] **Weekly schedule** (**Our Classes**, `public/our-classes`). It stepped through the week in 24-hour jumps from Sunday midnight. The week of Sunday 11/1 is 169 hours long, so every day after the change landed on 11 PM of the day before, and the week ended an hour early.
+  - **Seen by visitors this week:** paging to next week showed Sunday to Friday only. **Saturday 11/7 was missing, with its 10:00 AM Knotty Yoga**, and the heading read "Nov 1 – Nov 6".
+  - Fix: the week's end, the heading's last day and the day-by-day loop now count calendar days.
+  - Spec `OurClassesComponent` "shows all seven days, Saturday's classes included, across a DST change": the clock is pinned to Tuesday 10/27. Next week has all seven days, a 10:00 AM and an 11:30 PM Saturday class (the week's last hour), and the heading "Nov 1 – Nov 7".
+  - The existing spec ("renders all seven days for a future week") is unchanged; it failed only because of the bug.
+- [x] **Schedule grid** (Manage, `manage/schedule-grid`). The default **To** date was "today + 7 × 24 hours". This week that's 11 PM on 11/2, so the date picker showed **Nov 2**, while the grid itself loaded through 11/3. Its request reads the date in UTC, which happened to round it up.
+  - Fix: To is seven calendar days on, at midnight.
+  - The existing spec now expects that.
+  - The new spec pins the clock to 10/27 and checks To is 11/3 at midnight.
+- Both clock-pinned specs only bite when the browser runs in a time zone with daylight saving, as the provider schedule's does: Mason's machine (Pacific) yes, the Linux CI runner (UTC) no. CI could only catch it in the week before a clock change, as it would have this week.
+
 **Tests** *(create_database_test.cpp)*
 - [x] New `SeededGalleriesShowRyansPhotosWithoutNames`, through the readers the pages use: the Gallery's list of carousels, each carousel's photos (both behind `/api/gallery_carousels`; the photos also behind `/api/image_carousel/<id>`, the home row's request), the home feed, and the photo reader behind `/api/get_scaled_photo`.
   - Exactly two carousels on the Gallery, home first. Neither shows its title or description.
@@ -2585,10 +2599,17 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
   - g9: every photo in the same place (one ordinal)
   - u1: the class page's box back to 900 × 675
   - The replaced class photos can't be mutation-checked: the seed and the test read the same copy beside the test program. The hash check below stands in for it.
+- [x] The two clock-change fixes, each reverted on its own on Windows (Pacific time), with that page's specs run and the file restored byte for byte. **u1 and these four:**
+  - u1, the class page's box back to 900 × 675: both of the class page's address specs fail.
+  - u3, the weekly schedule's heading ending 6 × 24 hours on: the new spec ("Nov 1 – Nov 6").
+  - u5, the week ending 7 × 24 hours on: the new spec, which loses the 11:30 PM Saturday class.
+  - u4, the grid's To back to today + 7 × 24 hours: both grid specs.
+  - u2, the weekly schedule's loop back to 24-hour steps, is **not caught, and can't be**. Once the week's end is a calendar date, 24-hour steps from Sunday still give one entry per day, on the right dates. Either half of the fix alone brings Saturday back. The loop counts calendar days anyway, so no day logic on the page depends on 24-hour steps.
 
 **Verification**
 - [ ] knottyyoga on Windows and Linux, the same test names on both.
-- [ ] Angular `ng test` on Windows and Linux; lint on the two changed files.
+- [ ] Angular `ng test` on Windows and Linux; lint on the six changed files.
+  - *As built,* lint: clean. The first Windows run, before the clock-change fixes: 3991 passed, 2 failed (above). The three changed pages' specs alone, after them: 103 passed.
 - [ ] All 15 files hash-checked beside the database helper and the test program on both platforms.
   - *As built,* Windows: 15 of 15 beside each. Both programs relinked, so the build's own copy ran.
 - [ ] End to end: `--install_schema` into a throwaway database, then the real server, read signed out: the Gallery feed, the home page's carousel, and every class and the Massage picture at its page's request.
@@ -2603,6 +2624,8 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
 5. Click the **Aerial Rope** card. The picture beside the description shows the whole person, feet included, and is as sharp as the other classes' pictures. Make the window about tablet width, so the picture spans the page above the description: still sharp.
 6. **Services** (page headed **Our Services**). The **Massage** card shows the same picture as before in warmer colour, Caleb's face and his elbow on the client's back.
 7. Make the window as narrow as it goes. On **About** → **Gallery**, both rows are still photos only, a little shorter.
+8. *(Only before Sunday 11/1: after it, next week has no clock change.)* Wide window again. **Our Classes** → **Weekly schedule** (page headed **Our Classes**) → **Next week**. The label beside the buttons reads **Nov 1 – Nov 7**, and the days run Sunday to **Saturday**, with Saturday's **Knotty Yoga** at 10:00 AM.
+9. *(Same: only before 11/1.)* **Sign In** as `masonbendixen@gmail.com` / `pass`. **Admin** → **Manage Products** → **Schedule Grid** tile. **To** is a week from today: on Tuesday 10/27, **11/3/2026**, not 11/2.
 
 ---
 
