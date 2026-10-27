@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/27/2026
-Version: 0.35
+Version: 0.36
 tags: 
 ---
 # Overview
@@ -83,6 +83,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.36 (10/27/2026)** — **13.13 follow-up:** Mason dropped `GalleryKnottyYoga4`, the upright crop of the same aerial rope pose as `3`. The home gallery now has three photos, on the home page and first on **About** ▸ **Gallery**; partner acro is unchanged. The file is deleted from `img/`.
+  - Three photos come to about 1,110 px across, so in most desktop windows the home row sits still with no arrow. Hand-test steps 1–3 updated.
+  - **Results:** knottyyoga Linux 5409 (WINDOWS_PENDING). The one mutation, the seed still listing the fourth photo, is caught. End to end, signed out, the home gallery returns three photos.
 - **v0.35 (10/27/2026)** — **13.13 is built**, and not committed. Ryan's edits replace the six class photos and Massage. Knotty Yoga's is a different photo, and Aerial Rope's is now upright.
   - Eight new photos fill two photo-only carousels: the home page's (`GalleryKnottyYoga1–4`), and a partner acro one (`GalleryPartnerAcro1–4`) that only **About** ▸ **Gallery** shows, after the home one. Neither has a heading, a blurb or captions.
   - **The class page** asks for a taller box, so the upright Aerial Rope comes back 884 px wide instead of 497 and isn't stretched.
@@ -2652,9 +2655,15 @@ Mason, 10/27: "Let's drop the last image from the knotty yoga gallery (GalleryKn
 - [x] `GalleryKnottyYoga4.jpg` deleted from `src/database_helper/img/`. Ryan's PNG is still in the 10/27 folder.
   - Its copies beside the Windows and Linux programs were deleted by hand too: the build copies new files there but never removes old ones.
 - [x] Test: `SeededGalleriesShowRyansPhotosWithoutNames` now expects three home photos, `1`–`3` in order.
-- [ ] Mutation m1, the seed still listing the fourth photo while the file is gone (the regression this change could have):
+- [x] Mutation m1, the seed still listing the fourth photo while the file is gone (the regression this change could have):
+  - *As built:* **caught** on Linux by `SeededGalleriesShowRyansPhotosWithoutNames`, "4 photos where 3 were expected". The seed logged `seed_image_missing` for it, which the page would show as an empty card. The source was restored byte for byte.
 - [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
-- [ ] End to end, signed out:
+  - *As built:* **Linux: 5409 passed**, the same count as before: the test changed, none was added. The database helper, the server and the test helper all build.
+  - Beside the test program and the database helper on Linux: the 14 remaining files match `src/`, and `GalleryKnottyYoga4.jpg` is gone.
+- [x] End to end, signed out:
+  - *As built,* on Linux, into a throwaway `knottyyoga_e2e_1313b`, dropped afterwards. The install attaches the three home photos to `image_carousel_photos` rows 1–3 and partner acro to 4–7, with no `seed_image_missing` or `seed_image_failed`.
+  - `/api/gallery_carousels`: `home` with **3 photos** (ordinals 10–30; 636, 738 and 775 × 560), then `partner_acro` with 4 as before. Both still have no title, description or captions.
+  - The home row points at carousel 1, and `/api/image_carousel/1` returns the same three.
 - On a 280 px tall row, the three home photos come to about 1,110 px across, against 1,350 for four. So in most desktop windows the home row now sits still with no arrow. On the Gallery, whose content is at most 1,168 px wide, the home row fits too; the partner acro row (about 1,590 px) still scrolls.
 
 **Hand-testing walkthrough**
