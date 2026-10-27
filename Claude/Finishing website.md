@@ -2543,7 +2543,7 @@ The folder holds 15 PNGs: Ryan's edits of the seven class and massage photos, an
 | `PartnerAcro.jpg` | Ryan's edit, same framing | Beginner Partner Acro's card and class page |
 | `IntermediatePartnerAcro.jpg` | Ryan's edit; recropped wider (1.43:1) | Intermediate Partner Acro's card and class page |
 | `Massage.jpg` | Ryan's edit (warmer), same framing | the Massage card on **Services**, and the home page's **Additional health services** (13.12) |
-| `GalleryKnottyYoga1–4.jpg` | new | the home page's photo row, and first on **About** ▸ **Gallery** |
+| `GalleryKnottyYoga1–3.jpg` | new (`4` was dropped the same day: see the follow-up below) | the home page's photo row, and first on **About** ▸ **Gallery** |
 | `GalleryPartnerAcro1–4.jpg` | new | second on **About** ▸ **Gallery** only |
 
 Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the home page's other pictures.
@@ -2560,7 +2560,7 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
 
 **Seed** *(create_database.cpp `PopulateImageCarousels`)*
 - [x] The class and massage photos need no seed change: same file names (13.1's tables).
-- [x] The home carousel (`home`, "Home page photos") gets `GalleryKnottyYoga1`–`4`, in that order.
+- [x] The home carousel (`home`, "Home page photos") gets `GalleryKnottyYoga1`–`4`, in that order. *Since the follow-up below, `1`–`3`.*
 - [x] A second carousel, `partner_acro` ("Partner acro photos"), gets `GalleryPartnerAcro1`–`4`. It is on the Gallery after the home one (gallery order 20 after 10), and no home page row shows it.
 - [x] Both carousels: **Show Title** and **Show Description** off, so neither the home page nor the Gallery draws a heading or blurb. Each photo has no title or description, which is what a caption is made of. The display names and the home one's description are kept, because **Site Theme** ▸ **Image carousels** lists a carousel by them.
   - *As built:* a small `SeedCarousel` table and one `AddSeedCarousel` loop: the carousel, then its photos at ordinals 10, 20, 30, 40 (the editor's own steps), each with its file attached.
@@ -2592,7 +2592,7 @@ The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only 
 **Tests** *(create_database_test.cpp)*
 - [x] New `SeededGalleriesShowRyansPhotosWithoutNames`, through the readers the pages use: the Gallery's list of carousels, each carousel's photos (both behind `/api/gallery_carousels`; the photos also behind `/api/image_carousel/<id>`, the home row's request), the home feed, and the photo reader behind `/api/get_scaled_photo`.
   - Exactly two carousels on the Gallery, home first. Neither shows its title or description.
-  - Each has four photos, none with a title or description, in four different places. Each photo is its file byte for byte, as a JPEG. The files are named in the test in display order, so a photo swapped, repeated or out of order fails.
+  - Each has four photos (the home one three, since the follow-up below), none with a title or description, each in its own place. Each photo is its file byte for byte, as a JPEG. The files are named in the test in display order, so a photo swapped, repeated or out of order fails.
   - The home page has one carousel row, and it shows the home carousel.
 - [x] The replaced files need no new test. `PopulateSeedPhotosPutsEachListedFileOnItsRow` compares every class picture with its file byte for byte, and checks each class has a different one. `ServicesShowsTheMassagePhoto` and `SeededHomeFeaturesShowTheStudiosOwnPhotos` check Massage is still 4:3.
 
@@ -2645,12 +2645,24 @@ The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only 
   - Class pictures at the **All Classes** card's request (540 box): Aerial Rope 397 × 540, upright, and the five others 540 wide. Massage's card request comes back 1152 × 863 (4:3), and both home features 797 × 598, as in 13.12.
   - As before, the install was given a dummy mail password, since the server refuses to start without one. Nothing was mailed.
 
+**Follow-up, 10/27: the fourth home photo dropped** *(seed; built 10/27, not committed)*
+
+Mason, 10/27: "Let's drop the last image from the knotty yoga gallery (GalleryKnottyYoga4)". It was the upright crop of the same aerial rope pose as `GalleryKnottyYoga3`.
+- [x] The home carousel's seed lists `GalleryKnottyYoga1`–`3` only. The partner acro gallery is unchanged.
+- [x] `GalleryKnottyYoga4.jpg` deleted from `src/database_helper/img/`. Ryan's PNG is still in the 10/27 folder.
+  - Its copies beside the Windows and Linux programs were deleted by hand too: the build copies new files there but never removes old ones.
+- [x] Test: `SeededGalleriesShowRyansPhotosWithoutNames` now expects three home photos, `1`–`3` in order.
+- [ ] Mutation m1, the seed still listing the fourth photo while the file is gone (the regression this change could have):
+- [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
+- [ ] End to end, signed out:
+- On a 280 px tall row, the three home photos come to about 1,110 px across, against 1,350 for four. So in most desktop windows the home row now sits still with no arrow. On the Gallery, whose content is at most 1,168 px wide, the home row fits too; the partner acro row (about 1,590 px) still scrolls.
+
 **Hand-testing walkthrough**
 
 **Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve` (the class page changed). Use a wide window, signed out.
-1. **Home**. Under the sentence and the **SAFE SPACE** badge, a row of four photos: two classes in the red aerial fabrics, then two of aerial rope. There is no heading above the row and no words on any photo. In a window wider than the four (about 1,350 px), the row ends short of the right edge and nothing moves.
-2. Narrow the window until the fourth photo is cut off at the right edge. An arrow appears there; click it and the row moves on by one photo. Left alone, it moves along by itself every few seconds.
-3. **About** → **Gallery**. Under the page's **Gallery** title, the same four photos, then a second row: partner acrobatics against a white wall, flyers balanced on their bases. Neither row has a heading, and no photo has words on it. Both rows are wider than the page, so each has its arrow.
+1. **Home**. Under the sentence and the **SAFE SPACE** badge, a row of three photos: two classes in the red aerial fabrics, then one of aerial rope, a woman upside down holding the rope. There is no heading above the row and no words on any photo. In a window wider than the three (about 1,110 px), the row ends short of the right edge and nothing moves.
+2. Narrow the window until the third photo is cut off at the right edge. An arrow appears there; click it and the row moves on by one photo. Left alone, it moves along by itself every few seconds.
+3. **About** → **Gallery**. Under the page's **Gallery** title, the same three photos, then a second row: partner acrobatics against a white wall, flyers balanced on their bases. Neither row has a heading, and no photo has words on it. In a wide window the first row fits the page and sits still with no arrow; the second is wider than the page and has its arrow.
 4. **Our Classes** (page headed **All Classes**). **Knotty Yoga**'s card shows a new picture: a class in side planks, one foot each in the red fabrics. The other five are the same photos, recoloured; **Aerial Rope** now shows one person, upside down on the rope.
 5. Click the **Aerial Rope** card. The picture beside the description shows the whole person, feet included, and is as sharp as the other classes' pictures. Make the window about tablet width, so the picture spans the page above the description: still sharp.
 6. **Services** (page headed **Our Services**). The **Massage** card shows the same picture as before in warmer colour, Caleb's face and his elbow on the client's back.
