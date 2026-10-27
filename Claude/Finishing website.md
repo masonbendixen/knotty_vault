@@ -2554,8 +2554,16 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
 - [x] A second carousel, `partner_acro` ("Partner acro photos"), gets `GalleryPartnerAcro1`–`4`. It is on the Gallery after the home one (gallery order 20 after 10), and no home page row shows it.
 - [x] Both carousels: **Show Title** and **Show Description** off, so neither the home page nor the Gallery draws a heading or blurb. Each photo has no title or description, which is what a caption is made of. The display names and the home one's description are kept, because **Site Theme** ▸ **Image carousels** lists a carousel by them.
   - *As built:* a small `SeedCarousel` table and one `AddSeedCarousel` loop: the carousel, then its photos at ordinals 10, 20, 30, 40 (the editor's own steps), each with its file attached.
-- No UI change. The home page and the Gallery already hide a carousel's heading and blurb, and every caption, when those are off; their specs cover it. With no title, a photo's alt text is "Studio photo".
+- No UI change for the galleries. The home page and the Gallery already hide a carousel's heading and blurb, and every caption, when those are off; their specs cover it. With no title, a photo's alt text is "Studio photo".
 - Not changed: the page title **Gallery** at the top of **About** ▸ **Gallery**. It names the page, like every other page's title, not a carousel. See OQ-42.
+
+**Class page** *(ui: `public/class-detail`; added 10/27, found checking the new photos end to end)*
+- [x] The class page asks for its picture in a **900 × 1200** box instead of 900 × 675.
+  - The server fits a picture inside the box, and the page shows it in a 4:3 frame, cropped to fill. In the old box, Ryan's upright Aerial Rope came back **497 px wide**, against 900 for every landscape class picture.
+  - The frame is up to about 735 px wide (a tablet, where the picture spans the page), so Aerial Rope was stretched 1.5×, and about 2× on a phone's sharper screen.
+  - In the new box it comes back 884 wide. A landscape picture still fits by width, so it is served exactly as before.
+- [x] Spec: the fallback address, and a new one checking that a 3:4 and a 4:3 picture both come back 900 wide from the box.
+- Not changed: the square class pictures (the **All Classes** cards, the weekly schedule's rows). Their boxes are square, which an upright picture fills.
 
 **Tests** *(create_database_test.cpp)*
 - [x] New `SeededGalleriesShowRyansPhotosWithoutNames`, through the readers the pages use: the Gallery's list of carousels, each carousel's photos (both behind `/api/gallery_carousels`; the photos also behind `/api/image_carousel/<id>`, the home row's request), the home feed, and the photo reader behind `/api/get_scaled_photo`.
@@ -2575,22 +2583,24 @@ Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the
   - g7: the home row shows the partner acro carousel
   - g8: the partner acro carousel not seeded
   - g9: every photo in the same place (one ordinal)
+  - u1: the class page's box back to 900 × 675
   - The replaced class photos can't be mutation-checked: the seed and the test read the same copy beside the test program. The hash check below stands in for it.
 
 **Verification**
-- [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
+- [ ] knottyyoga on Windows and Linux, the same test names on both.
+- [ ] Angular `ng test` on Windows and Linux; lint on the two changed files.
 - [ ] All 15 files hash-checked beside the database helper and the test program on both platforms.
   - *As built,* Windows: 15 of 15 beside each. Both programs relinked, so the build's own copy ran.
 - [ ] End to end: `--install_schema` into a throwaway database, then the real server, read signed out: the Gallery feed, the home page's carousel, and every class and the Massage picture at its page's request.
 
 **Hand-testing walkthrough**
 
-**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`, then rebuild and start the server. Use a wide window, signed out.
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`. Rebuild and start the server, and restart `ng serve` (the class page changed). Use a wide window, signed out.
 1. **Home**. Under the sentence and the **SAFE SPACE** badge, a row of four photos: two classes in the red aerial fabrics, then two of aerial rope. There is no heading above the row and no words on any photo. In a window wider than the four (about 1,350 px), the row ends short of the right edge and nothing moves.
 2. Narrow the window until the fourth photo is cut off at the right edge. An arrow appears there; click it and the row moves on by one photo. Left alone, it moves along by itself every few seconds.
 3. **About** → **Gallery**. Under the page's **Gallery** title, the same four photos, then a second row: partner acrobatics against a white wall, flyers balanced on their bases. Neither row has a heading, and no photo has words on it. Both rows are wider than the page, so each has its arrow.
 4. **Our Classes** (page headed **All Classes**). **Knotty Yoga**'s card shows a new picture: a class in side planks, one foot each in the red fabrics. The other five are the same photos, recoloured; **Aerial Rope** now shows one person, upside down on the rope.
-5. Click the **Aerial Rope** card. The picture beside the description shows the whole person, feet included.
+5. Click the **Aerial Rope** card. The picture beside the description shows the whole person, feet included, and is as sharp as the other classes' pictures. Make the window about tablet width, so the picture spans the page above the description: still sharp.
 6. **Services** (page headed **Our Services**). The **Massage** card shows the same picture as before in warmer colour, Caleb's face and his elbow on the client's back.
 7. Make the window as narrow as it goes. On **About** → **Gallery**, both rows are still photos only, a little shorter.
 
