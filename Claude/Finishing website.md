@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/23/2026
-Version: 0.34
+Last Updated: 10/27/2026
+Version: 0.35
 tags: 
 ---
 # Overview
@@ -83,6 +83,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.35 (10/27/2026)** — **13.13 is built**, and not committed. Ryan's edits replace the six class photos and Massage. Knotty Yoga's is a different photo, and Aerial Rope's is now upright.
+  - Eight new photos fill two photo-only carousels: the home page's (`GalleryKnottyYoga1–4`), and a partner acro one (`GalleryPartnerAcro1–4`) that only **About** ▸ **Gallery** shows, after the home one. Neither has a heading, a blurb or captions.
+  - **The class page** asks for a taller box, so the upright Aerial Rope comes back 884 px wide instead of 497 and isn't stretched.
+  - **Found on the way:** two pages lost a day across the 11/1 clock change, and two Angular specs had started failing this week.
+    - The weekly schedule's **Next week** dropped **Saturday 11/7**, its 10:00 AM Knotty Yoga included, and its heading read "Nov 1 – Nov 6". Visitors would see this all week.
+    - The schedule grid's default **To** showed one day early.
+    - Both now count calendar days, with clock-pinned specs.
+  - **New open question, OQ-42:** does "no gallery name" include the Gallery page's own **Gallery** title? **Default:** keep it.
+  - **Results:** knottyyoga Windows 5409, Linux 5409, the same names on both. Angular Windows 3995, Linux 3995. End to end, signed out, both carousels come back with no title, description or captions, and every photo is served.
 - **v0.34 (10/23/2026)** — **13.12 is built**, and not committed. On the home page, **Types of classes** now shows `Class.jpg` (Mason's 10/22 shoot) and **Additional health services** shows `Massage.jpg`, the same file as the **Services** card. Both replace the design's stand-ins.
   - Neither is cropped: a home feature shows its picture whole, so these two blocks are 4:3 and a little taller than the design's 1.58:1. The two stand-ins are deleted from `img/`.
   - **Results:** knottyyoga Windows 5408 passed, Linux 5408 passed, the same names on both. Mutations: 4 of 4 caught. End to end, signed out, both pictures are served at 797 × 598 at the page's own request.
@@ -2607,12 +2616,24 @@ The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only 
   - u2, the weekly schedule's loop back to 24-hour steps, is **not caught, and can't be**. Once the week's end is a calendar date, 24-hour steps from Sunday still give one entry per day, on the right dates. Either half of the fix alone brings Saturday back. The loop counts calendar days anyway, so no day logic on the page depends on 24-hour steps.
 
 **Verification**
-- [ ] knottyyoga on Windows and Linux, the same test names on both.
-- [ ] Angular `ng test` on Windows and Linux; lint on the six changed files.
-  - *As built,* lint: clean. The first Windows run, before the clock-change fixes: 3991 passed, 2 failed (above). The three changed pages' specs alone, after them: 103 passed.
-- [ ] All 15 files hash-checked beside the database helper and the test program on both platforms.
-  - *As built,* Windows: 15 of 15 beside each. Both programs relinked, so the build's own copy ran.
-- [ ] End to end: `--install_schema` into a throwaway database, then the real server, read signed out: the Gallery feed, the home page's carousel, and every class and the Massage picture at its page's request.
+- [x] knottyyoga on Windows and Linux, the same test names on both.
+  - *As built:* **Windows: 5409 passed. Linux: 5409 passed**, the same 5409 names on both: 13.12's 5408 and the new test.
+  - On Linux the database helper, the server and the test helper all build.
+  - On Windows only the test program and the database helper were rebuilt, because Mason's server was running; the server's own code didn't change.
+- [x] Angular `ng test` on Windows and Linux; lint on the six changed files; `ng build`.
+  - *As built:* **Windows: 3995 passed. Linux: 3995 passed**, 13.11's 3992 and the three new specs. Lint is clean.
+  - `ng build` succeeds. Its size warnings are the existing ones; no stylesheet changed.
+  - The first Windows run, before the clock-change fixes, had 3991 passed and 2 failed (above).
+- [x] All 15 files hash-checked beside the database helper and the test program on both platforms.
+  - *As built:* 15 of 15 beside each program, on both platforms. Both programs relinked, so the build's own copy ran; no hand copy was needed.
+- [x] End to end: `--install_schema` into a throwaway database, then the real server, read signed out: the Gallery feed, the home page's carousel, and every class and the Massage picture at its page's request.
+  - *As built,* on Linux, into a throwaway `knottyyoga_e2e_1313`, dropped afterwards. The install log attaches the eight gallery photos to `image_carousel_photos` rows 1–8, in order, and every other picture as before:
+    - 6 classes, 8 home sections, 5 instructors, 2 people, 6 products
+    - no `seed_image_missing`, `seed_image_failed` or `seed_lookup_missing` line
+  - `/api/gallery_carousels`: `home`, then `partner_acro`, both with `show_title` and `show_description` false. Each has four photos at ordinals 10–40, every title and description empty. Each photo comes back 560 px tall at the carousel's own 900 × 560 request: home 636, 738, 775 and 460 wide; partner acro 567, then 839 three times.
+  - The home feed's carousel row points at carousel 1, the `home` one, and `/api/image_carousel/1` returns the same four photos.
+  - Class pictures at the **All Classes** card's request (540 box): Aerial Rope 397 × 540, upright, and the five others 540 wide. Massage's card request comes back 1152 × 863 (4:3), and both home features 797 × 598, as in 13.12.
+  - As before, the install was given a dummy mail password, since the server refuses to start without one. Nothing was mailed.
 
 **Hand-testing walkthrough**
 
@@ -3842,6 +3863,7 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
   - **Knotty Yoga** keeps today's picture.
   - The massage photo's framing is OQ-40.
 - → 10/23, later: **13.11 is built.** All six classes and the Massage card have their pictures. Only `Studio.jpg` is still to come.
+- → 10/27: Ryan's edits of those seven, and eight gallery photos, are in and attached (**13.13**). `Studio.jpg` is still the only one to come.
 
 **OQ-40 — The massage photo is upright; the Services card shows a wide strip.** *(Found checking the new photos, 10/23.)*
 - The **Services** card shows its picture across the top of the card, 160 px tall. That strip is about 2.3 times as wide as it is tall on a desktop (about 375 × 160), and 2.2 times on a phone.
