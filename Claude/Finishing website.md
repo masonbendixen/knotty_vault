@@ -561,7 +561,7 @@ How the site crops each kind, so the subject survives the crop:
 - [x] 4. Tiana Cheung headshot → `TianaInstructor.jpg`
 - [x] 5. Gifford Cheung headshot → `GiffordInstructor.jpg`
 - [x] 6. Beginner Knotty Yoga class → `BeginnerKnottyYoga.jpg` *(in 10/23; attached in 13.11)*
-- [ ] 7. Knotty Yoga class → `KnottyYoga.jpg` (replaces today's, if reshot) *(not reshot; today's stays)*
+- [x] 7. Knotty Yoga class → `KnottyYoga.jpg` (replaces today's, if reshot) *(not reshot; today's stays. → 10/27: replaced by a different photo in Ryan's edits, 13.13)*
 - [x] 8. Aerial Rope class → `AerialRope.jpg` *(in 10/23; attached in 13.11)*
 - [x] 9. Handstands class → `Handstand.jpg` (replaces today's, if reshot) *(reshot, in 10/23; replaced in 13.11)*
 - [x] 10. Beginner Partner Acro class → `PartnerAcro.jpg` (replaces today's, if reshot) *(reshot, in 10/23; replaced in 13.11)*
@@ -576,6 +576,7 @@ How the site crops each kind, so the subject survives the crop:
     - `IntermediatePartnerAcro.jpg` there is byte for byte the 10/20 original, so it changes nothing.
     - The twelve `.heic` files in the folder above it are left alone, as before.
     - → 10/23, later: a seventh, `Class.jpg`, joined them for the home page's **Types of classes** (13.12). Upright, 4:3, no EXIF or GPS.
+  - → 10/27: **Ryan's edits** are in `D:\Knotty Yoga\2026\Oct\Oct 27 Ryan Editied\`: 15 PNGs. Seven replace the six class photos and Massage (Knotty Yoga's is a different photo), and eight are new, for the home page's carousel and the Gallery. Converted and attached in **13.13**.
 - [x] Claude converts each into `server/knottyyoga_server/src/database_helper/img/` with **ffmpeg**:
   - JPEG, long edge 2000 px, `-q:v 3`, under about 1.5 MB.
   - Phone rotation applied.
@@ -2203,6 +2204,7 @@ Uses Phase 1's files.
 **Status: implemented 10/20/2026, and committed as `13a7d74d`.** Six photos and all five bios are in. Four photos were still to come (1.1: Beginner Knotty Yoga, Aerial Rope, Massage, Studio); each joins later as file + row + test expectation (13.1). Results are in 13.4.
 - → 10/23: Beginner Knotty Yoga, Aerial Rope and Massage are in, with new Handstands and Beginner Partner Acro photos. **13.11** attaches them: built 10/23, not committed. Only the studio picture is still to come (OQ-11).
 - → 10/23, later: the home page's **Types of classes** and **Additional health services** show `Class.jpg` and `Massage.jpg` in place of the design's stand-ins. **13.12**, built 10/23, not committed.
+- → 10/27: Ryan's edits replace the six class photos and Massage, and seed two photo-only carousels: the home page's, and a partner acro one on **About** ▸ **Gallery**. **13.13**, built 10/27, not committed.
 
 ### 13.1 Table-driven photo attachment *(seed)*
 - [x] Extend `PopulateSeedPhotos` to one table per target, with one loop each, every lookup by natural key, and every outcome logged (the existing `AttachSeedPhoto` contract):
@@ -2515,6 +2517,82 @@ Mason, 10/23: "On the home page, for the Additional health services photo, pleas
 1. **Home**. Scroll past **Why Knotty Yoga**. **Types of classes** shows a class stretching in red aerial fabrics, in an orange room, with the picture on the right.
 2. Under it, **Additional health services** shows Caleb giving a massage, his elbow on the client's back, with the picture on the left.
 3. Make the window as narrow as it goes. Each picture sits above its words, and is still whole.
+
+### 13.13 Ryan's edited photos and the two galleries *(seed; added 10/27 from Mason's request; built 10/27, not committed)*
+
+Mason, 10/27: "Ryan was able to edit the photos to make them nicer. I would like you to replace the existing photos with the edited ones at `D:\Knotty Yoga\2026\Oct\Oct 27 Ryan Editied`. Then please use the photos labelled GalleryKnottyYoga*.png for the home page gallery. Please don't show the name of the gallery on the page or the names of each photo. I just want the photos. I also want that gallery to show up on the gallery page under about but also create a second gallery for the about gallery page with the GalleryPartnerAcro*.png photos. Same thing, just raw photos. No gallery name or image name."
+
+The folder holds 15 PNGs: Ryan's edits of the seven class and massage photos, and eight new gallery photos.
+
+| File | | Where it shows |
+|---|---|---|
+| `BeginnerKnottyYoga.jpg` | Ryan's edit; recropped wider (1.59:1) | Beginner Knotty Yoga's card and class page |
+| `KnottyYoga.jpg` | **a different photo**: a class in side planks, one foot in the red fabrics. The old one was a partner acro stack. | Knotty Yoga's card and class page |
+| `AerialRope.jpg` | Ryan's edit; recropped **upright** to one of the two people | Aerial Rope's card and class page |
+| `Handstand.jpg` | Ryan's edit; recropped closer (3:2) | Handstands' card and class page |
+| `PartnerAcro.jpg` | Ryan's edit, same framing | Beginner Partner Acro's card and class page |
+| `IntermediatePartnerAcro.jpg` | Ryan's edit; recropped wider (1.43:1) | Intermediate Partner Acro's card and class page |
+| `Massage.jpg` | Ryan's edit (warmer), same framing | the Massage card on **Services**, and the home page's **Additional health services** (13.12) |
+| `GalleryKnottyYoga1–4.jpg` | new | the home page's photo row, and first on **About** ▸ **Gallery** |
+| `GalleryPartnerAcro1–4.jpg` | new | second on **About** ▸ **Gallery** only |
+
+Not in the folder, so unchanged: `Class.jpg` (13.12), the five headshots and the home page's other pictures.
+
+**Files**
+- [x] Convert each into `src/database_helper/img/` as 1.2 did: ffmpeg, long edge 2000 px, `-q:v 3`, all metadata stripped.
+  - *As built:* also 4:2:0 colour (ffmpeg keeps a PNG's full-colour 4:4:4 unless told), as every other seed JPEG is. 130–492 KB each.
+  - Seven PNGs carried an sRGB colour profile. sRGB is what a browser assumes anyway, so removing it changes no colour; it was removed so these match the other seed photos. No PNG carried EXIF, GPS or text.
+  - Two PNGs have a transparency channel. `GalleryPartnerAcro2` is fully opaque. `IntermediatePartnerAcro` has a few pixels at 97 % opacity, a difference no one can see; the JPEG drops the channel.
+  - All 15 were opened after conversion, the seven replacements beside the pictures they replace: upright, sharp, and the same subjects.
+- [x] **Massage** is cropped to 4:3 exactly as in 13.11 (OQ-40): Ryan's PNG is the full upright original, recoloured, so the same crop (full width, 800 px from the top) keeps the same face, fist and elbow. 2000 × 1500.
+- [x] **Aerial Rope** is now upright (1474 × 2000). The class page shows a 4:3 cutout and the **All Classes** card a square, both from the middle. Checked both: the whole person is in each, the raised foot just inside the top of the 4:3 one.
+- [x] The other five keep Ryan's own shapes, 1.40:1 to 1.59:1. The class page cuts a little off their sides to make 4:3.
+
+**Seed** *(create_database.cpp `PopulateImageCarousels`)*
+- [x] The class and massage photos need no seed change: same file names (13.1's tables).
+- [x] The home carousel (`home`, "Home page photos") gets `GalleryKnottyYoga1`–`4`, in that order.
+- [x] A second carousel, `partner_acro` ("Partner acro photos"), gets `GalleryPartnerAcro1`–`4`. It is on the Gallery after the home one (gallery order 20 after 10), and no home page row shows it.
+- [x] Both carousels: **Show Title** and **Show Description** off, so neither the home page nor the Gallery draws a heading or blurb. Each photo has no title or description, which is what a caption is made of. The display names and the home one's description are kept, because **Site Theme** ▸ **Image carousels** lists a carousel by them.
+  - *As built:* a small `SeedCarousel` table and one `AddSeedCarousel` loop: the carousel, then its photos at ordinals 10, 20, 30, 40 (the editor's own steps), each with its file attached.
+- No UI change. The home page and the Gallery already hide a carousel's heading and blurb, and every caption, when those are off; their specs cover it. With no title, a photo's alt text is "Studio photo".
+- Not changed: the page title **Gallery** at the top of **About** ▸ **Gallery**. It names the page, like every other page's title, not a carousel. See OQ-42.
+
+**Tests** *(create_database_test.cpp)*
+- [x] New `SeededGalleriesShowRyansPhotosWithoutNames`, through the readers the pages use: the Gallery's list of carousels, each carousel's photos (both behind `/api/gallery_carousels`; the photos also behind `/api/image_carousel/<id>`, the home row's request), the home feed, and the photo reader behind `/api/get_scaled_photo`.
+  - Exactly two carousels on the Gallery, home first. Neither shows its title or description.
+  - Each has four photos, none with a title or description, in four different places. Each photo is its file byte for byte, as a JPEG. The files are named in the test in display order, so a photo swapped, repeated or out of order fails.
+  - The home page has one carousel row, and it shows the home carousel.
+- [x] The replaced files need no new test. `PopulateSeedPhotosPutsEachListedFileOnItsRow` compares every class picture with its file byte for byte, and checks each class has a different one. `ServicesShowsTheMassagePhoto` and `SeededHomeFeaturesShowTheStudiosOwnPhotos` check Massage is still 4:3.
+
+**Mutation check**
+- [ ] Planned, each against the new test on its own Linux run:
+  - g1: both carousels show their name
+  - g2: both show their description
+  - g3: each photo captioned with its file name
+  - g4: the two galleries' first photos swapped
+  - g5: home photos 2 and 3 out of order
+  - g6: partner acro first on the Gallery
+  - g7: the home row shows the partner acro carousel
+  - g8: the partner acro carousel not seeded
+  - g9: every photo in the same place (one ordinal)
+  - The replaced class photos can't be mutation-checked: the seed and the test read the same copy beside the test program. The hash check below stands in for it.
+
+**Verification**
+- [ ] knottyyoga on Windows and Linux, the same test names on both. No UI change, so no Angular run.
+- [ ] All 15 files hash-checked beside the database helper and the test program on both platforms.
+  - *As built,* Windows: 15 of 15 beside each. Both programs relinked, so the build's own copy ran.
+- [ ] End to end: `--install_schema` into a throwaway database, then the real server, read signed out: the Gallery feed, the home page's carousel, and every class and the Massage picture at its page's request.
+
+**Hand-testing walkthrough**
+
+**Setup.** Recreate the database with `knottyyoga_database_helper --recreate_database`, then rebuild and start the server. Use a wide window, signed out.
+1. **Home**. Under the sentence and the **SAFE SPACE** badge, a row of four photos: two classes in the red aerial fabrics, then two of aerial rope. There is no heading above the row and no words on any photo. In a window wider than the four (about 1,350 px), the row ends short of the right edge and nothing moves.
+2. Narrow the window until the fourth photo is cut off at the right edge. An arrow appears there; click it and the row moves on by one photo. Left alone, it moves along by itself every few seconds.
+3. **About** → **Gallery**. Under the page's **Gallery** title, the same four photos, then a second row: partner acrobatics against a white wall, flyers balanced on their bases. Neither row has a heading, and no photo has words on it. Both rows are wider than the page, so each has its arrow.
+4. **Our Classes** (page headed **All Classes**). **Knotty Yoga**'s card shows a new picture: a class in side planks, one foot each in the red fabrics. The other five are the same photos, recoloured; **Aerial Rope** now shows one person, upside down on the rope.
+5. Click the **Aerial Rope** card. The picture beside the description shows the whole person, feet included.
+6. **Services** (page headed **Our Services**). The **Massage** card shows the same picture as before in warmer colour, Caleb's face and his elbow on the client's back.
+7. Make the window as narrow as it goes. On **About** → **Gallery**, both rows are still photos only, a little shorter.
 
 ---
 
@@ -3753,6 +3831,12 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - Nothing overflows or overlaps, and a desktop shows each header on one line.
 - **Default:** leave it. Manage is mostly used on a desktop.
 - **Alternative:** on a phone, the period moves to its own line under the name and badge.
+- Say which.
+
+**OQ-42 — Does "no gallery name" include the Gallery page's own title?** *(13.13, 10/27.)*
+- **About** ▸ **Gallery** opens with the page title **Gallery**, as every page opens with its own title. Under it, 13.13's two carousels have no heading, no blurb and no captions.
+- **Default:** keep the page title. It names the page, not a carousel.
+- **Alternative:** drop it, so the page starts with the photos. A one-line change to the page and its spec.
 - Say which.
 
 ### Resolved
