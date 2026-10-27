@@ -92,6 +92,7 @@ Please create a plan with phases of implementation. Within each phase, please re
     - Both now count calendar days, with clock-pinned specs.
   - **New open question, OQ-42:** does "no gallery name" include the Gallery page's own **Gallery** title? **Default:** keep it.
   - **Results:** knottyyoga Windows 5409, Linux 5409, the same names on both. Angular Windows 3995, Linux 3995. End to end, signed out, both carousels come back with no title, description or captions, and every photo is served.
+  - **Mutations:** the seed's 9 of 9 caught. The UI's 4 of 5 caught; the fifth can't be, because its fix is redundant once the week's end counts calendar days (13.13).
 - **v0.34 (10/23/2026)** — **13.12 is built**, and not committed. On the home page, **Types of classes** now shows `Class.jpg` (Mason's 10/22 shoot) and **Additional health services** shows `Massage.jpg`, the same file as the **Services** card. Both replace the design's stand-ins.
   - Neither is cropped: a home feature shows its picture whole, so these two blocks are 4:3 and a little taller than the design's 1.58:1. The two stand-ins are deleted from `img/`.
   - **Results:** knottyyoga Windows 5408 passed, Linux 5408 passed, the same names on both. Mutations: 4 of 4 caught. End to end, signed out, both pictures are served at 797 × 598 at the page's own request.
@@ -2596,7 +2597,7 @@ The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only 
 - [x] The replaced files need no new test. `PopulateSeedPhotosPutsEachListedFileOnItsRow` compares every class picture with its file byte for byte, and checks each class has a different one. `ServicesShowsTheMassagePhoto` and `SeededHomeFeaturesShowTheStudiosOwnPhotos` check Massage is still 4:3.
 
 **Mutation check**
-- [ ] Planned, each against the new test on its own Linux run:
+- [x] Planned, each against the new test on its own Linux run:
   - g1: both carousels show their name
   - g2: both show their description
   - g3: each photo captioned with its file name
@@ -2608,6 +2609,15 @@ The Windows `ng test` failed two specs that 13.13 doesn't touch. Both fail only 
   - g9: every photo in the same place (one ordinal)
   - u1: the class page's box back to 900 × 675
   - The replaced class photos can't be mutation-checked: the seed and the test read the same copy beside the test program. The hash check below stands in for it.
+  - *As built:* **g1–g9, 9 of 9 caught** by `SeededGalleriesShowRyansPhotosWithoutNames`. The source was restored byte for byte, and the clean rerun passes.
+    - g1 and g2: "home shows its name" / "home shows its description"
+    - g3: "home has a photo with a title"
+    - g4: "home photo 1 is not GalleryKnottyYoga1.jpg", and the same for partner acro
+    - g5: "home photo 2 is not GalleryKnottyYoga2.jpg", and photo 3
+    - g6: "the home page's photos come first on the Gallery"
+    - g7: the home row points at carousel 8, not 7
+    - g8: "both carousels belong on the Gallery" (1 of 2). Its first attempt was never applied: the pattern ended at a line end, which never matches before this file's Windows line endings. It was rerun without that anchor.
+    - g9: one photo where four were expected
 - [x] The two clock-change fixes, each reverted on its own on Windows (Pacific time), with that page's specs run and the file restored byte for byte. **u1 and these four:**
   - u1, the class page's box back to 900 × 675: both of the class page's address specs fail.
   - u3, the weekly schedule's heading ending 6 × 24 hours on: the new spec ("Nov 1 – Nov 6").
