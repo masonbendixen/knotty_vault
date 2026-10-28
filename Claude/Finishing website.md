@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/27/2026
-Version: 0.36
+Version: 0.37
 tags: 
 ---
 # Overview
@@ -83,6 +83,17 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.37 (10/27/2026)** — **Phase 18, verification, is done** except Mason's hand-test (18.3). Not committed.
+  - **18.1, everything green:**
+    - knottyyoga: **Windows 5409, Linux 5409**, the same names on both.
+    - honuware: **Windows 1900, Linux 1900**, at the pinned `920f18a`.
+    - Angular: **Windows 3996, Linux 3996**. `tsc` and `ng build` are clean.
+    - Playwright layout specs: 378 passed at all 7 sizes.
+    - honuware-web-components: 514 passed, and the library builds.
+  - **18.2:** Mason's local database was recreated with his own launch settings. 34 pictures attached, and nothing is missing, skipped or failed.
+  - **18.4, a bug fixed:** after changing a temporary password, **Staff** and **Manage** kept sending the person back to **Change Password** until they reloaded. The server had cleared the flag, but the app never re-read it. Every instructor given a temporary password in 19.3 would have hit this. One-line fix and a new spec, mutation-checked.
+  - **18.3 rechecked:** ten steps no longer matched the site, mostly because of changes since 10/14. Examples: the signed-in menu is **My Classes**, the weekly page starts at today, and the reset page's heading changed. All are corrected; 18.4 lists them.
+  - **New open question, OQ-43:** a *failed* password change also goes to **User Information**, with no message. **Default:** leave it.
 - **v0.36 (10/27/2026)** — **13.13 follow-up:** Mason dropped `GalleryKnottyYoga4`, the upright crop of the same aerial rope pose as `3`. The home gallery now has three photos, on the home page and first on **About** ▸ **Gallery**; partner acro is unchanged. The file is deleted from `img/`.
   - Three photos come to about 1,110 px across, so in most desktop windows the home row sits still with no arrow. Hand-test steps 1–3 updated.
   - **Results:** knottyyoga Windows 5409, Linux 5409, the same names on both. The one mutation, the seed still listing the fourth photo, is caught. End to end, signed out, the home gallery returns three photos.
@@ -3686,11 +3697,19 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
 
 *Was Phase 14 until 10/21, when Ryan's review became Phases 14–17.*
 
+**Status: 18.1, 18.2 and 18.4 done 10/27, not committed. 18.3 is Mason's hand-test, rechecked against the code the same day.** Verification found one real bug, the stale temporary-password flag (18.4), and ten walkthrough steps that no longer matched the site.
+
 ### 18.1 Build and test (Claude, both platforms; reported per platform)
-- [ ] knottyyoga: Linux gate (`server/docker/build_and_test.sh`) and Windows (`x64-Debug`). Also build `knottyyoga_database_helper` and `knottyyoga_test_helper` explicitly, since the gate builds neither `main.cpp`.
-- [ ] Phases 4, 11 and 14 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
+- [x] knottyyoga: Linux gate (`server/docker/build_and_test.sh`) and Windows (`x64-Debug`). Also build `knottyyoga_database_helper` and `knottyyoga_test_helper` explicitly, since the gate builds neither `main.cpp`.
+  - *As built (10/27):* **Windows: 5409 passed. Linux: 5409 passed**, the same 5409 names on both. Linux cloned the pinned honuware SHA, `920f18a`.
+  - Linux builds all four programs: the database helper, the server, the test helper and the scheduler.
+  - Windows builds all of them except the server, because Mason's server was running when the build started. No server code changed in this phase, and the server builds on Linux.
+  - All 32 `img/` files match `src/` beside the test program and the database helper.
+    - The Linux build volume also holds 7 files deleted from `src/` in earlier phases, such as `tagline.png` and the `tier_icon_*.png` set.
+    - No seed names any of them, so they are leftovers nothing reads; a fresh build doesn't have them.
+- [x] Phases 4, 11 and 14 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
   - *As built (10/27):* `server_components` is clean and at `920f18a`, the SHA knottyyoga pins, so both gates test exactly what the app uses.
-  - **Linux: 1900 passed** (floor 1700).
+  - **Windows: 1900 passed. Linux: 1900 passed** (floor 1700), the same names on both.
   - `honuware-web-components` (`b7d77d4`, clean): **514 passed**, and the library builds.
 - [x] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`, and the Playwright layout specs added in Phases 14–17.
   - *As built (10/27):* **Windows: 3996 passed. Linux: 3996 passed.** That's 13.13's 3995 plus 18.4's new spec. The first runs, before 18.4, had 3995 on both.
