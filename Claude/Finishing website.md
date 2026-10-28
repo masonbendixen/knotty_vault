@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/27/2026
-Version: 0.37
+Version: 0.38
 tags: 
 ---
 # Overview
@@ -83,6 +83,25 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.38 (10/27/2026)** — **Phase 19 rewritten as copy-and-paste instructions** (Mason: "give me copyable instructions for everything"). Nothing was run against production.
+  - Every command is now written out in full, with where it runs (laptop, EC2 or browser) and what it should print. That covers:
+    - the tag and CI deploy
+    - the snapshot
+    - stopping and starting the services
+    - the reinstall and the migration
+    - the secrets
+    - mail and health checks
+    - restoring from the snapshot
+    - the password hand-over
+  - **Corrections found while writing it:**
+    - The old text named `SafeSpace_icon.svg`; the file is `safe_space_badge.svg`. The image should hold 32 seed files.
+    - The `set_secret` block gained `website_address_login`, so email links point at the `cloudfront.net` address.
+    - `send_test_email` takes `--to`, which works only at the test helper's prompt, not as a one-shot flag.
+    - The seeded admin `masonbendixen@hotmail.com` signs in with `mason`.
+  - **New in it:**
+    - Caleb, Kit and the three instructors get temporary passwords generated on the EC2, so nobody keeps a seeded password from source control.
+    - A check of whether SES can mail anyone, which decides whether **Forgot password?** works for the instructors.
+    - The "paste late bios" step is gone: all five are in the seed (OQ-15).
 - **v0.37 (10/27/2026)** — **Phase 18, verification, is done** except Mason's hand-test (18.3). Not committed.
   - **18.1, everything green:**
     - knottyyoga: **Windows 5409, Linux 5409**, the same names on both.
@@ -3989,7 +4008,7 @@ sudo sed -n 's/=.*//p' /etc/knottyyoga/server.env
 
 ### 19.2 Reinstall *(EC2, in the same session as step 8)*
 
-Run each block on its own and check its result before the next. If you opened a new session, run step 8's `TAG=…` line again first.
+Run each block on its own and check its result before the next. If the session drops partway through, sign in again and rerun step 1 before carrying on.
 
 **1. Remember the tag.**
 ```bash
@@ -4080,7 +4099,7 @@ systemctl is-active knottyyoga-server knottyyoga-helper
   - `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=2`
   - `[scheduler] event=event_loop_starting`
 - The last command prints `active` twice.
-- `event=login_failure` means the scheduler password in `server.env` changed since step 3. Run step 3 again.
+- `event=login_failure` means the scheduler password in `server.env` doesn't match the one step 3 stored. That shouldn't happen minutes later; `RUNBOOK.md` §5, *The scheduler service-account password*, is the fix.
 
 **7. Prove mail works.**
 ```bash
@@ -4101,7 +4120,7 @@ Same answer as step 6. If it is a **403**, CloudFront's origin secret no longer 
 
 **If something goes wrong**
 - **Step 3 or 4 printed an error:** the site is still stopped. Read the error, then run that step again. Step 3 can be repeated as often as needed.
-- **You want the old data back:** restore the step 7 snapshot. Then point the server at the restored copy. *(Browser, then EC2)*
+- **You want the old data back:** restore the 19.1 step 7 snapshot. Then point the server at the restored copy. *(Browser, then EC2)*
   1. RDS → **Snapshots** → **Manual snapshots** → select `knottyyoga-before-content-reinstall` → **Actions** → **Restore snapshot**.
   2. Fill in:
      - **DB instance identifier:** `knottyyoga-restored`
