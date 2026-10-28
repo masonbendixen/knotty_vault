@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/28/2026
-Version: 0.1
+Version: 0.2
 tags: 
 ---
 # Overview
