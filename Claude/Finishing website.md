@@ -4101,22 +4101,45 @@ systemctl is-active knottyyoga-server knottyyoga-helper
 - The last command prints `active` twice.
 - `event=login_failure` means the scheduler password in `server.env` doesn't match the one step 3 stored. That shouldn't happen minutes later; `RUNBOOK.md` §5, *The scheduler service-account password*, is the fix.
 
-**7. Prove mail works.** *(Browser, then EC2 only if no mail arrives)* Send yourself a password reset email. It goes out exactly as every email the site sends: from `noreply@knottyyoga.com`, through SES.
-1. Open https://dv1tgxa9ok30f.cloudfront.net/ → **Sign In** → **Forgot password?**
-2. **Email:** `masonbendixen@gmail.com` → **Send reset link**. The page says a link was sent if the account exists.
-3. Within a minute the masonbendixen@gmail.com inbox has **Reset your Knotty Yoga password**, from **Knotty Yoga**. Leave its link alone: 19.3 step 1 changes the password, and the link expires in an hour.
+**7. Prove mail works.** This needs 19.5's fix, in `v1.0.0-sandbox.12` or later. On `sandbox.11`, `send_test_email` sends from the developer Gmail address, and SES refuses it with `Mail message rejection.` (Mason hit this on 10/27).
 
-If nothing arrives (check spam too), look for the error on the EC2:
+**7a. Release the fix.** Skip this if step 1 printed `sandbox.12` or later.
+- The database isn't touched. The deploy runs `--migrate`, which finds nothing new. The settings from step 5 stay as they are.
+- The site keeps running, apart from a few seconds while the server restarts.
+
+*(Laptop)* Once 19.5 is committed:
 ```bash
-sudo journalctl -u knottyyoga-server --since "15 minutes ago" --no-pager | grep 'event=mail_failed'
+cd /c/Users/mason/source/repos/knottyyoga
+git status --short
+git push origin master
 ```
-- **`Mail message rejection.`:** SES signed you in but refused the email. Either:
-  - **The domain isn't verified.** Open https://us-west-2.console.aws.amazon.com/ses/home?region=us-west-2#/identities (SES → **Configuration** → **Identities**). `knottyyoga.com` must say **Verified**. If it isn't listed, follow Deploying to AWS 4.7, *Verify the sending domain*, whose box is unticked there.
-  - **The account is still in the sandbox, and `masonbendixen@gmail.com` isn't verified.** On the same page, it would need its own **Verified** row. The **Account dashboard** says whether the account is in the sandbox.
-- **`Username rejection.`, `Password rejection.` or `Authentication rejection.`:** the SMTP username or password is wrong. Rerun step 5 with the values from the `ses-smtp-knottyyoga` `.csv`.
-- **No `mail_failed` line:** the email went out. Look in Gmail's spam and **All Mail**.
+Wait for master's pipeline to go green, as in 19.1 step 2. Then:
+```bash
+TAG=v1.0.0-sandbox.12
+git tag -a "$TAG" -m "send_test_email sends from the configured sender (Finishing website 19.5)"
+git push origin "$TAG"
+```
+Wait for the tag pipeline, then press ▶ on **`deploy-manual:ec2`** and then on **`deploy-manual:ui`**, as in 19.1 steps 4–5. Then:
+```bash
+curl -sS -m 10 https://dv1tgxa9ok30f.cloudfront.net/api/health; echo
+```
+It prints `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.12"}`.
 
-**Don't use `send_test_email` on this release.** It sent from the developer Gmail address, which SES refuses with `Mail message rejection.` (Mason hit this on 10/27). It is fixed for the next release, where it sends from `noreply@knottyyoga.com` and prints the From address either way.
+**7b. Send the test email.** *(EC2)*
+```bash
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --repl
+```
+At its prompt, type these two lines:
+```
+send_test_email --to=masonbendixen@gmail.com
+quit
+```
+- It prints `Test email sent from noreply@knottyyoga.com to masonbendixen@gmail.com.`, and the email from **Knotty Yoga** arrives within a minute. If it isn't in the inbox, check spam and **All Mail**.
+- **A From other than `noreply@knottyyoga.com`:** `mail_sender_address` is wrong. Rerun step 1, then step 5, then 7b.
+- **`… Mail message rejection.`** with the right From means SES signed in but refused the email. One of:
+  - **The domain isn't verified.** Open https://us-west-2.console.aws.amazon.com/ses/home?region=us-west-2#/identities (SES → **Configuration** → **Identities**). `knottyyoga.com` must say **Verified**. If it isn't listed, follow Deploying to AWS 4.7, *Verify the sending domain*; its box is unticked there.
+  - **The account is still in the sandbox, and `masonbendixen@gmail.com` isn't verified.** On the same page, that address would need its own **Verified** row. The **Account dashboard** says whether the account is in the sandbox.
+- **`Username rejection.`, `Password rejection.` or `Authentication rejection.`:** the SMTP username or password is wrong. Rerun step 1, then step 5 with the values from the `ses-smtp-knottyyoga` `.csv`, then 7b.
 
 **8. Check from outside.** *(Laptop)*
 ```bash
@@ -4245,7 +4268,7 @@ Error: Failed to send email: Mail message rejection.
 - [ ] Mutation: the hard-coded Gmail From put back.
 - [ ] Build and test on both platforms.
 - [ ] End to end: `send_test_email` at the test helper's prompt, against a throwaway database, with mail pointed at a closed local port so nothing leaves.
-- **19.2 step 7 now uses Forgot password,** which works on `sandbox.11` and is the site's real path. Its failure lines in the log say which of SES's checks to look at. The fixed command ships with the next release.
+- **19.2 step 7 now releases the fix first,** as `v1.0.0-sandbox.12`, then uses the command (Mason, 10/27: "go back to the old solution… wait for the build to deploy and then push a new server"). No database change: the deploy's `--migrate` finds nothing new, and step 5's settings stay.
 
 ---
 
