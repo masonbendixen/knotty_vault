@@ -3896,30 +3896,297 @@ Found checking step 24, which said "clicking **My Classes** comes back to it". *
 
 *Was Phase 15 until 10/21.*
 
-Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of their own (4.6); this phase is the content reinstall. Everything here runs on the EC2 host following the Deploying to AWS conventions:
-- `--entrypoint` for helpers
-- `-v /etc/knottyyoga:/etc/knottyyoga:ro`
-- `--env-file /etc/knottyyoga/server.env`
+Per D11 (OQ-9: wipe). Phase 4's fixes reached production earlier, in their own release (4.6, `v1.0.0-sandbox.10`). This phase ships everything since and then **replaces production's data with the new seed**.
+
+Everything below is copy-and-paste. The only things you type yourself are the three secrets in 19.2 step 5, which come from the password manager.
+
+**What it does to the live site**
+- **Wiped:** every account, purchase, booking and setting on production is deleted. They are sandbox test data (OQ-9).
+- **Downtime:** the site is down from 19.2 step 2 until step 6, about 10–15 minutes. UptimeRobot will email that it is down; that is expected.
+- **Signed out:** everyone signed in is signed out.
+
+**Where each command runs**
+- **Laptop:** Git Bash on your machine, in the repo. Not PowerShell.
+- **EC2:** the production server, reached over SSH from Git Bash.
+- **Browser:** the AWS console, GitLab and the site.
+
+**Before you start**
+- [ ] The 18.3 hand-test passed.
+- [ ] Everything is committed.
+- [ ] In the password manager, find:
+  - the SES SMTP **username** (starts `AKIA`) and **password**, from the `ses-smtp-knottyyoga` credential `.csv`
+  - the Square **sandbox** access token
 
 ### 19.1 Before
-- [ ] Tag and deploy the release that contains the finished phases the normal way (CI tag → deploy script → `--migrate`). This proves the image, and confirms the new `img/` files are staged in it ([[gotcha_release_image_glibc_and_entrypoint]] #4), including Phase 14's `SafeSpace_icon.svg` and `home_hero_mobile.jpg`, and 13.11's `BeginnerKnottyYoga.jpg`, `AerialRope.jpg` and `Massage.jpg`.
-- [ ] Manual RDS snapshot, named for this change. It is cheap insurance even though nothing is being kept.
-- [ ] Have the `set_secret` block from Deploying to AWS 5.1 step 6 ready, with `website_address_login` = the cloudfront URL until go-live. Check that `mail_app_password` is in it: forgot password and the instructor digest need working mail.
 
-### 19.2 Reinstall
-- [ ] Stop `knottyyoga-helper` and `knottyyoga-server`.
-- [ ] Run `knottyyoga_database_helper --install_schema --force` with `HONUWARE_ALLOW_DESTRUCTIVE=1` (one-shot, on that command only) and `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` from `server.env`.
-- [ ] `--migrate` records the migration ledger; expect `applied=N skipped=0`, as on 9/23.
-- [ ] Re-run the `set_secret` block.
-- [ ] Start the server, then the helper. Expect `/api/health` → `db:"ok"`, and the helper log shows `login_success`.
+**1. Push, and find the next tag number.** *(Laptop)*
+```bash
+cd /c/Users/mason/source/repos/knottyyoga
+git status --short
+git push origin master
+git fetch origin --tags
+git tag --list "v1.0.0-sandbox.*" --sort=-v:refname | head -1
+```
+- `git status --short` should print nothing.
+- The last line is the newest tag: `v1.0.0-sandbox.10` as of 10/27. The new one is that number plus one.
+
+**2. Wait for master's pipeline.** *(Browser)* Open https://gitlab.com/knotty-yoga/knottyyoga/-/pipelines. The top pipeline is on master, for your newest commit. Wait until every job is green. The tag pipeline refuses a commit whose master pipeline isn't green (`verify:green-commit`).
+
+**3. Tag the release.** *(Laptop)* If step 1 showed a newer tag than `.10`, change the `11` first.
+```bash
+TAG=v1.0.0-sandbox.11
+git tag -a "$TAG" -m "Finishing website: the studio's real content (Phases 1-18)"
+git push origin "$TAG"
+```
+
+**4. Wait for the tag pipeline.** *(Browser)* Open https://gitlab.com/knotty-yoga/knottyyoga/-/pipelines?scope=tags. Its pipeline runs:
+- `verify:green-commit`
+- `package:server`, the slow one
+- `package:ui`
+- `release:gitlab`
+
+Wait for all four to be green.
+
+**5. Deploy it the normal way.** *(Browser)* This proves the new image on the server before anything is wiped. For a few minutes the new code runs on the old data, which is fine.
+- In the same tag pipeline, press ▶ on **`deploy-manual:ec2`**. Open the job: its log ends with `[knottyyoga-deploy] event=deploy_done tag=v1.0.0-sandbox.11`.
+- Then press ▶ on **`deploy-manual:ui`** and wait for it to pass.
+
+**6. Check the site took both halves.** *(Laptop)*
+```bash
+curl -sS -m 10 https://dv1tgxa9ok30f.cloudfront.net/api/health; echo
+curl -sS -m 10 https://dv1tgxa9ok30f.cloudfront.net/VERSION; echo
+```
+Both name the new tag. The first prints `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.11"}`, and the second prints `v1.0.0-sandbox.11`.
+
+**7. Take a manual database snapshot.** *(Browser)* Nothing is being kept, but it makes the wipe undoable.
+1. Open https://us-west-2.console.aws.amazon.com/rds/home?region=us-west-2#databases: (RDS → **Databases**).
+2. Select **`knottyyoga`**, then **Actions** → **Take snapshot**.
+3. **Snapshot name:** `knottyyoga-before-content-reinstall`. Click **Take snapshot**.
+4. Left sidebar → **Snapshots** → **Manual snapshots** tab. Wait until the snapshot's **Status** is **Available**, a few minutes.
+
+**8. Check the new image carries the photos.** *(EC2)* Sign in:
+```bash
+ssh -i ~/.ssh/knottyyoga-ec2.pem ubuntu@34.215.204.200
+```
+If that hangs, your home IP has changed. Either fix it as in `RUNBOOK.md` §8, or open a shell in the browser: **Systems Manager** → **Session Manager** → **Start session** → `knottyyoga-server` → **Start session**, then type `bash`.
+
+Then, on the EC2:
+```bash
+TAG=$(sudo sed -n 's/^KNOTTYYOGA_IMAGE_TAG=//p' /etc/knottyyoga/version.env); echo "running: $TAG"
+sudo docker run --rm --entrypoint ls "knottyyoga:$TAG" /opt/knottyyoga/bin/img | wc -l
+sudo docker run --rm --entrypoint ls "knottyyoga:$TAG" /opt/knottyyoga/bin/img | grep -E 'Gallery|Class|safe_space'
+sudo sed -n 's/=.*//p' /etc/knottyyoga/server.env
+```
+- `running:` shows the new tag.
+- The count is **32**.
+- The `grep` lists:
+  - `Class.jpg`
+  - `GalleryKnottyYoga1.jpg` to `3`
+  - `GalleryPartnerAcro1.jpg` to `4`
+  - `safe_space_badge.svg`
+- The last command prints `server.env`'s setting names only, never the values. Among them: `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`, `HONUWARE_SECRET_KEY` and `PORT`.
+- There should be **no** `HONUWARE_VERSION` or `HONUWARE_ALLOW_DESTRUCTIVE` line.
+
+### 19.2 Reinstall *(EC2, in the same session as step 8)*
+
+Run each block on its own and check its result before the next. If you opened a new session, run step 8's `TAG=…` line again first.
+
+**1. Remember the tag.**
+```bash
+TAG=$(sudo sed -n 's/^KNOTTYYOGA_IMAGE_TAG=//p' /etc/knottyyoga/version.env); echo "$TAG"
+```
+It prints the new tag. Everything below uses `$TAG`.
+
+**2. Stop the site.** The downtime starts here.
+```bash
+sudo systemctl stop knottyyoga-helper knottyyoga-server
+systemctl is-active knottyyoga-helper knottyyoga-server
+```
+Prints `inactive` twice.
+
+**3. Wipe and reinstall the database.** `HONUWARE_ALLOW_DESTRUCTIVE=1` applies to this one command only.
+```bash
+sudo docker run --rm \
+    -v /etc/knottyyoga:/etc/knottyyoga:ro \
+    --env-file /etc/knottyyoga/server.env \
+    -e HONUWARE_ALLOW_DESTRUCTIVE=1 \
+    --entrypoint knottyyoga_database_helper \
+    "knottyyoga:$TAG" --install_schema --force 2>&1 | tee ~/install_schema.log
+```
+Then check it:
+```bash
+grep -c 'event=install_schema_done' ~/install_schema.log
+grep -c 'event=seed_image_added' ~/install_schema.log
+grep -E 'seed_image_(missing|failed)|seed_lookup_missing|_skipped|refused|install_schema failed|SQL error' ~/install_schema.log
+```
+- `1`: it finished.
+- `34`: every picture is attached.
+- The last command prints **nothing**.
+
+What it did: it dropped and recreated every table and seeded the studio's content. It also created the scheduler account from `server.env`'s password.
+
+**4. Record the migrations.**
+```bash
+sudo docker run --rm \
+    -v /etc/knottyyoga:/etc/knottyyoga:ro \
+    --env-file /etc/knottyyoga/server.env \
+    --entrypoint knottyyoga_database_helper \
+    "knottyyoga:$TAG" --migrate 2>&1 | grep -E '\[migrate\] event='
+```
+- It prints `[migrate] event=success applied=<a number> skipped=0`.
+- The reinstall emptied the migration ledger, so every migration is applied once more. Each is written to be safe on a schema that already has it.
+
+**5. Put the secrets back.** The reinstall reset every setting to its default. Mail and Square stay empty until this step, and the server will not start without a mail password.
+- Paste the first three lines one at a time, replacing each `PASTE_…` with the value from the password manager. Keep the quotes. The leading space keeps them out of the shell history.
+- Then paste the rest as one block.
+```bash
+ SES_USER='PASTE_SES_SMTP_USERNAME'
+ SES_PASS='PASTE_SES_SMTP_PASSWORD'
+ SQUARE_TOKEN='PASTE_SQUARE_SANDBOX_TOKEN'
+```
+```bash
+set_secret() {
+  sudo docker run --rm \
+      -v /etc/knottyyoga:/etc/knottyyoga:ro \
+      --env-file /etc/knottyyoga/server.env \
+      --entrypoint knottyyoga_test_helper "knottyyoga:$TAG" \
+      --nosend_real_email --command=set_secret --key="$1" --value="$2"
+}
+set_secret mail_server_name      email-smtp.us-west-2.amazonaws.com
+set_secret mail_server_port      465
+set_secret mail_smtp_username    "$SES_USER"
+set_secret mail_app_password     "$SES_PASS"
+set_secret mail_sender_address   noreply@knottyyoga.com
+set_secret square_access_token   "$SQUARE_TOKEN"
+set_secret square_environment    sandbox
+set_secret website_address_login https://dv1tgxa9ok30f.cloudfront.net/
+unset SES_USER SES_PASS SQUARE_TOKEN
+```
+- Expect eight lines, each `Secret '<name>' set to '<value>'.`
+- `website_address_login` is the start of every link in an email. It stays the `cloudfront.net` address until go-live.
+- Leave `production_mode_on` and `website_address` alone until then too (Deploying to AWS 5.1 step 9).
+
+**6. Start the site.** The downtime ends here.
+```bash
+sudo systemctl start knottyyoga-server
+for i in $(seq 1 15); do curl -fsS -m 5 http://localhost/api/health && break; sleep 2; done; echo
+sudo systemctl start knottyyoga-helper
+sleep 20
+sudo journalctl -u knottyyoga-helper --since "2 minutes ago" --no-pager | grep -E 'login_(success|failure)|event_loop_starting'
+systemctl is-active knottyyoga-server knottyyoga-helper
+```
+- Health prints `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.11"}`.
+- The helper's lines include:
+  - `[api_client] event=login_success email=scheduler@knottyyoga.local status=200 cookies=2`
+  - `[scheduler] event=event_loop_starting`
+- The last command prints `active` twice.
+- `event=login_failure` means the scheduler password in `server.env` changed since step 3. Run step 3 again.
+
+**7. Prove mail works.**
+```bash
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --repl
+```
+At its prompt, type these two lines:
+```
+send_test_email --to=masonbendixen@gmail.com
+quit
+```
+A test email from **Knotty Yoga** reaches masonbendixen@gmail.com within a minute.
+
+**8. Check from outside.** *(Laptop)*
+```bash
+curl -sS -m 10 https://dv1tgxa9ok30f.cloudfront.net/api/health; echo
+```
+Same answer as step 6. If it is a **403**, CloudFront's origin secret no longer matches `server.env` (`RUNBOOK.md` §5).
+
+**If something goes wrong**
+- **Step 3 or 4 printed an error:** the site is still stopped. Read the error, then run that step again. Step 3 can be repeated as often as needed.
+- **You want the old data back:** restore the step 7 snapshot. Then point the server at the restored copy. *(Browser, then EC2)*
+  1. RDS → **Snapshots** → **Manual snapshots** → select `knottyyoga-before-content-reinstall` → **Actions** → **Restore snapshot**.
+  2. Fill in:
+     - **DB instance identifier:** `knottyyoga-restored`
+     - **DB instance class:** `db.t3.micro`
+     - **Multi-AZ deployment:** No
+     - **DB subnet group:** `knottyyoga-db-subnet-group`
+     - **Public access:** No
+     - **Existing VPC security groups:** `knottyyoga-db` only
+  3. Click **Restore DB instance**, and wait about 15 minutes for **Available**.
+  4. Copy its **Endpoint**, then on the EC2, after replacing `PASTE_ENDPOINT`:
+```bash
+NEW_HOST=PASTE_ENDPOINT
+sudo sed -i -E "s/^((HONUWARE|KNOTTYYOGA)_DB_HOST=).*/\1$NEW_HOST/" /etc/knottyyoga/server.env
+sudo systemctl restart knottyyoga-server knottyyoga-helper
+curl -sS -m 10 http://localhost/api/health; echo
+```
 
 ### 19.3 After
-- [ ] Mason, Caleb and Kit each sign in and change their password: first-name menu → **Profile** → **Change Password** (OQ-10). The seeded ones are in source control. This includes the `masonbendixen@hotmail.com` admin.
-- [ ] For each instructor who should sign in, either:
-  - `knottyyoga_test_helper --command=set_password` (5.2), with the temporary password handed over in person, or
-  - once Phase 11 is live and their real email is seeded (5.8), they click **Forgot password?** themselves
-- [ ] Paste any bios that arrived late under **Admin** → **Manage Products** → **Instructors** (OQ-15).
-- [ ] The public half of the Phase 18.3 walkthrough (steps 1–9) against `https://dv1tgxa9ok30f.cloudfront.net/`.
+
+**1. Change your own two passwords.** *(Browser, https://dv1tgxa9ok30f.cloudfront.net/)* The seeded passwords are in source control.
+
+| Sign in as | Seeded password | First-name menu reads |
+|---|---|---|
+| `masonbendixen@gmail.com` | `pass` | **Mason** |
+| `masonbendixen@hotmail.com` | `mason` | **Mason2** |
+
+For each:
+1. **Sign In** with the email and seeded password.
+2. First-name menu → **Profile** → **Change Password**.
+3. Fill in:
+   - **Old Password:** the seeded one
+   - **Reenter Old Password:** the seeded one
+   - **New Password:** your new one
+4. Click **Update**.
+5. First-name menu → **Sign Out** → **Log Out**.
+
+- [ ] `masonbendixen@gmail.com`
+- [ ] `masonbendixen@hotmail.com`
+
+**2. Give Caleb and Kit a temporary password.** *(EC2)* Their seeded passwords (`caleb`, `kit`) are in source control too. A temporary one makes each choose a new password at their first sign-in (18.4). Run this once per person, and hand over the password it prints in person:
+```bash
+TEMP=$(openssl rand -base64 9 | tr -d '/+='); echo "Caleb's temporary password: $TEMP"
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_email \
+    --command=set_password --email=mr.calebault@gmail.com --password="$TEMP"
+```
+```bash
+TEMP=$(openssl rand -base64 9 | tr -d '/+='); echo "Kit's temporary password: $TEMP"
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_email \
+    --command=set_password --email=kiteagle@gmail.com --password="$TEMP"
+```
+Each reports that the person must choose a new password at next sign-in.
+- [ ] Caleb
+- [ ] Kit
+
+**3. Let Beth, Gifford and Tiana in.** They have no password yet. There are two ways.
+- **Forgot password,** if Amazon SES can mail anyone.
+  - Check: open https://us-west-2.console.aws.amazon.com/ses/home?region=us-west-2#/account (SES → **Account dashboard**).
+  - If the page says the account is **in the sandbox**, SES only delivers to verified addresses, so use the temporary password instead.
+  - Otherwise, tell each of them: go to https://dv1tgxa9ok30f.cloudfront.net/ → **Sign In** → **Forgot password?**, enter your email, and follow the link.
+- **Temporary password,** the same as step 2:
+```bash
+TEMP=$(openssl rand -base64 9 | tr -d '/+='); echo "Beth's temporary password: $TEMP"
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_email \
+    --command=set_password --email=bethismoving@gmail.com --password="$TEMP"
+```
+```bash
+TEMP=$(openssl rand -base64 9 | tr -d '/+='); echo "Gifford's temporary password: $TEMP"
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_email \
+    --command=set_password --email=giffordcheung@gmail.com --password="$TEMP"
+```
+```bash
+TEMP=$(openssl rand -base64 9 | tr -d '/+='); echo "Tiana's temporary password: $TEMP"
+sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_email \
+    --command=set_password --email=tianabun@hotmail.com --password="$TEMP"
+```
+- [ ] Beth
+- [ ] Gifford
+- [ ] Tiana
+
+**4. Look at the site.** *(Browser, signed out, a wide window)* Run 18.3's steps 1–9 against https://dv1tgxa9ok30f.cloudfront.net/. Also check:
+- The home page's photo row shows **three** photos (13.13).
+- **About** → **Gallery** shows two rows of photos.
+- Photos are sent so that the browser re-checks them, so no cached old picture should appear. If one does, reload with Ctrl+F5.
+
+**5. Done.** All five bios are already in the seed (OQ-15), so there is nothing to paste. Once you're happy with the site, delete the 19.1 step 7 snapshot. A manual snapshot is billed as backup storage for as long as it exists. RDS → **Snapshots** → **Manual snapshots** → select `knottyyoga-before-content-reinstall` → **Actions** → **Delete snapshot**.
 
 ### 19.4 Every month: extend Caleb's bookable hours (OQ-8)
 - [ ] **Admin** → **Manage Products** → **Service Providers** → **Caleb Ault** → **Templates** → **Massage hours** → **Generate Availability**. Then:
