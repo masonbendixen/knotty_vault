@@ -3699,7 +3699,17 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
   - The first Playwright run had 66 failures, all in the header, calendar and sticky pay-bar specs. 18.4 was edited during that run, so its `ng serve` rebuilt mid-run (`gotcha_angular_cache_drops_tailwind`). After clearing the Angular cache and starting the server by hand, with its stylesheet matching the Tailwind CLI's (4 `xl:` and 14 `md:` rules), the full rerun was clean.
 
 ### 18.2 Local run
-- [ ] `knottyyoga_database_helper --recreate_database` against the local dev database. This is destructive, so it is announced before running. Confirm no `seed_lookup_missing`, `*_skipped` or `seed_image_failed` lines in the log, other than any photos still outstanding from Phase 1.
+- [x] `knottyyoga_database_helper --recreate_database` against the local dev database. This is destructive, so it is announced before running. Confirm no `seed_lookup_missing`, `*_skipped` or `seed_image_failed` lines in the log, other than any photos still outstanding from Phase 1.
+  - *As built (10/27),* after Mason stopped his server: the Windows database helper, with the settings Visual Studio gives it from `launch_defaults.local.json`. So the scheduler password matches `knottyyoga_helper`'s, and the real mail password is in place for steps 25–26. No setting was printed; neither credential appears in the log.
+  - It ends `recreate_database_done`. There is no `seed_lookup_missing`, `_skipped`, `seed_image_missing` or `seed_image_failed` line.
+  - 34 pictures attached:
+    - 6 classes and 6 products
+    - 5 instructors and 2 people
+    - 8 home sections
+    - 7 gallery photos: `GalleryKnottyYoga1–3`, then `GalleryPartnerAcro1–4`
+  - Caleb's massage hours were generated for 25 days.
+  - The only photo outstanding is `Studio.jpg` (OQ-11), which the seed doesn't list, so it logs nothing.
+  - Mason's local database is now the fresh seed: every earlier local change is gone, and the 13.13 hand-test can run against it.
 
 ### 18.3 Hand-testing steps
 
