@@ -29,6 +29,9 @@ These are the things we need in phases
 	- Be able to splice in other video
 	- Be able to do voice overs over sections of video
 	- Be able to put text and overlay graphics over sections of video
+- Be able to change playback speed
+	- All features of previous section
+	- Be able to playback video at slower or faster than normal speed and do overlays, voice over, and other inputs while this video is at a different speed or fully paused 
 - Record and serve multiple source video
 	- All features of previous section
 	- Have multiple cameras / video inputs
@@ -48,6 +51,9 @@ These are the things we need in phases
 	- All features of previous section
 	- For instance, we might use OBS studio for streaming but it might create a Davinci resolve solution (or something else or stay in OBS) for editing later
 	- The saved input sources should be high quality
+- Be able to put section titles in the video
+	- All features of previous section
+	- YouTube and other platforms have markers in the video for things like explanation here, breakdown of move, questions and answer, demo, etc.
 - Allow interaction with viewers
 	- All features of previous section
 	- Have people be able to watch and click a button desiring to interact
