@@ -3689,7 +3689,14 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
 ### 18.1 Build and test (Claude, both platforms; reported per platform)
 - [ ] knottyyoga: Linux gate (`server/docker/build_and_test.sh`) and Windows (`x64-Debug`). Also build `knottyyoga_database_helper` and `knottyyoga_test_helper` explicitly, since the gate builds neither `main.cpp`.
 - [ ] Phases 4, 11 and 14 only: the `server_components` gates on both platforms. Phase 11 also: `honuware-web-components` `ng test` + build.
-- [ ] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`, and the Playwright layout specs added in Phases 14–17.
+  - *As built (10/27):* `server_components` is clean and at `920f18a`, the SHA knottyyoga pins, so both gates test exactly what the app uses.
+  - **Linux: 1900 passed** (floor 1700).
+  - `honuware-web-components` (`b7d77d4`, clean): **514 passed**, and the library builds.
+- [x] Angular (`ui/`): `ng test`, `tsc --noEmit`, `ng build`, and the Playwright layout specs added in Phases 14–17.
+  - *As built (10/27):* **Windows: 3996 passed. Linux: 3996 passed.** That's 13.13's 3995 plus 18.4's new spec. The first runs, before 18.4, had 3995 on both.
+  - `tsc --noEmit` is clean for the app, the specs and the Playwright specs. `ng build` succeeds with the same six size-budget warnings as before. Lint is clean on 18.4's two files.
+  - **Playwright `layout/` at all 7 sizes: 378 passed**, 637 skipped (sizes a spec doesn't apply to), 0 failed. Same 378 as after 17.8.
+  - The first Playwright run had 66 failures, all in the header, calendar and sticky pay-bar specs. 18.4 was edited during that run, so its `ng serve` rebuilt mid-run (`gotcha_angular_cache_drops_tailwind`). After clearing the Angular cache and starting the server by hand, with its stylesheet matching the Tailwind CLI's (4 `xl:` and 14 `md:` rules), the full rerun was clean.
 
 ### 18.2 Local run
 - [ ] `knottyyoga_database_helper --recreate_database` against the local dev database. This is destructive, so it is announced before running. Confirm no `seed_lookup_missing`, `*_skipped` or `seed_image_failed` lines in the log, other than any photos still outstanding from Phase 1.
