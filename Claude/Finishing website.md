@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/27/2026
-Version: 0.38
+Version: 0.39
 tags: 
 ---
 # Overview
@@ -4101,16 +4101,22 @@ systemctl is-active knottyyoga-server knottyyoga-helper
 - The last command prints `active` twice.
 - `event=login_failure` means the scheduler password in `server.env` doesn't match the one step 3 stored. That shouldn't happen minutes later; `RUNBOOK.md` §5, *The scheduler service-account password*, is the fix.
 
-**7. Prove mail works.**
+**7. Prove mail works.** *(Browser, then EC2 only if no mail arrives)* Send yourself a password reset email. It goes out exactly as every email the site sends: from `noreply@knottyyoga.com`, through SES.
+1. Open https://dv1tgxa9ok30f.cloudfront.net/ → **Sign In** → **Forgot password?**
+2. **Email:** `masonbendixen@gmail.com` → **Send reset link**. The page says a link was sent if the account exists.
+3. Within a minute the masonbendixen@gmail.com inbox has **Reset your Knotty Yoga password**, from **Knotty Yoga**. Leave its link alone: 19.3 step 1 changes the password, and the link expires in an hour.
+
+If nothing arrives (check spam too), look for the error on the EC2:
 ```bash
-sudo docker exec -it knottyyoga-server knottyyoga_test_helper --repl
+sudo journalctl -u knottyyoga-server --since "15 minutes ago" --no-pager | grep 'event=mail_failed'
 ```
-At its prompt, type these two lines:
-```
-send_test_email --to=masonbendixen@gmail.com
-quit
-```
-A test email from **Knotty Yoga** reaches masonbendixen@gmail.com within a minute.
+- **`Mail message rejection.`:** SES signed you in but refused the email. Either:
+  - **The domain isn't verified.** Open https://us-west-2.console.aws.amazon.com/ses/home?region=us-west-2#/identities (SES → **Configuration** → **Identities**). `knottyyoga.com` must say **Verified**. If it isn't listed, follow Deploying to AWS 4.7, *Verify the sending domain*, whose box is unticked there.
+  - **The account is still in the sandbox, and `masonbendixen@gmail.com` isn't verified.** On the same page, it would need its own **Verified** row. The **Account dashboard** says whether the account is in the sandbox.
+- **`Username rejection.`, `Password rejection.` or `Authentication rejection.`:** the SMTP username or password is wrong. Rerun step 5 with the values from the `ses-smtp-knottyyoga` `.csv`.
+- **No `mail_failed` line:** the email went out. Look in Gmail's spam and **All Mail**.
+
+**Don't use `send_test_email` on this release.** It sent from the developer Gmail address, which SES refuses with `Mail message rejection.` (Mason hit this on 10/27). It is fixed for the next release, where it sends from `noreply@knottyyoga.com` and prints the From address either way.
 
 **8. Check from outside.** *(Laptop)*
 ```bash
@@ -4216,6 +4222,31 @@ sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_emai
   Click **Generate**. It reports "Generated N availability blocks", and "Skipped M days (already existed)" for days already generated, so pressing it early or twice is harmless (7.4; before that fix a second press doubled the hours). If this ever gets forgotten, the massage picker simply shows no times after the last generated day. A scheduled job is the follow-up if it becomes a chore.
 - [ ] **After changing Caleb's hours with Edit Template, press Generate Availability straight away**, with the same three fields. Saving an edit replaces the template, and every hour generated from the old one goes with it, so until you press it **Book Now** offers no massage at all (OQ-23).
 
+### 19.5 `send_test_email` was refused by SES *(test_helper + business logic; found by Mason in 19.2 step 7, 10/27; built 10/27, not committed)*
+
+Mason ran 19.2 step 7 on `v1.0.0-sandbox.11`:
+```
+knotty [Mason]> send_test_email --to=masonbendixen@gmail.com
+Error: Failed to send email: Mail message rejection.
+```
+**Why:**
+- The command built its own From: the developer Gmail address `knottyyogaandspa@gmail.com`, written into the code.
+- SES sends only from identities it has verified, here the `knottyyoga.com` domain. For any other From it signs you in, accepts the recipient, and then refuses the message itself (`554 Message rejected: Email address is not verified`).
+- The mail library reports that last refusal as `Mail message rejection.` and drops SES's reason (OQ-44).
+- Locally the same address *is* the Gmail account that sends, so it always worked there.
+
+**The site's own mail was never affected.** Every email the site sends takes its From from the `mail_sender_address` setting, through `::Mail::LoadSenderAddress`, and 19.2 step 5 sets that to `noreply@knottyyoga.com`. This command was the only place that wrote an address in. A search of the app for other written-in senders found none.
+
+- [x] `MailCheck::MakeTestEmail(secrets, transaction, to)` *(new, `business_logic/mail_check/test_email.h/.cpp`)* builds the test message From the configured sender, like the site's other mail. The subject and body are unchanged.
+- [x] `send_test_email` uses it. Its result now names both addresses, sent or failed: `Test email sent from noreply@knottyyoga.com to …`, or `Failed to send email from … to …: …`. A From SES won't take is then visible at a glance.
+- [x] Tests *(`test_email_test.cpp`)*:
+  - `TestEmailTest.IsFromTheConfiguredSender` sets its own sender and checks the message's From equals what `LoadSenderAddress` reads, the reader the site's mail uses. The seeded default sender *is* the old Gmail address, so a test left on the default would pass with the bug in place.
+  - `TestEmailTest.GoesOnlyToTheGivenRecipient`.
+- [ ] Mutation: the hard-coded Gmail From put back.
+- [ ] Build and test on both platforms.
+- [ ] End to end: `send_test_email` at the test helper's prompt, against a throwaway database, with mail pointed at a closed local port so nothing leaves.
+- **19.2 step 7 now uses Forgot password,** which works on `sandbox.11` and is the site's real path. Its failure lines in the log say which of SES's checks to look at. The fixed command ships with the next release.
+
 ---
 
 # Cross-references
@@ -4288,6 +4319,12 @@ sudo docker exec -it knottyyoga-server knottyyoga_test_helper --nosend_real_emai
 - It was like this before Phase 18. 18.4 fixed only the success path.
 - **Default:** leave it for now; nothing in Phase 19 depends on it.
 - **Alternative:** on failure, stay on the page and show "That old password isn't right." A small change to the page and its spec.
+- Say which.
+
+**OQ-44 — A refused email doesn't say why.** *(19.5, 10/27.)*
+- When SES refuses an email, its reply says why, for example `554 Message rejected: Email address is not verified … noreply@example.com`. The mail library keeps that reply, but honuware's `SendMail` passes on only the library's summary, `Mail message rejection.`. That summary is all the server log and `send_test_email` show.
+- **Default:** add SES's reply to the error the next time `server_components` is opened, with a test. It is a honuware change, so it needs a `server_components` commit and a pin bump. Not part of Phase 19.
+- **Alternative:** do it now, before the next release, in the same way as 11.11.
 - Say which.
 
 ### Resolved
