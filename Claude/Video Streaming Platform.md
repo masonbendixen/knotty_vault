@@ -61,6 +61,7 @@ These are the things we need in phases
 		- Upgrading the connection switches to a low latency connection to the video from the creator
 		- It also sends a stream from the viewer being upgraded that becomes an input source to the creator so the creator can switch the viewer to full screen, PIP, etc.
 		- We should allow multiple viewers to be upgraded
+		- Should be able to also interactively downgrade back to normal viewer
 		- The viewers audio should be mixed in as well
 		- Record the video locally from the viewer
 
