@@ -37,6 +37,8 @@ These are the things we need in phases
 		- Side by side horizontally with two of the inputs
 		- Side by side vertically with two of the inputs
 		- One input full screen and the other a positionable PIP window
+		- Four quadrants
+		- One input full screen and multiple PIP
 - Be able to stream video in real time
 	- All features of previous section
 		- For instance, you should be able to start the intro sequence while streaming, choose to play a video file, and be able to toggle between inputs (like two cameras or a video playback file)
@@ -49,7 +51,12 @@ These are the things we need in phases
 - Allow interaction with viewers
 	- All features of previous section
 	- Have people be able to watch and click a button desiring to interact
-	- Allow creator to see the people asking to interact and 
+	- Allow creator to see the people asking to interact and upgrade their connection
+		- Upgrading the connection switches to a low latency connection to the video from the creator
+		- It also sends a stream from the viewer being upgraded that becomes an input source to the creator so the creator can switch the viewer to full screen, PIP, etc.
+		- We should allow multiple viewers to be upgraded
+		- The viewers audio should be mixed in as well
+		- Record the video locally from the viewer
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
