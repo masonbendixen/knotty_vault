@@ -83,6 +83,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.39 (10/27/2026)** — **19.5: `send_test_email` was refused by SES**, found by Mason in 19.2 step 7 on `sandbox.11`. Not committed.
+  - **Cause:** the command wrote in the developer Gmail address as its From, and SES sends only from the verified `knottyyoga.com`. The site's own mail always used the configured sender, `noreply@knottyyoga.com`.
+  - **Fix:** the command now uses the configured sender, and prints the From whether it succeeds or fails. Two tests, mutation-checked.
+  - **Results:** knottyyoga **Windows 5411, Linux 5411**. End to end, the command sends from the configured address.
+  - **19.2 step 7** now releases the fix as `v1.0.0-sandbox.12` (7a) before sending the test email (7b). That is a new tag, with no database change.
+  - **New open question, OQ-44:** SES's reason for refusing an email is dropped, so the log shows only `Mail message rejection.`. **Default:** fix it in honuware later.
 - **v0.38 (10/27/2026)** — **Phase 19 rewritten as copy-and-paste instructions** (Mason: "give me copyable instructions for everything"). Nothing was run against production.
   - Every command is now written out in full, with where it runs (laptop, EC2 or browser) and what it should print. That covers:
     - the tag and CI deploy
@@ -4265,9 +4271,9 @@ Error: Failed to send email: Mail message rejection.
 - [x] Tests *(`test_email_test.cpp`)*:
   - `TestEmailTest.IsFromTheConfiguredSender` sets its own sender and checks the message's From equals what `LoadSenderAddress` reads, the reader the site's mail uses. The seeded default sender *is* the old Gmail address, so a test left on the default would pass with the bug in place.
   - `TestEmailTest.GoesOnlyToTheGivenRecipient`.
-- [ ] Mutation: the hard-coded Gmail From put back.
-- [ ] Build and test on both platforms.
-- [ ] End to end: `send_test_email` at the test helper's prompt, against a throwaway database, with mail pointed at a closed local port so nothing leaves.
+- [x] Mutation: with the hard-coded Gmail From put back, `IsFromTheConfiguredSender` fails: "Which is: knottyyogaandspa@gmail.com … noreply@studio.test". The source was restored and checked by hash.
+- [x] Build and test: knottyyoga **Windows 5411, Linux 5411**, the 5409 from Phase 18 plus these two. Linux is on the pinned honuware. All four programs build on Linux. On Windows, the test helper and the tests build; the server wasn't rebuilt because Mason's was running, and none of its code changed.
+- [x] End to end: a throwaway database, `--install_schema`, then `set_secret` with `mail_sender_address` = `noreply@knottyyoga.test` and the mail server set to `127.0.0.1` port 1, where nobody listens. At the test helper's prompt, `send_test_email --to=someone@example.test` printed `Failed to send email from noreply@knottyyoga.test to someone@example.test: Server connecting failed.`, so the From comes from the setting. The database was dropped afterwards.
 - **19.2 step 7 now releases the fix first,** as `v1.0.0-sandbox.12`, then uses the command (Mason, 10/27: "go back to the old solution… wait for the build to deploy and then push a new server"). No database change: the deploy's `--migrate` finds nothing new, and step 5's settings stay.
 
 ---
