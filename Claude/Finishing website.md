@@ -3698,12 +3698,14 @@ Today a product page's **Active Subscriptions** (a membership's page) and **Rece
 
 Phases 14–17 each have their own walkthrough (14.9, 15.5, 16.8, 17.7), which these steps don't repeat.
 
-Menu labels were checked against the templates on 10/14. `mockHeaderResponse.ts` **is** the production menu: `header.service.ts` always builds from it. Below 1280 px the top nav collapses into the hamburger, so use a wide window.
+Menu labels were checked against the templates on 10/14, and every step again on 10/27 (18.4 lists what changed). `mockHeaderResponse.ts` **is** the production menu: `header.service.ts` always builds from it. Below 1280 px the top nav collapses into the hamburger, so use a wide window.
+- Signed out, the top nav says **Our Classes**. Signed in, the same place says **My Classes**, which opens the weekly page; its **Browse all classes** leads to the class cards.
+- The weekly page starts at **today**, not at Sunday, so a step that needs the whole week says **Next week**.
 
 **Setup.** Run `knottyyoga_database_helper --recreate_database` with these set:
 - `HONUWARE_ALLOW_DESTRUCTIVE=1`
 - `SCHEDULER_SERVICE_ACCOUNT_PASSWORD`
-- `HONUWARE_MAIL_APP_PASSWORD`, so steps 23–26 can send mail
+- `HONUWARE_MAIL_APP_PASSWORD`, so steps 25–26 can send mail
 
 Then start the server and the Angular app. Accounts:
 - Admin: `masonbendixen@gmail.com` / `pass`
@@ -3719,7 +3721,9 @@ Then start the server and the Angular app. Accounts:
    - **Intermediate Partner Acro**
 
    There are no Therapeutic Knotty Yoga, Tumbling, Aerial Fabric or Partner Acrobatics cards.
-2. Click **Weekly schedule** (page headed **Our Classes**). Check the 14 rows against the schedule table, including **Saturday 10:00 AM – 12:00 PM Knotty Yoga with Mason Bendixen** and **Wednesday 5:00 PM Beginner Knotty Yoga with Beth Cooper**. These four rows also read **Requires attending: …**:
+2. Click **Weekly schedule** (page headed **Our Classes**), then **Next week**. Check the 14 rows against the schedule table. Each row shows the class, then its start and length, then the instructor. They include:
+   - Saturday's **Knotty Yoga**, **10:00 AM · 120 min**, **with Mason Bendixen**
+   - Wednesday's **Beginner Knotty Yoga**, **5:00 PM · 60 min**, **with Beth Cooper** These four rows also read **Requires attending: …**:
    - Monday 7:00 PM Handstands → **Knotty Yoga**
    - Wednesday 7:00 PM Aerial Rope → **Knotty Yoga**
    - Thursday 7:00 PM Intermediate Partner Acro → **Beginner Partner Acro**
@@ -3746,17 +3750,17 @@ Then start the server and the Angular app. Accounts:
    - **Massage** is listed with its photo.
    - **Early Bird Spa, Non-Peak Spa, Peak Spa and Late Night Spa are gone.**
    - **About** → **Our Providers** shows **Caleb Ault** only (not Mason).
-   - **About** → **Our Location** shows the studio photo (once `Studio.jpg` is in; OQ-11), and text beginning "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes…" with the 520 directions. No climbing wall, no "Street parking is free after 6pm".
+   - **About** → **Our Location** shows no photo yet (`Studio.jpg` is still outstanding, OQ-11), and text beginning "Our home gym: a full acrobatics floor with crash mats, aerial rigging, 24 fabrics, 9 ropes…" with the 520 directions. No climbing wall, no "Street parking is free after 6pm".
 
 **Silver member: Silver opens Beginner Knotty Yoga and nothing else**
 
 10. **Sign In** as `kiteagle@gmail.com` / `kit`.
-11. **Memberships** → **Knotty Yoga Silver Membership** → **Subscribe**. Leave **Start month** as it is, enter the sandbox card `4111 1111 1111 1111` (any future expiry, CVV `111`), and click **Subscribe & Pay $160.00**.
-12. **My Classes** → **Full Schedule**:
+11. **Memberships** → **Knotty Yoga Silver Membership** → **Subscribe**. Leave **Start month** as it is, enter the sandbox card `4111 1111 1111 1111` (any future expiry, CVV `111`), and click **Save Card**. **Subscribe & Pay $160.00** stays greyed out until the card is saved; then click it.
+12. **My Classes** → **Full Schedule** → **Next week**:
     - Beginner Knotty Yoga rows no longer carry a badge.
     - Knotty Yoga and Beginner Partner Acro still read **Requires a membership**.
     - Handstands still reads **Prerequisite needed**.
-13. **Our Classes** → **All Classes**:
+13. **My Classes** → **Browse all classes** (page headed **All Classes**):
     - **Beginner Knotty Yoga**: **Pricing** reads **Included with your membership**, "Just show up — staff will check you in."
     - Back → **Knotty Yoga**: **Members only: Gold membership**.
 
@@ -3764,14 +3768,14 @@ Then start the server and the Angular app. Accounts:
 
 14. Kit's first-name menu → **Sign Out** → **Log Out**. Sign in as `masonbendixen@gmail.com` / `pass`.
 15. Top nav **Staff** (page headed **Staff Portal**) → **Person Skills** tile → **Search for a person**: type `Kit` and click **Kit Williams**. Then **Assign new skill** → **Skill**: **Handstand**, **Note (optional)**: `Belly to the wall, 30 seconds` → **Assign**.
-16. Sign out, then sign back in as Kit. **Our Classes** → **All Classes** → **Handstands**: **Required Skills** now reads **You meet the prerequisites**, but **Pricing** still reads **Members only: Gold membership**. Approval alone does not admit a Silver member, because Handstands needs Gold **and** approval.
+16. Sign out, then sign back in as Kit. **My Classes** → **Browse all classes** → **Handstands**: **Required Skills** now reads **You meet the prerequisites**, but **Pricing** still reads **Members only: Gold membership**. Approval alone does not admit a Silver member, because Handstands needs Gold **and** approval.
 
 **Admin views of the same data**
 
-17. As Mason: **Admin** → **Manage Products** → **Class Schedules** → **Class**: **Beginner Knotty Yoga**. The **Requirements** card holds one group, **Membership**, with the Silver and Gold permissions. **Description (shown to members)** reads "Silver or Gold membership".
+17. As Mason: **Admin** → **Manage Products** → **Class Schedules** → **Class**: **Beginner Knotty Yoga**. The **Requirements** card holds one group, **Membership**, with the **silver_member** and **gold_member** chips. **Description (shown to members)** reads "Silver or Gold membership".
 18. Same page, **Class**: **Handstands**.
     - The **Requirements** card holds **Membership** (Gold) and **Instructor approval** (Handstand).
-    - Expand **Class Instances** → **Class Schedules** → **Class Schedule Slots**. There is one slot: **Monday**, **7:00 PM**, **60**, **Instructor** Mason Bendixen, **Requires attending** **Knotty Yoga · 6:00 PM–7:00 PM**.
+    - Under **Class Instances**, expand **Perpetual**, then **Default schedule**. **Class Schedule Slots** has one slot, **Monday · 7:00 PM**. Expand it: **Duration** 60 min, **Instructor** Mason Bendixen, **Requires attending** **Knotty Yoga · Monday · 6:00 PM**.
 19. **Admin** → **Manage Products** → **Skills**: three skills, **Handstand**, **Aerial Rope** and **Intermediate Partner Acro**.
 20. **Admin** → **Manage Products** → **Products**:
     - No product named "Spa" anything, even with **Show Inactive** on.
@@ -3783,42 +3787,72 @@ Then start the server and the Angular app. Accounts:
 
 21. **Admin** → **Manage Products** → **Service Providers**: one card, **Caleb Ault**, with **Accepting bookings** on. Click **Templates**: one template, **Massage hours**, with five chips, "Monday: 11:00 AM – 3:00 PM" through "Sunday: 1:30 PM – 4:00 PM", at the hours in the massage table.
 22. **Services** → **Massage** → **Book Now**.
-    - In the week strip, click the next **Mon** (use **Next week** if needed). There is one provider card, **Caleb Ault**. The first hour header is **11:00 AM**, and no session starts so late that it would end after 3:00 PM.
-    - The next **Wed** is greyed out and can't be clicked: no hours that day.
-    - Click the next **Sun**: Caleb's earliest time is **1:30 PM**.
+    - The week strip starts today and shows seven days. Click **Mon**. There is one provider card, **Caleb Ault**. Its hour headers start at **11:00 AM**. Each one opens with a click. Open the last one: no time starts so late that it would end after 3:00 PM.
+    - **Wed** is greyed out and can't be clicked: no hours that day.
+    - Click **Sun**. The first hour header is **1:00 PM**; open it, and Caleb's earliest time is **1:30 PM**.
 
 **Temporary password (Phase 5)**
 
 23. In `knottyyoga_test_helper` (REPL), run `set_password --email=bethismoving@gmail.com --password=Welcome-2026`, or `sp` with the same arguments. It reports that Beth must choose a new password at next sign-in. (It sends no mail.)
-24. Sign out. **Sign In** as Beth: `bethismoving@gmail.com` with `Welcome-2026`. The site goes straight to **Change Password**, and clicking **My Classes** comes back to it. Fill in:
+24. Sign out. **Sign In** as Beth: `bethismoving@gmail.com` with `Welcome-2026`. The site goes straight to **Change Password**, and clicking **Staff** comes back to it. Fill in:
     - **Old Password**: `Welcome-2026`
     - **Reenter Old Password**: `Welcome-2026`
     - **New Password**: one of your choosing
 
-    Click **Update**. **My Classes** now opens normally.
+    Click **Update**. The site opens **User Information**, and **Staff** (page headed **Staff Portal**) now opens normally, without reloading the page. Before 18.4 it kept coming back to **Change Password** until a reload.
 
 **Forgot password (Phase 11)**
 
 25. Sign out. **Sign In** → **Forgot password?**
     - **Email**: `masonbendixen@gmail.com` → **Send reset link**. The page says a link was sent if the account exists.
     - Repeat with `nobody@example.com`. The page shows the identical message.
-26. In the masonbendixen@gmail.com inbox, open **Reset your Knotty Yoga password**. The sender reads **Knotty Yoga**, not "Knotty Yoga and Spa". Click the link. The **Reset your password** page opens.
-    - **New Password** and **Confirm New Password**: `Reset-2026` → **Set Password**. The Log In page says the password has changed.
+26. In the masonbendixen@gmail.com inbox, open **Reset your Knotty Yoga password**. The sender reads **Knotty Yoga**, not "Knotty Yoga and Spa". Click the link. The **Choose a new password** page opens.
+    - **New Password** and **Confirm New Password**: `Reset-2026` → **Set Password**. The Log In page opens with the message "Your password has been changed. Please log in."
     - Signing in with `pass` now fails; `Reset-2026` works.
-    - Clicking the email's link a second time shows **This reset link is invalid or has expired.**
+    - Click the email's link a second time. The form opens again, since the link is only checked when you submit. Fill in both fields and click **Set Password**: the page shows **This reset link is invalid or has expired.**
 
 **Co-instructors (Phase 10)**
 
-27. **My Classes** → **Full Schedule** → Tuesday 6:00 PM **Beginner Knotty Yoga** reads **with Gifford Cheung, Tiana Cheung**. **About** → **Instructors** → **Tiana Cheung** lists Beginner Knotty Yoga among her classes.
+27. **My Classes** → **Full Schedule** → **Next week** → Tuesday 6:00 PM **Beginner Knotty Yoga** reads **with Gifford Cheung, Tiana Cheung**. **About** → **Instructors** → **Tiana Cheung** lists Beginner Knotty Yoga among her classes.
 
 **Nothing sample-only (Phase 9)**
 
-28. **Upcoming Events** lists nothing. **Our Classes** has no **Aerial Series**. This base seed is exactly what production gets.
+28. **Upcoming Events** reads **No upcoming events at this time.** **My Classes** → **Browse all classes** has no **Aerial Series**. This base seed is exactly what production gets.
 
 **Surviving a database restart (Phase 4)**
 
-29. With the server and the site open, restart the local database container: in `server_components\database_server`, stop the `load_container.cmd` window (or its daemon) and run `load_container.cmd` again. Wait about ten seconds, then reload the home page **without restarting the server**. It renders normally, and **Sign In** with `masonbendixen@gmail.com` / `pass` works. Before Phase 4, every page answered "An unexpected error occurred" and sign-in said "The email or password you entered is incorrect" until the server was restarted.
-30. Start `knottyyoga_helper` locally with `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` set and the extra argument `--event_reminders_interval=60`, so one job runs every minute instead of hourly. Within two minutes its window prints `event=job_success job=send_event_reminders`, and never `event=job_http_error … status=403`. Repeat step 29's database restart while it runs: the next minute's job still succeeds.
+29. With the server and the site open, restart the local database container: in `server_components\database_server`, run `remove_container.cmd`, then `load_container.cmd`. The data survives: it lives on the host, not in the container. If the database instead runs in a window from `load_container_interactive.cmd`, press Ctrl+C there and run it again. Wait about ten seconds, then reload the home page **without restarting the server**. It renders normally, and **Sign In** with `masonbendixen@gmail.com` / `pass` works. Before Phase 4, every page answered "An unexpected error occurred" and sign-in said "The email or password you entered is incorrect" until the server was restarted.
+30. Start `knottyyoga_helper` locally with `SCHEDULER_SERVICE_ACCOUNT_PASSWORD` set and the extra argument `--event_reminders_interval=60`, so one job runs every minute instead of hourly. Keep its `--server_url=http://localhost:18080` (Visual Studio's launch settings add it; without it the helper looks for the server on port 80).
+
+### 18.4 What verification found *(10/27)*
+
+**The walkthrough, rechecked.** Every step of 18.3 was checked against today's templates, seed and server text. Ten no longer matched what the site shows, mostly from changes after 10/14, and are corrected above:
+- **Signed-in menu (13, 16, 28):** signed in, the top nav says **My Classes**, not **Our Classes**, and the class cards are under **Browse all classes**.
+- **Weekly page (2, 12, 27):**
+  - It starts at today, not at Sunday, so these steps use **Next week** to see every row.
+  - Rows read "10:00 AM · 120 min", not a time range.
+- **Step 9:** there is no studio photo yet (`Studio.jpg`, OQ-11).
+- **Step 11:** **Subscribe & Pay** stays greyed out until **Save Card**.
+- **Step 17:** the requirement chips read **silver_member** and **gold_member**.
+- **Step 18:** the slot sits under **Perpetual** → **Default schedule**. Its **Requires attending** reads "Knotty Yoga · Monday · 6:00 PM".
+- **Step 22:** the massage week strip starts today, and its hour headers open with a click. Sunday's first header is 1:00 PM; the first time under it is 1:30 PM.
+- **Step 26:**
+  - The reset page is headed **Choose a new password**.
+  - A used link opens the form again; the error appears on **Set Password**.
+- **Step 29:** `load_container.cmd` runs the database in the background, so running it again restarts nothing. The step now uses `remove_container.cmd` first; the data lives on the host and survives.
+- **Setup:** only steps 25–26 send mail.
+
+**A bug in Phase 5's temporary password: fixed** *(ui: `account/update_user_password`)*
+
+Found checking step 24, which said "clicking **My Classes** comes back to it". **My Classes** is a public page, so it never did. The real problem is on the pages that are guarded:
+- The server clears `must_change_password` when the password changes (`update_user_password.cpp`). The app, though, kept the copy it read at sign-in.
+- **Change Password** moves on to **User Information**, which is fine because it is under the same `/my` guard. **Staff** and **Manage**, however, sent the person straight back to **Change Password**, every time, until they reloaded the page.
+- Every instructor given a temporary password in 19.3 would have hit this on their first sign-in.
+- [x] Fix: after a successful **Update**, the page re-reads the signed-in user, with the call the app makes at start-up, before moving on.
+- [x] Spec `UpdateUserPasswordComponent` "lets a temporary-password user into Staff once they have changed it". It signs in with the flag set, then checks **Staff** sends them to **Change Password**. It clicks **Update**, with the mock clearing the flag as the server does, and checks **Staff** now lets them in. It reads through `AuthGuard`, the code that does the sending back.
+- [x] Mutation: without the re-read, the spec fails, "Expected /my/update-user-password to be true". Restored byte for byte.
+- [x] Lint clean on both files.
+- Not changed: a **failed** change also goes to **User Information**, with no message (OQ-43). Within two minutes its window prints `event=job_success job=send_event_reminders`, and never `event=job_http_error … status=403`. Repeat step 29's database restart while it runs: the next minute's job still succeeds.
 
 ---
 
@@ -3924,6 +3958,14 @@ Per D11 (OQ-9: wipe). Phase 4's fixes reach production earlier, in a release of 
 - **About** ▸ **Gallery** opens with the page title **Gallery**, as every page opens with its own title. Under it, 13.13's two carousels have no heading, no blurb and no captions.
 - **Default:** keep the page title. It names the page, not a carousel.
 - **Alternative:** drop it, so the page starts with the photos. A one-line change to the page and its spec.
+- Say which.
+
+**OQ-43 — A failed Change Password looks like it worked.** *(18.4, 10/27.)*
+- On **Change Password**, a wrong **Old Password** goes to **User Information** just as a successful change does, with no message. Nothing else on the site shows the error.
+- For someone with a temporary password it is confusing: they think they changed it, then **Staff** sends them back to **Change Password**.
+- It was like this before Phase 18. 18.4 fixed only the success path.
+- **Default:** leave it for now; nothing in Phase 19 depends on it.
+- **Alternative:** on failure, stay on the page and show "That old password isn't right." A small change to the page and its spec.
 - Say which.
 
 ### Resolved
