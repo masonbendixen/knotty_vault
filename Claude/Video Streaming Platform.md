@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/29/2026
-Version: 0.3
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -73,11 +73,14 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan status
 
-**v0.3 (10/29/2026): `obs_probe` (0.1) is written and tested.**
-- **Where:** `C:\Users\mason\source\repos\creator_studio\tools\obs_probe`.
-- **Tests:** Windows: 102 passed. Linux: 102 passed.
-- **Waiting on you:** the findings need OBS's WebSocket server turned on (see 0.1).
-- **Unchanged:** nothing else is built, and the Open Questions are still open.
+**v0.4 (10/29/2026): 0.1 is done, with findings, against your OBS 33.**
+- **Results:**
+  - Scene switching, layouts and chapter markers all work over the websocket.
+  - The edit log's clock is settled (D-5): the app's own clock, from "recording started", is accurate to a frame. OBS's reported timecode lags by about 0.55 s.
+- **Tests:** Windows: 105 passed. Linux: 105 passed.
+- **Unchanged:** the Open Questions are still open.
+
+**v0.3 (10/29/2026): `obs_probe` (0.1) written and tested (102 tests on each platform). Its findings waited on OBS's WebSocket server being turned on.**
 
 **v0.2 (10/28/2026): first draft, for your review. Nothing is built yet.**
 
@@ -353,13 +356,34 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
       - the client
       - `FakeObsServer`, a stateful stand-in for OBS that every test runs against
     - **The Windows tests caught a Qt bug:** for a refused connection, Qt 6.12 on Windows signals "disconnected" before the error. The message now says to turn on the WebSocket server, rather than "normal close".
-- [ ] [Mason] Turn the WebSocket server on (Tools › WebSocket Server Settings › Enable WebSocket server › OK), then tell me. I run `obs_probe list`, then `obs_probe run`, and fill in the findings below.
+- [x] [Mason] Turn the WebSocket server on (Tools › WebSocket Server Settings › Enable WebSocket server › OK), then tell me. I run `obs_probe list`, then `obs_probe run`, and fill in the findings below. ✅ 2026-10-29
   - **What the run touches:** it adds two temporary scenes, briefly switches your program scene, and records about 8 seconds.
   - **Running it yourself:** `out\build\x64-Debug\bin\obs_probe.exe run` from the probe's folder, then paste the output here.
-- [ ] Findings:
+  - *Done 10/29. There were two runs: the default 8 s, then `--record-seconds 30 --switches 10`. Both finished with exit code 0 and put OBS back exactly (scene "Scene", recording format `hybrid_mp4`, which was already set). Each recording was checked frame by frame with ffprobe and ffmpeg.*
+  - *The first run's output was misleading in two places: it extrapolated the record clock from OBS's lagging timecode, and it compared width/height where the bounds are what count. Both are fixed, along with a new timing for `SceneTransitionStarted`. The tests went from 102 to 105. Windows: 105 passed. Linux: 105 passed.*
+  - *The two test recordings are in `C:\Users\mason\Videos`: `2026-10-29 15-27-10.mp4` (8 s) and `2026-10-29 15-33-19.mp4` (30 s). Open one in VLC (Playback › Chapter) to see the markers, then delete them.*
+- [x] Findings (OBS 33.0.0, obs-websocket 5.7.6, Simple output mode, NVENC, 1920x1080 canvas, 1280x720 output at 30 fps, Fade 300 ms): ✅ 2026-10-29
   - how long a scene switch takes
+    - **The request is fast:** the response takes about 6 ms (3.7–35 ms).
+    - **`SceneTransitionStarted` comes first:** it arrives within 1 ms, before the response. In the file, every fade starts within one frame of that event.
+    - **`CurrentProgramSceneChanged` comes last:** it arrives only when the transition finishes, about 330 ms with the 300 ms Fade.
+    - **So:** the edit log stamps a switch at `SceneTransitionStarted`, or at the moment it sends the request, and records the transition's kind and length. Stamping at `CurrentProgramSceneChanged` would put every cut a transition's length late.
   - whether `CreateRecordChapter` works on OBS 33
+    - **Yes, with Hybrid MP4.** Both markers in both runs landed in the file within one frame of their request (1.000 s became 0.966 s; 10.306 s became 10.300 s).
+    - **OBS adds two chapters of its own:** a "Start" chapter at 0:00, and a trailing "Dummy" chapter that starts at the end of the video and runs past it (30.0 s to 49.7 s).
+    - **So:** YouTube chapters (Phase 8) come from our own log, not from the file's chapter list.
   - how the record timecode relates to the wall clock (the edit log depends on this)
+    - **The probe's own clock is accurate.** Wall time since the "recording started" event (`RecordStateChanged` STARTED) matches the file to within one frame:
+      - all 10 fades
+      - both chapters
+      - the file's length: 900 of 900 frames, exactly 30.000 s against 30.0 s of wall time
+    - **OBS's reported timecode is not.** `GetRecordStatus` (`outputTimecode` and `outputDuration`) counts frames that have come *out of the encoder*. It sits near 0 for the first ~0.6 s, then lags the file by a steady ~0.55 s (range 528–571 ms, changing by only 20 ms over 29 s).
+    - **So (D-5):** the edit log stamps decisions with the creator app's own monotonic clock, measured from the STARTED event, and uses `GetRecordStatus` only to confirm the recording is running.
+    - **Still open: drift over a full session.** None appeared over 30 s, but an hour-long session needs checking. Do that during 0.2's 10-minute recording, with `obs_probe watch` running alongside.
+  - **Also found:**
+    - **Duplicate events:** OBS 33 sends `SceneCreated` **twice** for every new scene, so anything that consumes events must tolerate duplicates.
+    - **Bounds:** the PIP lands exactly where asked (checked on a frame of the recording). `GetSceneItemTransform`'s `width`/`height` ignore the bounds, so compare `boundsWidth`/`boundsHeight` instead.
+    - **One input, many layouts:** one input in two scenes with two transforms works. That's the layout model (I-2) in miniature.
 
 ### 0.2 Multi-source capture probe
 - [ ] [Mason] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11).
@@ -370,6 +394,7 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
   - whether the ISO files start at the same moment
   - disk use per hour
   - any crashes
+  - whether the record clock (D-5) drifts over 10 minutes. Run `obs_probe watch` alongside the recording, then compare its stamps for a few scene switches with the file.
 
 ### 0.3 Phone capture probe
 - [ ] Compare four routes on quality, latency and fuss:
@@ -785,10 +810,11 @@ Filled in as Phase 0 lands and questions get answered.
 
 | # | Decision | Chosen | Date | Why |
 |---|---|---|---|---|
-| D-1 | Capture and control engine for Phases 1–9 | OBS 33 over obs-websocket (proposed) | | Your lean, and R-2 confirms it covers what's needed |
+| D-1 | Capture and control engine for Phases 1–9 | OBS 33 over obs-websocket (switching, layouts and chapters confirmed by 0.1) | 10/29/2026 | Your lean, and R-2 confirms it covers what's needed. 0.1 ran end to end on your OBS 33 with no workarounds. |
 | D-2 | MVP video host | YouTube unlisted (business plan #8) | 4/2026 | Costs $0, and the player that doesn't care who hosts keeps migration cheap |
 | D-3 | Broadcast for passive viewers | YouTube Live (business plan #7) | 4/2026 | To revisit with OQ-17 |
 | D-4 | Where Qt 6.12 lives on this machine | `C:\Qt\6.12.0\msvc2022_64`, beside 6.8.3. The `Qt6_ROOT` environment variable stays on 6.8.3; creator_studio's CMake presets set `Qt6_ROOT` as a cache variable, which takes precedence. | 10/29/2026 | video_library keeps building unchanged, and the creator app gets OBS 33's Qt (OQ-3's default) |
+| D-5 | The clock the edit log (I-1) stamps decisions with | The creator app's own monotonic clock, measured from the `RecordStateChanged` STARTED event. Switches are stamped at `SceneTransitionStarted` (or the moment the request is sent), along with the transition's kind and length. Never `GetRecordStatus`, and never `CurrentProgramSceneChanged`. | 10/29/2026 | 0.1 findings: that clock matches the file to within one frame, while OBS's timecode lags it by about 0.55 s and the program-changed event arrives a transition's length late. Drift over an hour is still to check (0.2). |
 
 # Open Questions
 
