@@ -386,7 +386,44 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
     - **One input, many layouts:** one input in two scenes with two transforms works. That's the layout model (I-2) in miniature.
 
 ### 0.2 Multi-source capture probe
-- [ ] [Mason] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11).
+
+**Camera recommendation (10/29/2026, from your question: matching cameras, not a lot of money).** Prices are from listings checked 10/29, so verify them at checkout.
+
+**How each camera connects:**
+
+| Connection | Use it when | Pros | Cons |
+|---|---|---|---|
+| **USB-C (UVC webcam)** | The cameras can sit within ~5 m of the PC, or ~10 m with an active USB 3 cable or a USB-C fiber cable (~$30–80; check it's rated for 5 Gbps). | • **Cheapest.**<br>• **Lowest latency:** a frame or two, so no audio delay to set.<br>• **One cable:** power and video.<br>• **Full control:** exposure and white balance from the app, and later from the creator app through the camera's SDK. | • **Cable length.**<br>• **USB ports:** each camera wants its own USB 3 port. Several identical webcams can get mixed up in OBS on Windows. The usual fix is to put each camera on a different port or controller and keep it there. |
+| **Ethernet (NDI HX, PoE)** | A permanent installation with cameras far from the PC (ceiling corners, the far wall). | • **One cable:** power, video and control, up to 100 m through a PoE switch.<br>• **Saved camera positions** (PTZ presets).<br>• **Scales** to many cameras. | • **About 2–3× the price** per camera.<br>• **About 100–150 ms of latency:** set a matching audio delay in OBS.<br>• **Compressed video.**<br>• **Needs the DistroAV plugin** (6.2.2 is "OBS 33+ ready") and the NDI runtime. |
+| **Wireless (Wi-Fi NDI, phone apps, wireless HDMI)** | Only for a roaming or temporary angle. | • **No cables.** | • **Unpredictable:** latency varies, and the picture can drop out.<br>• **Batteries.**<br>• **Interference** in a busy room.<br>• **Not suitable for the main angles.**<br>• The phone already covers this role (0.3, I-4). |
+
+**Recommendation:**
+- **Buy:** two identical **OBSBOT Tiny 3 Lite** USB-C webcams. They list at $199 and were $169 on sale in June.
+- **Total:** about **$400–520**, including two 10 m active USB 3 cables if the PC is far from where the cameras go.
+- **Third angle:** your phone, as the plan already has it.
+- **Why this camera:**
+  - **AI tracking on a motorized mount:** it pans and tilts to follow you, which matters for inversions and rope work that a fixed wide shot would crop.
+  - **4K:** room to crop and reframe in the edit, even though the stream goes out at 720p or 1080p.
+  - **Manual exposure and white balance:** you can set both cameras the same, so they match.
+  - **An SDK:** the creator app can push identical settings to every camera.
+  - **Current model:** this year's model is still for sale, so a matching third camera will be available later. A cheaper previous-generation model may not be.
+- **If the studio light is dim:** spend $150 more per camera on the **Tiny 3**, which has a much larger 1/1.28" sensor (the Lite's is 1/2"). The same advice applies to both: buy the same model throughout.
+- **Making the angles match:**
+  - Lock each camera to manual white balance at the same Kelvin value.
+  - Lock exposure (shutter and ISO).
+  - Turn off HDR and auto-framing exposure.
+  - Save the same profile in OBSBOT Center.
+  - Identical cameras still won't match if light from windows changes during a class. Steady LED studio lighting is the real fix, and can come later.
+- **Where to buy:** a shop with a 30-day return window, so 0.2 runs before it closes.
+- **Not recommended at this budget:**
+  - **Mirrorless cameras plus capture cards:** they look the best, but the cheapest suitable body (Sony ZV-E10 II) is about $1,000–1,200, and reviews report overheating in long 4K sessions.
+  - **NDI PTZ cameras:** consider them if you later want a ceiling-mounted permanent installation. Options:
+    - AVKANS LV20N, about $430
+    - SMTAV 4K NDI, about $650
+    - OBSBOT Tail Air, about $600 with NDI, plus a $99 Ethernet/PoE adapter
+    - OBSBOT Tail 2, about $1,300, with built-in PoE
+
+- [ ] [Mason] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11). If buying, the default is two OBSBOT Tiny 3 Lite cameras (see above).
 - [ ] [Mason] Install *Source Record* on OBS 33, in the new plugin folder.
 - [ ] [Mason] Record two cameras and one phone (as a webcam) for 10 minutes, with a separate ISO file per source.
 - [ ] Findings:
@@ -395,6 +432,9 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
   - disk use per hour
   - any crashes
   - whether the record clock (D-5) drifts over 10 minutes. Run `obs_probe watch` alongside the recording, then compare its stamps for a few scene switches with the file.
+  - whether two identical USB cameras keep their identities in OBS after unplugging and rebooting
+  - whether the cameras are best run at 1080p60 or 4K30 (USB bandwidth and decode load against room to crop)
+  - how many NVENC sessions the run uses: one ISO per camera, plus the program recording, plus a stream. Recent drivers allow 8 at once on GeForce cards; confirm that on this driver.
 
 ### 0.3 Phone capture probe
 - [ ] Compare four routes on quality, latency and fuss:
@@ -862,6 +902,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
     - Which cameras (models; HDMI or USB), capture cards, phones (iPhone or Android) and microphones (wireless lav?) will you use?
     - Is this 3070 Ti PC the studio machine?
     - **Default until you say: this PC, two cameras, one phone and one wireless mic.**
+    - *10/29: if you're buying, the recommendation is two OBSBOT Tiny 3 Lite USB-C cameras, about $400–520 all in. The reasoning and the alternatives are in 0.2.*
 12. **How much editing to build into the app.**
     - **Default: a guided editor in the app (trim, split, reorder, splice, voice-over, overlays, speed), plus OTIO export to Resolve for anything beyond that.**
     - Alternative: skip editing in the app and go straight to Resolve. That's fewer features to build, but more steps for every video.
@@ -983,3 +1024,19 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
 - [Qt 6.12 LTS released](https://qt.io/blog/qt-6.12-released)
 - [Qt releases](https://doc.qt.io/qt-6/qt-releases.html)
 - [Qt Multimedia](https://doc.qt.io/qt-6/qtmultimedia-index.html)
+
+**Cameras (0.2, checked 10/29/2026)**
+- [OBSBOT Tiny 3 Lite review (CGMagazine)](https://www.cgmagonline.com/review/hardware/obsbot-tiny-3-lite-webcam)
+- [OBSBOT Prime Day 2026 prices](https://the-gadgeteer.com/2026/06/24/obsbot-prime-day-2026-the-tiny-3-drops-to-296-and-the-tiny-2-hits-a-historic-low/)
+- [OBSBOT Tiny 3 specs](https://www.obsbot.com/obsbot-tiny-3-series-4k-ptz-webcam/specs)
+- [OBSBOT SDK](https://www.obsbot.com/sdk)
+- [Tiny 3 vs Insta360 Link 2 Pro](https://www.streamtechreviews.com/blog/tiny3-link2-pro)
+- [Insta360 Link 2 and 2C pricing (TechCrunch)](https://techcrunch.com/?p=2883557)
+- [OBS forum: identical webcams in OBS](https://obsproject.com/forum/threads/2-x-4k-webcams-exactly-the-same-wont-recognize-them-individually.171912/)
+- [Lightware 10 m active USB cable, rated for 4K webcams](https://archive.lightware.com/cab-usb-amaf-t1000a)
+- [OBSBOT Tail Air store page](https://www.obsbot.com/store/products/obsbot-tail-air)
+- [OBSBOT Tail 2](https://www.obsbot.com/obsbot-tail-2-ptzr-4k-live-production-camera)
+- [Videomaker: Tail Air review](https://www.videomaker.com/reviews/cameras/obsbot-tail-air-review-packed-with-features-but-not-without-flaws/)
+- [AVKANS NDI PTZ cameras](https://avkans.com/collections/ndi-ptz-camera)
+- [DistroAV (NDI for OBS)](https://obsproject.com/forum/resources/distroav-ndi%C2%AE-integration-into-obs-studio.528/)
+- [Videomaker: Sony ZV-E10 II overheating](https://www.videomaker.com/reviews/cameras/sony-zv-e10-ii-review-a-powerful-camera-for-creators-held-back-by-overheating/)
