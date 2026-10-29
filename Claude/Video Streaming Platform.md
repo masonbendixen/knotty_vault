@@ -317,7 +317,7 @@ Crow reads each request body fully into memory. Large files therefore arrive as 
 Goal: answer the questions that would be expensive to get wrong, using small throwaway probes rather than production code. Each item ends with a short findings note under **Decisions**.
 
 ### 0.1 OBS control probe
-- [ ] [Mason] Update OBS from 32.1.1 to 33.0.0. Turn on the WebSocket server (Tools › WebSocket Server Settings) and note the password.
+- [x] [Mason] Update OBS from 32.1.1 to 33.0.0. Turn on the WebSocket server (Tools › WebSocket Server Settings) and note the password. ✅ 2026-10-29
 - [ ] [app] Write `obs_probe`, a small Qt console program in `creator_studio/tools/` built on Qt WebSockets. It will:
   - sign in to OBS's websocket (obs-websocket 5 uses a SHA-256 challenge)
   - list scenes and inputs
