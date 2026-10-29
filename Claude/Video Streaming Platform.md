@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/28/2026
-Version: 0.2
+Last Updated: 10/29/2026
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -73,6 +73,12 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan status
 
+**v0.3 (10/29/2026): `obs_probe` (0.1) is written and tested.**
+- **Where:** `C:\Users\mason\source\repos\creator_studio\tools\obs_probe`.
+- **Tests:** Windows: 102 passed. Linux: 102 passed.
+- **Waiting on you:** the findings need OBS's WebSocket server turned on (see 0.1).
+- **Unchanged:** nothing else is built, and the Open Questions are still open.
+
 **v0.2 (10/28/2026): first draft, for your review. Nothing is built yet.**
 
 As the Overview asks, this draft starts with research, ideas and questions, then lays out the phases.
@@ -95,7 +101,7 @@ As the Overview asks, this draft starts with research, ideas and questions, then
 
 | # | Finding | Why it matters here |
 |---|---|---|
-| R-1 | **OBS 33.0.0 shipped 10/23/2026.**<br>• Requires Qt 6.10 or later (support for 6.4–6.9 was removed).<br>• Built with VS 2026.<br>• Dropped FFmpeg 6 and 7.<br>• Overhauled plugin loading: third-party plugins move to a new folder, and the old locations work until 34.0.<br>OBS 32.1 (March) added a new audio mixer, WebRTC simulcast, and partial canvas support in obs-websocket. | • The creator app should build on **Qt 6.12 LTS**, not video_library's 6.8.3, so the later libobs phase (Phase 10) shares OBS's Qt.<br>• The third-party plugins this plan leans on (Source Record, Replay Source) need re-checking on 33.<br>• You have 32.1.1 installed. |
+| R-1 | **OBS 33.0.0 shipped 10/23/2026.**<br>• Requires Qt 6.10 or later (support for 6.4–6.9 was removed).<br>• Built with VS 2026.<br>• Dropped FFmpeg 6 and 7.<br>• Overhauled plugin loading: third-party plugins move to a new folder, and the old locations work until 34.0.<br>OBS 32.1 (March) added a new audio mixer, WebRTC simulcast, and partial canvas support in obs-websocket. | • The creator app should build on **Qt 6.12 LTS**, not video_library's 6.8.3, so the later libobs phase (Phase 10) shares OBS's Qt.<br>• The third-party plugins this plan leans on (Source Record, Replay Source) need re-checking on 33.<br>• You updated to 33.0.0 on 10/29. |
 | R-2 | **obs-websocket 5.x, built into OBS since version 28, covers almost everything the early phases need.** It controls:<br>• scenes, scene items and their transforms<br>• inputs, filters and transitions<br>• media inputs: play, pause, seek<br>• recording: start, stop, pause, split<br>• **`CreateRecordChapter`**: chapter markers; needs Hybrid MP4 and OBS 30.2 or later<br>• streaming: start, stop, service settings<br>• the virtual camera and the replay buffer<br>It also sends an event for every state change. | • Confirms your instinct to drive OBS over the socket first.<br>• Phases 1–9 can be built without linking OBS.<br>• Section titles (Phase 8) are native. |
 | R-3 | **OBS has no native per-source ("ISO") recording.**<br>• The standard route is Exeldro's free *Source Record* filter plugin. Reviews mention past crashes.<br>• OBS 31+ has *canvases* (multiple video mixes) in libobs. That's how a deep integration would record each input on its own. | • Recording every input at full quality (Phases 5–7) depends on a plugin until Phase 10.<br>• Phase 0.2 tests the plugin on OBS 33. |
 | R-4 | **DaVinci Resolve 21.1 (September 2026) removed scripting from the free edition.**<br>• Python and Lua scripting are now Studio-only ($295, one-time).<br>• Timeline import (File › Import › Timeline: OTIO, FCPXML, EDL) is a GUI action. | • "Generate a Resolve project automatically" needs Studio.<br>• With free Resolve, our app writes an **OpenTimelineIO (OTIO)** file and you import it. Kdenlive and other editors open OTIO too. |
@@ -318,13 +324,38 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
 
 ### 0.1 OBS control probe
 - [x] [Mason] Update OBS from 32.1.1 to 33.0.0. Turn on the WebSocket server (Tools › WebSocket Server Settings) and note the password. ✅ 2026-10-29
-- [ ] [app] Write `obs_probe`, a small Qt console program in `creator_studio/tools/` built on Qt WebSockets. It will:
+  - *Checked 10/29: OBS 33.0.0 is installed and running, but the WebSocket server is still **off**. Its settings file has `server_enabled: false` and nothing is listening on port 4455, so `obs_probe` stops with "cannot talk to OBS". A password is already saved, so the probe picks it up and you don't need to note it.*
+- [x] [app] Write `obs_probe`, a small Qt console program in `creator_studio/tools/` built on Qt WebSockets. It will:
   - sign in to OBS's websocket (obs-websocket 5 uses a SHA-256 challenge)
   - list scenes and inputs
   - create a scene with two sources and move one into a picture-in-picture rectangle
   - switch the program scene
   - start and stop a Hybrid MP4 recording, and add a chapter marker
   - print every event with its record timecode
+  - *Done 10/29: `creator_studio/tools/obs_probe`, on Qt 6.12.0. Windows: 102 passed. Linux: 102 passed (Debian trixie, Qt 6.8.2). The README has the details.*
+    - **Three modes:**
+      - `list` is read-only.
+      - `run` is the probe.
+      - `watch` prints every event, stamped with the record timecode while recording.
+    - **Beyond the spec, so the findings mean more:**
+      - **Two layouts from one input:** a PIP layout and a full-screen layout, so the layout model (I-2) gets exercised.
+      - **Timed switches:** several switches during the recording, each timed to the response and to the `CurrentProgramSceneChanged` event.
+      - **Timecode sampling:** `GetRecordStatus` every 250 ms, to measure the timecode-to-wall-clock offset and drift.
+      - **PIP check:** the PIP rectangle is read back to check where OBS actually put it.
+    - **Safe to run on your real OBS:**
+      - It refuses while you're streaming or recording.
+      - Every change is paired with its undo, and the undos run at the end or on any failure: stop the recording, restore the program scene, remove its inputs and scenes, restore the recording format.
+      - It also removes anything an interrupted earlier run left behind. All of it is named `obs_probe …`.
+      - The only thing it leaves is the short recording, whose path it prints.
+    - **The password stays out of sight:** it's read from OBS's own settings file and never typed or printed. `OBS_WEBSOCKET_PASSWORD` overrides it.
+    - **Built to move into the creator app** as its `ObsClient`:
+      - the protocol, as pure functions
+      - the client
+      - `FakeObsServer`, a stateful stand-in for OBS that every test runs against
+    - **The Windows tests caught a Qt bug:** for a refused connection, Qt 6.12 on Windows signals "disconnected" before the error. The message now says to turn on the WebSocket server, rather than "normal close".
+- [ ] [Mason] Turn the WebSocket server on (Tools › WebSocket Server Settings › Enable WebSocket server › OK), then tell me. I run `obs_probe list`, then `obs_probe run`, and fill in the findings below.
+  - **What the run touches:** it adds two temporary scenes, briefly switches your program scene, and records about 8 seconds.
+  - **Running it yourself:** `out\build\x64-Debug\bin\obs_probe.exe run` from the probe's folder, then paste the output here.
 - [ ] Findings:
   - how long a scene switch takes
   - whether `CreateRecordChapter` works on OBS 33
@@ -412,8 +443,10 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
 
 ### 1.1 Repository scaffold
 - [ ] [Mason] Create `honuware/creator_studio` on GitHub (private), per OQ-1.
+  - *The local folder `C:\Users\mason\source\repos\creator_studio` exists since 0.1, holding `tools/obs_probe` plus the top-level `CLAUDE.md`, `.gitignore` and `.gitattributes`. It isn't a git repository yet; `git init` there, or clone the new repo and move the files in.*
 - [ ] [app] Create the `creator_app/` skeleton, copied from video_library's working toolchain:
   - `tools/setup_machine.ps1`, installing **Qt 6.12** through aqtinstall with Multimedia, NetworkAuth, WebSockets and WebEngine
+    - *Found in 0.1: aqtinstall 3.3.0 (the newest on PyPI, as of 10/29) can't install Qt 6.12. Qt's repository now has one folder per architecture (`qt6_6120/qt6_6120_msvc2022_64/`). For the probe, I downloaded `qtbase` and `qtwebsockets` from there by hand, checked their SHA-1s, and unpacked them into `C:\Qt\6.12.0\msvc2022_64`. Until aqt catches up, the setup script has to do the same for each module. `Qt6_ROOT` stays on 6.8 for video_library; creator_studio's presets set it as a CMake cache variable instead (D-4).*
   - the Conan provider
   - `windeployqt` after each build
   - targets `creator_core`, `creator_app` and `creator_tests`
@@ -424,6 +457,7 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
   - Login, register and admin come from `@honuware/ui`.
   - It uses the documented sibling-checkout co-dev.
 - [ ] [all] Add `CLAUDE.md`, `README.md`, `.gitignore` and `shared/fixtures/`, and record the planning-document rule.
+  - *Started in 0.1: `CLAUDE.md` (with the planning-document rule, who does what, and the conventions), `.gitignore` and `.gitattributes` exist. The top-level `README.md` and `shared/fixtures/` are still to do.*
 
 ### 1.2 [hw] Schema
 - [ ] Create `videos`, `video_sources`, `video_access_permissions` and `video_share_links` in a new `components/video/db_schema/`, with a header and a cpp for each.
@@ -754,6 +788,7 @@ Filled in as Phase 0 lands and questions get answered.
 | D-1 | Capture and control engine for Phases 1–9 | OBS 33 over obs-websocket (proposed) | | Your lean, and R-2 confirms it covers what's needed |
 | D-2 | MVP video host | YouTube unlisted (business plan #8) | 4/2026 | Costs $0, and the player that doesn't care who hosts keeps migration cheap |
 | D-3 | Broadcast for passive viewers | YouTube Live (business plan #7) | 4/2026 | To revisit with OQ-17 |
+| D-4 | Where Qt 6.12 lives on this machine | `C:\Qt\6.12.0\msvc2022_64`, beside 6.8.3. The `Qt6_ROOT` environment variable stays on 6.8.3; creator_studio's CMake presets set `Qt6_ROOT` as a cache variable, which takes precedence. | 10/29/2026 | video_library keeps building unchanged, and the creator app gets OBS 33's Qt (OQ-3's default) |
 
 # Open Questions
 
@@ -853,7 +888,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
 | Risk | Mitigation |
 |---|---|
 | OBS plugins (Source Record, Replay Source) break under OBS 33's new plugin loading, or crash | • Verified in Phase 0 before anything depends on them.<br>• Phase 10's canvases replace Source Record.<br>• Fallbacks: a second OBS instance, or a hardware ISO switcher (R-13). |
-| obs-websocket behavior changes between OBS releases | • An `ObsClient` seam with a fake for unit tests.<br>• Recorded protocol fixtures.<br>• An opt-in integration test against a real OBS. |
+| obs-websocket behavior changes between OBS releases | • An `ObsClient` seam with a fake for unit tests. The seed exists since 0.1: obs_probe's client and `FakeObsServer`.<br>• Recorded protocol fixtures.<br>• An opt-in integration test against a real OBS: `obs_probe run` is the first. |
 | Friction from YouTube's API terms, quota or sign-in (R-5, R-6) | • Verified in 0.4.<br>• Manual upload plus pasting the link always works.<br>• The catalog doesn't care who hosts the video. |
 | Unlisted links leak (a business-plan risk) | • Share links and permissions gate *our* pages.<br>• Real protection comes with a self-hosted provider that uses signed URLs (Phase 11.3). |
 | The editor creeps toward a full editing suite | A guided editor, with OTIO hand-off for the rest (OQ-12). |
