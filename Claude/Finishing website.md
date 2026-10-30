@@ -4414,7 +4414,10 @@ All five require the `admin` role: 401 when signed out, 403 without it.
   - Once bumped, the pinned knottyyoga count should equal the co-dev one, 5451 on both platforms.
   - *10/30:* `GIT_TAG` bumped in both `CMakeLists.txt` files.
     - knottyyoga moves from `920f18a`. CommunityFinder moves from `4e5089b`, so it already had the two earlier commits.
-    - Pinned gates: running.
+    - **knottyyoga, pinned, Linux: 5451 passed**, the same as the co-dev run. The database helper and server build.
+    - **CommunityFinder, pinned, Linux: 2227 passed**, and its database helper and server build.
+    - Both logs say `pinned SHA (FetchContent will clone it)`, and both clones are at `04f88eeeef41…`.
+    - **Windows:** not run yet. It waits for Mason, with the other Windows runs in 20.8.
 
 ### 20.7 Mutation check
 - [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
@@ -4517,7 +4520,7 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 
 In order:
 - [x] **Mason** pushes `server_components` (20.6). *10/30: `04f88ee`.*
-- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed, pin bumped, gates running.* The remaining runs in 20.8 go one at a time.
+- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed and the pin is bumped. Both apps' pinned Linux gates pass (knottyyoga 5451, CommunityFinder 2227). The Windows runs are still to come.* The remaining runs in 20.8 go one at a time.
 - [ ] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump, and CommunityFinder's pin bump.
 - [ ] **Mason** tags a release and deploys it, as in Phase 19.
   - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
