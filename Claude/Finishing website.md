@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 10/30/2026
-Version: 0.40
+Version: 0.41
 tags: 
 ---
 # Overview
@@ -83,6 +83,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.41 (10/30/2026)** — **Phase 20: the honuware side is pushed.** Mason pushed `server_components` `04f88ee` "Roles and editing issues", and its CI is running (20.6).
+  - New **20.10** sets out the release in order, and notes that the Roles page could ship before the honuware fix.
+  - 20.8 now lists everything still to run, in the order it will run once Mason says so. The mobile audit of the two new pages is added to it.
 - **v0.40 (10/30/2026)** — **New Phase 20: Roles.** Mason, on the live site: Manage Data's **New Role Assignments** has no fields, so nobody can be made an admin. He asked for a **Roles** page under Manage Products.
   - **Cause:** honuware's seed marks the role-assignment columns *read-only*, and the CRUD editor hides read-only columns on **New**. It needs a honuware fix with a migration (20.5).
   - **The Roles page** is built in this repo, for admins only (D17). It has a person lookup with their roles, and a page per role with its members. You can't remove your own admin role, and the scheduler account is left alone.
@@ -4290,7 +4293,7 @@ Error: Failed to send email: Mail message rejection.
 
 ---
 
-# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built 10/30, not committed. Still to run: the Windows suites and the C++ mutation check, after a low-memory stop)*
+# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built 10/30. The honuware side is pushed (`04f88ee`, CI running); the knottyyoga side isn't committed. Still to run: the pin bump, the Windows suites, the Linux Angular suite, the mobile audit and the C++ mutation check)*
 
 Mason, 10/30, on the live site: "I went into the editor for the live website and went to make people admins. When I went into the CRUD editor, I can't do a role assignment to make someone and admin. When I go to the page for that and do new item, a New Role Assignments page appears with a create and cancel button appear but no way to choose a person and role. I also would like an option in Manage Products called Roles that lets there be a bespoke UI for looking up people and doing CRUD on their roles and being able to go into a role and see who has that role and be able to do CRUD type stuff that way too."
 
@@ -4402,8 +4405,14 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     - **server_components, Linux: 1907 passed** (1900 at the pin, 5 from the two unpinned commits, and these 2).
     - **knottyyoga against the local checkout, Linux: 5451 passed**, and the database helper, server and test helper all build. The log says `honuware : /honuware (local override)`.
     - **server_components, Windows:** it builds, but its test run was stopped for low memory before it finished. Not rerun yet.
-- [ ] **Mason** commits and pushes `server_components`. The pin bump also brings in the two commits already pushed since `920f18a`: `7cd3522` "Calendar name" and `4e5089b` "Quick fix".
-- [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder, and re-runs both apps' pinned gates.
+- [x] **Mason** commits and pushes `server_components`. The pin bump also brings in the two commits already pushed since `920f18a`: `7cd3522` "Calendar name" and `4e5089b` "Quick fix".
+  - *10/30:* pushed as **`04f88ee` "Roles and editing issues"** (`04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`), on `origin/master`.
+    - It has the five files of 20.5 and nothing else: the seed, the migration and its header, and both test files.
+    - The local checkout is clean, so the co-dev runs above built exactly what was pushed.
+- [ ] `server_components` CI passes on `04f88ee`. *10/30: running.*
+- [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to `04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`, and re-runs both apps' pinned gates.
+  - Waits for CI.
+  - Once bumped, the pinned knottyyoga count should equal the co-dev one, 5451 on both platforms.
 
 ### 20.7 Mutation check
 - [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
@@ -4427,6 +4436,13 @@ All five require the `admin` role: 401 when signed out, 403 without it.
       - The first try at the knottyyoga build didn't link `knottyyoga_the_server.exe` (LNK1168), because Mason's server was running. It was left running.
       - Nothing was left behind by the stop.
     - **Not run yet:** the full Angular suite on Linux (CI's `test:frontend` in Docker).
+  - **Still to run, one at a time, once Mason says so.** Three heavy Windows runs at once is what ran out of memory.
+    1. honuware's tests on Windows.
+    2. The knottyyoga build and tests on Windows. If Mason's server is running, its exe is left alone and only the other targets are built.
+    3. The full Angular suite on Windows.
+    4. The full Angular suite on Linux.
+    5. The C++ mutation check (20.7).
+    6. The mobile audit of **Roles** and a role's page, at phone and desktop widths. Both routes are already in the audit's route list (20.4).
 - [x] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
   - *10/30, Linux, built against the local honuware:*
     - **22 of 22 checks passed** on a fresh `phase20_check` (`--install_schema`). The roles list matches the seed, with no `scheduler`. A POST without the CSRF header is refused (403) and changes nothing.
@@ -4493,6 +4509,21 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 
 13. **Admin** → **Manage Data** → **Role Assignments** → **New Item**. The **New Role Assignments** page now has **Person** and **Role** pickers. Pick Kit Williams and Instructor, then **Create**.
 14. **Manage Products** → **Roles**, and find Kit: Instructor is listed. Remove it, to finish where you started.
+
+### 20.10 Release to production
+**Until this deploys, the live site has no page that can give an existing account a role.**
+
+In order:
+- [x] **Mason** pushes `server_components` (20.6). *10/30: `04f88ee`.*
+- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). The remaining runs in 20.8 go one at a time.
+- [ ] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump, and CommunityFinder's pin bump.
+- [ ] **Mason** tags a release and deploys it, as in Phase 19.
+  - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
+- [ ] **Mason**, on the live site: **Admin** → **Manage Products** → **Roles**. Find each person who should be an admin, then **Add a role** → **Admin** → **Add**.
+  - Each change appears under **Requires Attention**.
+  - Each new admin sees the **Admin** menu the next time they load the site.
+
+**If admins are needed sooner:** the Roles page doesn't depend on the honuware fix (D17). It can ship on the current pin, `920f18a`, without waiting for CI, and 20.5 can follow in a later release. Until then, Manage Data's New Role Assignments stays empty, but the Roles page covers that.
 
 ---
 
