@@ -73,7 +73,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan status
 
-**v0.5 (10/30/2026): gear for 0.2.** You bought two OBSBOT Tiny 3 Lite cameras. 0.2 now has the camera recommendation (10/29), a microphone recommendation (one OBSBOT Vox SE), and two audio checks for the 10-minute recording.
+**v0.5 (10/30/2026): gear for 0.2.** You bought two OBSBOT Tiny 3 Lite cameras and ordered one OBSBOT Vox SE mic. 0.2 now has the camera recommendation (10/29), the microphone recommendation, and two audio checks for the 10-minute recording.
 
 **v0.4 (10/29/2026): 0.1 is done, with findings, against your OBS 33.**
 - **Results:**
@@ -448,7 +448,7 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
 - **Only if you want your voice independent of the cameras:** a USB-C wireless kit such as the DJI Mic Mini (two transmitters and a receiver, about $45–80 in the US lately) plugs its receiver into the PC. It takes a USB port, and its latency differs from the cameras', so OBS needs a sync offset. Not needed now.
 
 - [ ] [Mason] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11). If buying, the default is two OBSBOT Tiny 3 Lite cameras (see above).
-  - *10/30: two Tiny 3 Lite cameras bought. Mic: one Vox SE (see above). Phone: still to confirm.*
+  - *10/30: two Tiny 3 Lite cameras bought, and one Vox SE mic ordered. Phone: still to confirm.*
 - [ ] [Mason] Install *Source Record* on OBS 33, in the new plugin folder.
 - [ ] [Mason] Record two cameras and one phone (as a webcam) for 10 minutes, with a separate ISO file per source.
 - [ ] Findings:
@@ -930,7 +930,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
     - Is this 3070 Ti PC the studio machine?
     - **Default until you say: this PC, two cameras, one phone and one wireless mic.**
     - *10/29: if you're buying, the recommendation is two OBSBOT Tiny 3 Lite USB-C cameras, about $400–520 all in. The reasoning and the alternatives are in 0.2.*
-    - *10/30: you bought the two Tiny 3 Lite cameras. For the mic, the recommendation is one OBSBOT Vox SE ($59), which pairs with a camera directly. See 0.2.*
+    - *10/30: you bought the two Tiny 3 Lite cameras and ordered one OBSBOT Vox SE mic ($59), which pairs with a camera directly. See 0.2. Still open: the phone, and whether this PC is the studio machine.*
 12. **How much editing to build into the app.**
     - **Default: a guided editor in the app (trim, split, reorder, splice, voice-over, overlays, speed), plus OTIO export to Resolve for anything beyond that.**
     - Alternative: skip editing in the app and go straight to Resolve. That's fewer features to build, but more steps for every video.
