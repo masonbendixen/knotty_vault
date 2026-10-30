@@ -4409,10 +4409,12 @@ All five require the `admin` role: 401 when signed out, 403 without it.
   - *10/30:* pushed as **`04f88ee` "Roles and editing issues"** (`04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`), on `origin/master`.
     - It has the five files of 20.5 and nothing else: the seed, the migration and its header, and both test files.
     - The local checkout is clean, so the co-dev runs above built exactly what was pushed.
-- [ ] `server_components` CI passes on `04f88ee`. *10/30: running.*
+- [x] `server_components` CI passes on `04f88ee`. *10/30: passed (Mason).*
 - [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to `04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`, and re-runs both apps' pinned gates.
-  - Waits for CI.
   - Once bumped, the pinned knottyyoga count should equal the co-dev one, 5451 on both platforms.
+  - *10/30:* `GIT_TAG` bumped in both `CMakeLists.txt` files.
+    - knottyyoga moves from `920f18a`. CommunityFinder moves from `4e5089b`, so it already had the two earlier commits.
+    - Pinned gates: running.
 
 ### 20.7 Mutation check
 - [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
@@ -4515,7 +4517,7 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 
 In order:
 - [x] **Mason** pushes `server_components` (20.6). *10/30: `04f88ee`.*
-- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). The remaining runs in 20.8 go one at a time.
+- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed, pin bumped, gates running.* The remaining runs in 20.8 go one at a time.
 - [ ] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump, and CommunityFinder's pin bump.
 - [ ] **Mason** tags a release and deploys it, as in Phase 19.
   - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
