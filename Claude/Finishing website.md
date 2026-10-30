@@ -87,6 +87,14 @@ Please create a plan with phases of implementation. Within each phase, please re
   - **Cause:** honuware's seed marks the role-assignment columns *read-only*, and the CRUD editor hides read-only columns on **New**. It needs a honuware fix with a migration (20.5).
   - **The Roles page** is built in this repo, for admins only (D17). It has a person lookup with their roles, and a page per role with its members. You can't remove your own admin role, and the scheduler account is left alone.
   - New open questions: **OQ-45** (editing role definitions) and **OQ-46** (four other columns the same mistake hides).
+  - **Built the same day,** not committed:
+    - **Linux:** knottyyoga 5451 passed (against the local honuware), honuware 1907 passed.
+    - **End to end:** 22 of 22 checks through the real server, and the migrate pass clears the old flags.
+    - **Angular:** the 41 new specs pass, and all 6 UI mutations are caught.
+  - **Still to run,** stopped by a low-memory reap:
+    - the Windows suites
+    - the C++ mutation check
+    - the Linux Angular suite
 - **v0.39 (10/27/2026)** — **19.5: `send_test_email` was refused by SES**, found by Mason in 19.2 step 7 on `sandbox.11`. Not committed.
   - **Cause:** the command wrote in the developer Gmail address as its From, and SES sends only from the verified `knottyyoga.com`. The site's own mail always used the configured sender, `noreply@knottyyoga.com`.
   - **Fix:** the command now uses the configured sender, and prints the From whether it succeeds or fails. Two tests, mutation-checked.
@@ -4282,7 +4290,7 @@ Error: Failed to send email: Mail message rejection.
 
 ---
 
-# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; not built)*
+# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built 10/30, not committed. Still to run: the Windows suites and the C++ mutation check, after a low-memory stop)*
 
 Mason, 10/30, on the live site: "I went into the editor for the live website and went to make people admins. When I went into the CRUD editor, I can't do a role assignment to make someone and admin. When I go to the page for that and do new item, a New Role Assignments page appears with a create and cancel button appear but no way to choose a person and role. I also would like an option in Manage Products called Roles that lets there be a bespoke UI for looking up people and doing CRUD on their roles and being able to go into a role and see who has that role and be able to do CRUD type stuff that way too."
 
@@ -4306,17 +4314,19 @@ Mason, 10/30, on the live site: "I went into the editor for the live website and
 - **Role definitions aren't editable here** (OQ-45). That means creating or renaming a role, and choosing which permissions a role grants. The page shows each role's permissions, read-only, so you can see what you're handing out.
 
 ### 20.1 Table helper *(sql_util/table_helpers)*
-- [ ] `TableHelpers::RoleMembership` (`role_membership.{h,cpp}`) reads and writes across `roles`, `role_assignments`, `role_permissions`, `permissions` and `people`, with joins the honuware helpers don't have:
+- [x] `TableHelpers::RoleMembership` (`role_membership.{h,cpp}`) reads and writes across `roles`, `role_assignments`, `role_permissions`, `permissions` and `people`, with joins the honuware helpers don't have:
   - `GetRoles`: every role, with its number of members, ordered by name.
   - `GetRolePermissionNames`: every (role, permission name) pair, in one query.
   - `GetMembersOfRole(roleId)`: id, first name, last name and email, ordered by last name, then first.
   - `GetRolesOfPerson(personId)`: id, name and description, ordered by name.
   - `AddRoleToPerson(personId, roleId)`: inserts, and does nothing if the person already has the role (`ON CONFLICT DO NOTHING`, against the existing unique key). Returns whether it added one.
+    - *As built:* it also checks `WHERE NOT EXISTS` first, so a second add can't insert even on a database whose unique key is missing.
   - `RemoveRoleFromPerson(personId, roleId)`: returns whether it removed one.
-- [ ] Tests for each, including: counts that include zero-member roles, ordering, adding twice, and removing what isn't there.
+- [x] Tests for each, including: counts that include zero-member roles, ordering, adding twice, and removing what isn't there.
+  - *As built:* 6 tests (`role_membership_test.cpp`). Each checks only its own rows, in the order they came back, so other rows in the table can't affect it. Adding twice is read back through honuware's own `RoleAssignments` reader.
 
 ### 20.2 Business logic *(business_logic/accounts)*
-- [ ] `Accounts::RoleAssignmentHelper` (`role_assignment_helper.{h,cpp}`):
+- [x] `Accounts::RoleAssignmentHelper` (`role_assignment_helper.{h,cpp}`):
   - `GetRoles()`: each role with its member count and permission names, without `scheduler`.
   - `GetRole(roleId)` and `GetMembers(roleId)`: nothing for an unknown role or for `scheduler`.
   - `GetPerson(personId)` and `GetRolesOfPerson(personId)`: nothing for an unknown person or a service account (`Auth::IsServiceAccountEmail` with `App::kServiceAccountEmailDomain`).
@@ -4329,12 +4339,15 @@ Mason, 10/30, on the live site: "I went into the editor for the live website and
     - `ProtectedPerson`: a service account
     - `OwnAdminRole`: removing your own `admin`
   - A change writes the admin alert, and logs a `[roles]` line. `Unchanged` writes nothing.
-- [ ] `role_key_value_table.{h,cpp}`: role, person and member to `KeyValueTable`, for the endpoints. Tests.
-- [ ] Tests, read back through the production readers: `PersonHelper::GetRolesForUser` and `Session::ActiveUserHasRole` for roles, `AdminAlerts` for the alerts. They cover:
+  - *As built:* the alert reads `role_added: admin to Kit Williams (kiteagle@gmail.com) by Mason Bendixen (masonbendixen@gmail.com)`, or `role_removed: … from …`. A service account is refused as `ProtectedPerson`, not reported as missing, so the page says why.
+- [x] `role_key_value_table.{h,cpp}`: role, person and member to `KeyValueTable`, for the endpoints. Tests.
+  - *As built:* 4 tests.
+- [x] Tests, read back through the production readers: `PersonHelper::GetRolesForUser` and `Session::ActiveUserHasRole` for roles, `AdminAlerts` for the alerts. They cover:
   - every outcome above
   - adding and removing really change what `ActiveUserHasRole` answers
   - one admin can remove another, but not themselves
   - the scheduler role and account are refused, and missing from every list
+  - *As built:* 12 tests (`role_assignment_helper_test.cpp`). Roles are read through `GetRolesForUser`, which is what `/api/get_user_info` reports, and alerts through `AdminAlerts::GetAdminAlertsSince`, the digest's reader. `ActiveUserHasRole` is covered by the endpoint tests (20.3), which need a signed-in session.
 
 ### 20.3 Endpoints *(endpoints/admin_roles.{h,cpp})*
 All five require the `admin` role: 401 when signed out, 403 without it.
@@ -4347,41 +4360,139 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 | POST | `/api/admin/people/<person_id>/roles/<role_id>` | `{changed: true/false}` |
 | DELETE | `/api/admin/people/<person_id>/roles/<role_id>` | `{changed: true/false}` |
 
-- [ ] The POST and DELETE answer **404** for an unknown person or role. They answer **400** with a message the page shows for a protected role or account, or for removing your own admin role: "You can't remove your own admin role."
-- [ ] Anchored in `web_app.cpp`, listed in `CMakeLists.txt`.
-- [ ] Endpoint tests: every status above, both JSON shapes, and that the POST and DELETE change what `ActiveUserHasRole` answers.
-- [ ] People are found with the existing `/api/staff/search_people`. It already leaves out unverified accounts and the `@knottyyoga.local` service accounts, and every admin has `staff_access`.
+- [x] The POST and DELETE answer **404** for an unknown person or role. They answer **400** with a message the page shows for a protected role or account, or for removing your own admin role: "You can't remove your own admin role."
+  - *As built:* the other two messages are "The scheduler role runs the scheduled jobs and can't be changed here." and "The scheduler account runs the scheduled jobs and can't be changed here."
+- [x] Anchored in `web_app.cpp`, listed in `CMakeLists.txt`.
+- [x] Endpoint tests: every status above, both JSON shapes, and that the POST and DELETE change what `ActiveUserHasRole` answers.
+  - *As built:* 11 tests (`admin_roles_test.cpp`). The main one takes Beth's own requests from refused (403), to allowed after the add, to refused again after the remove.
+- [x] People are found with the existing `/api/staff/search_people`. It already leaves out unverified accounts and the `@knottyyoga.local` service accounts, and every admin has `staff_access`.
 
 ### 20.4 Frontend: Manage Products ▸ Roles *(ui)*
-- [ ] Types (`role.types.ts`), plus `ServerAccess`, the proxy, the network implementation and the mock for the five calls. The mock applies the same guards. `ServerAccess.mock.spec.ts` cases.
-- [ ] **Manage Products** gets a **Roles** tile, only for admins.
-- [ ] `/manage/roles` (admins only, `AdminGuard`):
+- [x] Types (`role.types.ts`), plus `ServerAccess`, the proxy, the network implementation and the mock for the five calls. The mock applies the same guards. `ServerAccess.mock.spec.ts` cases.
+  - *As built:* `role.types.ts` also turns stored names into display names: `admin` becomes **Admin**, and `manage_products` becomes **Manage products**. It also coerces the server's JSON, which sends a digits-only name as a number. Tests:
+    - 6 for `role.types.ts`
+    - 8 for the mock
+    - 5 for a new network spec that pins each path and verb (`server-access-network-roles.spec.ts`)
+- [x] **Manage Products** gets a **Roles** tile, only for admins.
+  - *As built:* "Who can teach, manage and administer the site", between **Refund Effectiveness** and **Room Occupancy**.
+- [x] `/manage/roles` (admins only, `AdminGuard`):
   - **Find a person:** search by name or email. Picking someone shows their roles, each with **Remove** (asks to confirm), and an **Add a role** list of the roles they don't have yet. Your own admin role's **Remove** is disabled, with the reason beside it.
   - **Roles:** each role with its description, permissions and number of people. Click one to open it.
-- [ ] `/manage/roles/:roleId`: the role's name, description and permissions. Under them, **Add a person** (the same search), then the members, ten to a page, each with **Remove**.
-- [ ] Errors from the server show on the page as it already shows other errors.
-- [ ] Specs for both pages and the search: rendering, add, remove and confirm, the disabled self-remove, errors, paging, and the tile shown only to admins. Both routes go into the mobile-audit route list.
+  - *As built:* the second card is **All roles**, a table of **Role**, **People** and **What it allows**, ten to a page. A role with no permissions reads "Nothing on its own".
+- [x] `/manage/roles/:roleId`: the role's name, description and permissions. Under them, **Add a person** (the same search), then the members, ten to a page, each with **Remove**.
+  - *As built:* the search leaves out people who already have the role. The list is headed **People with this role (N)**.
+- [x] Errors from the server show on the page as it already shows other errors.
+- [x] Specs for both pages and the search: rendering, add, remove and confirm, the disabled self-remove, errors, paging, and the tile shown only to admins. Both routes go into the mobile-audit route list.
+  - *As built:*
+    - 14 specs for the Roles page, 10 for a role's page, and 6 for the search.
+    - 2 for the dashboard: an admin sees 33 tiles, Roles among them in alphabetical order; `manage_products` alone sees 32, without it.
+    - 2 in a new `manage.routes.spec.ts`, pinning `AdminGuard` on both routes.
 
 ### 20.5 The generic editor gets its pickers back *(server_components: platform)*
-- [ ] `create_framework_tables.cpp`: drop the read-only flag from `role_assignments.person_id`, `role_assignments.role_id` and `role_permissions.role_id`.
-- [ ] Idempotent framework migration **`honuware/0003_role_pickers`**: clears the same three flags on an existing database. It only `UPDATE`s, and a second run changes nothing.
-- [ ] Tests, through the reader the editor uses (`/api/get_db_schema`'s column data): a new database's three columns aren't read-only; the migration clears them on a database that has them set, and running it again is harmless.
+- [x] `create_framework_tables.cpp`: drop the read-only flag from `role_assignments.person_id`, `role_assignments.role_id` and `role_permissions.role_id`.
+- [x] Idempotent framework migration **`honuware/0003_role_pickers`**: clears the same three flags on an existing database. It only `UPDATE`s, and a second run changes nothing.
+- [x] Tests, through the reader the editor uses (`/api/get_db_schema`'s column data): a new database's three columns aren't read-only; the migration clears them on a database that has them set, and running it again is harmless.
+  - *As built:* 2 tests. Both read through `AdminColumnDataInfo`, the helper `/api/get_db_schema` reads, which turns an empty flag into `"readonly": "f"`.
+    - The migration test also checks that a column which really is read-only (`people.created_at`) keeps its flag.
+    - The header's "currently empty" comment on the framework migration list was out of date, and is corrected.
 
 ### 20.6 Ship the honuware side
 - [ ] Gates on `server_components` (Windows + Linux), and knottyyoga against the local checkout (Linux).
+  - *10/30:*
+    - **server_components, Linux: 1907 passed** (1900 at the pin, 5 from the two unpinned commits, and these 2).
+    - **knottyyoga against the local checkout, Linux: 5451 passed**, and the database helper, server and test helper all build. The log says `honuware : /honuware (local override)`.
+    - **server_components, Windows:** it builds, but its test run was stopped for low memory before it finished. Not rerun yet.
 - [ ] **Mason** commits and pushes `server_components`. The pin bump also brings in the two commits already pushed since `920f18a`: `7cd3522` "Calendar name" and `4e5089b` "Quick fix".
 - [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder, and re-runs both apps' pinned gates.
 
 ### 20.7 Mutation check
 - [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
-- [ ] Angular: the tile shown to non-admins; the self-remove button enabled; **Remove** without a confirmation; the wrong path or verb.
+  - *Not run yet.* It edits the same files the Windows build reads, so it waits for the Windows runs.
+- [x] Angular: the tile shown to non-admins; the self-remove button enabled; **Remove** without a confirmation; the wrong path or verb.
+  - *10/30, all 6 caught:*
+    - The tile shown to `manage_products` fails 2 dashboard specs.
+    - Your own admin role removable fails 1 Roles-page spec, and the same on a role's page fails 1 there.
+    - **Remove** without asking fails 3.
+    - A DELETE sent as a POST fails the network spec.
+    - The Roles route without `AdminGuard` fails the routes spec.
+
+    Every file was restored and checked by hash.
 
 ### 20.8 Verification
 - [ ] knottyyoga, honuware and Angular on Windows and Linux, reported per platform. The three programs build on Linux.
-- [ ] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
+  - *10/30:*
+    - **Linux: knottyyoga 5451 passed, honuware 1907 passed.** The three programs build.
+    - **Angular, Windows:** the 41 new specs, the mock and dashboard specs (720 in all), and the routes and route-manifest specs pass. `ng lint` and `tsc` (app and specs) are clean.
+    - **Stopped for low memory, not rerun:** the full Angular suite on Windows, honuware's tests on Windows, and the knottyyoga build on Windows.
+      - The first try at the knottyyoga build didn't link `knottyyoga_the_server.exe` (LNK1168), because Mason's server was running. It was left running.
+      - Nothing was left behind by the stop.
+    - **Not run yet:** the full Angular suite on Linux (CI's `test:frontend` in Docker).
+- [x] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
+  - *10/30, Linux, built against the local honuware:*
+    - **22 of 22 checks passed** on a fresh `phase20_check` (`--install_schema`). The roles list matches the seed, with no `scheduler`. A POST without the CSRF header is refused (403) and changes nothing.
+    - Kit's own next request goes from refused, to allowed after Mason2 adds admin, then back to refused after the remove, all in the same session. Kit can't remove her own admin role (400 with the message).
+    - Both changes are admin alerts, and `/api/get_db_schema` shows `role_assignments`' two columns as not read-only.
+    - **Migrate pass:** the three old flags were set back by hand. `--migrate` applied `honuware/0003_role_pickers`, the three flags are now empty, and `people.created_at` is still `t`. A second `--migrate` applied 0 and skipped 15.
+    - The database was dropped afterwards.
+  - *Note:* the first run failed 3 checks because the script POSTed to `/api/get_db_schema`, which is a GET route. The fixed script passes.
 
 ### 20.9 Hand-testing walkthrough
-*Written once the pages are built, with their real labels.*
+
+**Before you start.**
+- Recreate the local database with `knottyyoga_database_helper --recreate_database`.
+- Start the server, built from this change, and `ng serve`.
+- Sign in as `masonbendixen@gmail.com` / `pass`.
+- Steps 13–14 need 20.5, which reaches your build with the pin bump (20.6). Until then, skip them.
+
+**The page**
+1. **Admin** → **Manage Products**. Among the tiles is **Roles**, "Who can teach, manage and administer the site", between **Refund Effectiveness** and **Room Occupancy**. Click it.
+2. The page is **Roles**, with **← Back to manage portal**.
+   - **All roles** lists six:
+     - Admin, 3 people
+     - Instructor, 5 people
+     - Provider, 0 people
+     - Studio Manager, 0 people
+     - Teachers, 0 people
+     - User, 0 people
+   - Admin's **What it allows** reads "Admin portal, Author blog, Manage class schedule, Manage products, Manage skills, Manage subscriptions, Staff access, View admin instructor load".
+   - Teachers and User read "Nothing on its own".
+   - There is no Scheduler row.
+
+**Making Kit an admin**
+
+3. In **Find a person**, type `kit`. **Kit Williams** (kiteagle@gmail.com) appears. Click her. The card shows her name and email, "No roles yet." and **Add a role**.
+4. **Add a role** → **Admin**, then **Add**. Admin appears in Kit's list, and in **All roles** Admin now shows 4 people.
+5. In a private window, sign in as `kiteagle@gmail.com` / `kit`. The top menu has **Admin**, and **Admin** → **Manage Products** shows the **Roles** tile.
+
+**Taking it away**
+
+6. Back in the first window, on Kit's **Admin** row, click **Remove**. It reads "Remove?" with **Confirm** and **Cancel**.
+   - Click **Cancel**: nothing changes.
+   - Click **Remove** again, then **Confirm**: Admin leaves Kit's list, and the count goes back to 3.
+7. In the private window, reload the page. **Admin** is gone from the top menu.
+
+**Your own admin role**
+
+8. Click **Change person**, type `masonbendixen@gmail`, and click **Mason Bendixen**. Admin and Instructor are listed.
+   - Admin's **Remove** is greyed out, with "You can't remove your own admin role." beside it.
+   - Instructor's **Remove** works. Click **Cancel** at the prompt.
+
+**A role's own page**
+
+9. In **All roles**, click **Admin**. The page is **Admin**, with **← Back to Roles**.
+   - The description is "Administrator role with full permissions.", and **What it allows:** shows the eight permissions as badges.
+   - **People with this role (3)** lists Caleb Ault, Mason Bendixen and Mason2 Bendixen. Your own row's **Remove** is greyed out, with the reason.
+10. In **Add a person**, type `beth`. **Beth Cooper** (bethismoving@gmail.com) appears. People who already have the role aren't offered. Click her: she joins the list, which now says (4).
+11. On Beth's row, click **Remove**, then **Confirm**. She's gone, and the list says (3).
+
+**The record**
+
+12. **← Back to Roles**, then **← Back to manage portal**. **Requires Attention** lists the four changes, for example "role_removed: admin from Beth Cooper (bethismoving@gmail.com) by Mason Bendixen (masonbendixen@gmail.com)". Dismiss them with ×.
+
+**The generic editor** *(after 20.6's pin bump)*
+
+13. **Admin** → **Manage Data** → **Role Assignments** → **New Item**. The **New Role Assignments** page now has **Person** and **Role** pickers. Pick Kit Williams and Instructor, then **Create**.
+14. **Manage Products** → **Roles**, and find Kit: Instructor is listed. Remove it, to finish where you started.
 
 ---
 
