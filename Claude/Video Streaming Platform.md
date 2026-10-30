@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/29/2026
-Version: 0.4
+Last Updated: 10/30/2026
+Version: 0.5
 tags: 
 ---
 # Overview
@@ -72,6 +72,8 @@ Let's start putting together the implementation plan but let's start with you of
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
 # Plan status
+
+**v0.5 (10/30/2026): gear for 0.2.** You bought two OBSBOT Tiny 3 Lite cameras. 0.2 now has the camera recommendation (10/29), a microphone recommendation (one OBSBOT Vox SE), and two audio checks for the 10-minute recording.
 
 **v0.4 (10/29/2026): 0.1 is done, with findings, against your OBS 33.**
 - **Results:**
@@ -423,7 +425,30 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
     - OBSBOT Tail Air, about $600 with NDI, plus a $99 Ethernet/PoE adapter
     - OBSBOT Tail 2, about $1,300, with built-in PoE
 
+**Microphone recommendation (10/30/2026, after you bought the two Tiny 3 Lite cameras: is the built-in mic enough?)**
+- **Use a separate wireless mic for your voice.** Each camera has three built-in mics with AI noise reduction. They're fine at arm's length on a desk, but not across a teaching room:
+  - **Distance:** at 2–4 m your voice competes with everything else in the room: echo off hard floors and mirrors, mats, breathing, students, and music.
+  - **Processing:** noise reduction working that hard to pull a distant voice forward tends to sound processed.
+  - **Movement:** you face away from the cameras for much of a class, and sometimes you're upside down. A worn mic stays the same distance from your mouth whichever way you face.
+- **Buy: one OBSBOT Vox SE, $59.** It's made for the Tiny 3 series:
+  - **No receiver:** it pairs with a camera directly (in OBSBOT Center: the camera's Audio settings, then OBSBOT Microphone, then add TX1).
+  - **One cable:** the camera passes your voice to the PC as its own microphone, over the same USB cable as the picture, so voice and picture stay in step and no extra USB port is used.
+  - **Specs:** about 9 g, 20 hours per charge, magnetic or clip mount, up to 100 m in the open.
+  - **A second one** ($59) covers a partner or co-teacher for acro. One camera takes two.
+  - **Limits:** it pairs only with Tiny 3 and Tiny 3 Lite cameras, has no recording of its own, and your voice depends on that one camera staying connected.
+- **Wearing it through inversions:**
+  - Clip it to the centre of a neckline or strap, about 15–20 cm below your chin, where clothing won't rub it.
+  - Don't trust the magnet alone upside down. Use the clip, or the back clip under a layer.
+  - Run your most inverted sequence once as a test and check that it stayed put and didn't rustle.
+- **In OBS:**
+  - **One voice source:** the camera with the Vox SE paired. Mute the other camera's mic in the stream. Two live mics on one voice sound hollow.
+  - **A backup track:** record the other camera's built-in mic on a separate recording track, muted in the stream. It's a spare if the Vox SE drops out, and gives room sound for the edit.
+  - **Noise suppression:** start on Low in OBSBOT Center. A worn mic doesn't need much.
+- **Music:** a worn mic still picks up music from the room's speakers. Commercial music in a YouTube stream or upload can get the video muted or claimed (Content ID), so play music you're licensed to stream.
+- **Only if you want your voice independent of the cameras:** a USB-C wireless kit such as the DJI Mic Mini (two transmitters and a receiver, about $45–80 in the US lately) plugs its receiver into the PC. It takes a USB port, and its latency differs from the cameras', so OBS needs a sync offset. Not needed now.
+
 - [ ] [Mason] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11). If buying, the default is two OBSBOT Tiny 3 Lite cameras (see above).
+  - *10/30: two Tiny 3 Lite cameras bought. Mic: one Vox SE (see above). Phone: still to confirm.*
 - [ ] [Mason] Install *Source Record* on OBS 33, in the new plugin folder.
 - [ ] [Mason] Record two cameras and one phone (as a webcam) for 10 minutes, with a separate ISO file per source.
 - [ ] Findings:
@@ -435,6 +460,8 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
   - whether two identical USB cameras keep their identities in OBS after unplugging and rebooting
   - whether the cameras are best run at 1080p60 or 4K30 (USB bandwidth and decode load against room to crop)
   - how many NVENC sessions the run uses: one ISO per camera, plus the program recording, plus a stream. Recent drivers allow 8 at once on GeForce cards; confirm that on this driver.
+  - whether the Vox SE's audio reaches OBS through the camera's USB audio device, and in sync with that camera's picture (clap on camera, then compare the clap's frame with the audio spike in the file)
+  - how the Vox SE sounds next to a camera's built-in mic, recorded on separate tracks in the same session
 
 ### 0.3 Phone capture probe
 - [ ] Compare four routes on quality, latency and fuss:
@@ -903,6 +930,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
     - Is this 3070 Ti PC the studio machine?
     - **Default until you say: this PC, two cameras, one phone and one wireless mic.**
     - *10/29: if you're buying, the recommendation is two OBSBOT Tiny 3 Lite USB-C cameras, about $400–520 all in. The reasoning and the alternatives are in 0.2.*
+    - *10/30: you bought the two Tiny 3 Lite cameras. For the mic, the recommendation is one OBSBOT Vox SE ($59), which pairs with a camera directly. See 0.2.*
 12. **How much editing to build into the app.**
     - **Default: a guided editor in the app (trim, split, reorder, splice, voice-over, overlays, speed), plus OTIO export to Resolve for anything beyond that.**
     - Alternative: skip editing in the app and go straight to Resolve. That's fewer features to build, but more steps for every video.
@@ -1040,3 +1068,10 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
 - [AVKANS NDI PTZ cameras](https://avkans.com/collections/ndi-ptz-camera)
 - [DistroAV (NDI for OBS)](https://obsproject.com/forum/resources/distroav-ndi%C2%AE-integration-into-obs-studio.528/)
 - [Videomaker: Sony ZV-E10 II overheating](https://www.videomaker.com/reviews/cameras/sony-zv-e10-ii-review-a-powerful-camera-for-creators-held-back-by-overheating/)
+
+**Microphones (0.2, checked 10/30/2026)**
+- [OBSBOT Tiny 3 series launch (the triple mic array)](https://www.obsbot.com/news/tiny-3-series-launch)
+- [OBSBOT Vox SE store page](https://www.obsbot.com/store/products/vox-se)
+- [TechBuzz Ireland: Tiny 3 and Vox SE review](https://techbuzzireland.com/2026/02/04/obsbot-tiny-3-and-obsbot-vox-se-wireless-microphone-review/)
+- [DJI Mic Mini (B&H)](https://www.bhphotovideo.com/c/product/803515260-USE/dji_cp_rn_00000432_01_mic_mini_compact_wireless.html)
+- [DJI Mic Mini two-transmitter kit price, 9/2026 (Slickdeals)](https://slickdeals.net/f/19992681-45-dji-mic-mini-wireless-microphone-system-2-tx-1-mobile-rx-at-amazon)
