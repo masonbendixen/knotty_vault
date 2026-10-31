@@ -4400,24 +4400,24 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     - The header's "currently empty" comment on the framework migration list was out of date, and is corrected.
 
 ### 20.6 Ship the honuware side
-- [ ] Gates on `server_components` (Windows + Linux), and knottyyoga against the local checkout (Linux).
+- [x] Gates on `server_components` (Windows + Linux), and knottyyoga against the local checkout (Linux).
   - *10/30:*
     - **server_components, Linux: 1907 passed** (1900 at the pin, 5 from the two unpinned commits, and these 2).
     - **knottyyoga against the local checkout, Linux: 5451 passed**, and the database helper, server and test helper all build. The log says `honuware : /honuware (local override)`.
-    - **server_components, Windows:** it builds, but its test run was stopped for low memory before it finished. Not rerun yet.
+    - **server_components, Windows:** its first test run was stopped for low memory. *Rerun 10/30: **1907 passed**.*
 - [x] **Mason** commits and pushes `server_components`. The pin bump also brings in the two commits already pushed since `920f18a`: `7cd3522` "Calendar name" and `4e5089b` "Quick fix".
   - *10/30:* pushed as **`04f88ee` "Roles and editing issues"** (`04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`), on `origin/master`.
     - It has the five files of 20.5 and nothing else: the seed, the migration and its header, and both test files.
     - The local checkout is clean, so the co-dev runs above built exactly what was pushed.
 - [x] `server_components` CI passes on `04f88ee`. *10/30: passed (Mason).*
-- [ ] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to `04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`, and re-runs both apps' pinned gates.
+- [x] Claude bumps `GIT_TAG` in knottyyoga and CommunityFinder to `04f88eeeef412d6fa7a2f97c9daab4b63f3177c1`, and re-runs both apps' pinned gates.
   - Once bumped, the pinned knottyyoga count should equal the co-dev one, 5451 on both platforms.
   - *10/30:* `GIT_TAG` bumped in both `CMakeLists.txt` files.
     - knottyyoga moves from `920f18a`. CommunityFinder moves from `4e5089b`, so it already had the two earlier commits.
     - **knottyyoga, pinned, Linux: 5451 passed**, the same as the co-dev run. The database helper and server build.
     - **CommunityFinder, pinned, Linux: 2227 passed**, and its database helper and server build.
     - Both logs say `pinned SHA (FetchContent will clone it)`, and both clones are at `04f88eeeef41…`.
-    - **Windows:** not run yet. It waits for Mason, with the other Windows runs in 20.8.
+    - **Windows, pinned to `04f88ee`:** knottyyoga **5451 passed**, and CommunityFinder **2227 passed**, its server included. Both match Linux.
 
 ### 20.7 Mutation check
 - [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
@@ -4446,7 +4446,7 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     2. The knottyyoga build and tests on Windows. If Mason's server is running, its exe is left alone and only the other targets are built.
        - *Done 10/30, pinned to `04f88ee`: **5451 passed**, the same as Linux.*
        - The tests, the database helper and the test helper build. The server exe wasn't relinked, because Mason's server was running. Linux and CI's `build:server` both built it.
-    3. The full Angular suite on Windows.
+    3. The full Angular suite on Windows. *Done 10/30: **4049 of 4049 passed**.*
     4. The full Angular suite on Linux. *Done 10/30 by CI:* `master`'s `test:frontend` job (pipeline 3010805181) runs `ng test` in Docker, and it passed. The count isn't visible without a GitLab token.
     5. The C++ mutation check (20.7).
     6. The mobile audit of **Roles** and a role's page, at phone and desktop widths. Both routes are already in the audit's route list (20.4).
