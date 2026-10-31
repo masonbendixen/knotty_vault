@@ -4521,8 +4521,19 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 In order:
 - [x] **Mason** pushes `server_components` (20.6). *10/30: `04f88ee`.*
 - [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed and the pin is bumped. Both apps' pinned Linux gates pass (knottyyoga 5451, CommunityFinder 2227). The Windows runs are still to come.* The remaining runs in 20.8 go one at a time.
-- [ ] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump, and CommunityFinder's pin bump.
-- [ ] **Mason** tags a release and deploys it, as in Phase 19.
+- [x] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump.
+  - *10/30:* knottyyoga `0262136` "Roles and editing issues". `master`'s pipeline 3010805181 passed all six jobs:
+    - `build:server`
+    - `test:backend` (20 min)
+    - `test:deploy-scripts`
+    - `test:frontend`
+    - `lint:frontend`
+    - `build:frontend`
+- [ ] **Mason** commits CommunityFinder's pin bump: the `GIT_TAG` line in `server/communityfinder_server/CMakeLists.txt`. *10/30: still uncommitted. It passed CommunityFinder's pinned Linux gate (20.6).*
+- [ ] Tag a release, and deploy it as in Phase 19.
+  - *10/30, Claude, at Mason's request:* checked that GitLab's `master` was `0262136`, then created the annotated tag **`v1.0.0-sandbox.13`** on that commit and pushed it. The tag pipeline is running.
+  - **Mason:** once it's green, press ▶ on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`**.
+  - `/api/health` should then report `"version":"v1.0.0-sandbox.13"`.
   - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
 - [ ] **Mason**, on the live site: **Admin** → **Manage Products** → **Roles**. Find each person who should be an admin, then **Add a role** → **Admin** → **Add**.
   - Each change appears under **Requires Attention**.
