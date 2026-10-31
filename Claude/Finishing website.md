@@ -4444,6 +4444,8 @@ All five require the `admin` role: 401 when signed out, 403 without it.
   - **Still to run, one at a time, once Mason says so.** Three heavy Windows runs at once is what ran out of memory.
     1. honuware's tests on Windows. *Done 10/30: **1907 passed**, the same as Linux.*
     2. The knottyyoga build and tests on Windows. If Mason's server is running, its exe is left alone and only the other targets are built.
+       - *Done 10/30, pinned to `04f88ee`: **5451 passed**, the same as Linux.*
+       - The tests, the database helper and the test helper build. The server exe wasn't relinked, because Mason's server was running. Linux and CI's `build:server` both built it.
     3. The full Angular suite on Windows.
     4. The full Angular suite on Linux. *Done 10/30 by CI:* `master`'s `test:frontend` job (pipeline 3010805181) runs `ng test` in Docker, and it passed. The count isn't visible without a GitLab token.
     5. The C++ mutation check (20.7).
