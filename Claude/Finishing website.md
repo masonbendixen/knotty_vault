@@ -4531,7 +4531,8 @@ In order:
     - `build:frontend`
 - [ ] **Mason** commits CommunityFinder's pin bump: the `GIT_TAG` line in `server/communityfinder_server/CMakeLists.txt`. *10/30: still uncommitted. It passed CommunityFinder's pinned Linux gate (20.6).*
 - [ ] Tag a release, and deploy it as in Phase 19.
-  - *10/30, Claude, at Mason's request:* checked that GitLab's `master` was `0262136`, then created the annotated tag **`v1.0.0-sandbox.13`** on that commit and pushed it. The tag pipeline is running.
+  - *10/30, Claude, at Mason's request:* checked that GitLab's `master` was `0262136`, then created the annotated tag **`v1.0.0-sandbox.13`** on that commit and pushed it.
+  - The tag pipeline 3010849991 passed all five jobs, and the release is built: `verify:green-commit`, `test:deploy-scripts`, `package:server` (13.5 min), `package:ui` and `release:gitlab`.
   - **Mason:** once it's green, press ▶ on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`**.
   - `/api/health` should then report `"version":"v1.0.0-sandbox.13"`.
   - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
