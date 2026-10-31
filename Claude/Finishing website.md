@@ -4420,8 +4420,21 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     - **Windows, pinned to `04f88ee`:** knottyyoga **5451 passed**, and CommunityFinder **2227 passed**, its server included. Both match Linux.
 
 ### 20.7 Mutation check
-- [ ] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
-  - *Not run yet.* It edits the same files the Windows build reads, so it waits for the Windows runs.
+- [x] C++: no admin check; the self-removal guard gone; the scheduler role listed; the scheduler account changeable; adding twice making a second row; no admin alert; the seed's read-only flags put back; the migration not clearing them.
+  - *10/30, Linux, after the Windows runs: **all 8 caught**.* The 45 tests of the six Phase 20 suites passed before and after.
+
+    | Mutation | Fails |
+    |---|---|
+    | No admin check on the POST/DELETE | `AdminRolesEndpointTest.EveryRouteNeedsTheAdminRole` |
+    | Your own admin role removable | `RemovingYourOwnAdminRoleIsRefused` (endpoint) and `NobodyRemovesTheirOwnAdminRole` (helper) |
+    | The scheduler role listed | 2 endpoint tests and `TheSchedulerRoleIsNeitherListedNorChanged` |
+    | The scheduler account changeable | `TheSchedulerRoleAndAccountAreRefused` and `TheSchedulerAccountIsNeitherListedNorChanged` |
+    | Adding twice inserts again (no `NOT EXISTS` or `ON CONFLICT`) | 3, one at each layer |
+    | No admin alert | 3 helper tests |
+    | The seed's read-only flags put back | `CreateFrameworkTablesTest.TheRoleForeignKeysAreEditableOnTheNewForm` |
+    | The migration doesn't clear them | `FrameworkMigrationsTest.RolePickersMigrationClearsTheReadOnlyFlags` |
+
+    Each file was restored straight after its mutation. Afterwards, `git status` showed both repos clean.
 - [x] Angular: the tile shown to non-admins; the self-remove button enabled; **Remove** without a confirmation; the wrong path or verb.
   - *10/30, all 6 caught:*
     - The tile shown to `manage_products` fails 2 dashboard specs.
@@ -4448,7 +4461,7 @@ All five require the `admin` role: 401 when signed out, 403 without it.
        - The tests, the database helper and the test helper build. The server exe wasn't relinked, because Mason's server was running. Linux and CI's `build:server` both built it.
     3. The full Angular suite on Windows. *Done 10/30: **4049 of 4049 passed**.*
     4. The full Angular suite on Linux. *Done 10/30 by CI:* `master`'s `test:frontend` job (pipeline 3010805181) runs `ng test` in Docker, and it passed. The count isn't visible without a GitLab token.
-    5. The C++ mutation check (20.7).
+    5. The C++ mutation check (20.7). *Done 10/30: all 8 caught.*
     6. The mobile audit of **Roles** and a role's page, at phone and desktop widths. Both routes are already in the audit's route list (20.4).
 - [x] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
   - *10/30, Linux, built against the local honuware:*
