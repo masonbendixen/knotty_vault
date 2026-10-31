@@ -88,7 +88,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - 20.8 now lists everything still to run, in the order it will run once Mason says so. The mobile audit of the two new pages is added to it.
   - **Later the same day:** CI passed, and the pin was bumped to `04f88ee` in both apps. Mason committed both. Claude tagged and pushed **`v1.0.0-sandbox.13`**, and its pipeline built the release.
     - Every remaining check passed: the Windows suites, the C++ mutation check (8 of 8 caught) and the mobile audit.
-    - Only the deploy and handing out admin remain (20.10).
+    - Mason deployed it the same day and tested it by hand on the live site. Phase 20 is done.
 - **v0.40 (10/30/2026)** — **New Phase 20: Roles.** Mason, on the live site: Manage Data's **New Role Assignments** has no fields, so nobody can be made an admin. He asked for a **Roles** page under Manage Products.
   - **Cause:** honuware's seed marks the role-assignment columns *read-only*, and the CRUD editor hides read-only columns on **New**. It needs a honuware fix with a migration (20.5).
   - **The Roles page** is built in this repo, for admins only (D17). It has a person lookup with their roles, and a page per role with its members. You can't remove your own admin role, and the scheduler account is left alone.
@@ -4296,7 +4296,7 @@ Error: Failed to send email: Mail message rejection.
 
 ---
 
-# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built, verified and released 10/30 as `v1.0.0-sandbox.13`. Still to do: Mason's deploy, then making the admins on the live site, 20.10)*
+# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built, verified, released as `v1.0.0-sandbox.13` and live 10/30 ✅)*
 
 Mason, 10/30, on the live site: "I went into the editor for the live website and went to make people admins. When I went into the CRUD editor, I can't do a role assignment to make someone and admin. When I go to the page for that and do new item, a New Role Assignments page appears with a create and cancel button appear but no way to choose a person and role. I also would like an option in Manage Products called Roles that lets there be a bespoke UI for looking up people and doing CRUD on their roles and being able to go into a role and see who has that role and be able to do CRUD type stuff that way too."
 
@@ -4555,13 +4555,15 @@ In order:
     - `build:frontend`
 - [x] **Mason** commits CommunityFinder's pin bump: the `GIT_TAG` line in `server/communityfinder_server/CMakeLists.txt`. It passed CommunityFinder's pinned Linux gate (20.6).
   - *10/30:* `a20db86` "Guide pages and gates as well as server components bump", pushed.
-- [ ] Tag a release, and deploy it as in Phase 19.
+- [x] Tag a release, and deploy it as in Phase 19.
+  - *10/30: Mason deployed it. The live `/api/health` answers `{"db":"ok","status":"ok","version":"v1.0.0-sandbox.13"}`.*
   - *10/30, Claude, at Mason's request:* checked that GitLab's `master` was `0262136`, then created the annotated tag **`v1.0.0-sandbox.13`** on that commit and pushed it.
   - The tag pipeline 3010849991 passed all five jobs, and the release is built: `verify:green-commit`, `test:deploy-scripts`, `package:server` (13.5 min), `package:ui` and `release:gitlab`.
   - **Mason:** once it's green, press ▶ on **`deploy-manual:ec2`**, then on **`deploy-manual:ui`**.
   - `/api/health` should then report `"version":"v1.0.0-sandbox.13"`.
   - The deploy's `--migrate` applies `honuware/0003_role_pickers`, which brings back Manage Data's **Person** and **Role** pickers. 20.8's migrate pass checked this on a database with the old flags set.
-- [ ] **Mason**, on the live site: **Admin** → **Manage Products** → **Roles**. Find each person who should be an admin, then **Add a role** → **Admin** → **Add**.
+- [x] **Mason**, on the live site: **Admin** → **Manage Products** → **Roles**. Find each person who should be an admin, then **Add a role** → **Admin** → **Add**.
+  - *10/30: Mason tested the new features by hand on the live site.*
   - Each change appears under **Requires Attention**.
   - Each new admin sees the **Admin** menu the next time they load the site.
 
