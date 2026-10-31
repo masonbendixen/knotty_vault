@@ -86,6 +86,9 @@ Please create a plan with phases of implementation. Within each phase, please re
 - **v0.41 (10/30/2026)** — **Phase 20: the honuware side is pushed.** Mason pushed `server_components` `04f88ee` "Roles and editing issues", and its CI is running (20.6).
   - New **20.10** sets out the release in order, and notes that the Roles page could ship before the honuware fix.
   - 20.8 now lists everything still to run, in the order it will run once Mason says so. The mobile audit of the two new pages is added to it.
+  - **Later the same day:** CI passed, and the pin was bumped to `04f88ee` in both apps. Mason committed both. Claude tagged and pushed **`v1.0.0-sandbox.13`**, and its pipeline built the release.
+    - Every remaining check passed: the Windows suites, the C++ mutation check (8 of 8 caught) and the mobile audit.
+    - Only the deploy and handing out admin remain (20.10).
 - **v0.40 (10/30/2026)** — **New Phase 20: Roles.** Mason, on the live site: Manage Data's **New Role Assignments** has no fields, so nobody can be made an admin. He asked for a **Roles** page under Manage Products.
   - **Cause:** honuware's seed marks the role-assignment columns *read-only*, and the CRUD editor hides read-only columns on **New**. It needs a honuware fix with a migration (20.5).
   - **The Roles page** is built in this repo, for admins only (D17). It has a person lookup with their roles, and a page per role with its members. You can't remove your own admin role, and the scheduler account is left alone.
@@ -4293,7 +4296,7 @@ Error: Failed to send email: Mail message rejection.
 
 ---
 
-# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built 10/30. The honuware side is pushed (`04f88ee`, CI running); the knottyyoga side isn't committed. Still to run: the pin bump, the Windows suites, the Linux Angular suite, the mobile audit and the C++ mutation check)*
+# Phase 20 — Roles: who can manage the site *(added 10/30 from Mason's report; built, verified and released 10/30 as `v1.0.0-sandbox.13`. Still to do: Mason's deploy, then making the admins on the live site, 20.10)*
 
 Mason, 10/30, on the live site: "I went into the editor for the live website and went to make people admins. When I went into the CRUD editor, I can't do a role assignment to make someone and admin. When I go to the page for that and do new item, a New Role Assignments page appears with a create and cancel button appear but no way to choose a person and role. I also would like an option in Manage Products called Roles that lets there be a bespoke UI for looking up people and doing CRUD on their roles and being able to go into a role and see who has that role and be able to do CRUD type stuff that way too."
 
@@ -4446,7 +4449,10 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     Every file was restored and checked by hash.
 
 ### 20.8 Verification
-- [ ] knottyyoga, honuware and Angular on Windows and Linux, reported per platform. The three programs build on Linux.
+- [x] knottyyoga, honuware and Angular on Windows and Linux, reported per platform. The three programs build on Linux.
+  - *10/30, all done:*
+    - **Windows:** knottyyoga 5451, honuware 1907, CommunityFinder 2227 and Angular 4049 passed.
+    - **Linux:** knottyyoga 5451, honuware 1907 and CommunityFinder 2227 passed, and CI's Angular job passed.
   - *10/30:*
     - **Linux: knottyyoga 5451 passed, honuware 1907 passed.** The three programs build.
     - **Angular, Windows:** the 41 new specs, the mock and dashboard specs (720 in all), and the routes and route-manifest specs pass. `ng lint` and `tsc` (app and specs) are clean.
@@ -4463,6 +4469,9 @@ All five require the `admin` role: 401 when signed out, 403 without it.
     4. The full Angular suite on Linux. *Done 10/30 by CI:* `master`'s `test:frontend` job (pipeline 3010805181) runs `ng test` in Docker, and it passed. The count isn't visible without a GitLab token.
     5. The C++ mutation check (20.7). *Done 10/30: all 8 caught.*
     6. The mobile audit of **Roles** and a role's page, at phone and desktop widths. Both routes are already in the audit's route list (20.4).
+       - *Done 10/30: both pages pass at all 7 sizes (14 of 14).* The same run's layout specs pass too, **392 passed** in all.
+       - The first try failed 65 layout specs on pages Phase 20 doesn't touch: calendar, header and the sticky pay bar. The dev server Playwright started for itself served a stylesheet without Tailwind's `xl:` classes.
+       - Against a dev server started by hand on 4300, every one passed. The server was stopped afterwards.
 - [x] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
   - *10/30, Linux, built against the local honuware:*
     - **22 of 22 checks passed** on a fresh `phase20_check` (`--install_schema`). The roles list matches the seed, with no `scheduler`. A POST without the CSRF header is refused (403) and changes nothing.
@@ -4535,7 +4544,7 @@ All five require the `admin` role: 401 when signed out, 403 without it.
 
 In order:
 - [x] **Mason** pushes `server_components` (20.6). *10/30: `04f88ee`.*
-- [ ] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed and the pin is bumped. Both apps' pinned Linux gates pass (knottyyoga 5451, CommunityFinder 2227). The Windows runs are still to come.* The remaining runs in 20.8 go one at a time.
+- [x] **Claude** bumps the pin in knottyyoga and CommunityFinder once CI passes, and runs the pinned gates (20.6). *10/30: CI passed and the pin is bumped. Both apps' pinned gates pass on Linux and Windows (knottyyoga 5451, CommunityFinder 2227). The rest of 20.7–20.8 is done too.*
 - [x] **Mason** commits knottyyoga, with the Phase 20 files and the pin bump.
   - *10/30:* knottyyoga `0262136` "Roles and editing issues". `master`'s pipeline 3010805181 passed all six jobs:
     - `build:server`
