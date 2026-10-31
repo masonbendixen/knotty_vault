@@ -4442,10 +4442,10 @@ All five require the `admin` role: 401 when signed out, 403 without it.
       - Nothing was left behind by the stop.
     - **Not run yet:** the full Angular suite on Linux (CI's `test:frontend` in Docker).
   - **Still to run, one at a time, once Mason says so.** Three heavy Windows runs at once is what ran out of memory.
-    1. honuware's tests on Windows.
+    1. honuware's tests on Windows. *Done 10/30: **1907 passed**, the same as Linux.*
     2. The knottyyoga build and tests on Windows. If Mason's server is running, its exe is left alone and only the other targets are built.
     3. The full Angular suite on Windows.
-    4. The full Angular suite on Linux.
+    4. The full Angular suite on Linux. *Done 10/30 by CI:* `master`'s `test:frontend` job (pipeline 3010805181) runs `ng test` in Docker, and it passed. The count isn't visible without a GitLab token.
     5. The C++ mutation check (20.7).
     6. The mobile audit of **Roles** and a role's page, at phone and desktop widths. Both routes are already in the audit's route list (20.4).
 - [x] End to end through the real server and its CSRF guard, on a throwaway database: an admin adds and removes a role, the self-removal is refused, and a non-admin gets 403. Then `--migrate` on a database with the old read-only flags clears them.
@@ -4529,7 +4529,8 @@ In order:
     - `test:frontend`
     - `lint:frontend`
     - `build:frontend`
-- [ ] **Mason** commits CommunityFinder's pin bump: the `GIT_TAG` line in `server/communityfinder_server/CMakeLists.txt`. *10/30: still uncommitted. It passed CommunityFinder's pinned Linux gate (20.6).*
+- [x] **Mason** commits CommunityFinder's pin bump: the `GIT_TAG` line in `server/communityfinder_server/CMakeLists.txt`. It passed CommunityFinder's pinned Linux gate (20.6).
+  - *10/30:* `a20db86` "Guide pages and gates as well as server components bump", pushed.
 - [ ] Tag a release, and deploy it as in Phase 19.
   - *10/30, Claude, at Mason's request:* checked that GitLab's `master` was `0262136`, then created the annotated tag **`v1.0.0-sandbox.13`** on that commit and pushed it.
   - The tag pipeline 3010849991 passed all five jobs, and the release is built: `verify:green-commit`, `test:deploy-scripts`, `package:server` (13.5 min), `package:ui` and `release:gitlab`.
