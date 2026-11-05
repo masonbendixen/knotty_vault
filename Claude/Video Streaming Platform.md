@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 10/30/2026
-Version: 0.5
+Last Updated: 11/05/2026
+Version: 0.6
 tags: 
 ---
 # Overview
@@ -72,6 +72,16 @@ Let's start putting together the implementation plan but let's start with you of
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
 
 # Plan status
+
+**v0.6 (11/05/2026): toolchain installed on a second machine.** This was done on `MASONLG`, an LG gram 17 laptop (Intel Iris Xe, 32 GB), not the RTX 3070 Ti PC the rest of this plan describes.
+- **Installed:**
+  - Qt 6.12.0 in `C:\Qt\6.12.0\msvc2022_64` (D-4): base, WebSockets, Multimedia, NetworkAuth, WebEngine, and the modules they need
+  - FFmpeg and ffprobe 9.0.2
+  - Kdenlive 26.08.2
+- **Checked:** a test program built with VS 2026 linked every module and ran. It loaded a page in WebEngine, and the FFmpeg media backend, SQLite and OpenSSL all worked.
+- **Already here:** VS 2026 with C++, CMake 4.4.3, Conan 2.31.2, Python 3.13, Node 22.14, Angular CLI 19.1.7, and OBS 33.0.1, which has never been launched here.
+- **Not on this machine:** `creator_studio`, `video_library`, and Qt 6.8.3. Docker Desktop 4.25.2 is installed, but its engine wasn't running.
+- **Limits of this laptop:** no NVIDIA GPU, so the NVENC findings in 0.1 and 0.2 don't apply here.
 
 **v0.5 (10/30/2026): gear for 0.2.** You bought two OBSBOT Tiny 3 Lite cameras and ordered one OBSBOT Vox SE mic. 0.2 now has the camera recommendation (10/29), the microphone recommendation, and two audio checks for the 10-minute recording.
 
@@ -539,6 +549,10 @@ Goal: answer the questions that would be expensive to get wrong, using small thr
 - [ ] [app] Create the `creator_app/` skeleton, copied from video_library's working toolchain:
   - `tools/setup_machine.ps1`, installing **Qt 6.12** through aqtinstall with Multimedia, NetworkAuth, WebSockets and WebEngine
     - *Found in 0.1: aqtinstall 3.3.0 (the newest on PyPI, as of 10/29) can't install Qt 6.12. Qt's repository now has one folder per architecture (`qt6_6120/qt6_6120_msvc2022_64/`). For the probe, I downloaded `qtbase` and `qtwebsockets` from there by hand, checked their SHA-1s, and unpacked them into `C:\Qt\6.12.0\msvc2022_64`. Until aqt catches up, the setup script has to do the same for each module. `Qt6_ROOT` stays on 6.8 for video_library; creator_studio's presets set it as a CMake cache variable instead (D-4).*
+    - *Found 11/05, installing on the laptop (aqtinstall is still 3.3.0):*
+      - ***WebEngine is in a different place:** it isn't under `desktop/`, it's under `extensions/qtwebengine/6120/`. **Use the `61400/msvc2022_64` subfolder (built 9/28), not `msvc2022_64` directly.** The direct one is a stale July build: it installs and links, but every program using it fails at startup with `0xC0000139`, because it imports a `QAccessibleInterface` constructor that the final `Qt6Gui.dll` doesn't export.*
+      - ***Archive layout:** the archives have no `6.12.0/msvc2022_64/` folder inside, so unpack them inside the target folder.*
+      - ***Two DLLs:** `d3dcompiler_47.dll` and `opengl32sw.dll` unpack to the top of that folder, so move them into `bin`.*
   - the Conan provider
   - `windeployqt` after each build
   - targets `creator_core`, `creator_app` and `creator_tests`
