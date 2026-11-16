@@ -1364,14 +1364,17 @@ T30, T31, T41 and G18.
 - Adding a class to the weekly plan sends a confirmation email each time, so five taps make five emails.
 - **Default:** stop it; the weekly digest lists the plan.
 - **Alternative:** keep it.
+- Let's just do the weekly digest. I don't want to spam emails. The only reason to generate an email per click is if it is sending an ICS entry to add to their calendar for each class (which is useful). If we do the alternative one email per click, it would be nice to be able to adjust this in their notification settings so they have control. It would be nice to have each email have a link to adjust these settings that takes them to their notification settings page on the site.
 
 **OQ-29 — Which control did Thomas tap on Our Classes?** *(6.3)*
 - The **My Schedule** toggle there means "classes I can attend", not "my weekly plan". A planned class shows a small checkbox. It's unclear which one let him sign up again.
 - **Default:** 6.3 fixes both readings. If you can ask him, his answer goes here.
+- Mason- Can you explain the issue here and what the choices are.
 
 **OQ-30 — Database connections per site** *(7.6)*
 - **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
 - **Alternative:** 2.
+- Mason- Can you explain the pros and cons of each choice. You haven't given me a lot to make a decision here :)
 
 ### Resolved
 
