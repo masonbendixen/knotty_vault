@@ -1253,18 +1253,21 @@ T30, T31, T41 and G18.
 - Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and excessive extra weight will make classes challenging and hard to keep up with the group. Contact us for suggestions of one on one training if you do not meet this criteria. You do not need a yoga mat as we have padded, nice traction floors. Please wear fitted gym clothes that are not baggy to avoid getting caught in equipment. Generally tights, leggings, or sweat pants are good (preferably grippy cotton) and a fitted tshirt or tank top. Guys wear tight underwear that keeps things snug. No watches, metal, zippers, or jewelry. Water bottles strongly encouraged.
 - Longer Silver and Gold descriptions.
 - Mason-
-	- Silver- This is our introductory option that features a selection of our more beginner friendly and accessible options. I would start here until instructors suggest you move on to gold and you feel ready. Part of doing acrobatics is learning terminology, body positions, and learning to move and organize yourself in a new way. These classes p
+	- Silver- This is our introductory option that features a selection of our more beginner friendly and accessible options. I would start here until instructors suggest you move on to gold and you feel ready. Part of doing acrobatics is learning terminology, body positions, and learning to move and organize yourself in a new way. These classes are foundational for things like aerial, partner acro, and handstand training.
+	- Gold- These are more advanced classes that also feature elements from circus acrobatics. This tier also includes some specialty classes for handstands, aerial, and partner acrobatics.
 - A line on each beginner class saying it prepares you for the others.
 - **Default:** Claude drafts each from your class descriptions and the About page, marked **DRAFT** here for you to edit. Nothing ships until you've approved it.
 
 **OQ-10 — The "Our" rule** *(8.4)*
 - **Default:** no "Our" in the menu, and each page's title matches its menu label (**Classes**, **Services**, **Instructors**, **Location**, **Providers**, **Events**).
 - **Alternative:** "Our" on every page title and none in the menu; or "Our" everywhere.
+- Mason- I like the dropping our idea.
 
 **OQ-11 — "Services" for massage** *(8.6)*
 - Gifford wondered if people would look for massage under "Services".
 - **Default:** keep **Services**, and list the providers on it. The home page already advertises massage.
 - **Alternative:** rename it **Massage**, or **Massage & Bodywork**, while massage is the only service.
+- Mason- We will soon offer more than massage so lets keep it as services.
 
 **OQ-12 — Gallery in the top menu** *(8.4, Gifford)*
 - **Default:** yes, next to **Blog**, and out of **About**. Gifford expects it to carry event photos over time, as the blog does.
