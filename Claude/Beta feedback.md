@@ -1277,15 +1277,17 @@ T30, T31, T41 and G18.
 **OQ-13 — A Classes menu** *(8.4, Gifford)*
 - **Default:** **Classes** opens **All Classes**, **Weekly Schedule** and **Calendar**. The buttons on All Classes stay as shortcuts.
 - **Alternative:** keep a single **Classes** item and make the two buttons more prominent.
-- Mason- I don't like making this a menu item. I think the issue is that if you have created an account but not bought a membership, the M
+- Mason- I don't like making this a menu item. I think the issue is that if you have created an account but not bought a membership, the My Schedule view shows nothing, which is confusing. I think we should default to Full Schedule view if they don't have a membership and then they see the LOCK icon with Requires a membership for the upsell.
 
 **OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
 - **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
 - **Alternative:** keep sign-in first.
+- Mason- I don't fully understand this item. Can you explain it more fully and what I am choosing between?
 
 **OQ-15 — One / Two / Family** *(5.2, Thomas)*
 - **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
 - **Alternative:** keep all five cards on show, adding only the saving line.
+- So there would just be a gold and silver option but have a Single, Couples, and Family options as what? Radio ch
 
 **OQ-16 — The Manage Products groups** *(9.2)*
 - **Default:** the six groups in 9.2's table.
