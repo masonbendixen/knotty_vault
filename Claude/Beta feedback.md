@@ -1272,10 +1272,12 @@ T30, T31, T41 and G18.
 **OQ-12 — Gallery in the top menu** *(8.4, Gifford)*
 - **Default:** yes, next to **Blog**, and out of **About**. Gifford expects it to carry event photos over time, as the blog does.
 - **Alternative:** keep it under **About**.
+- Mason- There are already enough top level menu items. Let's keep it under about.
 
 **OQ-13 — A Classes menu** *(8.4, Gifford)*
 - **Default:** **Classes** opens **All Classes**, **Weekly Schedule** and **Calendar**. The buttons on All Classes stay as shortcuts.
 - **Alternative:** keep a single **Classes** item and make the two buttons more prominent.
+- Mason- I don't like making this a menu item. I think the issue is that if you have created an account but not bought a membership, the M
 
 **OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
 - **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
