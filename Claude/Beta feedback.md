@@ -617,7 +617,7 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
 - [ ] Tests:
   - the billing run on the 1st charges and creates the entitlement
   - nothing is granted before then
-  - `GetCurrentForPerson` already counts it (so Back can't double it)
+  - `GetCurrentPaidByPerson` already counts it, so Back hits the 2.2 warning
 
 ### 2.4 One email per signup *(business_logic/payment)*
 - [ ] A subscription's first charge sends one email: "Welcome to Gold", with the receipt (amount, card, period) folded in. `PayWithCard` gets a `suppressConfirmationEmail` flag that only `CreateSubscription` sets.
@@ -1021,7 +1021,7 @@ T18, T43, T45, T46, G10 and P11.
 ### 7.8 Public photos from CloudFront's edge *(server_components: platform; @honuware/ui: access; ui/package; OQ-21)*
 - [ ] **Measure first** (7.1): how many photo requests the home page and Gallery make, and how long each takes.
 - [ ] **A public photo route:** `GET /api/public_photo/<table>/<id>/<width>/<height>?v=<stamp>`.
-  - It serves only the tables whose photos are public: classes, instructors, gallery, carousels, site assets. Anything else gets 404. People's own photos stay on `get_scaled_photo`, `private, no-cache` (F20).
+  - It serves only the tables `get_scaled_photo` already treats as public (the class, instructor, gallery and carousel photos; to list them from the code). Anything else gets 404. People's own photos stay on `get_scaled_photo`, `private, no-cache` (F20).
   - `v` is the photo's update stamp, so a replaced photo has a new address.
   - It sends `Cache-Control: public, max-age=31536000, immutable`. A stale `v` gets a redirect to the current one.
 - [ ] **CloudFront:** a `/api/public_photo/*` behaviour, placed ahead of `/api/*`. It caches on the full URL (query included) and forwards no cookies. Nothing ever needs invalidating, because a new photo has a new URL.
@@ -1097,7 +1097,7 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
   - an Angular spec that no template under `src/app` has visible text matching `no longer|used to|Phase \d|OQ-\d`, outside comments
   - the developer-only style guide is exempt
 
-### 8.10 Bios *(seed + production edit)*
+### 8.10 Bios *(seed)*
 - [ ] Mason's and Gifford's bios, rewritten by Mason (OQ-7). They go into the seed (D8), and the seed test reads them back through the instructor reader.
 
 ### 8.11 Back and Forward, checked *(e2e)*
@@ -1205,39 +1205,24 @@ T29, T32–T37, G19, and P6–P8.
 
 ---
 
-# Phase 10 — Manage Data you can trust *(mostly server_components and @honuware/ui)*
+# Phase 10 — Manage Data becomes a developer's tool, and a red-team pass *(mostly server_components)*
 
 T30, T31, T41 and G18.
 
-### 10.1 Help text *(server_components: platform db_schema + seed; knottyyoga seed + migration)*
-- [ ] `admin_column_friendly_names.description` (framework migration `honuware/0005_column_descriptions`).
-- [ ] The editor shows the table's description under its title. Each column's description shows under its field, for every control type including the foreign-key picker.
-- [ ] Claude writes a one-line description for every app table and every column a person edits. App migration **`app/0019_admin_descriptions`** fills empty ones only.
-- [ ] Tests: through `AdminColumnFriendlyNames`; a seed test that every admin top-level table has a description.
+**Default from OQ-20 (still open):** Manage Data is a developer's tool, so it gets its own permission and a warning rather than a friendlier editor. v0.1's help text, foreign-key previews, table list and history (its 10.1–10.4) are deferred to 10.3, unless you decide otherwise.
 
-### 10.2 Foreign keys show what they point at *(@honuware/ui: controls)*
-- [ ] The picker shows the chosen record's display template under the field, with **Open** to edit that row.
-- [ ] Specs.
-
-### 10.3 A list of tables, and a word of warning *(@honuware/ui: crud; ui: admin)*
-- [ ] A left-hand list of tables (grouped as in 9.2), searchable, replacing the dropdown (G18). It collapses to a menu on a phone.
-- [ ] A banner at the top: "This edits the raw data. Day-to-day work belongs in Manage Products. Every change here is recorded (History)."
-- [ ] Specs.
-
-### 10.4 History and restore *(server_components: platform)*
-- [ ] **`admin_change_log`:** table, row key, action, the row before and after (JSON), who and when. A framework table, with migration **`honuware/0006_admin_change_log`**.
-- [ ] `add_item`, `add_item_fetch_primary_key`, `update_item` and `delete_item` write to it **in the same transaction** as the change.
-- [ ] `GET /api/admin/change_log?table=&row=` (admin) lists the history.
-- [ ] `POST /api/admin/change_log/<id>/restore` (admin) writes the *before* image back through the same write path. That write is logged too, so a restore can itself be undone.
-- [ ] A restore that would break a foreign key fails with the database's reason (OQ-20).
+### 10.1 Its own permission *(server_components: platform; @honuware/ui: crud, auth; knottyyoga seed)*
+- [ ] A framework permission **`manage_data`**, given through a framework **Developer** role. Framework migration **`honuware/0005_manage_data_permission`** adds both, and gives the role to every current admin so CommunityFinder's admins keep access. It is idempotent.
+- [ ] The Manage Data page (`/admin`), its menu item and `get_db_schema` require `manage_data`, not just admin.
+  - The generic endpoints keep Phase 1's rule (a table grant), because about twenty Manage Products pages use them (1.1).
+- [ ] The knottyyoga seed gives **Developer** to Mason's account only. Testers made admins for the beta no longer see Manage Data.
+- [ ] A banner on the page: "Developer tool: this edits the raw data, with no undo. Day-to-day work belongs in Manage Products."
 - [ ] Tests:
-  - each write logs, read through the log reader
-  - restoring an update, a delete and an add
-  - a restore that a foreign key refuses
-  - a rolled-back write leaves no log
-- [ ] **History** on each row, and a **Recent changes** list on Manage Data. Specs.
+  - an admin without the role gets 403 on `get_db_schema` and has no menu item; with the role, both work
+  - the migration grants the role to existing admins, and running it twice changes nothing
+  - library specs for the guard and the banner
 
-### 10.5 Red-team pass *(server_components + knottyyoga)*
+### 10.2 Red-team pass *(server_components + knottyyoga)*
 - [ ] **Route census test:** walk every registered route. Signed out, each one must answer 401 unless it is on a reviewed public list. The list lives in the test with a reason per entry, so a new endpoint is private until someone says otherwise.
   - Crow's router exposes its rules; to verify. If it doesn't, a test-time list is checked against the anchors in `web_app.cpp`.
 - [ ] **Ownership tests** for every route that takes another person's id or a row id (subscriptions, purchases, bookings, gift permissions, entitlements, templates): a second member gets 404.
@@ -1246,6 +1231,15 @@ T30, T31, T41 and G18.
   - CSRF, IDOR, mass assignment through `update_item` (writing `person_id` or `status`), rate limits, and what `get_db_schema` reveals
 
   Findings are recorded here and each one is fixed with a test.
+
+### 10.3 Deferred unless OQ-20 says otherwise
+- Help text: a description under each table and field, written for every table and column.
+- Foreign keys show the record they point at, with **Open**.
+- A left-hand list of tables instead of the dropdown (G18).
+- History and restore, sized in OQ-20:
+  - an `admin_change_log` that the four generic writes fill in the same transaction
+  - a **History** list on each row
+  - **Restore**
 
 ---
 
@@ -1262,6 +1256,7 @@ T30, T31, T41 and G18.
 - [ ] A server-rendered signed-out home page means a Node runtime next to the C++ server, or a pre-render step. The page's content comes from the database at run time, so a build-time pre-render goes stale.
   - **Default:** do 11.1 now, and write a separate plan, **Server-rendered public pages.md**, if Mason wants more.
   - Google and Bing run JavaScript. Most other crawlers, and link previews, read only the HTML, which 11.1's tags cover.
+  - Public photos are cached at CloudFront's edge in 7.8, which answers the image-cache half of OQ-21.
 
 ---
 
@@ -1278,11 +1273,13 @@ T30, T31, T41 and G18.
 ### 12.2 End to end
 - [ ] A throwaway database with `--install_schema`, then the scripted checks:
   - signed-out writes refused
-  - one membership per person
+  - a second membership refused without the tick, allowed with it
   - a declined card leaves nothing
   - an invitation with a link registers and takes the seat
   - `site_info` with a cache hit and a 304
-- [ ] A pre-release database with `--migrate`: app migrations 0013–0019 and honuware 0004–0006. A second run changes nothing.
+  - a public photo with its long-lived cache header
+- [ ] A throwaway database with `--install_schema --force` followed by the `set_secret` block, exactly as Phase 13 runs it.
+- [ ] A copy of a sandbox.15-era database with `--migrate`: app migrations 0014–0016 and honuware 0004–0005. A second run changes nothing. Production is reinstalled, but Mason's local databases and CommunityFinder migrate.
 
 ### 12.3 Hand-testing walkthrough
 - [ ] One walkthrough across all phases, from a blank database, with exact menu and field labels, no URLs. Each phase's own walkthrough is folded in.
@@ -1291,14 +1288,10 @@ T30, T31, T41 and G18.
 
 # Phase 13 — Release to production
 
-- [ ] Phase 1 and Phase 2 are already out (sandbox.14 and .15).
-- [ ] The rest goes as **`v1.0.0-sandbox.16`**, by `--migrate`. No reinstall, so the testers keep their accounts (OQ-6).
-- [ ] The production content edits, done by Mason after deploy, each with its exact menu path:
-  - Getting Started's steps (5.3)
-  - the home rows (5.5, 8.5)
-  - the bios (8.10)
-  - the membership descriptions (5.2)
-  - the class descriptions (6.4)
+- [ ] Phase 1 and Phase 2 are already out (sandbox.14 and .15, both by `--migrate`).
+- [ ] Before: Mason tells the testers that their accounts will be removed and they'll need to register again.
+- [ ] The rest goes out as **`v1.0.0-sandbox.16`**, and production is **reinstalled from the seed** (OQ-6, D8). That means `--install_schema --force` followed by the `set_secret` block, as Finishing website did (Deploying to AWS 5.1 step 4). All content comes from the seed, with no hand edits.
+- [ ] The CloudFront photo behaviour from 7.8 is added before the deploy.
 - [ ] Afterwards: Claude probes production signed out, and the testers are asked to retry their journeys. A short list for Thomas, Gifford and Jennifer of what changed against each of their points.
 
 ---
@@ -1308,7 +1301,8 @@ T30, T31, T41 and G18.
 - [[Finishing website]]: the plan this follows; its OQ-43 (a failed password change) is closed by 8.3. D13 there (what a password reset ends) is why D6 keeps server sessions.
 - [[Subscriptions- Recurring billing and card management]] §6.4 "Subscription Upgrades": the server half of Phase 3, built without a member-facing page. Proration was dropped there; OQ-2 asks again.
 - [[Customer user scenarios]]: scenarios 12 (multi-seat subscription), 31–33 (upgrade, downgrade, reactivate) are what Phases 3–4 make reachable.
-- [[Security Review]]: Phase 1 and 10.5 extend it; the CSRF design (8.x there) is kept, with `delete_item` moved off GET.
+- [[Security Review]]: Phase 1 and 10.2 extend it; the CSRF design (8.x there) is kept, with `delete_item` moved off GET.
+- [[Deploying to AWS]]: the reinstall Phase 13 uses (5.1 step 4), and the CloudFront behaviours that 7.7 and 7.8 change.
 - [[Tenant Theming and Branding]]: `site_info` and the runtime fonts that 7.2–7.4 change.
 - [[Componentizing the frontend]] and [[Splitting the server up into components]]: where the honuware halves of 1.2, 4.5, 7.2, 9.3 and Phase 10 live.
 
@@ -1316,48 +1310,238 @@ T30, T31, T41 and G18.
 
 # Open questions
 
-*Each has a default the plan is written against. Answer under the question; "→ Plan" will say what changed.*
+*Mason's answers are kept as written. "→ Plan" says what changed; "→ Explained" answers a question you asked back. Anything still open has a default the plan is written against.*
 
 ### Still open
+
+**OQ-7 — Mason's and Gifford's bios** *(8.10)*
+- Thomas: lead with your own teaching and training, not Ana Forrest's name; Beth's is the model. He says Gifford's undersells him too.
+- **Default:** wait for your text, and Gifford's. Claude doesn't invent experience.
+- Paste them here when ready.
+- → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
+
+**OQ-9 — New copy you need to write or approve** *(5.2, 5.3, 6.4)*
+- The new-student FAQ: physical requirements, what to wear and not wear, what to bring.
+- Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and excessive extra weight will make classes challenging and hard to keep up with the group. Contact us for suggestions of one on one training if you do not meet this criteria. You do not need a yoga mat as we have padded, nice traction floors. Please wear fitted gym clothes that are not baggy to avoid getting caught in equipment. Generally tights, leggings, or sweat pants are good (preferably grippy cotton) and a fitted tshirt or tank top. Guys wear tight underwear that keeps things snug. No watches, metal, zippers, or jewelry. Water bottles strongly encouraged.
+- Longer Silver and Gold descriptions.
+- Mason-
+	- Silver- This is our introductory option that features a selection of our more beginner friendly and accessible options. I would start here until instructors suggest you move on to gold and you feel ready. Part of doing acrobatics is learning terminology, body positions, and learning to move and organize yourself in a new way. These classes are foundational for things like aerial, partner acro, and handstand training.
+	- Gold- These are more advanced classes that also feature elements from circus acrobatics. This tier also includes some specialty classes for handstands, aerial, and partner acrobatics.
+- A line on each beginner class saying it prepares you for the others.
+- **Default:** Claude drafts each from your class descriptions and the About page, marked **DRAFT** here for you to edit. Nothing ships until you've approved it.
+- → Plan:
+  - **The FAQ** is in 5.3 as a DRAFT under three headings: *Is Knotty Yoga right for me?*, *What to wear* and *What to bring*.
+    - Every point you made is kept. The changes are punctuation, "Men:" for "Guys", and one softer phrase for a page strangers read first: "carrying a lot of extra weight makes classes hard to keep up with", for "excessive extra weight will make classes challenging".
+    - **Say "approved", or "use mine as written".**
+  - **Silver and Gold** are in 5.2, with light punctuation edits.
+  - **"Prepares you for" in the descriptions:** no new copy is needed. The class page's **Leads to** line, built from your OQ-23 pairs, says it on every class that prepares for another. Beginner Partner Acro's description already says it leads to Intermediate. Say if you still want a sentence in the descriptions.
+
+**OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
+- **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
+- **Alternative:** keep sign-in first.
+- Mason- I don't fully understand this item. Can you explain it more fully and what I am choosing between?
+- → Explained:
+  - **Today:** on **Memberships**, a visitor who isn't signed in presses **Subscribe** on a card and lands on **Log In**, because the subscribe page requires sign-in (`shop.routes.ts:20`). Someone with no account then registers. Registration loses where they were going (F11), so they end up on the home page with no membership.
+  - **What they never saw:** the subscribe page is where the money details are. It shows the start month you pick, what you pay today (part of this month), and the monthly charge after that.
+  - **Gifford's point:** show those details *before* asking someone to make an account, the way an airline shows the fare before you log in.
+  - **Option A (default): show the page first.**
+    - A visitor sees the tier, the start month, today's charge and the monthly charge.
+    - Where the card form would be, they see **Sign in or create an account to continue**. After either, they come back to the same page with their choices kept.
+    - It's small: the route's sign-in guard comes off, the page hides the card form when signed out, and its price preview must answer signed out (to verify).
+  - **Option B: keep sign-in first.** Registration would still return to the subscribe page, because 4.5 fixes that either way.
+  - **Recommendation: A.** Every screen before the price is a place where people leave (Thomas's funnel point).
+
+**OQ-15 — One / Two / Family** *(5.2, Thomas)*
+- **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
+- **Alternative:** keep all five cards on show, adding only the saving line.
+- So there would just be a gold and silver option but have a Single, Couples, and Family options as what? Radio controls or separate buttons for each option that list the savings?
+- → Explained: yes, two tiers (Silver and Gold) with the sizes as a choice. There are five membership products today, shown as five cards side by side:
+  - Silver $160
+  - Silver Couple's $240
+  - Gold $200
+  - Gold Couple's $300
+  - Gold Family $400 (three people)
+
+  Thomas's idea is to ask "how many people?" so the page shows fewer choices and can say out loud that the bigger sizes save money. There are three ways to lay it out.
+  - **A (default): radio buttons inside each card.** Silver's card lists its two sizes and Gold's lists three, each with its price and the saving per person. You pick one and press **Subscribe**. Every price is visible at once, and nothing changes elsewhere on the page when you pick.
+
+    ```
+    ┌ Silver ───────────────────────┐  ┌ Gold ─────────────────────────┐
+    │ Beginner-friendly classes     │  │ Every class on the schedule   │
+    │                               │  │                               │
+    │ ● Just me      $160/month     │  │ ● Just me      $200/month     │
+    │ ○ Couple       $240/month     │  │ ○ Couple       $300/month     │
+    │     $120 each · save $40 each │  │     $150 each · save $50 each │
+    │                               │  │ ○ Family (3)   $400/month     │
+    │                               │  │     $133 each · save $67 each │
+    │                               │  │                               │
+    │        [ Subscribe ]          │  │        [ Subscribe ]          │
+    └───────────────────────────────┘  └───────────────────────────────┘
+    ```
+
+  - **B: one set of buttons above both cards.** Three joined buttons, **Just me | Couple | Family**, with one selected. Picking one changes the price on both cards, and the saving shows under the buttons. It's tidier, but you only see one size's prices at a time, and Silver has to say "Not offered for families" under Family.
+
+    ```
+              [ Just me |▐ Couple ▌| Family ]
+          Couples save up to $50 a person each month
+
+    ┌ Silver ──────────────┐  ┌ Gold ────────────────┐
+    │ $240/month for two   │  │ $300/month for two   │
+    │ $120 each            │  │ $150 each            │
+    │    [ Subscribe ]     │  │    [ Subscribe ]     │
+    └──────────────────────┘  └──────────────────────┘
+    ```
+
+  - **C: keep the five cards,** and add the saving line to the three shared ones.
+  - **Recommendation: A.** It does what Thomas asked (fewer cards, the discount said out loud) without hiding any price.
+
+**OQ-19 — Product categories** *(9.7)*
+- **Default:** group by the existing **kind** (Memberships, Classes & drop-ins, Events & workshops, Services), plus a search box. No new column.
+- **Alternative:** a free category field you fill in for each product.
+- Mason- I really don't understand the issue being addressed here. Can you let me know what your asking and why?
+- → Explained: Gifford wrote, under *Admin > Manage Products*: "Categorize the products so that it's easier to manage the big collection of products." That can mean two different things:
+  1. **The grid of tiles on Manage Products** (32 of them). That's the same point as Thomas's "gigantic grid", and 9.2's groups, which you approved, answer it.
+  2. **The Products list** (**Manage Products** ▸ **Products**), every item you sell in one list. It holds eight seeded products today, and each new workshop or event adds one.
+  - v0.1 read it as 2. It proposed sectioning that list by the kind each product already has (Memberships, Classes & drop-ins, Events & workshops, Services) plus a search box; the alternative was a category field you'd fill in yourself.
+  - **Default now: reading 1.** 9.2 covers it, so 9.7 builds nothing. With eight products, the list isn't big yet.
+  - Say if you'd still like the Products list sectioned (a small change), or ask Gifford which he meant.
+
+**OQ-20 — How far "restore" goes** *(Phase 10)*
+- **Default:** every change made through Manage Data (and the pages that use the same generic endpoints) is recorded and can be restored one row at a time. Changes made by dedicated pages (subscriptions, bookings, payments) aren't, since they have their own records.
+- **Alternative:** record those too: larger, and touches every helper.
+- Mason- Can you explain what the issue we are trying to resolve here is? I'm on the fence about Manage Data. I feel like it started out as a way to manually create items in the database before we added bespoke UI to things. Now it is more of diagnostic / developer access tool. It's kind of beyond admin. Would it maybe make more sense to add a special permission for it? I think those same endpoints that they UI hits might be used for other features in the UI? How expensive is doing this rollback feature?
+- → Explained:
+  - **The issue.** Thomas, as an admin, could open Manage Data and edit any row of any table, with no explanation of the columns and no undo. A wrong edit (a price, a class's required permission, a foreign key) breaks the site and leaves no record of what the value was. He suggested help text, foreign-key previews, and history with rollback. v0.1 planned all three (its 10.1–10.4).
+  - **Your instinct matches the code.** Manage Data began as the way to create rows before the dedicated pages existed. Today every workflow has its own page, so Manage Data is a developer's tool. The cheapest fix for "risky" is to let fewer people reach it.
+  - **Do other pages use the same endpoints? Yes.** About twenty Manage Products pages call the generic add/update/delete endpoints. Among them: Products, Pricing Overview, Membership Tiers, Class Schedules, Instructors, Locations, Page Content and the event editors. No member page does.
+    - So the endpoints stay. What changes is who can open the Manage Data *page*, and the schema behind it.
+    - Separately, Phase 1 makes the endpoints check the caller's grants.
+  - **What rollback would cost.** There are three pieces:
+    - a change log that the four generic writes fill, in the same transaction
+    - a history endpoint and a list on the page
+    - a restore that writes the old row back
+
+    The log on its own is modest. Restore is where the work is: putting back a deleted row with its old id, refusing when a foreign key no longer matches, and being able to undo a restore. With tests, the whole thing is roughly the size of the sharing rework (4.1–4.4). It would also record the twenty pages' edits, which is a plus, but it's a lot of work for a tool only you use.
+  - **Default now:** a **Developer** role with its own `manage_data` permission, given only to you, plus a warning banner (10.1). The help text, previews, table list and history move to 10.3, deferred.
+  - **Say if you'd rather build the history anyway.** It goes back in as 10.3's last item, at the size above.
+
+**OQ-21 — Server-rendered pages** *(Phase 11)*
+- **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
+- **Alternative:** plan server rendering now.
+- Wasn't the server side rendering also for SEO? Would it make sense to possibly have an image cache in memory for the home page photos, gallery, and generally images that are there for every user versus the dynamically generated ones per user? I imagine there are C++ libraries for caches that do some kind of LRU removal.
+- → Explained:
+  - **Yes, server rendering is mostly for search engines and link previews,** plus a faster first paint. Today the server sends an empty page and the browser builds it with JavaScript.
+    - Google and Bing run the JavaScript, though Google can take days to come back and render it.
+    - Most other crawlers read only the HTML. So do the previews that Messages, Slack and Facebook draw for a shared link. They see a blank page titled "Knotty Yoga".
+  - **11.1 (the default, small).** Each public page gets its own title, description and preview image in the page head, and the site gets a sitemap. That fixes link previews and gives every crawler something to read. It doesn't put the page's body text into the HTML.
+  - **Full server rendering (large).** Angular runs on a Node server next to the C++ one. CloudFront sends page requests to Node, which calls the C++ API and returns finished HTML.
+    - That's a second server to deploy, watch and keep in step, and every page has to be checked for browser-only code.
+    - It's worth a plan of its own once 11.1 and Phase 7's speed work are in and you can see what's still missing. Google Search Console shows what Google actually indexed.
+  - **The image cache: yes, but the best place for it is CloudFront, not the C++ server.**
+    - Today every photo request goes through CloudFront to the server, because the `/api/*` behaviour caches nothing (F20). The server answers `no-cache` with an ETag, so a repeat view is still a round trip, and a first view is a database read.
+    - If the public photos (home page, gallery, classes, instructors) get an address that changes whenever the photo changes, CloudFront can keep them at its edge for a year. The server never sees a repeat request, and a replaced photo shows at once because its address is new. People's own photos stay uncached. That's new item **7.8**.
+    - An in-memory LRU cache in the server would save only the database read, and each server would have its own copy. It's the fallback if 7.1 shows that first views are slow.
+  - **Default:** 11.1 and 7.8 now, with server rendering as its own plan later. Say if you want that plan written now instead.
+
+**OQ-22 — One font address** *(7.4, D7)*
+- The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
+- **Default:** both use the seeded address (variable weights), so the second is a cache hit. Critical CSS stays inline.
+- **Alternative:** drop the `index.html` fonts and rely on the runtime ones from the cached site config (7.3).
+- Mason- What are the pros and cons of the two options?
+- → Explained: the site's fonts (Roboto and Barlow) come from Google Fonts.
+  - `index.html` links one Google address in its head.
+  - After the app starts, the site config links a *different* address for the same fonts. That config comes from the database, so a studio can change fonts in **Site Theme**.
+  - The browser downloads both, which is Thomas's "fonts start late".
+  - **Option A (default): `index.html` uses the same address as the database.**
+    - Pro: the download starts in the first few milliseconds, before any JavaScript, so text draws in the right font sooner and doesn't jump. The second link is then a cache hit, not a download.
+    - Con: the address is written into `index.html` when the site is built. If you change fonts in **Site Theme**, visitors download the old fonts first (wasted, not broken) until the next deploy updates `index.html`. A test catches the seed and `index.html` drifting apart.
+  - **Option B: drop the fonts from `index.html` and load only the database's.**
+    - Pro: one source of truth, and a font change in **Site Theme** is the only download.
+    - Con: on a first visit the fonts start only after the app has booted and fetched the site config. 7.3 caches the config, so repeat visits are quicker, but they still wait for the JavaScript. Text appears in a fallback font and then swaps: the flash Thomas noticed.
+  - **Recommendation: A.** Fonts change rarely, and first paint happens on every visit.
+
+**OQ-27 — Subscribing for a later month** *(2.3)*
+- Today it's free that month (F4).
+- **Default:** charge on the 1st of that month, as the page says, with nothing granted before then.
+- **Alternative:** charge now for that month.
+- Mason- I don't understand this. What is free today?
+- → Explained: the subscribe page lets you pick when the membership starts, this month or a later one. Say it's November 16 and you pick **December**.
+  - **What the page says:** you'll be charged on December 1.
+  - **What actually happens:** nothing is charged when you subscribe, and you get December's access at $0. The first charge is on **January 1**. Nobody ever pays for December, so it's a free month (F4, `subscription_helper.cpp:289-314`).
+  - **Option A (default): charge on December 1.**
+    - Nothing is charged today, and nothing is granted until December. On the 1st the billing run charges the month and grants it, like any renewal. That's what the page already promises.
+    - If the card fails on the 1st, the membership goes past due, as a failed renewal does.
+    - Cancelling before the 1st costs nothing.
+  - **Option B: charge for December today.**
+    - The card is tested while the person is still on the page.
+    - But they pay two weeks before they can use it, and cancelling before December means a refund.
+  - Either way December stops being free. **Recommendation: A.**
+
+**OQ-30 — Database connections per site** *(7.6)*
+- **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
+- **Alternative:** 2.
+- Mason- Can you explain the pros and cons of each choice. You haven't given me a lot to make a decision here :)
+- → Explained: the server keeps a few open connections to the database, called the pool. Each request borrows one for as long as it runs.
+  - **Today** every site has **one**. So the server answers one request at a time per site, and the browser queues its requests so it never sends two at once (F13). A page that needs three calls, as the calendar does, waits for all three one after another.
+  - **What a bigger pool buys.** Requests run side by side. The calendar's three calls overlap, and so do the start-up calls, so a page waits for its slowest call instead of the sum of all of them. Two visitors stop waiting on each other, too.
+  - **What it costs.**
+    - *Database memory.* Each connection is a Postgres process using a few MB. The RDS `db.t3.micro` (1 GB) allows on the order of 80 connections, so one site at 4 is a small share.
+    - *Correctness.* With one connection, two requests from the same person can never overlap, and that hides races such as a double-tapped **Subscribe**. With more, they can. So 2.2's row lock and 7.6's concurrency test go in first, and that work is the same for 2 or 4.
+    - *Later, with many studios on one database,* the count is per site. That's why it's set in the app config, where it can come down.
+  - **2 vs 4.** With 2, a page's main call and one background call overlap, but the calendar's three calls still queue. With 4, the busiest page's three calls all run at once, with one to spare. The memory difference is a few MB per extra connection.
+  - **Recommendation: 4,** read from the app config so changing it is one line.
+
+### Resolved
+
+*All answered 11/16/2026, in number order.*
 
 **OQ-1 — One membership per person?** *(D2, 2.2)*
 - **Default:** a person can be the payer of only one current membership. "Current" includes one that's cancelled but running to the end of its month, and a change scheduled for next month. Someone who holds a seat on another person's membership is asked "You're already on Thomas's Gold Couple's membership. Buy your own anyway?" and may go ahead.
 - **Alternatives:** refuse the seat holder outright; or allow two memberships if they're different tiers.
 - Mason- I actually have had people who were paying for a poor friend's membership so I don't think that we should only allow a single person to just pay for one membership. However, I would like to have the UI explicitly warn them that they are already paying for a membership and have to acknowledge this before paying for a second.
+- → Plan: D2 and 2.2 are rewritten.
+  - A second membership is allowed once the buyer ticks **I want an additional membership**, on a warning that names what they already pay for or share. Without the tick, the server refuses (`ALREADY_HAS_A_MEMBERSHIP`), so a second tab or a script can't skip it.
+  - A second membership doesn't give the buyer its first seat, so the friend's seat is free.
+  - 2.6, 2.7, 3.3 and 4.6 follow from this.
 
 **OQ-2 — What does an upgrade cost?** *(3.1)*
 - Today the server charges the **whole** month's price difference, whatever the date.
 - **Default:** prorate it by the days left, with the same rule the first month already uses. Silver → Gold on the 20th of a 30-day month costs a third of the difference.
 - **Alternative:** keep the full difference.
 - Mason- let's prorate.
+- → Plan: 3.1 prorates, as the default had it.
 
 **OQ-3 — Downgrading to fewer seats** *(3.1)*
 - Gold Family (3 seats) → Gold Couple's (2): who loses their seat?
 - **Default:** the payer keeps theirs, then seats are kept in the order they were given. Whoever's left off gets an email, and so does the payer. The confirm screen names them first.
 - **Alternative:** the payer must remove someone before the downgrade can be scheduled.
 - Mason- it would be good to prompt who to remove.
+- → Plan: 3.1 and 3.3.
+  - A downgrade to fewer seats makes the payer tick who comes off, and the server refuses the change without that choice (`CHOOSE_WHO_TO_REMOVE`).
+  - The people named keep their seat to the end of the period, and each gets an email.
 
 **OQ-4 — The "you just bought this" window** *(2.5)*
 - **Default:** a paid order with the same items by the same person within **10 minutes** asks "Buy it again?".
 - **Alternative:** a different window, or none (rely on 2.6's page changes alone).
 - Mason- This sounds like a good idea but can we make it configurable in the admin UI but default to 10min?
+- → Plan: 2.5 reads the window from a setting: 10 minutes by default, and 0 turns it off. New 2.8 is a **Studio Settings** page under Manage Products for changing it. There was no settings page to put it on (F21).
 
 **OQ-5 — The testers' extra memberships on the live site** *(2.8)*
 - They are sandbox charges, but the billing run will keep charging the duplicates every month.
 - **Default:** before sandbox.15, Claude lists them and Mason cancels the extras under **Manage Products** ▸ **Subscriptions**.
 - **Alternative:** leave them; or reinstall production (which also removes the testers' accounts).
 - Mason- This is the Square sandbox and basically monopoly money that is all going to get thrown away so I don't care as long as we make it hard for them to get in this situation after we do these updates.
+- → Plan: the clean-up item is gone. The reinstall (OQ-6) removes them, and Phase 2 is what stops it happening again.
 
 **OQ-6 — Migrate or reinstall production?** *(D8, Phase 13)*
 - Finishing website reinstalled production to get its content in. The testers now have accounts and history there.
 - **Default:** migrate, and make the content changes by hand from a numbered list.
 - **Alternative:** reinstall from the seed, and ask the testers to register again.
 - We are going to fully reinstall from seed. This is extremely test data that needs to be thrown away.
-
-**OQ-7 — Mason's and Gifford's bios** *(8.10)*
-- Thomas: lead with your own teaching and training, not Ana Forrest's name; Beth's is the model. He says Gifford's undersells him too.
-- **Default:** wait for your text, and Gifford's. Claude doesn't invent experience.
-- Paste them here when ready.
+- → Plan: D8 and Phase 13 are rewritten.
+  - sandbox.16 reinstalls production from the seed (`--install_schema --force` plus the `set_secret` block), and the testers register again.
+  - Every "production edit" step is gone. So are the migrations that only fixed data or wording: v0.1's admin hints, admin descriptions and invitation lower-casing.
+  - Schema migrations stay, for local databases and for sandbox.14 and .15, which still migrate.
 
 **OQ-8 — Getting Started's new order** *(5.3)*
 - **Default:**
@@ -1369,52 +1553,40 @@ T30, T31, T41 and G18.
   6. Create your account and plan your week
 - Say if you'd order or name them differently.
 - Mason- This sounds fine.
-
-**OQ-9 — New copy you need to write or approve** *(5.2, 5.3, 6.4)*
-- The new-student FAQ: physical requirements, what to wear and not wear, what to bring.
-- Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and excessive extra weight will make classes challenging and hard to keep up with the group. Contact us for suggestions of one on one training if you do not meet this criteria. You do not need a yoga mat as we have padded, nice traction floors. Please wear fitted gym clothes that are not baggy to avoid getting caught in equipment. Generally tights, leggings, or sweat pants are good (preferably grippy cotton) and a fitted tshirt or tank top. Guys wear tight underwear that keeps things snug. No watches, metal, zippers, or jewelry. Water bottles strongly encouraged.
-- Longer Silver and Gold descriptions.
-- Mason-
-	- Silver- This is our introductory option that features a selection of our more beginner friendly and accessible options. I would start here until instructors suggest you move on to gold and you feel ready. Part of doing acrobatics is learning terminology, body positions, and learning to move and organize yourself in a new way. These classes are foundational for things like aerial, partner acro, and handstand training.
-	- Gold- These are more advanced classes that also feature elements from circus acrobatics. This tier also includes some specialty classes for handstands, aerial, and partner acrobatics.
-- A line on each beginner class saying it prepares you for the others.
-- **Default:** Claude drafts each from your class descriptions and the About page, marked **DRAFT** here for you to edit. Nothing ships until you've approved it.
+- → Plan: 5.3 as written.
 
 **OQ-10 — The "Our" rule** *(8.4)*
 - **Default:** no "Our" in the menu, and each page's title matches its menu label (**Classes**, **Services**, **Instructors**, **Location**, **Providers**, **Events**).
 - **Alternative:** "Our" on every page title and none in the menu; or "Our" everywhere.
 - Mason- I like the dropping our idea.
+- → Plan: 8.4 as written.
 
 **OQ-11 — "Services" for massage** *(8.6)*
 - Gifford wondered if people would look for massage under "Services".
 - **Default:** keep **Services**, and list the providers on it. The home page already advertises massage.
 - **Alternative:** rename it **Massage**, or **Massage & Bodywork**, while massage is the only service.
 - Mason- We will soon offer more than massage so lets keep it as services.
+- → Plan: 8.6 keeps **Services** and lists the providers on it.
 
 **OQ-12 — Gallery in the top menu** *(8.4, Gifford)*
 - **Default:** yes, next to **Blog**, and out of **About**. Gifford expects it to carry event photos over time, as the blog does.
 - **Alternative:** keep it under **About**.
 - Mason- There are already enough top level menu items. Let's keep it under about.
+- → Plan: 8.4 no longer moves Gallery.
 
 **OQ-13 — A Classes menu** *(8.4, Gifford)*
 - **Default:** **Classes** opens **All Classes**, **Weekly Schedule** and **Calendar**. The buttons on All Classes stay as shortcuts.
 - **Alternative:** keep a single **Classes** item and make the two buttons more prominent.
 - Mason- I don't like making this a menu item. I think the issue is that if you have created an account but not bought a membership, the My Schedule view shows nothing, which is confusing. I think we should default to Full Schedule view if they don't have a membership and then they see the LOCK icon with Requires a membership for the upsell.
-
-**OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
-- **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
-- **Alternative:** keep sign-in first.
-- Mason- I don't fully understand this item. Can you explain it more fully and what I am choosing between?
-
-**OQ-15 — One / Two / Family** *(5.2, Thomas)*
-- **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
-- **Alternative:** keep all five cards on show, adding only the saving line.
-- So there would just be a gold and silver option but have a Single, Couples, and Family options as what? Radio controls or separate buttons for each option that list the savings?
+- → Plan: 8.4 drops the Classes menu.
+  - You're right about the cause (F19). Our Classes starts every signed-in person on the eligible-only view, so an account with no membership sees "Your current filters hide everything."
+  - New in 6.3: anyone without a membership starts on **Full Schedule**. Members' classes there already show the lock and "Requires a membership", which 6.3 links to **Memberships**. Members still start on the eligible view.
 
 **OQ-16 — The Manage Products groups** *(9.2)*
 - **Default:** the six groups in 9.2's table.
 - Say if a tile belongs elsewhere, or you'd like fewer groups (Thomas suggested about five).
 - Mason- I like this grouping.
+- → Plan: 9.2 as written, plus the **Studio Settings** tile in **Website** (2.8).
 
 **OQ-17 — What the business overview counts** *(9.1)*
 - **Default:**
@@ -1425,32 +1597,15 @@ T30, T31, T41 and G18.
   - **Underused / full:** a slot under 40% / at 100% in most of its weeks.
 - Say if you track any of these differently.
 - Mason- This all sounds great.
+- → Plan: 9.1 as written.
 
 **OQ-18 — A visiting teacher without an account** *(9.5)*
 - **Default:** a **Led by** field: a name shown on the workshop, stored on the session (one new column). An instructor with an account is picked as today.
 - **Alternative:** require an account (a quick account by staff), or put the name in the title.
 - Mason- I want to require an account. It's not that hard to make.
-
-**OQ-19 — Product categories** *(9.7)*
-- **Default:** group by the existing **kind** (Memberships, Classes & drop-ins, Events & workshops, Services), plus a search box. No new column.
-- **Alternative:** a free category field you fill in for each product.
-- Mason- I really don't understand the issue being addressed here. Can you let me know what your asking and why?
-
-**OQ-20 — How far "restore" goes** *(10.4)*
-- **Default:** every change made through Manage Data (and the pages that use the same generic endpoints) is recorded and can be restored one row at a time. Changes made by dedicated pages (subscriptions, bookings, payments) aren't, since they have their own records.
-- **Alternative:** record those too: larger, and touches every helper.
-- Mason- Can you explain what the issue we are trying to resolve here is? I'm on the fence about Manage Data. I feel like it started out as a way to manually create items in the database before we added bespoke UI to things. Now it is more of diagnostic / developer access tool. It's kind of beyond admin. Would it maybe make more sense to add a special permission for it? I think those same endpoints that they UI hits might be used for other features in the UI? How expensive is doing this rollback feature?
-
-**OQ-21 — Server-rendered pages** *(Phase 11)*
-- **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
-- **Alternative:** plan server rendering now.
-- Wasn't the server side rendering also for SEO? Would it make sense to possibly have an image cache in memory for the home page photos, gallery, and generally images that are there for every user versus the dynamically generated ones per user? I imagine there are C++ libraries for caches that do some kind of LRU removal.
-
-**OQ-22 — One font address** *(7.4, D7)*
-- The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
-- **Default:** both use the seeded address (variable weights), so the second is a cache hit. Critical CSS stays inline.
-- **Alternative:** drop the `index.html` fonts and rely on the runtime ones from the cached site config (7.3).
-- Mason- What are the pros and cons of the two options?
+- → Plan: 9.5's **Led by** column and its migration are gone.
+  - The form picks an instructor, and a visiting teacher is added under **Instructors** first.
+  - 9.5 checks that **Instructors** can add someone with no account, and adds that if it can't.
 
 **OQ-23 — "Build up to it in…"** *(6.4)*
 - Nothing in the data says which class prepares you for which. The default shows the **predecessor** class and the **required skills**, and names Beginner Knotty Yoga as the way to build up.
@@ -1460,44 +1615,47 @@ T30, T31, T41 and G18.
 	- Beginner Knotty Yoga prepares for: Knotty Yoga and Beginner Partner Acro
 	- Knotty Yoga prepares for: Handstands, Aerial Rope, Beginner Partner Acro
 	- Beginner Partner Acro prepares for: Intermediate Partner Acro
+- → Plan: 6.4's seed uses your pairs. They also make the class pages say it, so the descriptions need no new sentence (OQ-9).
 
 **OQ-24 — A site search** *(Gifford, "not a strong recommendation")*
 - **Default:** not now. The site has about twenty public pages, and Phase 8's menus make them easier to find.
 - **Alternative:** a search over classes, instructors, events and blog posts.
 - Mason- Let's skip search for now.
+- → Plan: no search.
 
 **OQ-25 — The favicon** *(8.2)*
 - **Default:** made from the logo in the brand red.
 - **Alternative:** Ryan designs one; drop it in the Photos folder.
 - Mason- Let's go with the SVG of the human hanging in the red fabric.
+- → Plan: 8.2 crops the figure-in-fabric emblem out of the logo file (`KnottyYoga_logo_white.svg`). Its figure is white, so it sits on a dark rounded square to show up on light browser tabs. If you meant a different SVG, drop it in the Photos folder.
 
 **OQ-26 — When does a class leave the sign-up lists?** *(6.2)*
 - **Default:** when it starts. **Today's Classes** keeps it until it ends.
 - **Alternative:** when it ends, everywhere.
 - Mason- I'd like to leave or for two hours after the class ends. It's pretty common for people to show up for a class and not sign up and then show up a few minutes late. It's nice for staff to be able to note this after the class ends (or for the person to)
-
-**OQ-27 — Subscribing for a later month** *(2.3)*
-- Today it's free that month (F4).
-- **Default:** charge on the 1st of that month, as the page says, with nothing granted before then.
-- **Alternative:** charge now for that month.
-- Mason- I don't understand this. What is free today?
+- → Plan: 6.2 is rewritten.
+  - A class stays on the lists until two hours after it ends, and until then it can be signed up for and checked in, by staff or the member. The two hours is a setting on Studio Settings.
+  - A class that has started sits under **Earlier today** with its end time, so it doesn't read as upcoming. That keeps Thomas's point about past classes in the list.
 
 **OQ-28 — An email on every weekly-plan tap** *(6.1)*
 - Adding a class to the weekly plan sends a confirmation email each time, so five taps make five emails.
 - **Default:** stop it; the weekly digest lists the plan.
 - **Alternative:** keep it.
 - Let's just do the weekly digest. I don't want to spam emails. The only reason to generate an email per click is if it is sending an ICS entry to add to their calendar for each class (which is useful). If we do the alternative one email per click, it would be nice to be able to adjust this in their notification settings so they have control. It would be nice to have each email have a link to adjust these settings that takes them to their notification settings page on the site.
+- → Plan:
+  - **6.1 stops the per-tap email.**
+  - **For calendar entries,** 6.1 makes sure the personal calendar feed includes weekly-plan classes, and links to it from My Weekly Plan. The feed is already offered on **Notifications**. One subscription keeps someone's calendar current as their plan changes, with no email per class.
+  - **New 8.12:** every notification email ends with a link to **Notifications**.
 
 **OQ-29 — Which control did Thomas tap on Our Classes?** *(6.3)*
 - The **My Schedule** toggle there means "classes I can attend", not "my weekly plan". A planned class shows a small checkbox. It's unclear which one let him sign up again.
 - **Default:** 6.3 fixes both readings. If you can ask him, his answer goes here.
 - Mason- Can you explain the issue here and what the choices are.
-
-**OQ-30 — Database connections per site** *(7.6)*
-- **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
-- **Alternative:** 2.
-- Mason- Can you explain the pros and cons of each choice. You haven't given me a lot to make a decision here :)
-
-### Resolved
-
-*None yet.*
+- → Explained, and no decision is needed. Thomas wrote that Our Classes "lets me sign up for classes that are already in my weekly schedule — despite it showing under 'My Schedule'." Two things on that page could cause it:
+  1. **The toggle's name.** On Our Classes, **My Schedule** means "classes I'm allowed to take". But **My Schedule** is also the My Account tile for the weekly-plan page. So the list read as "this is my plan", while every class on it still offered sign-up.
+  2. **The class chips.** A class shows its plan state only if the page managed to load your plan. When that lookup fails, the page quietly treats nothing as planned and offers sign-up everywhere (`our-classes.component.ts:219-222`).
+  - 6.3 fixes both:
+    - the toggle becomes **Classes I can take**, and the tile becomes **My Weekly Plan** (5.4)
+    - a planned class reads **On your weekly plan**, with no sign-up control
+    - a failed lookup says so
+  - Asking Thomas would only tell us which of the two he hit.
