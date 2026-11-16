@@ -1287,11 +1287,12 @@ T30, T31, T41 and G18.
 **OQ-15 — One / Two / Family** *(5.2, Thomas)*
 - **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
 - **Alternative:** keep all five cards on show, adding only the saving line.
-- So there would just be a gold and silver option but have a Single, Couples, and Family options as what? Radio ch
+- So there would just be a gold and silver option but have a Single, Couples, and Family options as what? Radio controls or separate buttons for each option that list the savings?
 
 **OQ-16 — The Manage Products groups** *(9.2)*
 - **Default:** the six groups in 9.2's table.
 - Say if a tile belongs elsewhere, or you'd like fewer groups (Thomas suggested about five).
+- Mason- I like this grouping.
 
 **OQ-17 — What the business overview counts** *(9.1)*
 - **Default:**
@@ -1301,6 +1302,7 @@ T30, T31, T41 and G18.
   - **Utilization:** check-ins ÷ capacity (past) and plans + bookings ÷ capacity (next 4 weeks).
   - **Underused / full:** a slot under 40% / at 100% in most of its weeks.
 - Say if you track any of these differently.
+- Mason- This all sounds great.
 
 **OQ-18 — A visiting teacher without an account** *(9.5)*
 - **Default:** a **Led by** field: a name shown on the workshop, stored on the session (one new column). An instructor with an account is picked as today.
