@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 11/16/2026
-Version: 0.1
+Version: 0.2
 tags: 
 ---
 # Overview
@@ -297,6 +297,25 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.2 (11/16/2026)** — Mason's answers folded in (see *Open questions*; his answers are kept as written). Still planning only. What changed:
+  - **More than one membership is allowed,** behind a warning the buyer must tick that names what they already pay for (OQ-1, D2, 2.2). A second membership doesn't give the buyer its first seat, since it's usually for someone else.
+  - **Production is reinstalled from the seed** at the final release, not migrated (OQ-6, D8, Phase 13). The testers register again. Every "production edit" step is gone, along with the migrations that only fixed data or wording. 2.8's clean-up of the testers' extra memberships is gone too (OQ-5).
+  - **Upgrades are prorated** (OQ-2). **A downgrade to fewer seats asks who comes off** (OQ-3, 3.1, 3.3).
+  - **New Studio Settings page** (2.8). It holds the "you just bought this" window (default 10 minutes, OQ-4) and the late sign-up window.
+  - **A class stays on the sign-up lists until two hours after it ends,** so walk-ins and late arrivals can still be marked (OQ-26, 6.2). It sits under **Earlier today** so it isn't mistaken for an upcoming class.
+  - **No Classes menu, and Gallery stays under About** (OQ-12, OQ-13). Instead, **Our Classes opens on Full Schedule for anyone without a membership,** with the existing lock and "Requires a membership" on members' classes (6.3).
+  - **No email per weekly-plan tap, and every notification email links to its settings** (OQ-28, 6.1, 8.12). Calendar entries come from the personal calendar feed instead of one email per class.
+  - **A visiting teacher needs an account;** the "Led by" column is dropped (OQ-18, 9.5).
+  - **Your copy is in:**
+    - the new-student FAQ, as a draft for your approval (5.3)
+    - the Silver and Gold descriptions (5.2)
+    - your "prepares you for" pairs (6.4)
+
+    The favicon is the logo's figure in the red fabric (OQ-25, 8.2).
+  - **Manage Data becomes a developer's tool** behind its own permission, by default. Its help text, foreign-key previews, table list and history are deferred (OQ-20, Phase 10).
+  - **Public photos are cached at CloudFront's edge,** in answer to your image-cache question (OQ-21, new 7.8).
+  - **The questions you asked me to explain** each have a fuller write-up and a recommendation: OQ-14, 15, 19, 20, 21, 22, 27 and 30. OQ-29 needed no decision and is closed.
+  - **Checked while revising:** no member page writes through the generic data API (the shop's `addItem` calls are the cart service's), so Phase 1.2 breaks no member page. The generic writes come from about twenty Manage Products pages (1.1).
 - **v0.1 (11/16/2026)** — First plan from the three testers' feedback. Planning only; no code changed.
   - Every piece of feedback is mapped to a plan item in *Where each piece of feedback goes*. Nothing is dropped. One item, a site search, is left as a question (OQ-24).
   - **Checking the code turned up five problems that nobody reported.** Two of them are urgent, and they come first:
@@ -307,7 +326,7 @@ Please create a plan with phases of implementation. Within each phase, please re
     5. Several smaller ones, listed under the phase that fixes each: the Pricing Overview shows staff permissions as price columns (9.6), Who's Teaching What misses every recurring class (9.8), and an invitation is lost if the email's capital letters differ (4.1).
   - Thomas's feedback is ordered first, as asked. His "most critical issue" (paying twice, three memberships) is Phase 2, sharing a couple's membership is Phase 4, and the conversion funnel is Phases 3, 5 and 6.
   - **Releases:** Phase 1 goes out alone, as soon as it is green. Phase 2 goes next. The rest ship together after verification (Phase 13).
-- **Migration numbers** follow build order: app `0013`–`0019`, honuware `0004`–`0006`. If phases are built in a different order, they are renumbered then.
+- **Migration numbers** follow build order: app `0013`–`0016`, honuware `0004`–`0005` (v0.2: content and data-fix migrations dropped, D8). If phases are built in a different order, they are renumbered then.
 - **Who builds (standing agreement, Finishing website OQ-18).** The Overview's line "I will build the C++ server and run tests myself" is superseded. **Claude builds and runs the tests on both Windows and Linux, fixes what fails, and reports the result for each platform** ("Windows: N passed. Linux: M passed."). Claude says so before long or destructive runs. Git stays Mason's: Claude only reads history. Mason commits, pushes and tags, unless he asks Claude to tag.
 - **Three repos.** Some items change the framework:
   - `server_components` (honuware C++), pinned by `GIT_TAG` in both knottyyoga and CommunityFinder
@@ -351,8 +370,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 | T27 | Favorite Instructors does nothing | 5.4 |
 | T28 | Change Password asks for the old password twice | 8.3 |
 | T29 | A business overview for the owner | 9.1 |
-| T30 | Manage Data gives no context; schema help; foreign-key preview | 10.1–10.3 |
-| T31 | No versioning or rollback | 10.4 |
+| T30 | Manage Data gives no context; schema help; foreign-key preview | 10.1: developer-only; help deferred (OQ-20) |
+| T31 | No versioning or rollback | 10.1, 10.3 (OQ-20) |
 | T32 | Login prompt on the first visit to Manage Products | 9.3 |
 | T33 | The grid of tiles; group it under ~5 headings | 9.2 |
 | T34 | Attendance plan search can't find people without a plan | 9.4 |
@@ -362,15 +381,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 | T38 | Leftover "decision history" wording | 8.9 |
 | T39 | Session tokens vs JWTs across replicas | F15, D6 (no change) |
 | T40 | Back and forward behave inconsistently | 2.6, 8.1, 8.11 |
-| T41 | A raw database API is a big attack surface; red-team it | Phase 1, 10.5 |
+| T41 | A raw database API is a big attack surface; red-team it | Phase 1, 10.2 |
 | T42 | Inline style in the index document | D7, 7.7 |
 | T43 | Script references belong in the head | 7.3, 7.7 |
 | T44 | Server-rendered signed-out home page | Phase 11 |
 | T45 | `site_info` is late and slow | 7.2, 7.3 |
 | T46 | Fonts start late | 7.4 |
 | G1 | Let newcomers explore before committing or making an account | 5.2, 5.3 |
-| G2, G8, G9 | Gallery to the top level; unbury Weekly Schedule and Calendar | 8.4 |
-| G3 | A site search | OQ-24 |
+| G2, G8, G9 | Gallery to the top level; unbury Weekly Schedule and Calendar | No menu change (OQ-12, OQ-13); 6.3 |
+| G3 | A site search | Not now (OQ-24) |
 | G4 | "Our" used inconsistently | 8.4 |
 | G5 | Blue links | 8.7 |
 | G6 | "Show me how" under the headline | 8.5 |
@@ -384,7 +403,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 | G16 | Favorite instructors' classes | 5.4 |
 | G17 | "Search people to assign" has no affordance | 4.6 |
 | G18 | Manage Data: left navigation instead of a dropdown | 10.3 |
-| G19 | Categorize products | 9.7 |
+| G19 | Categorize products | 9.2 (OQ-19) |
 | J1 | My Bookings' "Browse services" goes to Memberships | 8.8 |
 | J2 | Back from a Get Started link doesn't return to the step | 8.1 |
 | P1 | Generic writes need no sign-in | Phase 1 |
@@ -452,19 +471,23 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
 15. **Sessions live in Postgres** (`sessions`, `device_tokens`), looked up on every request. Nothing about a login is held in memory, so a replica failing over loses none (T39). Every `/api/remember` uses up the device token and issues a new one, so two tabs racing can sign one out (9.3).
 16. **No business overview exists.** The reports look back only (enrollment trend, open-seat heatmap: past 12 weeks of materialized sessions), or forward only over materialized rows (Who's Teaching What, which so misses recurring classes). Subscription Revenue sums all time and puts counts in money-named fields.
 17. **There's no change history** for anything edited through Manage Data. `admin_table_friendly_names.description` exists and reaches the browser, but nothing shows it.
-18. **Production is migrated, not reseeded.** Seed changes reach only new installs. Content that lives in the database (Getting Started steps, home sections, bios, membership descriptions) reaches the live site through a migration or a hand edit in **Manage Products** (D8).
+18. **Production deploys migrate; they don't reseed.** Seed changes reach only new installs, which is why the final release reinstalls (D8).
+19. **Our Classes starts every signed-in person on My Schedule** (`our-classes.component.ts:113`). That view hides every class the viewer can't take, so someone with an account but no membership sees "Your current filters hide everything." The schedule's compact chip already shows a lock and "Requires a membership" on a members' class (`calendar-event.component.ts:46-49`).
+20. **CloudFront caches nothing under `/api/*`** (`Managed-CachingDisabled`, Deploying to AWS), and that includes photos. A public scaled photo is sent as `public, no-cache` with an ETag (`get_scaled_photo.cpp:172-241`), so even a repeat view is a round trip to the server. A first view is a database read, since the scaled bytes are cached there.
+21. **There's no general settings page.** Site Theme edits its own `site_*` values. `/api/admin/secrets` exists (`endpoints/admin_secrets.cpp`), but no page in the app or `@honuware/ui` calls it. Other values change only through `knottyyoga_test_helper --command=set_secret`. A setting a studio owner should change needs its own page (2.8).
 
 ---
 
 # Design decisions
 
 - **D1 — The server enforces "once"; the page only helps.**
-  - The server refuses: a second membership, a paid order paid again, an unpaid membership left active. Each has its own error code that the page turns into a sentence.
+  - The server refuses: a second membership nobody confirmed, a paid order paid again, an unpaid membership left active. Each has its own error code that the page turns into a sentence.
   - The page avoids getting there: the order in the URL, history replaced on success, the button disabled while processing. A bug or a second tab in the page can't charge twice.
-- **D2 — A person holds at most one current membership as its payer** (OQ-1).
-  - A membership is a product of kind `subscription`.
-  - "Current" means active or past due, **or** cancelled but running until its period ends, **or** a scheduled change that starts next period. That way Back, Reactivate and Change can't make an overlap.
-  - Holding a *seat* on someone else's membership doesn't count. Buying your own then asks "You're already on Thomas's Gold Couple's membership. Buy your own anyway?" (OQ-1).
+- **D2 — A second membership takes an explicit yes** (OQ-1).
+  - People do pay for a friend's membership, so a person may pay for more than one. What the server refuses is a second one *by accident*: anyone who already pays for a current membership, or holds a seat on one, must send `confirm_additional_membership`. The page sends it only after the buyer ticks a warning.
+  - A membership is a product of kind `subscription`. "Current" means active or past due, **or** cancelled but running until its period ends, **or** a scheduled change that starts next period. So Back, Reactivate and Change all hit the warning.
+  - The warning names what you already have: "You already pay for **Gold** (for you) and **Silver** (for Bri). This adds another membership, charged separately every month. To change a membership instead, go to My Membership."
+  - A second membership is usually for someone else. So if the buyer already holds a seat on a current membership, the new one doesn't seat them: its seat card starts with "Who is this membership for?" (4.6).
 - **D3 — Every checkout carries its order in the URL, and success replaces history.**
   - After the first Pay click the URL gains the purchase id (`?purchase=123`, `replaceUrl`). Coming back to it shows that order: its receipt if paid, the same order if not.
   - Success navigates with `replaceUrl`, so Back lands on the page *before* checkout, never on the form. This is Thomas's "a transaction id assigned the first time".
@@ -478,10 +501,10 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
 - **D7 — Critical CSS stays inlined** (T42).
   - The inline `<style>` in the served page is Angular's *critical CSS*: the rules the first screen needs, put in the page so the first paint doesn't wait for a stylesheet. Moving it to a stylesheet would make first paint slower, not faster.
   - What *does* go is the Google Fonts CSS that the build also inlines, which Phase 7.4 replaces (OQ-22).
-- **D8 — Content changes go into the seed and into a numbered list of hand edits for production** (OQ-6).
-  - Production is migrated, not reinstalled, so the testers keep their accounts.
-  - Text Mason may already have edited (Getting Started steps, bios, descriptions) is **not** overwritten by a migration. Each phase lists its production edits with exact menu paths, done in Phase 13.
-  - Schema and seed-*metadata* changes (allow-lists, admin field hints) do go through idempotent migrations.
+- **D8 — Content goes into the seed; production is reinstalled from it** (OQ-6).
+  - The final release (Phase 13) reinstalls production from the seed, as Finishing website D11 did: `--install_schema --force`, then the `set_secret` block. The testers' accounts and history go with it, and they register again.
+  - So content changes go **only** into the seed, each with a seed test through its reader: Getting Started, bios, descriptions, home rows, admin hints. No hand edits, and no migrations that only fix data or wording.
+  - Schema changes still get an idempotent migration (the project's rule). Mason's local databases need them, and so do the two interim releases: sandbox.14 and .15 deploy with `--migrate`.
 - **D9 — Framework fixes go in honuware; studio-specific screens stay in this repo.** The generic API, auth, registration, the CRUD editor and `site_info` are honuware. Memberships, sharing, scheduling, reports and the workshop wizard are knottyyoga.
 - **D10 — Each fix is tested through the reader that production uses** ([[feedback_assert_through_the_reader]]):
   - "no unpaid membership" through the billing run's due-row reader and `GetCurrentMembership`
@@ -501,7 +524,9 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
   - the reads `getTableRows`, `getRow`, `getFilteredTableRows`, `getDbSchema`
 
   For each: the table, and who reaches it (signed out, member, staff, `manage_products`, `manage_class_schedule`, admin).
-- [ ] Any **member** page that writes through the generic API gets a dedicated endpoint first (in 1.4), so 1.2 doesn't break it. Expected: none, because the weekly plan and notification preferences have their own endpoints. To confirm.
+- [ ] Any **member** page that writes through the generic API gets a dedicated endpoint first (in 1.4), so 1.2 doesn't break it.
+  - **Checked 11/16:** none do. The shop pages' `addItem` calls go to the cart service, not the generic API.
+  - The generic writes come from about twenty Manage Products pages and two shared editors (`event-session-card`, `event-session-price-override-editor`). Each of their tables needs a grant to the permission that opens the page; the inventory lists any that are missing.
 - [ ] The same inventory for CommunityFinder's UI, which takes the same pin.
 
 ### 1.2 Writes need a grant *(server_components: platform/endpoints)*
@@ -571,21 +596,24 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
   - retrying three times with a declined card leaves zero subscriptions, then one after a good card
   - the success path is unchanged: one subscription, one entitlement, the buyer seated
 
-### 2.2 One current membership per person *(table helpers + business_logic/payment + endpoints)*
-- [ ] `TableHelpers::Subscriptions::GetCurrentForPerson(personId, nowUs)` is the D2 definition, in one query. Tests for each of its four cases, plus expired (not current).
-- [ ] `SubscriptionHelper::GetCurrentMembership(personId)`.
-- [ ] `CreateSubscription` refuses with **`ALREADY_A_MEMBER`**, carrying the current subscription's id and product name. Admin creation gets the same refusal: an admin changes a membership, not adds one.
-- [ ] Holding a seat on someone else's membership: the refusal is **`ALREADY_ON_A_SHARED_MEMBERSHIP`** unless the request says `confirm_own_membership: true` (OQ-1).
-- [ ] `POST /api/subscriptions` answers 409 with `{code, subscription_id, product_name}`.
+### 2.2 A second membership needs a yes *(table helpers + business_logic/payment + endpoints; OQ-1)*
+- [ ] `TableHelpers::Subscriptions::GetCurrentPaidByPerson(personId, nowUs)`: the D2 definition, in one query. Tests for each of its four cases, plus expired (not current).
+- [ ] `TableHelpers::EntitlementAssignments::GetCurrentMembershipSeatsForPerson(personId, nowUs)`: the seats a person holds on current memberships, with each payer's name. Tests.
+- [ ] `SubscriptionHelper::GetMembershipSummary(personId)`:
+  - the memberships they pay for: the product, and who holds each seat
+  - the memberships they hold a seat on: the product, and the payer
+- [ ] `CreateSubscription` refuses with **`ALREADY_HAS_A_MEMBERSHIP`** when the summary isn't empty and the request doesn't say `confirm_additional_membership: true`. With the flag, the membership is created.
+- [ ] **Seating the buyer.** Today the buyer always takes seat 1 (`subscription_helper.cpp:316-326`). That stays for a first membership. A buyer who already holds a seat on a current membership gets a new one with every seat empty.
+- [ ] `POST /api/subscriptions` and the admin create both take `confirm_additional_membership` and answer 409 `{code, summary}`. The admin Subscriptions page gets the same warning.
 - [ ] Tests:
-  - second subscribe → 409, and still exactly one subscription
-  - the same for each "current" case: cancelled-but-running, past due, a pending downgrade
-  - expired → allowed
-  - a seat holder → refused without the flag, allowed with it
-- [ ] The database serializes a person's requests today, because each site has one connection (F13). 7.6 raises that, so it adds a row lock on the person (`SELECT … FOR UPDATE`) inside `CreateSubscription`, with a concurrency test.
+  - a second subscribe without the flag → 409 with the summary, and still exactly one subscription
+  - the same for each "current" case (cancelled-but-running, past due, a pending downgrade) and for a seat holder
+  - with the flag → two subscriptions, the second with nobody seated
+  - expired → allowed without the flag, and the buyer seated
+- [ ] Today a site has one database connection, so one person's two requests can't overlap (F13). 7.6 raises that, so this item adds a row lock on the person (`SELECT … FOR UPDATE`) inside `CreateSubscription`. Concurrency test: two simultaneous first subscribes make one subscription and one 409.
 
-### 2.3 A later start month is billed on its 1st *(business_logic/payment; OQ-27)*
-- [ ] Subscribing for a future month makes no entitlement and no charge now. `next_billing_us` is that month's start, and the billing run charges it on the 1st, as the page says.
+### 2.3 A later start month is no longer free *(business_logic/payment; OQ-27, still open)*
+- [ ] **Default (OQ-27's option A):** subscribing for a future month makes no entitlement and no charge now. `next_billing_us` is that month's start, and the billing run charges it on the 1st, as the page says.
 - [ ] Tests:
   - the billing run on the 1st charges and creates the entitlement
   - nothing is granted before then
@@ -595,13 +623,18 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
 - [ ] A subscription's first charge sends one email: "Welcome to Gold", with the receipt (amount, card, period) folded in. `PayWithCard` gets a `suppressConfirmationEmail` flag that only `CreateSubscription` sets.
 - [ ] Tests against the mail double: exactly one email per signup, containing the amount and the period. One-off purchases still send their confirmation.
 
-### 2.5 The same order twice in a row asks first *(table helpers + business_logic/payment + endpoints)*
-- [ ] `TableHelpers::Purchases::FindRecentPaidMatch(payerId, items, sinceUs)`: a paid purchase by the same payer, with the same products and quantities, in the last 10 minutes (OQ-4).
+### 2.5 The same order twice in a row asks first *(services + table helpers + business_logic/payment + endpoints)*
+- [ ] **The window is a setting** (OQ-4):
+  - `duplicate_purchase_window_minutes` in `config_secrets`. The default is **10**, and `0` turns the check off.
+  - `StudioSettings` (business_logic) reads it, using the default when the row is missing, and validates writes: whole minutes, 0–1440.
+  - Tests: the default, a stored value, a bad value refused.
+- [ ] `TableHelpers::Purchases::FindRecentPaidMatch(payerId, items, sinceUs)`: a paid purchase by the same payer, with the same products and quantities, since the window began.
 - [ ] `purchase_pay_card` and `cart_checkout` refuse with 409 **`RECENT_DUPLICATE`** (name, paid at) unless `confirm_duplicate: true`.
 - [ ] Tests:
   - a second identical order inside the window → 409, and Square isn't called
   - with the flag → charged
   - a different item, or outside the window → charged without asking
+  - the window set to 0 → never asks
 
 ### 2.6 The checkout pages follow the order *(ui: pages/shop)*
 - [ ] **Checkout** (`checkout`):
@@ -609,7 +642,10 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
   - opening with that parameter loads the purchase: paid → the receipt view with no **Pay** button; pending → the same order
   - success → `replaceUrl` to the receipt view
 - [ ] **Subscribe** (`subscription-signup`):
-  - signed-in members are sent to **My Membership** with "You're already a Gold member. Change it here." The same happens for a 409 `ALREADY_A_MEMBER`.
+  - someone who already pays for or holds a membership sees the D2 warning above the card form:
+    - **Subscribe** stays disabled until they tick **I want an additional membership**
+    - **Change my membership instead** goes to **My Membership**
+    - a 409 `ALREADY_HAS_A_MEMBERSHIP` (bought in another tab) shows the same warning
   - the idempotency key is made once per visit and kept with the order, so a retry reuses it
   - success → `replaceUrl`
 - [ ] **Cart**: the same as checkout.
@@ -620,29 +656,33 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
 - [ ] Specs:
   - each page's resume, receipt and redirect paths
   - the duplicate dialog
+  - the membership warning: shown, the tick required, the flag sent
   - the key reused on retry
   - `replaceUrl` on success
 - [ ] A Playwright spec for Thomas's exact path: pay, Back, Pay again. It must not reach the server's pay call a second time.
 
 ### 2.7 Memberships knows who's signed in *(ui: shop catalog, membership-tier-cards)*
-- [ ] The tier cards take the current membership.
-  - Its own card reads **Your membership** (no Subscribe).
-  - The others read **Switch to this**, going to Phase 3's change flow, or to **My Membership** until Phase 3 lands.
-- [ ] The catalog loads the current membership when signed in. Specs: signed out, a member, a seat holder.
+- [ ] Signed in with a membership, the page opens with a line naming it: "You're a **Gold** member · **Change membership**". A seat holder sees "You're on **Thomas's Gold Couple's** membership".
+- [ ] The tier cards take the membership summary (2.2):
+  - the card you have reads **Your membership**, with **Manage**, which goes to My Membership
+  - the others read **Switch to this** (Phase 3's change flow, or **My Membership** until Phase 3 lands)
+  - every card keeps a smaller **Buy another membership** link, which opens the subscribe page with the D2 warning (2.6)
+- [ ] The catalog loads the summary when signed in. Specs: signed out, a member, a seat holder, and someone paying for two.
 
-### 2.8 The testers' extra memberships in production (OQ-5)
-- [ ] Before release, Claude lists the duplicate and unpaid subscriptions in production through **Manage Products** ▸ **Subscriptions**, and records them here.
-- [ ] Mason cancels the extras there, by the steps written at the time. That matters because the billing run would charge them on the 1st.
+### 2.8 Studio Settings *(endpoint + ui)*
+- [ ] `GET` and `PUT /api/manage/studio_settings` (`manage_products`). The settings are the duplicate-purchase window (2.5) and, from Phase 6, the late sign-up window (6.2). Endpoint tests: 401, 403, a read, a write, and a bad value → 400.
+- [ ] **Studio Settings** under **Manage Products** (a tile in the **Website** group, 9.2). Each setting is one field with a sentence saying what it does, for example: "**Ask before charging for the same order again within** [10] minutes. 0 turns this off." Specs.
+- [ ] The testers' duplicate memberships on the live site are left alone. They're Square sandbox charges, and the Phase 13 reinstall removes them (OQ-5).
 
 ### 2.9 Ship it
 - [ ] Mutation check:
   - subscription inserted before the charge
-  - the `ALREADY_A_MEMBER` guard removed
+  - the `ALREADY_HAS_A_MEMBERSHIP` guard removed, and the buyer seated on a second membership
   - the duplicate window set to zero
   - the email flag ignored
   - `replaceUrl` dropped
 - [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1.
-- [ ] Release as **`v1.0.0-sandbox.15`**, after 2.8.
+- [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
 
 ---
 
@@ -657,26 +697,26 @@ T5, T6, T8, T13 and T24, plus F6.
   3. Only on success: cancel the old subscription, revoke its entitlement, create the new one, and move the seats.
 
   A decline changes nothing.
-- [ ] **What an upgrade costs:** the price difference, prorated over the days left in the period with the existing `CalculateProratedCharge` (OQ-2).
+- [ ] **What an upgrade costs:** the price difference, prorated over the days left in the period with the existing `CalculateProratedCharge` (OQ-2, decided).
 - [ ] **Downgrades** stay at period end. The new subscription's first entitlement carries the seat holders over.
-  - If it has fewer seats, the payer keeps theirs and the others are kept in assignment order up to the new size.
-  - The rest get an email, and so does the payer (OQ-3).
+  - **Fewer seats** (OQ-3, decided): the change must name who comes off (`remove_person_ids`), exactly enough to fit. Without that, the server refuses with **`CHOOSE_WHO_TO_REMOVE`** and lists the seat holders. The payer may name themselves.
+  - The people named keep their seat until the period ends. Each gets an email when the change is made, giving the date, and the payer gets a confirmation that names them.
 - [ ] Changing to the same product is refused. Changing while a change is already scheduled replaces the scheduled one.
 - [ ] `PreviewChange(subscriptionId, newProductId)` writes nothing. It returns:
   - immediate or at period end
   - the charge today
   - the date it takes effect
-  - which seat holders would lose their seat
+  - when the new tier has fewer seats: the seat holders, and how many must come off
 - [ ] Tests:
   - a declined upgrade leaves the old subscription active, with its entitlement and seats
   - the prorated amount on the 1st, the 15th and the last day
   - a downgrade carries seats over, through the billing run and the assignment reader
-  - shrinking from 3 seats to 2
+  - 3 seats to 2: refused with no one named, or with the wrong number. With one person named, they keep the seat until the period ends and lose it after, read through the billing run and the assignment reader.
   - the preview equals what the change then does
 
 ### 3.2 Endpoints *(endpoints/subscriptions)*
 - [ ] `GET /api/subscriptions/<id>/change_preview?product_id=` returns the preview. Only the subscriber may call it: 404 for anyone else's subscription.
-- [ ] `POST …/change_product` gets the same ownership test (to confirm), and returns the codes from 3.1.
+- [ ] `POST …/change_product` gets the same ownership test (to confirm), takes `remove_person_ids`, and returns the codes from 3.1.
 - [ ] Endpoint tests: 401, 404 for another person's subscription, the preview shape, and a decline.
 
 ### 3.3 "My Membership" *(ui: pages/account/subscriptions, header menu, shared pipe)*
@@ -687,6 +727,8 @@ T5, T6, T8, T13 and T24, plus F6.
   - the seats, with who holds each one (Phase 4 adds **Add a person**)
   - the card on file
   - **Change membership**, which opens the tier cards with each one's preview: "**Upgrade** — $42.67 today, then $X a month", or "**Switch** on Jan 1". Choosing one opens a confirm.
+  - a downgrade to fewer seats asks first: "Gold Couple's has 2 seats. Choose who comes off on Jan 1:", with a check box per seat holder. **Confirm** is enabled once enough are ticked.
+- [ ] **More than one membership:** each one you pay for is its own card. Then **Shared with you** lists the memberships you hold a seat on, with the payer's name.
 - [ ] **Without a membership:** the tier cards themselves, with no "Browse Memberships" click (T6), plus "Not sure yet? Try an intro workshop" (5.1).
 - [ ] Permission names display as words: a shared `permissionDisplayName` turns `gold_member` into **Gold member**, reusing `role.types.ts`'s rule. Used on My Membership, its detail page and User Information (T24).
 - [ ] Specs: both states, the preview text, confirm and decline, the menu label, and the display names.
@@ -701,7 +743,7 @@ T9–T12 and G17, plus F8–F11.
 - [ ] `gift_permissions.entitlement_id` and `gift_permission_invitations.entitlement_id`: nullable foreign keys to `entitlements`.
 - [ ] `gift_permission_invitations.invited_email` is stored lower-cased. Lookups lower-case too (P9).
 - [ ] The CLAUDE.md new-column checklist: admin column data info, friendly names, and the display template.
-- [ ] Migration **`app/0014_sharing_invites_name_a_seat`**: adds both columns if missing and lower-cases existing invitation emails. It is idempotent.
+- [ ] Migration **`app/0014_sharing_invites_name_a_seat`**: adds both columns if missing. It is idempotent. Existing invitations aren't lower-cased, because production is reinstalled (D8).
 - [ ] Tests: the columns exist on a new database and after the migration; a mixed-case invitation is found by the registration lookup.
 
 ### 4.2 Table helpers *(sql_util/table_helpers)*
@@ -748,6 +790,7 @@ T9–T12 and G17, plus F8–F11.
   - **Add a person**: one email field and an **Invite** button.
 - [ ] **The seat card** (after Subscribe and on My Membership):
   - Seat 1 reads "**You**" (the `[assignments]` bug fixed), and **Assign to myself** never shows to someone already seated.
+  - When no seat is taken yet (a second membership, 2.2), the card asks "**Who is this membership for?**" It offers **Me**, the people you already share with, and the invite field.
   - Each empty seat shows the people you already share with as buttons, then "Or invite someone new" with an email field and an **Invite** button. Enter works too.
   - "No one by that name" shows when a search matches nobody (G17).
   - The sharing link goes to `/my/sharing`.
@@ -777,14 +820,26 @@ T1–T4, T27, G1, G7 and G13–G16.
 ### 5.2 Memberships *(business_logic/payment + endpoints + ui)*
 - [ ] **What each tier includes, from the data:** `CatalogHelper` lists, for each membership product, the classes its granted permission opens. The data is the classes' requirement groups (the `ClassAccessHelper` rules), with "needs instructor approval" when a skill is also required. It goes on the catalog response.
   - Tests through `ClassAccessHelper::CheckAccess`, against the seeded rules: Silver lists only Beginner Knotty Yoga; Gold lists all six, three marked approval.
-- [ ] **One / Two / Family** (T2, OQ-15): a toggle over the cards, grouped by `seats_default`, starting on **One**. **Two** and **Family** read "Couples save $X a person each month", computed from the prices.
-- [ ] **Silver vs Gold:** under the cards, a comparison of the included classes from the line above (✓, ✓ with approval, —). Longer descriptions come from Mason (OQ-9).
+- [ ] **One / Two / Family** (T2; OQ-15, still open, with sketches): by default, two cards, **Silver** and **Gold**, with the size choice inside each card.
+  - The sizes come from the products, grouped by the permission they grant and by `seats_default`, so a new size needs no code.
+  - Each size shows its price and saving: "Couple — $300/month ($150 each, save $50 a person)".
+  - Silver has no Family size, so its card shows two.
+  - **Subscribe** opens the chosen product.
+- [ ] **Silver vs Gold:** under the cards, a comparison of the included classes from the line above (✓, ✓ with approval, —).
+- [ ] **The tier descriptions are Mason's** (OQ-9). In the seed they go on every product of the tier:
+  - **Silver:** "Our introductory membership, with a selection of our most beginner-friendly and accessible classes. Start here until your instructors suggest moving on to Gold and you feel ready. Part of acrobatics is learning the terminology and body positions, and learning to move and organize yourself in a new way. These classes are the foundation for aerial, partner acro and handstand training."
+  - **Gold:** "More advanced classes that also bring in elements of circus acrobatics, plus our specialty classes in handstands, aerial and partner acrobatics."
+  - Seed test through the catalog reader.
+  - Edited lightly from your answer, for punctuation. Say if you want them word for word.
 - [ ] **"Browse bookable services →"** comes off Memberships (G13).
-- [ ] **Look before you sign up** (G14, OQ-14): the subscribe page opens signed out. It shows the tier, the price, the start month and the first charge. **Subscribe** reads **Sign in or create an account to continue**, returning here (4.5).
-- [ ] Specs: the toggle, the saving line, the comparison, the signed-out subscribe page, and the return.
+- [ ] **Look before you sign up** (G14; OQ-14, still open; this is the default): the subscribe page opens signed out.
+  - It shows the tier, the price, the start month and the first charge.
+  - **Subscribe** reads **Sign in or create an account to continue**, and returns here (4.5).
+  - Whatever the page asks the server for its price must answer signed out; to verify.
+- [ ] Specs: the size choice with its prices and savings, Silver without Family, the comparison, the signed-out subscribe page, and the return.
 
 ### 5.3 Getting Started: look first, commit last *(seed + Page Content + ui)*
-- [ ] **New step order** (seed; and production edits per D8, OQ-8):
+- [ ] **New step order** (seed; OQ-8, decided):
   1. What to expect
   2. Try an intro workshop
   3. Find the classes for you
@@ -793,7 +848,19 @@ T1–T4, T27, G1, G7 and G13–G16.
   6. Create your account and plan your week
 
   Check-in, workshops and notifications move out of the steps, to the end of step 6 and to My Account.
-- [ ] **What to expect** is the new-student FAQ (G7): physical requirements by class, what to wear and not wear, what to bring ("nothing — no mat; the floor is padded"). Mason's text (OQ-9). It is a step body in Markdown; to verify the steps render Markdown.
+- [ ] **What to expect** is the new-student FAQ (G7), from Mason's text (OQ-9).
+  - Each class's own requirements stay on its class page; this step links to **All Classes** for them.
+  - It is a step body in Markdown; to verify that the steps render Markdown. **Contact us** is a `mailto:` link to the studio's address (5.1).
+  - The page text, a **DRAFT** for your approval: your wording, split under three headings.
+
+  > **Is Knotty Yoga right for me?**
+  > Knotty Yoga is physically rigorous. You'll keep up best if you're reasonably fit and free of significant injuries; carrying a lot of extra weight makes classes hard to keep up with. If that describes you, **contact us** about one-on-one training to get started.
+  >
+  > **What to wear**
+  > Fitted gym clothes that aren't baggy, so nothing catches on the equipment: tights, leggings or sweatpants (grippy cotton is best) and a fitted T-shirt or tank top. Men: snug underwear that keeps things in place. No watches, metal, zippers or jewelry.
+  >
+  > **What to bring**
+  > A water bottle (strongly encouraged). You don't need a yoga mat: our floors are padded, with good traction.
 - [ ] Each step gets an `id` anchor. **Get started** links land at the top (8.1 fixes the cause).
 - [ ] Seed tests through the Getting Started reader: order, titles, links.
 
@@ -810,13 +877,14 @@ T1–T4, T27, G1, G7 and G13–G16.
   | **People** | Sharing, Favorite Instructors |
   | **Profile & settings** | User Information, Change Password, Notifications, My Skills |
 
+- [ ] The **My Schedule** tile becomes **My Weekly Plan**, the name Thomas used and the page's own heading (to verify). It then no longer shares a name with the Our Classes toggle (6.3).
 - [ ] **Favorite Instructors** (T27, G16): each card links to the instructor's page and lists their next three classes.
   - The favorites endpoint returns them, from the same reader the instructor page uses, so it's one call, not one per instructor.
   - Endpoint test; spec.
 - [ ] Specs: both card states, the group order, and the display names.
 
 ### 5.5 No membership, no dead end *(seed + ui)*
-- [ ] The home page's **Upcoming classes** row gets `hidden_when_not_member` (seed, and a production edit). Non-members see the Get Started band and the intro call to action instead (T3).
+- [ ] The home page's **Upcoming classes** row gets `hidden_when_not_member` (seed). Non-members see the Get Started band and the intro call to action instead (T3).
 - [ ] **My Weekly Plan** with no membership: "You need a membership to plan classes", with **Choose a membership** and **Try an intro workshop**. A member who simply has no eligible classes keeps today's message, plus a link to the class pages.
 - [ ] The upcoming-classes empty text says the same.
 - [ ] Specs for each state.
@@ -830,7 +898,10 @@ T14–T17.
 ### 6.1 A tap changes one class *(business_logic/scheduling + ui)*
 - [ ] `AddTemplateEntry` checks the one slot (`IsSlotEligible`) instead of rebuilding the whole eligible list.
   - Test: for every seeded slot and a Silver, a Gold and an approved Gold member, it gives the same answer as the list reader.
-- [ ] The per-tap confirmation email stops (OQ-28); the weekly digest already says what's planned. Test against the mail double.
+- [ ] The per-tap confirmation email stops (OQ-28, decided); the weekly digest says what's planned. Test against the mail double: five taps, no email.
+- [ ] **Calendar entries without the emails:** a planned class reaches someone's calendar through the personal calendar feed. That's the iCal work in the tree, and **Notifications** already offers the subscription.
+  - Verify the feed includes weekly-plan classes and their skips; add them if not, with tests through the feed reader.
+  - **My Weekly Plan** gets an **Add your plan to your calendar** link to that subscription. Spec.
 - [ ] **My Weekly Plan:**
   - a tap flips that class at once and saves it in the background
   - each class has its own busy state, so several taps can be in flight
@@ -839,30 +910,55 @@ T14–T17.
 - [ ] The **Upcoming** tab loads when it is opened, not with the page.
 - [ ] Specs: three quick taps make three calls and no reload; failure reverts.
 
-### 6.2 Lists start now *(business_logic/scheduling + ui)*
-- [ ] `GetUpcomingClassesForPerson` and `ResolveClassesInRange` start at **now**, so a class that has started is gone from the sign-up lists (OQ-26). **Today's Classes** keeps a class until it ends, since people use it at the door.
-- [ ] The page asks from now, not midnight.
-- [ ] Tests with a fixed clock: 5:30 pm drops the 5:00 class from upcoming; Today's keeps it until 6:00.
+### 6.2 A class leaves the lists two hours after it ends *(services + business_logic/scheduling + endpoints + ui; OQ-26)*
+- [ ] **A setting:** `late_signup_window_minutes` in `config_secrets`, default **120**, on **Studio Settings** (2.8). Read through `StudioSettings` with its default. Tests.
+- [ ] **The cut-off:** a class stays on the sign-up lists until its **end + the window**. Until then it can still be signed up for or marked attended; after that it's gone.
+  - Today the lists start at midnight and keep the whole day, while the sign-up check refuses a class once it has started. To verify which checks do that, and move each to this cut-off.
+  - `GetUpcomingClassesForPerson`, `ResolveClassesInRange` and `GetTodayClassesForPerson` drop a class past the cut-off.
+  - The same cut-off applies to a member's own sign-up, a weekly-plan "attending" mark, and staff check-in.
+- [ ] **Labels, so a past class isn't mistaken for an upcoming one** (T16):
+  - classes that have started sit under **Earlier today**, after the upcoming ones
+  - an ended class reads "**Ended 6:00 PM** · You can still mark attendance until 8:00 PM"
+  - a class under way reads "**Started 10 minutes ago**"
+- [ ] The page asks from now minus the window, not from midnight.
+- [ ] Tests with a fixed clock, for a 5:00–6:00 class:
+  - 5:30 → listed under **Earlier today** as started; sign-up allowed
+  - 7:59 → still listed; sign-up and staff check-in allowed
+  - 8:01 → gone, and sign-up refused
+  - the window set to 0 → gone at 6:00
+- [ ] Specs for the grouping and both labels.
 
-### 6.3 Our Classes shows what you've planned *(ui)*
-- [ ] The **My Schedule** toggle becomes **Classes I can attend**. It filters by access, and its old name collided with the plan page.
+### 6.3 Our Classes: the right view first, and what you've planned *(ui)*
+- [ ] **Without a membership, the page opens on Full Schedule** (OQ-13, decided; F19):
+  - signed in **with** a current membership or seat → the eligible-only view, as today
+  - signed in **without** one, or signed out → **Full Schedule**. Each members' class shows the existing lock and "**Requires a membership**", linking to **Memberships**.
+  - the page knows which from the membership summary (2.2), loaded with the schedule
+- [ ] The **My Schedule** toggle becomes **Classes I can take**. It filters by access, and "My Schedule" was also the weekly-plan page's tile, which is likely what confused Thomas (OQ-29).
 - [ ] A class on your weekly plan shows **On your weekly plan** and no sign-up control. A one-off plan shows **Planned**.
-- [ ] A failed plan lookup shows "Couldn't load your plan", instead of silently showing nothing as planned.
-- [ ] Specs for each. Ask Thomas which control he tapped (OQ-29); this item covers both readings.
+- [ ] A failed plan lookup shows "Couldn't load your plan", instead of silently treating nothing as planned (`our-classes.component.ts:219-222`).
+- [ ] Specs:
+  - the starting view for a member, a non-member and a visitor
+  - the lock and its link
+  - the rename
+  - both planned states
+  - the error
 
 ### 6.4 Which class is right for me *(db_schema + table helpers + seed + ui)*
 - [ ] `classes.sort_order` (`INT NOT NULL DEFAULT 0`), with migration **`app/0015_classes_sort_order`** and the admin metadata checklist.
   - `TableHelpers::Classes` orders by `sort_order`, then name.
   - Seed order: Beginner Knotty Yoga, Beginner Partner Acro, Knotty Yoga, Handstands, Aerial Rope, Intermediate Partner Acro.
   - A **Sort order** field in Class Schedules' class dialog.
-- [ ] **Prepares you for** (OQ-23): a `class_prepares_for` table (`class_id`, `prepares_class_id`, unique pair), with migration **`app/0016_class_prepares_for`**, the admin metadata checklist, and a table helper with tests. It is edited in the Class Schedules class dialog. Seed: Beginner Knotty Yoga prepares for Knotty Yoga, Beginner Partner Acro and Aerial Rope; Beginner Partner Acro for Intermediate Partner Acro; Knotty Yoga for Handstands and Aerial Rope.
+- [ ] **Prepares you for** (OQ-23): a `class_prepares_for` table (`class_id`, `prepares_class_id`, unique pair), with migration **`app/0016_class_prepares_for`**, the admin metadata checklist, and a table helper with tests. It is edited in the Class Schedules class dialog. Seed, from Mason's pairs (OQ-23):
+  - Beginner Knotty Yoga → Knotty Yoga, Beginner Partner Acro
+  - Knotty Yoga → Handstands, Aerial Rope, Beginner Partner Acro
+  - Beginner Partner Acro → Intermediate Partner Acro
 - [ ] **The class page:**
   - **Start here** on classes that need only a membership
   - on a class that needs more, a **How to get here** section: the required skills (as today), "Requires attending: Knotty Yoga" from the predecessor slot, and "Build up to it in **Beginner Knotty Yoga**" from `class_prepares_for`
   - on a class that prepares for others, "**Leads to:** Knotty Yoga, Aerial Rope"
   - the class detail endpoint returns both lists; endpoint test
 - [ ] Our Classes and All Classes list by the new order.
-- [ ] The beginner descriptions say they prepare you for the others: Mason's copy (OQ-9), seed and a production edit.
+- [ ] No new description copy (OQ-9). The **Leads to** line says it on every class that prepares for another, and Beginner Partner Acro's description already says it leads to Intermediate.
 - [ ] Tests: the migration; the order through the catalog reader; specs for the badge and section.
 
 ### 6.5 From a class to its schedule *(ui)*
@@ -922,6 +1018,22 @@ T18, T43, T45, T46, G10 and P11.
 - [ ] Critical CSS stays inlined (D7). After 7.4, check the built `index.html` no longer carries the font CSS twice.
 - [ ] After numbers for first paint, next to 7.1's.
 
+### 7.8 Public photos from CloudFront's edge *(server_components: platform; @honuware/ui: access; ui/package; OQ-21)*
+- [ ] **Measure first** (7.1): how many photo requests the home page and Gallery make, and how long each takes.
+- [ ] **A public photo route:** `GET /api/public_photo/<table>/<id>/<width>/<height>?v=<stamp>`.
+  - It serves only the tables whose photos are public: classes, instructors, gallery, carousels, site assets. Anything else gets 404. People's own photos stay on `get_scaled_photo`, `private, no-cache` (F20).
+  - `v` is the photo's update stamp, so a replaced photo has a new address.
+  - It sends `Cache-Control: public, max-age=31536000, immutable`. A stale `v` gets a redirect to the current one.
+- [ ] **CloudFront:** a `/api/public_photo/*` behaviour, placed ahead of `/api/*`. It caches on the full URL (query included) and forwards no cookies. Nothing ever needs invalidating, because a new photo has a new URL.
+  - Done by Mason in the console, from steps written here when the item is built. Deploying to AWS records the behaviour.
+- [ ] `PhotoUrlBuilder` builds public photo URLs with the stamp. The pages that show public photos use it.
+- [ ] Tests:
+  - the header on each route
+  - a private table refused on the public route
+  - a stale stamp redirected
+  - a replaced photo's URL changes (library spec)
+- [ ] **No in-memory cache in the server yet.** Once CloudFront answers repeat requests, the server only sees each photo's first request per edge location. If 7.1's numbers show those first views are slow, a small LRU cache of scaled bytes in the server is the next step (OQ-21).
+
 ---
 
 # Phase 8 — Polish and the site's navigation
@@ -939,7 +1051,10 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
 - [ ] A Playwright check at 390 px Android: the footer is fully visible at the end of the home page.
 
 ### 8.2 Favicon *(ui + seed)*
-- [ ] A Knotty Yoga icon from the logo, in the brand red: `favicon.ico` (16/32), a 180 px `apple-touch-icon` and an SVG (OQ-25).
+- [ ] The icon is **the figure hanging in the red fabric** from the logo (OQ-25, decided). That's the emblem at the left of `assets/svg/KnottyYoga_logo_white.svg`, cropped away from the wordmark.
+  - Its figure is white, which disappears on a light browser tab, so the icon puts the emblem on a rounded square in the brand ink.
+  - It's made as `favicon.svg`, `favicon.ico` (16 and 32 px) and a 180 px `apple-touch-icon`.
+  - Checked by eye at 16 px, where the fabric may need thickening.
 - [ ] `site_favicon_url` stays the studio override. A spec checks `index.html` names all three.
 
 ### 8.3 Change Password *(ui: update_user_password)*
@@ -948,20 +1063,19 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
 - [ ] Specs: the labels, mismatch, the wrong current password, and success.
 
 ### 8.4 Navigation and names *(ui: header menu + page titles)*
-- [ ] **Classes** becomes a menu: **All Classes**, **Weekly Schedule**, **Calendar** (G9, OQ-13). The red buttons on All Classes stay as shortcuts.
-- [ ] **Gallery** moves to the top level, next to **Blog** (G8, OQ-12).
+- [ ] There's no new **Classes** menu, and **Gallery** stays under **About** (OQ-12, OQ-13: there are already enough top-level items). 6.3 fixes the empty My Schedule view behind G9.
 - [ ] **Upcoming Events** becomes **Events**, menu and page (G12).
-- [ ] **"Our":** menu labels drop it, and each page's title matches the label that opened it (OQ-10):
+- [ ] **"Our":** menu labels drop it, and each page's title matches the label that opened it (OQ-10, decided):
   - Classes / All Classes, Services, Instructors, Location, Providers
   - "My Classes" and "Our Classes" stop swapping titles
 - [ ] Specs: the menu for signed out, member, staff and admin, desktop and mobile. The mobile-audit route list gains any new route.
 
 ### 8.5 "Show me how" under the headline *(seed + ui: home hero)*
-- [ ] The hero section shows its link as a button when it has one. The seed gives it **Show me how** → Getting Started, plus a production edit. Spec.
+- [ ] The hero section shows its link as a button when it has one. The seed gives it **Show me how** → Getting Started. Spec.
 
 ### 8.6 Services name their providers *(endpoints + ui)*
 - [ ] Each service card lists who provides it ("Massage with **Caleb Ault**"), linking to the provider's bio. The data is from the providers directory reader, on the service catalog response. Endpoint test; spec.
-- [ ] The name **Services** stays (OQ-11).
+- [ ] The name **Services** stays, since more services than massage are coming (OQ-11, decided).
 
 ### 8.7 Link colour *(ui: tokens)*
 - [ ] A `--theme-link` token (default: the brand's primary). `.back-link`, prose links and the 15 `text-blue-600` templates use it. `design-tokens.spec.ts` covers it.
@@ -977,17 +1091,25 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
   - "(Phase 3 SL-11)", "(skill_levels.id, Phase 3)", "(Phase 4)", "(M-14; …)"
   - the "(M-13)" table description
 
-  They are reworded in the seed. Migration **`app/0017_admin_hints_plain_words`** updates only rows that still hold the old text.
+  They are reworded in the seed only. Production gets them with the reinstall (D8).
 - [ ] **Guard tests:**
   - a C++ test that no seeded hint or description matches `Phase \d|OQ-\d|\(M-\d|SL-\d`
   - an Angular spec that no template under `src/app` has visible text matching `no longer|used to|Phase \d|OQ-\d`, outside comments
   - the developer-only style guide is exempt
 
 ### 8.10 Bios *(seed + production edit)*
-- [ ] Mason's and Gifford's bios, rewritten by Mason (OQ-7). The seed is updated, and production is edited under **Manage Products** ▸ **Instructors**. The seed test reads them back through the instructor reader.
+- [ ] Mason's and Gifford's bios, rewritten by Mason (OQ-7). They go into the seed (D8), and the seed test reads them back through the instructor reader.
 
 ### 8.11 Back and Forward, checked *(e2e)*
 - [ ] A Playwright journey spec at 390 and 1280 px. It goes Home → Classes → a class → Calendar → Back ×3, Forward ×3, then the purchase, sharing and Get Started paths. Each Back returns to the previous page, at its scroll position.
+
+### 8.12 Every email links to its settings *(business_logic: mail templates; OQ-28)*
+- [ ] Each notification email (the weekly digest, reminders, sharing, class changes) ends with "**Change which emails you get**", linking to **Notifications**. The link is built from the site address.
+- [ ] Emails that must always go (verify, password reset, receipts) explain instead: "You're getting this because…".
+- [ ] The notification emails share one footer template, so a new email can't leave it out.
+- [ ] Tests:
+  - every notification template's output contains the link
+  - the test lists the templates, so a new one has to be added to it
 
 ---
 
@@ -1012,7 +1134,7 @@ T29, T32–T37, G19, and P6–P8.
 - [ ] **Business Overview** at the top of Manage Products: a stat row, revenue by month (12 months), and two class lists. Specs.
 
 ### 9.2 Grouped tiles *(ui: manage dashboard)*
-- [ ] The tiles in headed groups (OQ-16):
+- [ ] The tiles in headed groups (OQ-16, decided):
 
   | Group | Tiles |
   |---|---|
@@ -1021,7 +1143,7 @@ T29, T32–T37, G19, and P6–P8.
   | **Memberships & sales** | Products, Pricing Overview, Price Schedules, Membership Tiers, Subscriptions, Entitlements, Event Sessions, Bundles, New Workshop |
   | **Discounts & credits** | Vouchers, Coupons, Comps, Refund Effectiveness |
   | **Reports** | Enrollment Trends, Open-Seat Heatmap, Room Occupancy, Subscription Revenue |
-  | **Website** | Site Theme, Fonts, Page Content |
+  | **Website** | Site Theme, Fonts, Page Content, Studio Settings (2.8) |
 
 - [ ] Each tile is shown only to people who can use it. Today only **Roles** is filtered (P7).
 - [ ] Specs: the groups and their order, and the per-permission tile sets. `manage-dashboard.component.spec.ts`'s flat-list tests are rewritten.
@@ -1041,14 +1163,13 @@ T29, T32–T37, G19, and P6–P8.
 - [ ] The tile follows its endpoint's permission, `manage_class_schedule` (P7).
 - [ ] Tests: someone with no plan is found; full-name search; paging; the permission.
 
-### 9.5 New Workshop *(db_schema + business_logic/scheduling + endpoint + ui)*
-- [ ] `event_sessions.led_by_name` (nullable), with migration **`app/0018_event_sessions_led_by`** and the admin metadata checklist (OQ-18). The public event card and page show it when there's no staffed instructor. Tests through the visible-events reader.
+### 9.5 New Workshop *(business_logic/scheduling + endpoint + ui)*
 - [ ] `WorkshopHelper::CreateOneOffWorkshop`, in one transaction, makes:
   - an event product (name, description, capacity)
   - its price on the default schedule
   - one event session (date, start, duration, room)
-  - the instructor's staffing
-  - a **Led by** name for a visiting teacher without an account (OQ-18)
+  - the instructor's staffing. **The teacher must have an account and be an instructor** (OQ-18, decided). A visiting artist is set up under **Manage Products** ▸ **Instructors** first.
+- [ ] To verify: **Instructors** can add someone who has no account yet. If it can't, it gets **Add an instructor** (name, email), which creates the account and sends the set-password email. Tests.
 
   Tests read the result back through the Events reader and the catalog.
 - [ ] `POST /api/admin/workshops` (`manage_products`). Endpoint tests.
@@ -1056,7 +1177,7 @@ T29, T32–T37, G19, and P6–P8.
   - Title, Description
   - Date, Start time, Length
   - Room
-  - Instructor, *or* Led by
+  - Instructor, with "Visiting teacher? Add them under **Instructors** first."
   - Capacity, Price
   - Photo
 
@@ -1068,8 +1189,9 @@ T29, T32–T37, G19, and P6–P8.
 - [ ] **Bug (P6):** only pricing-eligible permissions become columns, as Membership Tiers promises.
 - [ ] Specs: the text, the names, and an ineligible permission's absence.
 
-### 9.7 Products grouped *(ui)*
-- [ ] The product list is sectioned by kind: Memberships, Classes & drop-ins, Events & workshops, Services. It gets a search box. The kind filter stays (OQ-19). Specs.
+### 9.7 Products grouped *(ui; OQ-19, still open)*
+- [ ] **Default: nothing to build.** Gifford's "categorize the products" most likely meant Manage Products' grid of tiles, the same point as Thomas's, and 9.2 groups those.
+- [ ] The **Products** list itself has eight seeded products. If you'd rather group it too, that's a small change: sections by the kind each product already has, plus a search box.
 
 ### 9.8 Reports that look forward *(business_logic/reporting + ui)*
 - [ ] **Enrollment Trends** and **Open-Seat Heatmap** get **Last 12 weeks** / **Next 4 weeks**:
