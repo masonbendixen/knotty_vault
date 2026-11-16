@@ -1322,16 +1322,19 @@ T30, T31, T41 and G18.
 **OQ-21 — Server-rendered pages** *(Phase 11)*
 - **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
 - **Alternative:** plan server rendering now.
+- Wasn't the server side rendering also for SEO? Would it make sense to possibly have an image cache in memory for the home page photos, gallery, and generally images that are there for every user versus the dynamically generated ones per user? I imagine there are C++ libraries for caches that do some kind of LRU removal.
 
 **OQ-22 — One font address** *(7.4, D7)*
 - The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
 - **Default:** both use the seeded address (variable weights), so the second is a cache hit. Critical CSS stays inline.
 - **Alternative:** drop the `index.html` fonts and rely on the runtime ones from the cached site config (7.3).
+- Mason- What are the pros and cons of the two options?
 
 **OQ-23 — "Build up to it in…"** *(6.4)*
 - Nothing in the data says which class prepares you for which. The default shows the **predecessor** class and the **required skills**, and names Beginner Knotty Yoga as the way to build up.
 - **Default:** the "build up" class is a per-class setting (**Prepares you for**, a list of classes, one new table), so it isn't hard-coded. The seed's pairs are in 6.4; correct them if they're wrong.
 - **Alternative:** leave it to each class's description (no schema change).
+- Mason- 
 
 **OQ-24 — A site search** *(Gifford, "not a strong recommendation")*
 - **Default:** not now. The site has about twenty public pages, and Phase 8's menus make them easier to find.
