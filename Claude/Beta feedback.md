@@ -1335,23 +1335,30 @@ T30, T31, T41 and G18.
 - **Default:** the "build up" class is a per-class setting (**Prepares you for**, a list of classes, one new table), so it isn't hard-coded. The seed's pairs are in 6.4; correct them if they're wrong.
 - **Alternative:** leave it to each class's description (no schema change).
 - Mason- 
+	- Beginner Knotty Yoga prepares for: Knotty Yoga and Beginner Partner Acro
+	- Knotty Yoga prepares for: Handstands, Aerial Rope, Beginner Partner Acro
+	- Beginner Partner Acro prepares for: Intermediate Partner Acro
 
 **OQ-24 — A site search** *(Gifford, "not a strong recommendation")*
 - **Default:** not now. The site has about twenty public pages, and Phase 8's menus make them easier to find.
 - **Alternative:** a search over classes, instructors, events and blog posts.
+- Mason- Let's skip search for now.
 
 **OQ-25 — The favicon** *(8.2)*
 - **Default:** made from the logo in the brand red.
 - **Alternative:** Ryan designs one; drop it in the Photos folder.
+- Mason- Let's go with the SVG of the human hanging in the red fabric.
 
 **OQ-26 — When does a class leave the sign-up lists?** *(6.2)*
 - **Default:** when it starts. **Today's Classes** keeps it until it ends.
 - **Alternative:** when it ends, everywhere.
+- Mason- I'd like to leave or for two hours after the class ends. It's pretty common for people to show up for a class and not sign up and then show up a few minutes late. It's nice for staff to be able to note this after the class ends (or for the person to)
 
 **OQ-27 — Subscribing for a later month** *(2.3)*
 - Today it's free that month (F4).
 - **Default:** charge on the 1st of that month, as the page says, with nothing granted before then.
 - **Alternative:** charge now for that month.
+- Mason- I don't understand this. What is free today?
 
 **OQ-28 — An email on every weekly-plan tap** *(6.1)*
 - Adding a class to the weekly plan sends a confirmation email each time, so five taps make five emails.
