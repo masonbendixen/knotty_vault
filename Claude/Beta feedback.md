@@ -281,6 +281,14 @@ I have a set of [5 personas](https://docs.google.com/document/d/1Ad-E-2IWAg87DmZ
 
 END GIFFORD FEEDBACK
 
+Jennifer Schulte offered this feedback:
+
+So far, I’ve only found one minor kink - when selecting “Browse services” from the My Bookings page, it somehow takes you to the Membership page. Although it does show “Browse bookable services” link on the top, it is just a bit confusing… Don’t know why it does that take you to the “Our Services” page.
+
+Also, when navigating to a different page from the Get Started page and hit the back button on the browser, it does not take u back to where u were. For example, select “Plan your weekly schedule” on the Get Started page, then hit the back button on the browser, you’ll notice that it does not take you back to the top of the Get Started page, instead of the “Plan your weekly schedule” section. Same behavior when u select any other sections on this page.
+
+END JENN FEEDBACK
+
 
 
 
