@@ -1250,8 +1250,10 @@ T30, T31, T41 and G18.
 
 **OQ-9 — New copy you need to write or approve** *(5.2, 5.3, 6.4)*
 - The new-student FAQ: physical requirements, what to wear and not wear, what to bring.
-- Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and 
+- Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and excessive extra weight will make classes challenging and hard to keep up with the group. Contact us for suggestions of one on one training if you do not meet this criteria. You do not need a yoga mat as we have padded, nice traction floors. Please wear fitted gym clothes that are not baggy to avoid getting caught in equipment. Generally tights, leggings, or sweat pants are good (preferably grippy cotton) and a fitted tshirt or tank top. Guys wear tight underwear that keeps things snug. No watches, metal, zippers, or jewelry. Water bottles strongly encouraged.
 - Longer Silver and Gold descriptions.
+- Mason-
+	- Silver- This is our introductory option that features a selection of our more beginner friendly and accessible options. I would start here until instructors suggest you move on to gold and you feel ready. Part of doing acrobatics is learning terminology, body positions, and learning to move and organize yourself in a new way. These classes p
 - A line on each beginner class saying it prepares you for the others.
 - **Default:** Claude drafts each from your class descriptions and the About page, marked **DRAFT** here for you to edit. Nothing ships until you've approved it.
 
