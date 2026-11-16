@@ -1201,6 +1201,7 @@ T30, T31, T41 and G18.
 **OQ-1 — One membership per person?** *(D2, 2.2)*
 - **Default:** a person can be the payer of only one current membership. "Current" includes one that's cancelled but running to the end of its month, and a change scheduled for next month. Someone who holds a seat on another person's membership is asked "You're already on Thomas's Gold Couple's membership. Buy your own anyway?" and may go ahead.
 - **Alternatives:** refuse the seat holder outright; or allow two memberships if they're different tiers.
+- Mason- I actually have had people who were paying for a poor friend's membership so I don't think that we should only allow a single person to just pay for one membership. However, I would like to have the UI explicitly warn them that they are already paying for a membership. 
 
 **OQ-2 — What does an upgrade cost?** *(3.1)*
 - Today the server charges the **whole** month's price difference, whatever the date.
