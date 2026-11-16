@@ -1207,25 +1207,30 @@ T30, T31, T41 and G18.
 - Today the server charges the **whole** month's price difference, whatever the date.
 - **Default:** prorate it by the days left, with the same rule the first month already uses. Silver → Gold on the 20th of a 30-day month costs a third of the difference.
 - **Alternative:** keep the full difference.
+- Mason- let's prorate.
 
 **OQ-3 — Downgrading to fewer seats** *(3.1)*
 - Gold Family (3 seats) → Gold Couple's (2): who loses their seat?
 - **Default:** the payer keeps theirs, then seats are kept in the order they were given. Whoever's left off gets an email, and so does the payer. The confirm screen names them first.
 - **Alternative:** the payer must remove someone before the downgrade can be scheduled.
+- Mason- it would be good to prompt who to remove.
 
 **OQ-4 — The "you just bought this" window** *(2.5)*
 - **Default:** a paid order with the same items by the same person within **10 minutes** asks "Buy it again?".
 - **Alternative:** a different window, or none (rely on 2.6's page changes alone).
+- Mason- This sounds like a good idea but can we make it configurable in the admin UI but default to 10min?
 
 **OQ-5 — The testers' extra memberships on the live site** *(2.8)*
 - They are sandbox charges, but the billing run will keep charging the duplicates every month.
 - **Default:** before sandbox.15, Claude lists them and Mason cancels the extras under **Manage Products** ▸ **Subscriptions**.
 - **Alternative:** leave them; or reinstall production (which also removes the testers' accounts).
+- Mason- This is the Square sandbox and basically monopoly money that is all going to get thrown away so I don't care as long as we make it hard for them to get in this situation after we do these updates.
 
 **OQ-6 — Migrate or reinstall production?** *(D8, Phase 13)*
 - Finishing website reinstalled production to get its content in. The testers now have accounts and history there.
 - **Default:** migrate, and make the content changes by hand from a numbered list.
 - **Alternative:** reinstall from the seed, and ask the testers to register again.
+- We are going to fully reinstall from seed. This is extremely test data that needs to be thrown away.
 
 **OQ-7 — Mason's and Gifford's bios** *(8.10)*
 - Thomas: lead with your own teaching and training, not Ana Forrest's name; Beth's is the model. He says Gifford's undersells him too.
@@ -1241,9 +1246,11 @@ T30, T31, T41 and G18.
   5. Pick a membership
   6. Create your account and plan your week
 - Say if you'd order or name them differently.
+- Mason- This sounds fine.
 
 **OQ-9 — New copy you need to write or approve** *(5.2, 5.3, 6.4)*
 - The new-student FAQ: physical requirements, what to wear and not wear, what to bring.
+- Mason- Knotty Yoga is physically rigorous and students should be passably fit, free of substantial injury, and 
 - Longer Silver and Gold descriptions.
 - A line on each beginner class saying it prepares you for the others.
 - **Default:** Claude drafts each from your class descriptions and the About page, marked **DRAFT** here for you to edit. Nothing ships until you've approved it.
