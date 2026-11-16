@@ -1307,14 +1307,17 @@ T30, T31, T41 and G18.
 **OQ-18 — A visiting teacher without an account** *(9.5)*
 - **Default:** a **Led by** field: a name shown on the workshop, stored on the session (one new column). An instructor with an account is picked as today.
 - **Alternative:** require an account (a quick account by staff), or put the name in the title.
+- Mason- I want to require an account. It's not that hard to make.
 
 **OQ-19 — Product categories** *(9.7)*
 - **Default:** group by the existing **kind** (Memberships, Classes & drop-ins, Events & workshops, Services), plus a search box. No new column.
 - **Alternative:** a free category field you fill in for each product.
+- Mason- I really don't understand the issue being addressed here. Can you let me know what your asking and why?
 
 **OQ-20 — How far "restore" goes** *(10.4)*
 - **Default:** every change made through Manage Data (and the pages that use the same generic endpoints) is recorded and can be restored one row at a time. Changes made by dedicated pages (subscriptions, bookings, payments) aren't, since they have their own records.
 - **Alternative:** record those too: larger, and touches every helper.
+- Mason- Can you explain what the issue we are trying to resolve here is? I'm on the fence about Manage Data. I feel like it started out as a way to manually create items in the database before we added bespoke UI to things. Now it is more of diagnostic / developer access tool. It's kind of beyond admin. Would it maybe make more sense to add a special permission for it? I think those same endpoints that they UI hits might be used for other features in the UI? How expensive is doing this rollback feature?
 
 **OQ-21 — Server-rendered pages** *(Phase 11)*
 - **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
