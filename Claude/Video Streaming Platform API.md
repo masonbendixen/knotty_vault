@@ -9,7 +9,7 @@ tags:
 ---
 # Overview
 
-Split from [[Video Streaming Platform]] on 11/16/2026. Mason asked for the development work to move here, so that document can hold the partner's work: gear, accounts, experiments and scripting, but no application code.
+Split from [[Video Streaming Platform]] on 11/16/2026. Mason asked for the development work to move here, so that document can hold the work of Mason's partner, Caleb: gear, accounts, experiments and scripting, but no application code.
 
 The requirements (the phase list, from "Record and serve simple video" to "Allow interaction with viewers") are in the Overview of [[Video Streaming Platform]] and aren't repeated here. The working instructions from that Overview apply to this document too:
 
@@ -25,15 +25,15 @@ The requirements (the phase list, from "Record and serve simple video" to "Allow
   - the development items in Phases 0–11
   - the decisions D-1 to D-5, Open Questions 1–22, the risks and the process notes
   - the history below
-- **Stayed in [[Video Streaming Platform]], now the partner's document:**
+- **Stayed in [[Video Streaming Platform]], now Caleb's document:**
   - **Phase 0's hands-on probes:** 0.2 (cameras and mics), 0.3 (phone), the account and upload checks in 0.4, the imports in 0.5, 0.7 (interaction), and the OBS checks in 0.8. Their numbers are unchanged, and each one's code side stays here as a short entry.
   - **0.6 grew into a pipeline lab:** intros and outros whose title is set by a script, editing after a stream, and a logo morph. Its results come back as production decisions (PD-1 to PD-5) and settle OQ-14 and OQ-15.
   - **The tool survey** (formerly "Tools surveyed, by job"), now its Tool landscape.
   - **Non-code work for each development phase,** including the hand tests in each phase's Verification.
 - **Plan changes that came with the split:**
-  - **`youtube_probe` is dropped.** The partner checks R-5 and R-6 with a short Python upload script. The C++ `YouTubeClient` is still built in 1.8.
+  - **`youtube_probe` is dropped.** Caleb checks R-5 and R-6 with a short Python upload script. The C++ `YouTubeClient` is still built in 1.8.
   - **Phase 2's approach is open again.** HTML/CSS cards (I-3) were the default. If the lab picks a Blender template or FFmpeg over a rendered background, 2.2–2.4 change; the end of 2.4 sketches both.
-  - **Open Questions are numbered across both documents.** This one keeps 1–22, and the partner's document continues from 23.
+  - **Open Questions are numbered across both documents.** This one keeps 1–22, and Caleb's document continues from 23.
 - **Nothing was built or tested in this update.**
 
 Earlier history, from before the split:
@@ -95,7 +95,7 @@ As the Overview asks, this draft starts with research, ideas and questions, then
 | R-12 | **Qt 6.12 LTS was released 9/30/2026** and is supported to 2031.<br>• Since Qt 6.10 the Windows Media Foundation backend is deprecated, and FFmpeg is the default.<br>• video_library had to work around an FFmpeg-backend crash when the playback rate changed. | • The editor's preview player can't rely on QMediaPlayer for variable speed.<br>• Candidates: OBS's own media source, or **libmpv** (speed changes with pitch correction).<br>• Phase 0.8 decides. |
 | R-13 | **Hardware switchers already do "edit later".** Blackmagic's ATEM Mini Pro ISO and Extreme ISO record every input, plus a DaVinci Resolve project that contains the live cuts. | • Proves the "live decisions are just the default edit" model works.<br>• A buy-instead-of-build fallback for multi-camera if the software path disappoints. |
 
-The tool survey (formerly "Tools surveyed, by job") moved to [[Video Streaming Platform]] as its **Tool landscape**, where the partner's pipeline lab works through it.
+The tool survey (formerly "Tools surveyed, by job") moved to [[Video Streaming Platform]] as its **Tool landscape**, where Caleb's pipeline lab works through it.
 
 # Ideas
 
@@ -244,7 +244,7 @@ Crow reads each request body fully into memory. Large files therefore arrive as 
 | **[web]** | the creator_studio demo site |
 | **[app]** | the Qt creator app |
 | **[Mason]** | needs Mason: purchases, accounts in Mason's name, git |
-| **[Partner]** | Mason's partner; the task itself is in [[Video Streaming Platform]] |
+| **[Caleb]** | Caleb, Mason's partner; the task itself is in [[Video Streaming Platform]] |
 
 **Order inside each phase, lowest layer first:**
 1. **[hw]:** schema → table helpers → business logic → endpoints.
@@ -262,7 +262,7 @@ Crow reads each request body fully into memory. Large files therefore arrive as 
 
 Goal: answer the questions that would be expensive to get wrong, using small throwaway probes rather than production code. Each item ends with a short findings note under **Decisions**.
 
-Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Platform]], under the same numbers. What stays here is each probe's code, and what the code needs from it.
+Since 11/16/2026 the hands-on probes are Caleb's, in [[Video Streaming Platform]], under the same numbers. What stays here is each probe's code, and what the code needs from it.
 
 ### 0.1 OBS control probe
 - [x] [Mason] Update OBS from 32.1.1 to 33.0.0. Turn on the WebSocket server (Tools › WebSocket Server Settings) and note the password. ✅ 2026-10-29
@@ -325,8 +325,8 @@ Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Pla
     - **One input, many layouts:** one input in two scenes with two transforms works. That's the layout model (I-2) in miniature.
 
 ### 0.2 Multi-source capture probe
-- [ ] [Partner] Make the recording and write up its findings: [[Video Streaming Platform#0.2 Multi-source capture probe]]. The camera and microphone recommendations are there too.
-- [ ] [app] Check the record clock for drift (D-5): run `obs_probe watch` during the partner's 10-minute recording, then compare its stamps for a few scene switches with the file, using ffprobe and a frame check like 0.1's.
+- [ ] [Caleb] Make the recording and write up its findings: [[Video Streaming Platform#0.2 Multi-source capture probe]]. The camera and microphone recommendations are there too.
+- [ ] [app] Check the record clock for drift (D-5): run `obs_probe watch` during Caleb's 10-minute recording, then compare its stamps for a few scene switches with the file, using ffprobe and a frame check like 0.1's.
 - **What the code needs from 0.2:**
   - whether ISO files start together, or need lining up (5.2, 5.3)
   - how many NVENC sessions one session uses (5.2, 6.3, 7.1)
@@ -335,13 +335,13 @@ Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Pla
   - which USB audio device carries the Vox SE (5.2)
 
 ### 0.3 Phone capture probe
-- [ ] [Partner] Moved: [[Video Streaming Platform#0.3 Phone capture probe]].
+- [ ] [Caleb] Moved: [[Video Streaming Platform#0.3 Phone capture probe]].
 - **What the code needs:**
   - the Phase 1 capture route, for 1.8's `ImportService`
   - the Phase 5 route for a phone as a live camera (OQ-13)
 
 ### 0.4 YouTube probe
-- [ ] [Partner] Set up the accounts and the Google Cloud project, then check R-5 and R-6 with a short Python upload script, which replaces a Qt `youtube_probe`: [[Video Streaming Platform#0.4 YouTube accounts and upload checks]].
+- [ ] [Caleb] Set up the accounts and the Google Cloud project, then check R-5 and R-6 with a short Python upload script, which replaces a Qt `youtube_probe`: [[Video Streaming Platform#0.4 YouTube accounts and upload checks]].
 - [ ] [web] Run the embed checks on a throwaway test page. Serve it over http: an embed on a page with no referrer, such as a `file://` page, can fail.
   - an unlisted video in a youtube-nocookie iframe
   - `setPlaybackRate`
@@ -352,28 +352,28 @@ Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Pla
   - cuts between angles
   - one PIP segment
   - chapter markers
-- [ ] [Partner] Import the timeline into free Resolve and into Kdenlive, and report what survives: [[Video Streaming Platform#0.5 Editing hand-off check]].
+- [ ] [Caleb] Import the timeline into free Resolve and into Kdenlive, and report what survives: [[Video Streaming Platform#0.5 Editing hand-off check]].
 - The findings feed OQ-15 (Resolve Studio) and 7.2.
 
 ### 0.6 Intro/outro probe
-- [ ] [Partner] Expanded into the pipeline lab: [[Video Streaming Platform#Pipeline lab]].
+- [ ] [Caleb] Expanded into the pipeline lab: [[Video Streaming Platform#Pipeline lab]].
 - [ ] [web] For the lab's E-8 (the HTML/CSS card, I-3): build a throwaway card page that reads `?title=` and plays a short animation on a transparent background, plus a Lottie variant. This is the only lab item that needs code.
 - **What the code needs:** PD-1, the intro and outro pipeline. It settles OQ-14 and the shape of Phase 2.
 
 ### 0.7 Interaction probe
-- [ ] [Partner] Moved: [[Video Streaming Platform#0.7 Interaction probe]]. VDO.Ninja, LiveKit Cloud and MediaMTX are all set up through their own apps and settings, without code.
+- [ ] [Caleb] Moved: [[Video Streaming Platform#0.7 Interaction probe]]. VDO.Ninja, LiveKit Cloud and MediaMTX are all set up through their own apps and settings, without code.
 - **What the code needs:**
   - the Phase 9 stack (OQ-16)
   - whether YouTube stays the broadcast layer (OQ-17)
 
 ### 0.8 Variable-speed probe
-- [ ] [Partner] The OBS side (media source speeds, Replay Source, freeze frames, narration) and a listening test of mpv at different speeds: [[Video Streaming Platform#0.8 Variable-speed checks]].
+- [ ] [Caleb] The OBS side (media source speeds, Replay Source, freeze frames, narration) and a listening test of mpv at different speeds: [[Video Streaming Platform#0.8 Variable-speed checks]].
 - [ ] [app] **Editor preview player:** compare QMediaPlayer (FFmpeg backend) with libmpv, both from 0.25× to 2× with audio. Keep video_library's swresample crash in mind.
 - [ ] Findings: the Phase 4 approach.
 
 ### 0.9 Decision record
 - [ ] Fill in **Decisions** from 0.1–0.8, and settle the open questions they answer.
-  - Include any of the partner's production decisions that change code, PD-1 above all.
+  - Include any of Caleb's production decisions that change code, PD-1 above all.
 - [ ] Then add detail to Phase 1's remaining items.
 
 ## Phase 1 — Record and serve simple video
@@ -482,7 +482,7 @@ Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Pla
   - a session file round trip
 
 ### 1.9 Verification
-- [ ] [Partner] Hand test, starting from a blank database:
+- [ ] [Caleb] Hand test, starting from a blank database:
   1. Sign in to the demo site as the seeded creator.
   2. Use Manage › Add video to add one from a YouTube link.
   3. Restrict it to a permission.
@@ -498,7 +498,7 @@ Since 11/16/2026 the hands-on probes are the partner's, in [[Video Streaming Pla
 
 Goal: every published video gets the studio's intro and outro, with transitions, without any per-video design work.
 
-**The approach waits on the partner's pipeline lab (PD-1, OQ-14).** 2.1–2.4 below describe the previous default, HTML/CSS cards (I-3). The end of 2.4 sketches how the alternatives change it.
+**The approach waits on Caleb's pipeline lab (PD-1, OQ-14).** 2.1–2.4 below describe the previous default, HTML/CSS cards (I-3). The end of 2.4 sketches how the alternatives change it.
 
 ### 2.1 [hw] Templates
 - [ ] Add `video_templates` with these fields:
@@ -532,7 +532,7 @@ Goal: every published video gets the studio's intro and outro, with transitions,
   - the render job's state machine
 - **If the lab picks a different approach:**
   - **A Blender template:**
-    - The partner's `.blend` template and title script become versioned brand assets, in `creator_studio/brand/`.
+    - Caleb's `.blend` template and title script become versioned brand assets, in `creator_studio/brand/`.
     - `TitleCardRenderer` runs `blender -b <template> -P set_title.py -- <parameters>` through `ProcessRunner`.
     - `video_templates` points at the template file rather than a component.
     - 2.2 and 2.3 shrink to a preview. Live use in OBS is through a rendered stinger, not a browser source.
@@ -739,7 +739,7 @@ Goal: viewers control playback speed. The creator can run footage slower, faster
 
 # Decisions
 
-Filled in as Phase 0 lands and questions get answered. Production decisions (PD-n: which intro pipeline, which editor, and so on) are recorded in the partner's document, and any that change code are copied here.
+Filled in as Phase 0 lands and questions get answered. Production decisions (PD-n: which intro pipeline, which editor, and so on) are recorded in Caleb's document, and any that change code are copied here.
 
 | # | Decision | Chosen | Date | Why |
 |---|---|---|---|---|
@@ -797,11 +797,11 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
     - **Default until you say: this PC, two cameras, one phone and one wireless mic.**
     - *10/29: if you're buying, the recommendation is two OBSBOT Tiny 3 Lite USB-C cameras, about $400–520 all in. The reasoning and the alternatives are in 0.2.*
     - *10/30: you bought the two Tiny 3 Lite cameras and ordered one OBSBOT Vox SE mic ($59), which pairs with a camera directly. See 0.2. Still open: the phone, and whether this PC is the studio machine.*
-    - *11/16: the gear work (0.2) moved to the partner's document, and the partner answers the phone question in 0.3.*
+    - *11/16: the gear work (0.2) moved to Caleb's document, and Caleb answers the phone question in 0.3.*
 12. **How much editing to build into the app.**
     - **Default: a guided editor in the app (trim, split, reorder, splice, voice-over, overlays, speed), plus OTIO export to Resolve for anything beyond that.**
     - Alternative: skip editing in the app and go straight to Resolve. That's fewer features to build, but more steps for every video.
-    - *11/16: the partner's editing bake-off (E-9) shows how much editing a weekly class really needs.*
+    - *11/16: Caleb's editing bake-off (E-9) shows how much editing a weekly class really needs.*
 13. **When a phone becomes a wireless camera (I-4): Phase 5 or Phase 9?**
     - **Default: Phase 5 uses apps like Camo or DroidCam. Our own web component arrives in Phase 9 and replaces them.**
     - Pull it forward if you'd rather not depend on a third-party app.
@@ -811,11 +811,11 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
       - FFmpeg `drawtext` cards: the simplest, and the plainest.
       - Remotion: needs a company license if Knotty Yoga counts as more than 3 people. Does it?
       - Motion Canvas.
-    - *11/16: the partner's pipeline lab answers this (PD-1). Remotion's 2026 license is still free for companies of up to 3 people, counting everyone involved when companies work together.*
+    - *11/16: Caleb's pipeline lab answers this (PD-1). Remotion's 2026 license is still free for companies of up to 3 people, counting everyone involved when companies work together.*
 15. **DaVinci Resolve Studio ($295).**
     - **Default: not yet. Use free Resolve with OTIO import.**
     - Studio adds scripting, so the app could create Resolve projects automatically. Revisit after 0.5.
-    - *11/16: answered by the partner's 0.5 import check and the lab's editing bake-off (E-9).*
+    - *11/16: answered by Caleb's 0.5 import check and the lab's editing bake-off (E-9).*
 
 **Live and interaction**
 
@@ -828,7 +828,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
 17. **The broadcast layer.**
     - **Default: YouTube Live**, as the business plan decided. Revisit after 0.7.
     - Self-hosting through MediaMTX would give a real paywall and no YouTube branding. The cost is running it and paying for delivery.
-    - *11/16: the partner's 0.7 answers this and question 16.*
+    - *11/16: Caleb's 0.7 answers this and question 16.*
 18. **Licensing of the creator app.**
     - Linking libobs (Phase 10) makes the app GPLv2 if it's ever distributed.
     - **Default: stay on the websocket (no linking) until you decide whether the app will ever be given or sold to other creators.**
@@ -871,7 +871,7 @@ Answer inline under each one, starting your answer with "Mason-". The **bold** t
   - mocks for every access seam
   - no assumed collection order
 - **Builds and git:** I build and test per OQ-6. Git is yours, and I only read history.
-- **The partner's work:** hands-on tasks, experiments and hand tests live in [[Video Streaming Platform]]. Results come back here as decisions when they change code.
+- **Caleb's work:** hands-on tasks, experiments and hand tests live in [[Video Streaming Platform]]. Results come back here as decisions when they change code.
 - **Bump points:** every honuware change follows the same rhythm:
   1. co-dev build
   2. you push

@@ -73,7 +73,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Plan status
 
-**v0.7 (11/16/2026): this is now the hands-on document.** Mason's partner is taking on much of this project. He is technical but not a developer, so the plan is now in two documents:
+**v0.7 (11/16/2026): this is now the hands-on document.** Caleb, Mason's partner, is taking on much of this project. Caleb is technical but not a developer, so the plan is now in two documents:
 - **This document:** gear, accounts, installs, studio setup, experiments, scripting (command lines, batch files, small Python or Blender scripts), brand assets, rehearsals and hand testing. Nothing here needs application code.
 - **[[Video Streaming Platform API]]:** the development work. That covers the architecture, the code in each phase, the research behind it, the technical decisions (D-n) and Open Questions 1–22. The history of v0.2–v0.6 moved there too, since it's about code.
 - **New in this version:**
@@ -82,7 +82,7 @@ Please create a plan with phases of implementation. Within each phase, please re
     - how recordings get edited after a stream
     - how to make a logo morph from an aerial move
   - **a Tool landscape,** expanded from the old tool survey with the tools the lab compares
-  - **what the partner does alongside each development phase**
+  - **what Caleb does alongside each development phase**
 - **Moved in from the old Phase 0:**
   - 0.2, the cameras and mics, with Mason's purchases
   - 0.3
@@ -99,10 +99,10 @@ Please create a plan with phases of implementation. Within each phase, please re
   - later, stream live and bring viewers on camera
 
   The business case is in [[Streaming Platform for Creators Business Plan]].
-- **Your part.** Items tagged **[Partner]** are yours. Items tagged **[Mason]** need Mason: purchases, accounts that must be in Mason's name, and decisions. Untagged items are shared.
+- **Your part.** Items tagged **[Caleb]** are yours. Items tagged **[Mason]** need Mason: purchases, accounts that must be in Mason's name, and decisions. Untagged items are shared.
 - **Recording results.** Each experiment has a **Findings** item and a **Recommendation** line. Fill them in as you go, including what didn't work. Mason reads the recommendation and decides, and the decision goes in **Production decisions**.
 - **Ticking boxes.** Tick an item when it's done and add the date, like `✅ 2026-11-20`.
-- **Questions.** Answer inline under each question in **Open Questions**, starting your answer with "Partner-". Mason's answers start with "Mason-". Every question has a default, which is used if nobody answers.
+- **Questions.** Answer inline under each question in **Open Questions**, starting your answer with "Caleb-". Mason's answers start with "Mason-". Every question has a default, which is used if nobody answers.
 - **Files.** Lab inputs, scripts and renders go in the shared folder from OQ-23, in one subfolder per experiment (`E-03 Blender`, …). Name each render after its experiment and title, like `E-03_aerial-rope-foot-locks_v2.mp4`.
 - **Scripts.** The lab is about command lines and small scripts, because the winning pipeline has to run with nobody at the keyboard. Claude can write a first version of any script here (OQ-30). Paste section L.1, *Shared inputs*, into the request along with what the script should do.
 
@@ -133,7 +133,7 @@ Every experiment uses the same inputs, so the results compare fairly.
   - **Right:** the wordmark "KNOTTY YOGA", in white.
   - Because so much of it is white, this version only works on dark backgrounds.
 - [ ] [Mason] Find the designer's source files (Illustrator or Figma), and export three versions: the mark alone, the wordmark alone, and the full logo for light backgrounds (OQ-29). Until then, the SVG is the source.
-- [ ] [Partner] Make transparent PNGs, 3840 px wide, of the full logo and of the mark alone. Some tools, FFmpeg among them, can't read SVG.
+- [ ] [Caleb] Make transparent PNGs, 3840 px wide, of the full logo and of the mark alone. Some tools, FFmpeg among them, can't read SVG.
 - **Colours:** the website's brand red is `#ED1C26`, the same red as the logo's `#EC1C25`. The site's full palette is on its style guide page (Admin › Style Guide); ask Mason for a screenshot.
 - **Fonts:** headings and display text are in **Barlow** (bold and condensed weights), and body text is in **Roboto**. Both are free from Google Fonts. Install them on every machine that renders.
 
@@ -195,8 +195,8 @@ Run E-1 first: every other experiment has to beat it. Each experiment makes an i
 
 ### E-1 FFmpeg only (the baseline)
 FFmpeg is a free command-line tool that can do nearly anything to video, with no window at all. Here it draws the title over a dark background with the logo, fades it in, and joins the pieces.
-- [ ] [Partner] Install FFmpeg (`winget install Gyan.FFmpeg`) on the machine you use. Mason's laptop already has it.
-- [ ] [Partner] Write `make_intro`, a PowerShell or Python script that reads `titles.csv` and makes one intro per row. A starting point for one title, in PowerShell:
+- [ ] [Caleb] Install FFmpeg (`winget install Gyan.FFmpeg`) on the machine you use. Mason's laptop already has it.
+- [ ] [Caleb] Write `make_intro`, a PowerShell or Python script that reads `titles.csv` and makes one intro per row. A starting point for one title, in PowerShell:
   ```powershell
   $row = (Import-Csv titles.csv -Encoding UTF8)[0]
   [IO.File]::WriteAllText("$PWD\title.txt", $row.title)
@@ -207,7 +207,7 @@ FFmpeg is a free command-line tool that can do nearly anything to video, with no
   - **Write `title.txt` as UTF-8 without a BOM,** as above. In Windows PowerShell, `Set-Content` would mangle the accents, and `Import-Csv` needs `-Encoding UTF8` for the same reason.
   - **Keep the font file next to the script** (`fontfile=Barlow-Bold.ttf`). A Windows path such as `C:/…` needs its colon escaped inside a filter.
   - **Long titles:** `drawtext` doesn't wrap or shrink text, so the script has to pick a smaller `fontsize` for long titles or split them over two lines.
-- [ ] [Partner] Write `join`, which puts the intro, the class and the outro together with short cross-fades and evens out the loudness. The core of it, for the intro and the class:
+- [ ] [Caleb] Write `join`, which puts the intro, the class and the outro together with short cross-fades and evens out the loudness. The core of it, for the intro and the class:
   ```powershell
   ffmpeg -i intro.mp4 -i class.mp4 -filter_complex "[0:v][1:v]xfade=transition=fade:duration=0.5:offset=5.5[v];[0:a][1:a]acrossfade=d=0.5,loudnorm=I=-14:TP=-1[a]" -map "[v]" -map "[a]" -c:v libx264 -c:a aac -ar 48000 out.mp4
   ```
@@ -219,8 +219,8 @@ FFmpeg is a free command-line tool that can do nearly anything to video, with no
 
 ### E-2 FFmpeg over a designed background
 E-2 aims for the look of E-3 or E-7 at the speed of E-1. Render a background animation once, with a clear band for the title, and let FFmpeg draw each title over it.
-- [ ] [Partner] Make a 6–8 s background, from E-3 (Blender), from E-7 (AI), or from a stock motion background.
-- [ ] [Partner] Change E-1's script to use it in place of the plain colour (`-i background.mp4`).
+- [ ] [Caleb] Make a 6–8 s background, from E-3 (Blender), from E-7 (AI), or from a stock motion background.
+- [ ] [Caleb] Change E-1's script to use it in place of the plain colour (`-i background.mp4`).
 - [ ] Findings: the scorecard.
 - **Recommendation:**
 - *This is the likely sweet spot. The expensive part is made once, and each new title costs seconds.*
@@ -228,13 +228,13 @@ E-2 aims for the look of E-3 or E-7 at the speed of E-1. Render a background ani
 ### E-3 Blender template
 Blender is free 3D and motion-graphics software. Python can control all of it, and it renders without opening its window (`-b`). One template file holds the design, and a short script swaps the title and renders.
 - **Version:** use **Blender 5.2 LTS**, which is supported to July 2028, so the template keeps working. Blender 5.3 came out on 11/10/2026.
-- [ ] [Partner] Build `intro.blend`:
+- [ ] [Caleb] Build `intro.blend`:
   - **The title:** a text object named `Title`, in Barlow. Give it a text box (Object Data properties › Text Boxes) and set **Paragraph › Overflow** to **Scale to Fit**, so long titles shrink to fit.
   - **The logo:** imported as curves (File › Import › SVG), given depth and a red material.
   - **Motion:** a camera move, lights, and a 4–8 s animation.
   - **Render engine:** **Eevee**, which is much faster than Cycles.
   - **Transparency:** turn on Film › **Transparent**, for the alpha version.
-- [ ] [Partner] Write `set_title.py`:
+- [ ] [Caleb] Write `set_title.py`:
   ```python
   import bpy, sys
   title, output = sys.argv[sys.argv.index("--") + 1:][:2]
@@ -246,7 +246,7 @@ Blender is free 3D and motion-graphics software. Python can control all of it, a
   ```powershell
   Import-Csv titles.csv -Encoding UTF8 | ForEach-Object { blender -b intro.blend -P set_title.py -- $_.title "out/$($_.slug)_" }
   ```
-- [ ] [Partner] Render to a PNG sequence with transparency. Then use FFmpeg to make the MP4, the ProRes 4444 master, and the WebM for OBS.
+- [ ] [Caleb] Render to a PNG sequence with transparency. Then use FFmpeg to make the MP4, the ProRes 4444 master, and the WebM for OBS.
 - [ ] Findings:
   - the scorecard
   - the render time per intro on each machine; Mason's laptop has no NVIDIA GPU
@@ -255,13 +255,13 @@ Blender is free 3D and motion-graphics software. Python can control all of it, a
 
 ### E-4 OBS alone, live
 There's no rendering in this one. The intro is an OBS scene that plays at the start of every class and is recorded along with it.
-- [ ] [Partner] Build an `Intro` scene:
+- [ ] [Caleb] Build an `Intro` scene:
   - **A looping background:** a media source playing E-2's background or E-7's loop.
   - **The logo:** an image source.
   - **The title:** a **Text (GDI+)** source with **Read from file** ticked, pointing at `current_title.txt`. Change the file, and the title changes, even live.
   - **Motion:** Exeldro's **Move** plugin, which moves and fades sources when the scene changes. Check that it loads on OBS 33, which moved where plugins go (API document R-1).
-- [ ] [Partner] Automate the start. Exeldro's **Advanced Scene Switcher** plugin can switch from `Intro` to the camera scene after 6 s, and play the outro on a hotkey.
-- [ ] [Partner] Add a stinger transition made in E-3 or E-6 (the transparent WebM), and check that it plays smoothly while recording.
+- [ ] [Caleb] Automate the start. Exeldro's **Advanced Scene Switcher** plugin can switch from `Intro` to the camera scene after 6 s, and play the outro on a hotkey.
+- [ ] [Caleb] Add a stinger transition made in E-3 or E-6 (the transparent WebM), and check that it plays smoothly while recording.
 - [ ] Findings: the scorecard, and whether anything stutters while recording and streaming at once.
 - **Recommendation:**
 - *Later, the creator app will set the title through OBS's websocket, and `current_title.txt` will go away.*
@@ -269,8 +269,8 @@ There's no rendering in this one. The intro is an OBS scene that plays at the st
 ### E-5 DaVinci Resolve title template
 Resolve's Fusion page builds animated titles that can be saved as templates. The title text then shows as a field you fill in on the Edit page.
 - [ ] [Mason] Install DaVinci Resolve 21 (free), unless 0.5 already has.
-- [ ] [Partner] Build the intro as a Fusion title, and save it as a template with the text published as a control. Do the same for the outro.
-- [ ] [Partner] Make a project template containing the intro, a placeholder for the class, the outro, the transitions, and a "YouTube 1080p" render preset.
+- [ ] [Caleb] Build the intro as a Fusion title, and save it as a template with the text published as a control. Do the same for the outro.
+- [ ] [Caleb] Make a project template containing the intro, a placeholder for the class, the outro, the transitions, and a "YouTube 1080p" render preset.
 - [ ] Findings: the scorecard.
   - Since Resolve 21.1, scripting is Studio-only ($295; API document R-4), so in the free edition every title is typed by hand.
   - Is that acceptable when the video is being edited in Resolve anyway (L.4)?
@@ -278,16 +278,16 @@ Resolve's Fusion page builds animated titles that can be saved as templates. The
 
 ### E-6 Template services: Canva and Jitter
 This is the no-code end: online design tools with animated templates, where a spreadsheet fills in the text.
-- [ ] [Partner] **Canva:** design an intro and outro, then run **Bulk Create** with `titles.csv`. It needs Canva Pro or higher and the desktop website. Check that it makes one video per row; most guides only show it making images.
-- [ ] [Partner] **Jitter:** do the same with Jitter's Bulk Create, which added CSV import on 7/21/2026. Check which plan it needs, and whether it exports video with transparency.
+- [ ] [Caleb] **Canva:** design an intro and outro, then run **Bulk Create** with `titles.csv`. It needs Canva Pro or higher and the desktop website. Check that it makes one video per row; most guides only show it making images.
+- [ ] [Caleb] **Jitter:** do the same with Jitter's Bulk Create, which added CSV import on 7/21/2026. Check which plan it needs, and whether it exports video with transparency.
 - [ ] Findings: the scorecard. Both fail row 8 unless their APIs can render with nobody signed in, so check what each offers and on which plan.
 - **Recommendation:**
 
 ### E-7 AI-generated background loops
 Today's AI video models make beautiful motion, but still mangle exact text and logos (API document R-11). So use them for backgrounds only, and lay the title on top with E-2.
-- [ ] [Partner] Generate 6–8 s loops, such as red silk rippling on black, slow light moving across the studio, or chalk dust in a beam of light. Try two or three services among Veo 3.1 (Google), Kling and Luma.
-- [ ] [Partner] **Make them loop seamlessly.** Give a model that takes both a first and a last frame (see L.5's list) the same image for both, or use Luma's loop option.
-- [ ] [Partner] Record the cost of each usable clip. Read each service's terms for commercial use on the plan you used.
+- [ ] [Caleb] Generate 6–8 s loops, such as red silk rippling on black, slow light moving across the studio, or chalk dust in a beam of light. Try two or three services among Veo 3.1 (Google), Kling and Luma.
+- [ ] [Caleb] **Make them loop seamlessly.** Give a model that takes both a first and a last frame (see L.5's list) the same image for both, or use Luma's loop option.
+- [ ] [Caleb] Record the cost of each usable clip. Read each service's terms for commercial use on the plan you used.
 - [ ] Findings: the scorecard, judged with the background used in E-2.
 - **Recommendation:**
 
@@ -299,7 +299,7 @@ This was the API document's default (idea I-3): the title card is a web page.
 
 It scores well on rows 6–8 by design, so the question is whether it can look as good as the others.
 - [ ] [Mason] Build a throwaway card page that reads the title from its address (`?title=`). This is API document 0.6.
-- [ ] [Partner] Try it as an OBS browser source, and judge its look against E-3 and E-2.
+- [ ] [Caleb] Try it as an OBS browser source, and judge its look against E-3 and E-2.
 - [ ] Findings: the scorecard.
 - **Recommendation:**
 
@@ -342,13 +342,13 @@ The results also tell Mason how much editing to build into the creator app (API 
 F-5 is a hand-made rehearsal of what the creator app will automate in Phases 5 and 7. If re-cutting the angles afterward isn't worth the time when done by hand, Mason should know that before building it.
 
 ### E-9 Editing bake-off
-- [ ] [Partner] Take one real 15–20 minute class recorded with two cameras (from 0.2), and finish it through F-1 to F-5. Add F-6 or F-7 if you like.
-- [ ] [Partner] For each flow, log:
+- [ ] [Caleb] Take one real 15–20 minute class recorded with two cameras (from 0.2), and finish it through F-1 to F-5. Add F-6 or F-7 if you like.
+- [ ] [Caleb] For each flow, log:
   - your hands-on minutes
   - the render time
   - what went wrong
   - whether someone else could repeat it from your notes
-- [ ] [Partner] Show Mason the finished videos side by side, without saying which flow made which.
+- [ ] [Caleb] Show Mason the finished videos side by side, without saying which flow made which.
 - [ ] Findings: the scorecard rows that apply (1, 3, 4, 5 and 8).
 - **Recommendation:** the default flow for a weekly class, and when to use something else.
 
@@ -362,9 +362,9 @@ F-5 is a hand-made rehearsal of what the creator app will automate in Phases 5 a
 **The key: choreograph backward from the logo.** The closer the last live frame matches the mark's silhouette, the easier every technique below gets, and the less an AI model has to invent.
 
 ### Shoot
-- [ ] [Partner] Study the mark. Print it, and note the body's angle, where the fabric runs, and where the head, hands and feet are.
-- [ ] [Partner] With the performer (OQ-27), choreograph a 3–5 s move that ends holding exactly that shape for 2 s.
-- [ ] [Partner] Shoot it:
+- [ ] [Caleb] Study the mark. Print it, and note the body's angle, where the fabric runs, and where the head, hands and feet are.
+- [ ] [Caleb] With the performer (OQ-27), choreograph a 3–5 s move that ends holding exactly that shape for 2 s.
+- [ ] [Caleb] Shoot it:
   - with the camera **locked on a tripod**, at the angle that matches the mark
   - against a **plain background**: plain is what makes cutting the performer out possible, and dark suits the white logo
   - with even, steady light, and the white balance and exposure locked
@@ -372,7 +372,7 @@ F-5 is a hand-made rehearsal of what the creator app will automate in Phases 5 a
   - with fabric as close to the logo's red as you can get; it can be colour-corrected later
   - in 5–10 takes, plus 5 s of the empty background (a "clean plate") from each camera position
   - optionally with the move in reverse, rising into the pose, for the outro
-- [ ] [Partner] Pick the best take, and export its last frame as a still. Every technique starts from it.
+- [ ] [Caleb] Pick the best take, and export its last frame as a still. Every technique starts from it.
 
 ### Ways to make the morph
 
@@ -405,10 +405,10 @@ F-5 is a hand-made rehearsal of what the creator app will automate in Phases 5 a
 - **Not covered:** Kling 4.0 came out on 10/15/2026, after the survey.
 
 ### E-10 Logo morph
-- [ ] [Partner] Make **M-1 first**, from the best take. It's the safe version.
-- [ ] [Partner] Try **M-3 alongside it**, for about an hour: 5–10 tries on each of two models, from the same first and last frames.
-- [ ] [Partner] If M-3 makes a good middle, **combine them**: real footage, then the AI transformation, then M-1's exact landing on the vector mark.
-- [ ] [Partner] Export the result as an MP4 and as a transparent version, and try it ahead of E-1's intro.
+- [ ] [Caleb] Make **M-1 first**, from the best take. It's the safe version.
+- [ ] [Caleb] Try **M-3 alongside it**, for about an hour: 5–10 tries on each of two models, from the same first and last frames.
+- [ ] [Caleb] If M-3 makes a good middle, **combine them**: real footage, then the AI transformation, then M-1's exact landing on the vector mark.
+- [ ] [Caleb] Export the result as an MP4 and as a transparent version, and try it ahead of E-1's intro.
 - [ ] Findings:
   - the time and money spent
   - which looked best
@@ -417,10 +417,10 @@ F-5 is a hand-made rehearsal of what the creator app will automate in Phases 5 a
 - *Keep M-2 and M-5 in reserve, in case the first two look cheap.*
 
 ## L.6 Sound: the intro sting and music
-- [ ] [Partner] Find three candidate 2–4 s stings for the intro, and a 15–20 s music bed for the outro.
+- [ ] [Caleb] Find three candidate 2–4 s stings for the intro, and a 15–20 s music bed for the outro.
   - **Sources:** YouTube's Audio Library (free on YouTube), a licensed library such as Epidemic Sound or Artlist (subscriptions), or a commissioned piece.
   - **AI-made music:** read the service's terms on who owns the result before using it.
-- [ ] [Partner] Check each candidate against YouTube's copyright matching (Content ID). Upload a test video as private: the Checks step of the upload reports any copyright claim. A claim on the intro would mean a claim on every class.
+- [ ] [Caleb] Check each candidate against YouTube's copyright matching (Content ID). Upload a test video as private: the Checks step of the upload reports any copyright claim. A claim on the intro would mean a claim on every class.
 - [ ] Findings.
 - **Recommendation:** (PD-5)
 
@@ -566,10 +566,10 @@ These are the original plan's probes that need hands rather than code. Their num
 - **Music:** a worn mic still picks up music from the room's speakers. Commercial music in a YouTube stream or upload can get the video muted or claimed (Content ID), so play music you're licensed to stream.
 - **Only if you want your voice independent of the cameras:** a USB-C wireless kit such as the DJI Mic Mini (two transmitters and a receiver, about $45–80 in the US lately) plugs its receiver into the PC. It takes a USB port, and its latency differs from the cameras', so OBS needs a sync offset. Not needed now.
 
-- [ ] [Partner] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11). If buying, the default is two OBSBOT Tiny 3 Lite cameras (see above).
+- [ ] [Caleb] Inventory the cameras, capture cards, phones and microphones you'd actually use (OQ-11). If buying, the default is two OBSBOT Tiny 3 Lite cameras (see above).
   - *10/30: two Tiny 3 Lite cameras bought, and one Vox SE mic ordered. Phone: still to confirm.*
-- [ ] [Partner] Install *Source Record* on OBS 33, in the new plugin folder.
-- [ ] [Partner] Record two cameras and one phone (as a webcam) for 10 minutes, with a separate ISO file per source.
+- [ ] [Caleb] Install *Source Record* on OBS 33, in the new plugin folder.
+- [ ] [Caleb] Record two cameras and one phone (as a webcam) for 10 minutes, with a separate ISO file per source.
 - [ ] Findings:
   - GPU and CPU load on the 3070 Ti, using NVENC for H.264/HEVC (30-series cards can't encode AV1)
   - whether the ISO files start at the same moment
@@ -583,8 +583,8 @@ These are the original plan's probes that need hands rather than code. Their num
   - how the Vox SE sounds next to a camera's built-in mic, recorded on separate tracks in the same session
 
 ## 0.3 Phone capture probe
-- [ ] [Partner] Find out which phone or phones would be used: iPhone or Android, and which model. Answer under OQ-11 in the API document, or tell Mason.
-- [ ] [Partner] Compare four ways of getting a phone's picture in, on quality, delay and fuss:
+- [ ] [Caleb] Find out which phone or phones would be used: iPhone or Android, and which model. Answer under OQ-11 in the API document, or tell Mason.
+- [ ] [Caleb] Compare four ways of getting a phone's picture in, on quality, delay and fuss:
   - the phone's camera app, then copying the file over
   - Camo, DroidCam or Iriun, which make the phone a webcam
   - the NDI HX Camera app with the DistroAV plugin in OBS
@@ -595,11 +595,11 @@ These are the original plan's probes that need hands rather than code. Their num
 - **Recommendation:**
 
 ## 0.4 YouTube accounts and upload checks
-- [ ] [Mason] Pick the channel or channels (API document OQ-7), and give the partner access to it. If it's a Brand Account, the Manager role is enough.
-- [ ] [Partner] Turn on live streaming for the channel now. It takes about 24 hours plus phone verification, and Phase 6 needs it.
-- [ ] [Partner] Create a Google Cloud project, turn on the YouTube Data API v3, and create an OAuth client of type *Desktop app*. Leave the consent screen in **Testing**, and add the channel owner's Google account as a test user.
-- [ ] [Partner] Upload a short clip as **unlisted** with a Python script that uses Google's API client library. Give it a title, and a description with chapter timestamps (`0:00 Intro`, `0:15 Warm-up`, `0:40 Demo`). Claude can write the script (OQ-30).
-- [ ] [Partner] Check two things Mason's code depends on:
+- [ ] [Mason] Pick the channel or channels (API document OQ-7), and give Caleb access to it. If it's a Brand Account, the Manager role is enough.
+- [ ] [Caleb] Turn on live streaming for the channel now. It takes about 24 hours plus phone verification, and Phase 6 needs it.
+- [ ] [Caleb] Create a Google Cloud project, turn on the YouTube Data API v3, and create an OAuth client of type *Desktop app*. Leave the consent screen in **Testing**, and add the channel owner's Google account as a test user.
+- [ ] [Caleb] Upload a short clip as **unlisted** with a Python script that uses Google's API client library. Give it a title, and a description with chapter timestamps (`0:00 Intro`, `0:15 Warm-up`, `0:40 Demo`). Claude can write the script (OQ-30).
+- [ ] [Caleb] Check two things Mason's code depends on:
   - **R-5:** does the upload stay **unlisted**, or does YouTube force it to private because the project hasn't been audited?
   - **R-6:** while the consent screen is in Testing, does sign-in stop working after 7 days? Run the script again on day 8, without signing in again.
 - [ ] Findings.
@@ -607,34 +607,34 @@ These are the original plan's probes that need hands rather than code. Their num
 ## 0.5 Editing hand-off check
 Mason's creator app will save each session's editing decisions as an OpenTimelineIO (`.otio`) file, which editors can import. This checks what survives the trip.
 - [ ] [Mason] Install DaVinci Resolve 21 (free), unless E-5 already has.
-- [ ] [Partner] Once Mason's `otio_probe` has written a timeline from 0.2's camera files, import it into free Resolve (File › Import › Timeline) and into Kdenlive.
-- [ ] [Partner] Note what survives in each: the cuts between cameras, the picture-in-picture position, the chapter markers, and the audio tracks.
-- [ ] [Partner] Check that free Resolve can play 0.2's camera files at all. 10-bit and 4:2:2 HEVC files need Studio.
+- [ ] [Caleb] Once Mason's `otio_probe` has written a timeline from 0.2's camera files, import it into free Resolve (File › Import › Timeline) and into Kdenlive.
+- [ ] [Caleb] Note what survives in each: the cuts between cameras, the picture-in-picture position, the chapter markers, and the audio tracks.
+- [ ] [Caleb] Check that free Resolve can play 0.2's camera files at all. 10-bit and 4:2:2 HEVC files need Studio.
 - [ ] Findings: is free Resolve with an imported timeline good enough, or is Studio ($295) worth buying (API document OQ-15)?
 
 ## 0.7 Interaction probe
 This is for Phase 9, where a viewer can be brought on camera. All three of these are set up through their own apps and settings files.
-- [ ] [Partner] **VDO.Ninja:** bring one remote guest (a friend at home) into OBS as a browser source. Check three things:
+- [ ] [Caleb] **VDO.Ninja:** bring one remote guest (a friend at home) into OBS as a browser source. Check three things:
   - that the guest doesn't hear themselves (mix-minus)
   - the round-trip delay
   - the picture quality
-- [ ] [Partner] **LiveKit:** run a room with two guests on LiveKit Cloud's free tier, and record each guest separately (track egress, through LiveKit's `lk` command-line tool).
-- [ ] [Partner] **MediaMTX:**
+- [ ] [Caleb] **LiveKit:** run a room with two guests on LiveKit Cloud's free tier, and record each guest separately (track egress, through LiveKit's `lk` command-line tool).
+- [ ] [Caleb] **MediaMTX:**
   - Run MediaMTX on a spare machine.
   - Send OBS's output to it over WHIP (OBS › Settings › Stream › Service: WHIP).
   - Watch it over WHEP in a browser.
   - Compare the delay with YouTube Live at its ultra-low latency setting.
-- [ ] [Partner] Test the studio's upload speed at class times, several times, since streaming depends on it.
+- [ ] [Caleb] Test the studio's upload speed at class times, several times, since streaming depends on it.
 - [ ] Findings:
   - which stack Phase 9 should use (API document OQ-16)
   - whether YouTube stays the broadcast for everyone else (OQ-17)
 
 ## 0.8 Variable-speed checks
 This is for Phase 4: slow motion and freeze frames while teaching.
-- [ ] [Partner] **OBS media source:** play a clip at 25%, 50% and 200% using its speed setting. Pause and resume, hold a freeze frame, and narrate live over it.
-- [ ] [Partner] **Replay Source on OBS 33:** an instant replay of a camera at half speed, with frame stepping.
-- [ ] [Partner] **Drawing on the picture:** try an OBS drawing plugin for arrows and circles on a paused frame (API document I-13). Note which ones work on OBS 33.
-- [ ] [Partner] **Listening test:** play a class clip with speech in the mpv player at 0.25×, 0.5×, 1.5× and 2× (`mpv --speed=0.5 clip.mp4`). How does the voice sound? Mason's editor will probably use the same engine.
+- [ ] [Caleb] **OBS media source:** play a clip at 25%, 50% and 200% using its speed setting. Pause and resume, hold a freeze frame, and narrate live over it.
+- [ ] [Caleb] **Replay Source on OBS 33:** an instant replay of a camera at half speed, with frame stepping.
+- [ ] [Caleb] **Drawing on the picture:** try an OBS drawing plugin for arrows and circles on a paused frame (API document I-13). Note which ones work on OBS 33.
+- [ ] [Caleb] **Listening test:** play a class clip with speech in the mpv player at 0.25×, 0.5×, 1.5× and 2× (`mpv --speed=0.5 clip.mp4`). How does the voice sound? Mason's editor will probably use the same engine.
 - [ ] Findings: the Phase 4 approach.
 
 # Alongside each development phase
@@ -642,28 +642,28 @@ This is for Phase 4: slow motion and freeze frames while teaching.
 This is the hands-on work for each phase of [[Video Streaming Platform API]]. Each phase there ends with a **Verification** section of hand tests. Those are yours to run once Mason says a phase is ready: start from a blank database and follow the menus as written.
 
 ## 1. Record and serve simple video
-- [ ] [Partner] Record three real sample classes to test with: a short one, a long one, and one with music.
-- [ ] [Partner] Set up the YouTube channel's look:
+- [ ] [Caleb] Record three real sample classes to test with: a short one, a long one, and one with music.
+- [ ] [Caleb] Set up the YouTube channel's look:
   - the banner and profile picture
   - a playlist for each type of class
   - default upload settings: unlisted, a category, and a description template
-- [ ] [Partner] Run Phase 1's Verification.
+- [ ] [Caleb] Run Phase 1's Verification.
 
 ## 2. Record and serve branded video
-- [ ] [Partner] Produce the final intro, outro and lower third with the pipeline chosen in PD-1, as reusable templates along with their scripts.
-- [ ] [Partner] Write down what each template needs: its fields, fonts, colours and files. Mason's code fills them in.
-- [ ] [Partner] Run Phase 2's Verification.
+- [ ] [Caleb] Produce the final intro, outro and lower third with the pipeline chosen in PD-1, as reusable templates along with their scripts.
+- [ ] [Caleb] Write down what each template needs: its fields, fonts, colours and files. Mason's code fills them in.
+- [ ] [Caleb] Run Phase 2's Verification.
 
 ## 3. Record and serve edited video
-- [ ] [Partner] Once the creator app's editor exists, edit two of the sample classes both in it and in PD-3's editor, and report what the app's editor is missing.
-- [ ] [Partner] Set up a quiet corner for voice-overs, and test the Vox SE, or another mic, for them.
+- [ ] [Caleb] Once the creator app's editor exists, edit two of the sample classes both in it and in PD-3's editor, and report what the app's editor is missing.
+- [ ] [Caleb] Set up a quiet corner for voice-overs, and test the Vox SE, or another mic, for them.
 
 ## 4. Playback speed
-- [ ] [Partner] Film material for slow motion: aerial and acro moves at 60 fps, or 120 if a camera can. Phase 4's slow playback and analysis are tested with it.
+- [ ] [Caleb] Film material for slow motion: aerial and acro moves at 60 fps, or 120 if a camera can. Phase 4's slow playback and analysis are tested with it.
 
 ## 5. Multiple cameras
-- [ ] [Partner] Plan the studio's camera positions, mounts and cable runs (10 m active USB cables), and its lighting. Steady LED light is what makes the cameras match.
-- [ ] [Partner] Build the six layouts by hand as OBS scenes, and use them in a real class:
+- [ ] [Caleb] Plan the studio's camera positions, mounts and cable runs (10 m active USB cables), and its lighting. Steady LED light is what makes the cameras match.
+- [ ] [Caleb] Build the six layouts by hand as OBS scenes, and use them in a real class:
   - each camera full screen
   - two side by side
   - two stacked
@@ -672,31 +672,31 @@ This is the hands-on work for each phase of [[Video Streaming Platform API]]. Ea
   - one camera with several picture-in-pictures
 
   Report which ones mattered. Mason's app will generate these scenes, and your trial shows Mason which ones to polish.
-- [ ] [Partner] Try the sync slate (a clap on camera at the start; API document I-11), and check that external recordings line up by it.
+- [ ] [Caleb] Try the sync slate (a clap on camera at the start; API document I-11), and check that external recordings line up by it.
 
 ## 6. Stream video in real time
-- [ ] [Partner] Write the run of show for a typical class as a cue list: intro, cameras, a clip, Q&A, outro (API document I-10).
-- [ ] [Partner] Stream three unlisted test classes to YouTube Live, and note dropped frames and other problems.
-- [ ] [Partner] Try a Stream Deck, a foot pedal, or a phone as a remote for changing scenes mid-move (API document OQ-22).
+- [ ] [Caleb] Write the run of show for a typical class as a cue list: intro, cameras, a clip, Q&A, outro (API document I-10).
+- [ ] [Caleb] Stream three unlisted test classes to YouTube Live, and note dropped frames and other problems.
+- [ ] [Caleb] Try a Stream Deck, a foot pedal, or a phone as a remote for changing scenes mid-move (API document OQ-22).
 
 ## 7. Edit previously streamed video
-- [ ] [Partner] Decide where session folders live (a fast SSD while recording, then the NAS), and script the copy to the NAS with `robocopy` (API document OQ-21).
-- [ ] [Partner] Measure the disk space a full session uses per hour, with every camera plus the program.
+- [ ] [Caleb] Decide where session folders live (a fast SSD while recording, then the NAS), and script the copy to the NAS with `robocopy` (API document OQ-21).
+- [ ] [Caleb] Measure the disk space a full session uses per hour, with every camera plus the program.
 
 ## 8. Section titles
-- [ ] [Partner] Write the list of chapter kinds (explanation, breakdown, Q&A, demo, …), with an icon for each.
-- [ ] [Partner] Check YouTube's chapter rules on a real upload: the first chapter at 0:00, at least three chapters, and each at least 10 s long.
+- [ ] [Caleb] Write the list of chapter kinds (explanation, breakdown, Q&A, demo, …), with an icon for each.
+- [ ] [Caleb] Check YouTube's chapter rules on a real upload: the first chapter at 0:00, at least three chapters, and each at least 10 s long.
 
 ## 9. Interact with viewers
-- [ ] [Partner] Recruit two or three friends as test guests, on different devices and connections.
+- [ ] [Caleb] Recruit two or three friends as test guests, on different devices and connections.
 - [ ] [Mason] Decide the consent wording guests agree to before going on camera (API document OQ-20).
-- [ ] [Partner] Run Phase 9's Verification with the test guests.
+- [ ] [Caleb] Run Phase 9's Verification with the test guests.
 
 ## 10. Deep integration
 - Nothing hands-on.
 
 ## 11. Adopt in Knotty Yoga and CommunityFinder
-- [ ] [Partner] List the videos on Knotty Yoga's site now, and propose categories for a members' video library.
+- [ ] [Caleb] List the videos on Knotty Yoga's site now, and propose categories for a members' video library.
 
 # Production decisions
 
@@ -712,17 +712,17 @@ These are filled in when Mason decides on a lab recommendation. Decisions that c
 
 # Open Questions
 
-Answer inline under each question, starting with "Partner-" or "Mason-". The **bold** text is the default, used if nobody answers. The numbers continue from the API document's 1–22, so no two questions in the two documents share a number.
+Answer inline under each question, starting with "Caleb-" or "Mason-". The **bold** text is the default, used if nobody answers. The numbers continue from the API document's 1–22, so no two questions in the two documents share a number.
 
 23. **Shared files.** Where do the lab's inputs, scripts and renders live?
     - **Default: a shared cloud folder called "Video Lab", with a subfolder per experiment.**
     - The scripts that win move into the `creator_studio` repository later, under `brand/` or `lab/`.
 24. **Reading and editing this document.**
-    - **Default: Mason shares this Obsidian vault, or just these two documents, through the sync Mason already uses.** The partner answers inline here.
+    - **Default: Mason shares this Obsidian vault, or just these two documents, through the sync Mason already uses.** Caleb answers inline here.
 25. **Which machine.**
-    - **Default: the partner's own computer for the lab, and the studio PC (RTX 3070 Ti) for anything involving OBS, the cameras or NVENC.**
+    - **Default: Caleb's own computer for the lab, and the studio PC (RTX 3070 Ti) for anything involving OBS, the cameras or NVENC.**
     - Mason's laptop has FFmpeg and Kdenlive installed but no NVIDIA GPU, so Blender and local AI run slowly there.
-    - What's in the partner's computer (GPU, operating system)?
+    - What's in Caleb's computer (GPU, operating system)?
 26. **Lab budget.**
     - **Default: up to $100 in total without asking first, for AI credits, a month of Canva Pro or Jitter, and music trials. Nothing billed annually.**
 27. **The performer and the fabric for the logo morph.**
@@ -734,7 +734,7 @@ Answer inline under each question, starting with "Partner-" or "Mason-". The **b
     - **Default: Mason looks for the designer's Illustrator or Figma files.**
     - Until they turn up, the white SVG from the website is the source, and the version for light backgrounds is made from it by changing the colours.
 30. **Using Claude for scripts.**
-    - **Default: yes.** The partner asks Claude, on claude.ai or in Claude Code, for first versions of scripts, pasting L.1 *Shared inputs* into the request. The scripts are kept in the shared folder.
+    - **Default: yes.** Caleb asks Claude, on claude.ai or in Claude Code, for first versions of scripts, pasting L.1 *Shared inputs* into the request. The scripts are kept in the shared folder.
 31. **Vertical versions** (Shorts, Reels, TikTok).
     - **Default: not in the first round.** Add them once PD-1 is chosen.
 32. **AI in the studio's brand.**
