@@ -1335,6 +1335,7 @@ T30, T31, T41 and G18.
     - **Say "approved", or "use mine as written".**
   - **Silver and Gold** are in 5.2, with light punctuation edits.
   - **"Prepares you for" in the descriptions:** no new copy is needed. The class page's **Leads to** line, built from your OQ-23 pairs, says it on every class that prepares for another. Beginner Partner Acro's description already says it leads to Intermediate. Say if you still want a sentence in the descriptions.
+  - Mason- Approved
 
 **OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
 - **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
@@ -1350,6 +1351,7 @@ T30, T31, T41 and G18.
     - It's small: the route's sign-in guard comes off, the page hides the card form when signed out, and its price preview must answer signed out (to verify).
   - **Option B: keep sign-in first.** Registration would still return to the subscribe page, because 4.5 fixes that either way.
   - **Recommendation: A.** Every screen before the price is a place where people leave (Thomas's funnel point).
+  - Mason- Let's go with A
 
 **OQ-15 — One / Two / Family** *(5.2, Thomas)*
 - **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
@@ -1394,6 +1396,7 @@ T30, T31, T41 and G18.
 
   - **C: keep the five cards,** and add the saving line to the three shared ones.
   - **Recommendation: A.** It does what Thomas asked (fewer cards, the discount said out loud) without hiding any price.
+  - Mason- Let's go with A
 
 **OQ-19 — Product categories** *(9.7)*
 - **Default:** group by the existing **kind** (Memberships, Classes & drop-ins, Events & workshops, Services), plus a search box. No new column.
