@@ -1408,6 +1408,7 @@ T30, T31, T41 and G18.
   - v0.1 read it as 2. It proposed sectioning that list by the kind each product already has (Memberships, Classes & drop-ins, Events & workshops, Services) plus a search box; the alternative was a category field you'd fill in yourself.
   - **Default now: reading 1.** 9.2 covers it, so 9.7 builds nothing. With eight products, the list isn't big yet.
   - Say if you'd still like the Products list sectioned (a small change), or ask Gifford which he meant.
+  - Mason- Let's go with the default.
 
 **OQ-20 — How far "restore" goes** *(Phase 10)*
 - **Default:** every change made through Manage Data (and the pages that use the same generic endpoints) is recorded and can be restored one row at a time. Changes made by dedicated pages (subscriptions, bookings, payments) aren't, since they have their own records.
@@ -1427,6 +1428,7 @@ T30, T31, T41 and G18.
     The log on its own is modest. Restore is where the work is: putting back a deleted row with its old id, refusing when a foreign key no longer matches, and being able to undo a restore. With tests, the whole thing is roughly the size of the sharing rework (4.1–4.4). It would also record the twenty pages' edits, which is a plus, but it's a lot of work for a tool only you use.
   - **Default now:** a **Developer** role with its own `manage_data` permission, given only to you, plus a warning banner (10.1). The help text, previews, table list and history move to 10.3, deferred.
   - **Say if you'd rather build the history anyway.** It goes back in as 10.3's last item, at the size above.
+  - Mason- I think we should do the developer role. Do you think this is a good idea or that we should do the rollback functionality? It seems like a lot of work for something kind of obscure.
 
 **OQ-21 — Server-rendered pages** *(Phase 11)*
 - **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
