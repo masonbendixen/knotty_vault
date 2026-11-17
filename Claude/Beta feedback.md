@@ -429,6 +429,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 | P11 | The browser sends one request at a time | 7.6 |
 | P12 | The seat card's sharing link goes nowhere (`/my/account#sharing`) | 4.6 |
 | P13 | Subscribing "for this month" charges the whole month, whatever the date | 2.3 |
+| P14 | A monthly renewal drops shared seats and seats the payer again | 2.2 |
 
 ---
 
@@ -493,6 +494,11 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
 19. **Our Classes starts every signed-in person on My Schedule** (`our-classes.component.ts:113`). That view hides every class the viewer can't take, so someone with an account but no membership sees "Your current filters hide everything." The schedule's compact chip already shows a lock and "Requires a membership" on a members' class (`calendar-event.component.ts:46-49`).
 20. **CloudFront caches nothing under `/api/*`** (`Managed-CachingDisabled`, Deploying to AWS), and that includes photos. A public scaled photo is sent as `public, no-cache` with an ETag (`get_scaled_photo.cpp:172-241`), so even a repeat view is a round trip to the server. A first view is a database read, since the scaled bytes are cached there.
 21. **There's no general settings page.** Site Theme edits its own `site_*` values. `/api/admin/secrets` exists (`endpoints/admin_secrets.cpp`), but no page in the app or `@honuware/ui` calls it. Other values change only through `knottyyoga_test_helper --command=set_secret`. A setting a studio owner should change needs its own page (2.8).
+22. **A monthly renewal drops every seat except the payer's (P14; found in v0.3 while checking OQ-27).**
+    - Each month the billing run charges through `PayWithCard` (`subscription_helper.cpp:640-650`; the past-due retry is the same at `:847-856`). That makes a new entitlement and seats only the payer (`payment_helper.cpp:267-271`).
+    - Nothing copies last month's seats across. `EntitlementHelper::TransferAssignments` does exactly that, but only a change of membership calls it (`subscription_helper.cpp:1136`).
+    - So on the 1st, Bri's seat on a couple's membership is gone, and the seat card reads "1/2" again. A membership bought for a friend seats its payer again, too.
+    - No test renews a shared membership. `GetCurrentEntitlementForSubscriptionAfterBilling` (`subscription_helper_test.cpp:599`) only checks that the entitlement is new.
 
 ---
 
@@ -622,6 +628,16 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
   - the memberships they hold a seat on: the product, and the payer
 - [ ] `CreateSubscription` refuses with **`ALREADY_HAS_A_MEMBERSHIP`** when the summary isn't empty and the request doesn't say `confirm_additional_membership: true`. With the flag, the membership is created.
 - [ ] **Seating the buyer.** Today the buyer always takes seat 1 (`subscription_helper.cpp:316-326`). That stays for a first membership. A buyer who already holds a seat on a current membership gets a new one with every seat empty.
+- [ ] **Seats carry over at renewal (P14, F22).**
+  - The billing run and the past-due retry copy the current seats onto the new month's entitlement with `TransferAssignments`, which already exists.
+  - `PayWithCard` gets a flag, set only by membership charges, that skips its automatic payer seat. A payer who had no seat last month then has none this month either.
+  - A membership waiting for its 1st (2.3) has no seats to copy, so its first charge seats by the rule above.
+  - Tests through the seat reader and `ClassAccessHelper::CheckAccess`:
+    - a couple's membership with both seats renews with both, and the second person can still book on the 2nd
+    - a membership bought for a friend renews with only the friend
+    - a seat removed before the 1st stays removed
+    - the past-due retry does the same
+    - one-off purchases still seat their payer
 - [ ] `POST /api/subscriptions` and the admin create both take `confirm_additional_membership` and answer 409 `{code, summary}`. The admin Subscriptions page gets the same warning.
 - [ ] Tests:
   - a second subscribe without the flag → 409 with the summary, and still exactly one subscription
@@ -743,6 +759,7 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - subscription inserted before the charge
   - the `ALREADY_HAS_A_MEMBERSHIP` guard removed, and the buyer seated on a second membership
   - **Start on December 1** granting the waiting days; **Start today** charging the full month; a member allowed `today_rest_free`
+  - the renewal's seat copy removed
   - the duplicate window set to zero
   - the email flag ignored
   - `replaceUrl` dropped
@@ -1056,10 +1073,38 @@ T18, T43, T45, T46, G10 and P11.
 - [ ] `PreloadAllModules` gives way to preloading the routes linked from the current page, so the lazy chunks stop competing with the first page.
 - [ ] Specs: cached, uncached, and a changed config; and the boot order.
 
-### 7.4 Fonts *(seed + ui)*
-- [ ] `index.html` and the seeded font rows use **the same** Google Fonts URL (OQ-22), so the runtime link is a cache hit, not a second download. A test checks that the seed's URL equals the one in `index.html`.
-- [ ] `index.html` gets a `preload` for that stylesheet next to its `preconnect`s.
+### 7.4 Fonts at first paint: the server fills in the page head *(server_components: platform; knottyyoga; ui; ui/package; OQ-22, still open)*
+**Default: OQ-22's option D.** The fonts stay a database setting, and the first byte of the page already names them. This is the biggest item in Phase 7: about twice the size of 7.8, plus a CloudFront change to how page addresses are served. If OQ-22 goes to option A instead, the last item replaces the rest.
+
+- [ ] **The template** *(ui, ui/package)*:
+  - The built `index.html` gets one marked block in its head, `<!-- site-head -->` … `<!-- /site-head -->`. The block holds the defaults (the seed's font address and the site's name), so `ng serve` and a direct S3 read still work.
+  - The build stops inlining the Google Fonts CSS, since that would bake in the build's fonts (D7).
+  - `deploy_ui.sh` also uploads the file as `shell/index.html`.
+  - A spec checks the built file has exactly one block.
+- [ ] **The server keeps a copy of the template** *(server_components: platform)*:
+  - It fetches `/shell/index.html` through CloudFront at start-up, then at most once a minute with `If-None-Match`. A UI deploy reaches it within a minute, so the script names always match the live build.
+  - To verify: the server can reach its own CloudFront address. It already reaches Square and SES.
+  - Until the first fetch succeeds, it answers 503, and CloudFront serves its last good copy (below).
+- [ ] **A page route for every address outside `/api/`** *(server_components: platform)*, through Crow's catch-all. It returns the template with the block filled in, everything HTML-escaped:
+  - **Fonts:** the `preconnect`s and stylesheet links from the site's font rows. They're the addresses `SiteConfigService` applies after start-up, so that link becomes a cache hit.
+  - **The site's own tags:** title, description and theme colour, from `site_info` (7.2's cache).
+  - **Per-page tags from an app hook** *(knottyyoga)*: one for the class, instructor and event pages that looks up the page's title, description and photo (11.1). Any other address gets the site's defaults. A request for `/` arrives as `/index.html` (the distribution's default root object) and gets the home page's tags.
+  - **Caching:** kept per site and address for at most 60 s, and cleared by the writes that clear 7.2's cache, so a Site Theme or font save shows on the next visit. No timer is needed.
+  - `Cache-Control: public, s-maxage=60, stale-if-error=86400`. CloudFront then answers most visits itself, and keeps serving the last good page if the server is down.
+- [ ] **CloudFront** *(Mason, in the console, from steps written here when the item is built; Deploying to AWS records it)*:
+  - The default behaviour (page addresses) goes to the server.
+  - New behaviours keep the built files on S3: `*.js`, `*.css`, `/media/*`, `/assets/*`, `/shell/*` and the favicon files.
+  - The SPA error-page fallback goes, since the server now answers every page address.
+- [ ] **Tests:**
+  - the page carries the seeded font address; after a font change through Site Theme's endpoint, the next request carries the new one
+  - a class page has that class's title, description and photo; an unknown address gets the site's defaults; `/index.html` gets the home page's
+  - a class name containing `<`, `"` or `&` comes out escaped, as a stored-XSS guard
+  - `/api/…` never reaches the page route
+  - two sites get their own heads (the two-tenant harness)
+  - the template is fetched again when its ETag changes, and the old copy is kept when a fetch fails (test HTTP client)
+  - the cache header
 - [ ] The leftover D-DIN `@font-face` rules go (`mixins/_fonts.scss`).
+- [ ] **Only if OQ-22 goes to option A,** this replaces everything above: `index.html` and the seeded font rows use the same Google Fonts address, with a test that they match, and a `preload` next to the `preconnect`s.
 
 ### 7.5 The schedule pages *(business_logic/scheduling + catalog)*
 - [ ] **Calendar and upcoming classes:**
@@ -1079,8 +1124,8 @@ T18, T43, T45, T46, G10 and P11.
 - [ ] Tests: the concurrency test; the proxy spec (4 in flight, the 5th waits).
 
 ### 7.7 The page shell and the CDN *(ui/package)*
-- [ ] `index.html`'s cache moves from `max-age=0` to `s-maxage=60`. The deploy already invalidates it, and CloudFront then stops checking S3 on every visit. To confirm in `deploy_ui.sh`.
-- [ ] Critical CSS stays inlined (D7). After 7.4, check the built `index.html` no longer carries the font CSS twice.
+- [ ] With 7.4, the page comes from the server with `s-maxage=60`, so CloudFront stops checking on every visit. Under option A, S3's `index.html` moves from `max-age=0` to `s-maxage=60` instead. The deploy already invalidates it; to confirm in `deploy_ui.sh`.
+- [ ] Critical CSS stays inlined (D7). After 7.4, check the served page no longer carries the font CSS twice.
 - [ ] After numbers for first paint, next to 7.1's.
 
 ### 7.8 Public photos from CloudFront's edge *(server_components: platform; @honuware/ui: access; ui/package; OQ-21)*
@@ -1254,9 +1299,9 @@ T29, T32–T37, G19, and P6–P8.
 - [ ] **Bug (P6):** only pricing-eligible permissions become columns, as Membership Tiers promises.
 - [ ] Specs: the text, the names, and an ineligible permission's absence.
 
-### 9.7 Products grouped *(ui; OQ-19, still open)*
-- [ ] **Default: nothing to build.** Gifford's "categorize the products" most likely meant Manage Products' grid of tiles, the same point as Thomas's, and 9.2 groups those.
-- [ ] The **Products** list itself has eight seeded products. If you'd rather group it too, that's a small change: sections by the kind each product already has, plus a search box.
+### 9.7 Products grouped *(OQ-19: nothing to build)*
+- Gifford's "categorize the products" most likely meant Manage Products' grid of tiles, the same point as Thomas's, and 9.2 groups those.
+- The **Products** list itself has eight seeded products, so it stays as it is. If it grows, sectioning it by each product's existing kind, plus a search box, is a small change.
 
 ### 9.8 Reports that look forward *(business_logic/reporting + ui)*
 - [ ] **Enrollment Trends** and **Open-Seat Heatmap** get **Last 12 weeks** / **Next 4 weeks**:
@@ -1274,7 +1319,7 @@ T29, T32–T37, G19, and P6–P8.
 
 T30, T31, T41 and G18.
 
-**Default from OQ-20 (still open):** Manage Data is a developer's tool, so it gets its own permission and a warning rather than a friendlier editor. v0.1's help text, foreign-key previews, table list and history (its 10.1–10.4) are deferred to 10.3, unless you decide otherwise.
+**Decided (OQ-20):** Manage Data is a developer's tool, so it gets its own permission and a warning rather than a friendlier editor. v0.1's help text, foreign-key previews, table list and history (its 10.1–10.4) are deferred to 10.3. A bad edit can still be undone, coarsely, from RDS's seven days of point-in-time backups (Deploying to AWS).
 
 ### 10.1 Its own permission *(server_components: platform; @honuware/ui: crud, auth; knottyyoga seed)*
 - [ ] A framework permission **`manage_data`**, given through a framework **Developer** role. Framework migration **`honuware/0005_manage_data_permission`** adds both, and gives the role to every current admin so CommunityFinder's admins keep access. It is idempotent.
@@ -1297,7 +1342,7 @@ T30, T31, T41 and G18.
 
   Findings are recorded here and each one is fixed with a test.
 
-### 10.3 Deferred unless OQ-20 says otherwise
+### 10.3 Deferred (OQ-20)
 - Help text: a description under each table and field, written for every table and column.
 - Foreign keys show the record they point at, with **Open**.
 - A left-hand list of tables instead of the dropdown (G18).
@@ -1311,17 +1356,20 @@ T30, T31, T41 and G18.
 # Phase 11 — Search engines and the first page *(T44)*
 
 ### 11.1 The basics *(ui + server)*
-- [ ] Each public page sets its own `<title>` and `<meta name="description">`, plus Open Graph tags for links shared in messages.
+- [ ] Each public page has its own `<title>` and `<meta name="description">`, plus Open Graph tags for links shared in messages.
+  - **They must be in the served HTML** for link previews and most crawlers, which don't run JavaScript. 7.4's page route puts them there, through the app hook for the class, instructor and event pages and the site's defaults elsewhere.
+  - Angular sets the same tags as the visitor moves between pages, for Google and for the browser tab.
+  - Under OQ-22's option A, only the second half happens, so link previews still show the site's defaults.
 - [ ] `robots.txt` and a `sitemap.xml`:
   - the public pages, every class and every instructor
   - generated by a server endpoint that CloudFront serves at `/sitemap.xml`
-- [ ] Tests: each route's title; the sitemap lists the seeded classes and instructors.
+- [ ] Tests: each route's title in the browser; each page's tags in the served HTML (with 7.4's tests); the sitemap lists the seeded classes and instructors.
 
-### 11.2 Server rendering: a decision *(OQ-21)*
-- [ ] A server-rendered signed-out home page means a Node runtime next to the C++ server, or a pre-render step. The page's content comes from the database at run time, so a build-time pre-render goes stale.
-  - **Default:** do 11.1 now, and write a separate plan, **Server-rendered public pages.md**, if Mason wants more.
-  - Google and Bing run JavaScript. Most other crawlers, and link previews, read only the HTML, which 11.1's tags cover.
-  - Public photos are cached at CloudFront's edge in 7.8, which answers the image-cache half of OQ-21.
+### 11.2 Server rendering: later, in its own plan *(OQ-21, decided)*
+- A server-rendered signed-out home page means a Node runtime next to the C++ server, or a pre-render step. The page's content comes from the database at run time, so a build-time pre-render goes stale.
+- **Decided:** 11.1 now. A separate plan, **Server-rendered public pages.md**, gets written if Mason wants more after Phase 7's speed work and 11.1.
+- Google and Bing run JavaScript. Most other crawlers, and link previews, read only the HTML. 11.1's tags reach them because 7.4 puts the tags in the HTML; the page's body text still doesn't.
+- Public photos are cached at CloudFront's edge in 7.8, which answers the image-cache half of OQ-21.
 
 ---
 
@@ -1343,6 +1391,8 @@ T30, T31, T41 and G18.
   - an invitation with a link registers and takes the seat
   - `site_info` with a cache hit and a 304
   - a public photo with its long-lived cache header
+  - a page address served with the site's font links and a class page's own tags (7.4)
+  - each start choice's charge and dates, with the billing run driven forward to the 1st (2.3)
 - [ ] A throwaway database with `--install_schema --force` followed by the `set_secret` block, exactly as Phase 13 runs it.
 - [ ] A copy of a sandbox.15-era database with `--migrate`: app migrations 0014–0016 and honuware 0004–0005. A second run changes nothing. Production is reinstalled, but Mason's local databases and CommunityFinder migrate.
 
@@ -1356,7 +1406,12 @@ T30, T31, T41 and G18.
 - [ ] Phase 1 and Phase 2 are already out (sandbox.14 and .15, both by `--migrate`).
 - [ ] Before: Mason tells the testers that their accounts will be removed and they'll need to register again.
 - [ ] The rest goes out as **`v1.0.0-sandbox.16`**, and production is **reinstalled from the seed** (OQ-6, D8). That means `--install_schema --force` followed by the `set_secret` block, as Finishing website did (Deploying to AWS 5.1 step 4). All content comes from the seed, with no hand edits.
-- [ ] The CloudFront photo behaviour from 7.8 is added before the deploy.
+- [ ] **CloudFront, in this order:**
+  1. 7.8's photo behaviour, any time before the UI goes out (nothing asks for those addresses until then)
+  2. the server, then the UI (which uploads `shell/index.html`)
+  3. 7.4's change, sending page addresses to the server, only once the server answers them
+
+  To undo step 3, point the default behaviour back at S3 and restore the error-page fallback.
 - [ ] Afterwards: Claude probes production signed out, and the testers are asked to retry their journeys. A short list for Thomas, Gifford and Jennifer of what changed against each of their points.
 
 ---
@@ -1367,7 +1422,7 @@ T30, T31, T41 and G18.
 - [[Subscriptions- Recurring billing and card management]] §6.4 "Subscription Upgrades": the server half of Phase 3, built without a member-facing page. Proration was dropped there; OQ-2 asks again.
 - [[Customer user scenarios]]: scenarios 12 (multi-seat subscription), 31–33 (upgrade, downgrade, reactivate) are what Phases 3–4 make reachable.
 - [[Security Review]]: Phase 1 and 10.2 extend it; the CSRF design (8.x there) is kept, with `delete_item` moved off GET.
-- [[Deploying to AWS]]: the reinstall Phase 13 uses (5.1 step 4), and the CloudFront behaviours that 7.7 and 7.8 change.
+- [[Deploying to AWS]]: the reinstall Phase 13 uses (5.1 step 4), the CloudFront behaviours that 7.4, 7.7 and 7.8 change, and the RDS point-in-time backups that stand in for Manage Data's rollback (OQ-20).
 - [[Tenant Theming and Branding]]: `site_info` and the runtime fonts that 7.2–7.4 change.
 - [[Componentizing the frontend]] and [[Splitting the server up into components]]: where the honuware halves of 1.2, 4.5, 7.2, 9.3 and Phase 10 live.
 
@@ -1384,6 +1439,52 @@ T30, T31, T41 and G18.
 - **Default:** wait for your text, and Gifford's. Claude doesn't invent experience.
 - Paste them here when ready.
 - → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
+- → v0.3: still waiting, as you said. Nothing else depends on them.
+
+**OQ-22 — One font address** *(7.4, D7)*
+- The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
+- **Default (v0.3):** option D below: the server fills in the page head from the database. v0.2's default was A.
+- **Alternative:** drop the `index.html` fonts and rely on the runtime ones from the cached site config (7.3).
+- Mason- What are the pros and cons of the two options?
+- → Explained: the site's fonts (Roboto and Barlow) come from Google Fonts.
+  - `index.html` links one Google address in its head.
+  - After the app starts, the site config links a *different* address for the same fonts. That config comes from the database, so a studio can change fonts in **Site Theme**.
+  - The browser downloads both, which is Thomas's "fonts start late".
+  - **Option A (default): `index.html` uses the same address as the database.**
+    - Pro: the download starts in the first few milliseconds, before any JavaScript, so text draws in the right font sooner and doesn't jump. The second link is then a cache hit, not a download.
+    - Con: the address is written into `index.html` when the site is built. If you change fonts in **Site Theme**, visitors download the old fonts first (wasted, not broken) until the next deploy updates `index.html`. A test catches the seed and `index.html` drifting apart.
+  - **Option B: drop the fonts from `index.html` and load only the database's.**
+    - Pro: one source of truth, and a font change in **Site Theme** is the only download.
+    - Con: on a first visit the fonts start only after the app has booted and fetched the site config. 7.3 caches the config, so repeat visits are quicker, but they still wait for the JavaScript. Text appears in a fallback font and then swaps: the flash Thomas noticed.
+  - **Recommendation: A.** Fonts change rarely, and first paint happens on every visit.
+  - Mason- I'm on the fence about this. I want this to be a generic server and want this to be configurable. Is there a way to let users change these fonts in the database but have something get updated so that first paint is fast? Maybe index.html could be generated based on something that gets updated by the timer process?
+- → Explained (v0.3): yes. The timer can do it, but there's a better way that needs no timer.
+  - **Why it's hard today.** `index.html` is a static file on S3, written by the UI deploy. CloudFront sends that same file to every visitor of every site. The fonts are in the database, so only code that reads the database can put them in the page head: either when the page is requested, or by rewriting the file whenever they change.
+  - **Option C: the timer process rewrites `index.html` on S3** when the fonts change.
+    - Pro: the page stays a static file, so first paint is as fast as A.
+    - Con: the server box would need permission to write the UI bucket and invalidate CloudFront, as CI's deploy key does today.
+    - Con: every UI deploy overwrites the file with the build's version, so the timer has to notice and redo it. Until it does, visitors get the build's fonts.
+    - Con: there's one `index.html` for the whole distribution, so two studios on one deployment can't each have their own.
+  - **Option D (new default): the C++ server fills in the page head when a page is requested,** and caches it (7.4).
+    - The UI build's `index.html` becomes a template with one marked block in its head. The server keeps a copy, refreshed within a minute of a UI deploy.
+    - For each page address, it fills in the site's font links, title, description and theme colour from the database. Its cache lasts 60 seconds and is cleared when Site Theme saves, so a font change shows on the next visit with no deploy and no timer.
+    - CloudFront keeps each filled-in page for 60 seconds too, so most visits never reach the server. If the server is down, CloudFront keeps serving the last good copy for a day.
+    - Pros:
+      - fully configurable from the database
+      - per site, which fits honuware's many-studios model
+      - first paint about as fast as A, since CloudFront caches the page
+      - **it also fixes link previews.** The same block carries each page's own title, description and preview image, which Slack, Messages and Facebook read from the HTML. That's the correction to 11.1 (see the v0.3 revision notes).
+    - Cons:
+      - it's the largest item in Phase 7, about twice the size of 7.8
+      - every page address now goes through the server, though cached, instead of straight from S3
+      - a CloudFront change, made in a set order at release (Phase 13)
+  - **A middle way, if D is more than you want now:** A, plus a few lines of script in `index.html` that remember the last font address in the browser and apply it before anything else loads. Repeat visitors then get a changed font at first paint. Only a first visit after a change sees the swap. Link previews stay generic.
+  - **Recommendation: D.** It's the only option that is generic, per site and fast all at once, and it does 11.1's job too. The plan is written against it (7.4, 7.7, 11.1, Phase 13), and option A stays in 7.4 as a one-item fallback.
+  - **Say D, A, or the middle way.**
+
+### Resolved 11/17/2026
+
+*Your second round, in number order.*
 
 **OQ-9 — New copy you need to write or approve** *(5.2, 5.3, 6.4)*
 - The new-student FAQ: physical requirements, what to wear and not wear, what to bring.
@@ -1401,6 +1502,7 @@ T30, T31, T41 and G18.
   - **Silver and Gold** are in 5.2, with light punctuation edits.
   - **"Prepares you for" in the descriptions:** no new copy is needed. The class page's **Leads to** line, built from your OQ-23 pairs, says it on every class that prepares for another. Beginner Partner Acro's description already says it leads to Intermediate. Say if you still want a sentence in the descriptions.
   - Mason- Approved
+- → Plan: 5.2 and 5.3 use the text as written here, without the DRAFT mark. No sentence is added to the class descriptions; the **Leads to** line does that job (6.4).
 
 **OQ-14 — See the subscribe page before signing in** *(5.2, Gifford)*
 - **Default:** yes. A visitor sees the tier, price, start month and first charge, and signs in or registers at **Subscribe**, coming back to the same page.
@@ -1417,6 +1519,7 @@ T30, T31, T41 and G18.
   - **Option B: keep sign-in first.** Registration would still return to the subscribe page, because 4.5 fixes that either way.
   - **Recommendation: A.** Every screen before the price is a place where people leave (Thomas's funnel point).
   - Mason- Let's go with A
+- → Plan: 5.2, as option A describes. The amounts on the signed-out page come from 2.3's new `start_options`, which answers signed out, so v0.2's "to verify" is settled.
 
 **OQ-15 — One / Two / Family** *(5.2, Thomas)*
 - **Default:** a toggle over the cards, starting on **One**, with "Couples save $X a person each month" on **Two** and **Family**.
@@ -1462,6 +1565,7 @@ T30, T31, T41 and G18.
   - **C: keep the five cards,** and add the saving line to the three shared ones.
   - **Recommendation: A.** It does what Thomas asked (fewer cards, the discount said out loud) without hiding any price.
   - Mason- Let's go with A
+- → Plan: 5.2, as the sketch shows.
 
 **OQ-19 — Product categories** *(9.7)*
 - **Default:** group by the existing **kind** (Memberships, Classes & drop-ins, Events & workshops, Services), plus a search box. No new column.
@@ -1474,6 +1578,7 @@ T30, T31, T41 and G18.
   - **Default now: reading 1.** 9.2 covers it, so 9.7 builds nothing. With eight products, the list isn't big yet.
   - Say if you'd still like the Products list sectioned (a small change), or ask Gifford which he meant.
   - Mason- Let's go with the default.
+- → Plan: 9.7 builds nothing.
 
 **OQ-20 — How far "restore" goes** *(Phase 10)*
 - **Default:** every change made through Manage Data (and the pages that use the same generic endpoints) is recorded and can be restored one row at a time. Changes made by dedicated pages (subscriptions, bookings, payments) aren't, since they have their own records.
@@ -1494,6 +1599,15 @@ T30, T31, T41 and G18.
   - **Default now:** a **Developer** role with its own `manage_data` permission, given only to you, plus a warning banner (10.1). The help text, previews, table list and history move to 10.3, deferred.
   - **Say if you'd rather build the history anyway.** It goes back in as 10.3's last item, at the size above.
   - Mason- I think we should do the developer role. Do you think this is a good idea or that we should do the rollback functionality? It seems like a lot of work for something kind of obscure.
+- → Plan, and my view: **the Developer role, and no rollback.**
+  - **The role is the right fix.** The problem Thomas hit is that any admin can reach a raw editor with no undo. 10.1 takes that editor away from everyone but you.
+  - **Rollback isn't worth building now:**
+    - After 10.1 you're the only person who can make the edits it would undo.
+    - **The disaster case is already covered.** RDS keeps seven days of point-in-time backups, and the restore drill passed on 9/25 and 10/3 (Deploying to AWS, runbook §6a).
+      - It's clumsy: you restore a copy of the database to just before the mistake, then copy the old rows back.
+      - It's there, though, and it covers every table, not just the ones Manage Data writes.
+    - **"Who changed this price, and when?"** If you ever want that, it belongs on the twenty Manage Products pages staff actually use. 10.3's change log would cover those too, and nothing in 10.1 needs redoing to add it later.
+  - Phase 10 is no longer marked as a default. 10.3 stays deferred.
 
 **OQ-21 — Server-rendered pages** *(Phase 11)*
 - **Default:** titles, descriptions, link-preview tags and a sitemap now (11.1). Full server rendering becomes its own plan, if you want it after seeing 7's speed work.
@@ -1513,24 +1627,11 @@ T30, T31, T41 and G18.
     - An in-memory LRU cache in the server would save only the database read, and each server would have its own copy. It's the fallback if 7.1 shows that first views are slow.
   - **Default:** 11.1 and 7.8 now, with server rendering as its own plan later. Say if you want that plan written now instead.
   - Mason- Let's go with the default. Is the cloudfront image cache thing going to get a work item?
-
-**OQ-22 — One font address** *(7.4, D7)*
-- The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
-- **Default:** both use the seeded address (variable weights), so the second is a cache hit. Critical CSS stays inline.
-- **Alternative:** drop the `index.html` fonts and rely on the runtime ones from the cached site config (7.3).
-- Mason- What are the pros and cons of the two options?
-- → Explained: the site's fonts (Roboto and Barlow) come from Google Fonts.
-  - `index.html` links one Google address in its head.
-  - After the app starts, the site config links a *different* address for the same fonts. That config comes from the database, so a studio can change fonts in **Site Theme**.
-  - The browser downloads both, which is Thomas's "fonts start late".
-  - **Option A (default): `index.html` uses the same address as the database.**
-    - Pro: the download starts in the first few milliseconds, before any JavaScript, so text draws in the right font sooner and doesn't jump. The second link is then a cache hit, not a download.
-    - Con: the address is written into `index.html` when the site is built. If you change fonts in **Site Theme**, visitors download the old fonts first (wasted, not broken) until the next deploy updates `index.html`. A test catches the seed and `index.html` drifting apart.
-  - **Option B: drop the fonts from `index.html` and load only the database's.**
-    - Pro: one source of truth, and a font change in **Site Theme** is the only download.
-    - Con: on a first visit the fonts start only after the app has booted and fetched the site config. 7.3 caches the config, so repeat visits are quicker, but they still wait for the JavaScript. Text appears in a fallback font and then swaps: the flash Thomas noticed.
-  - **Recommendation: A.** Fonts change rarely, and first paint happens on every visit.
-  - Mason- I'm on the fence about this. I want this to be a generic server and want this to be configurable. Is there a way to let users change these fonts in the database but have something get updated so that first paint is fast? Maybe index.html could be generated based on something that gets updated by the timer process?
+- → Plan: **yes, 7.8 is that work item.**
+  - Public photos get an address that changes whenever the photo does, and CloudFront keeps them at its edge for a year.
+  - The CloudFront behaviour for it is yours to add in the console, from steps written when 7.8 is built, before the UI goes out (Phase 13).
+  - 11.2 records server rendering as a later, separate plan.
+  - **One correction:** I wrote that 11.1's tags fix link previews. They do only once they're in the HTML the server sends, which OQ-22's new option D does.
 
 **OQ-27 — Subscribing for a later month** *(2.3)*
 - Today it's free that month (F4).
@@ -1549,6 +1650,21 @@ T30, T31, T41 and G18.
     - But they pay two weeks before they can use it, and cancelling before December means a refund.
   - Either way December stops being free. **Recommendation: A.**
   - Mason- I'd like a way to be able to have the option to have staff create a membership that they pay now for the next month but the rest of the current month is thrown in for free. But this is something that needs to be done by staff. For users, I would like them to be able to sign up for a membership and have the option to have the billing and membership become active the next month but also have the option to make a pro rated payment for the current month and then have full month billing start for the next month.
+- → Plan: 2.3 is rewritten around named **start choices**. The server works out the dates and the amount from the choice; the page no longer sends dates.
+  - **Members** get your two:
+    - **Start today:** the rest of this month, by the day, now; then the full price on the 1st of each month.
+    - **Start on December 1:** nothing now; access and the first full charge both start on the 1st, through the billing run.
+  - **Staff, on Create Subscription,** get both of those, plus:
+    - **Start today, rest of this month free:** next month's full price charged now, and access from today.
+    - **Start on the 1st of a later month.**
+  - **Your staff option half exists already.** **Create Subscription** has an **Include this month free** box, but with it nothing is charged until the 1st. 2.3 makes it charge now, as you described.
+  - **Found while checking this (P13):** a member who picks the current month today pays the whole month's price, even on the 28th. **Start today** fixes that.
+  - **One preview endpoint** (`start_options`) shows the same numbers that checkout will charge, signed in or out (OQ-14).
+  - **Two calls I made that you should check:**
+    - Members lose the later months, since you described two choices.
+    - The staff page loses **Prorate for remaining days** unticked, which charged the full price for a part month.
+
+    Say if either should stay.
 
 **OQ-30 — Database connections per site** *(7.6)*
 - **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
@@ -1564,10 +1680,11 @@ T30, T31, T41 and G18.
   - **2 vs 4.** With 2, a page's main call and one background call overlap, but the calendar's three calls still queue. With 4, the busiest page's three calls all run at once, with one to spare. The memory difference is a few MB per extra connection.
   - **Recommendation: 4,** read from the app config so changing it is one line.
   - Mason- I'll go with your recommendation.
+- → Plan: 7.6, as written: 4 connections, read from the app config.
 
-### Resolved
+### Resolved 11/16/2026
 
-*All answered 11/16/2026, in number order.*
+*Your first round, in number order.*
 
 **OQ-1 — One membership per person?** *(D2, 2.2)*
 - **Default:** a person can be the payer of only one current membership. "Current" includes one that's cancelled but running to the end of its month, and a change scheduled for next month. Someone who holds a seat on another person's membership is asked "You're already on Thomas's Gold Couple's membership. Buy your own anyway?" and may go ahead.
