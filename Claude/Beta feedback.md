@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 11/16/2026
-Version: 0.2
+Last Updated: 11/17/2026
+Version: 0.3
 tags: 
 ---
 # Overview
@@ -297,6 +297,16 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.3 (11/17/2026)** — Mason's second round of answers folded in. Still planning only. Eight questions are now resolved; two stay open (OQ-7 bios, OQ-22 fonts). What changed:
+  - **Approved as written:** the FAQ and the Silver and Gold text (OQ-9), the subscribe page before sign-in (OQ-14), sizes inside each card (OQ-15), no products regrouping (OQ-19), CloudFront for public photos (OQ-21, 7.8) and 4 database connections (OQ-30).
+  - **Manage Data: the Developer role, and no rollback** (OQ-20). You asked for my view: the role is the right call, and rollback isn't worth building now. RDS already keeps seven days of point-in-time backups, and you'll be the only person using the page. Phase 10 is no longer a default.
+  - **Starting a membership is redesigned** (OQ-27, 2.3):
+    - Members choose **Start today**, paying for the rest of this month by the day, or **Start on the 1st** of next month, with nothing charged until then.
+    - Staff get a third choice: **rest of this month free**, with next month charged now.
+    - The server works out the dates and amounts from the choice, and one preview endpoint shows the same numbers on the page, signed in or not.
+  - **Found while checking OQ-27 (P13):** a member who subscribes "for this month" pays the **whole** month's price, even on the 28th. The page sends the full calendar month, so nothing is prorated (F4). 2.3 fixes it.
+  - **OQ-22 has a new option, and it's now the default:** the server fills in the page's `<head>` from the database, so a font change in **Site Theme** reaches first paint without a deploy. That rewrites 7.4. No timer is needed: the server builds the head when asked and caches it, and a Site Theme save clears the cache.
+  - **A correction to v0.2.** I wrote that 11.1's per-page titles and preview tags would fix link previews. They wouldn't on their own. The page is a static file from S3, and Angular adds those tags only once JavaScript runs, which link previews never do. They work once the server fills them into the served page, the same mechanism as the new 7.4. 11.1 and 11.2 now say so.
 - **v0.2 (11/16/2026)** — Mason's answers folded in (see *Open questions*; his answers are kept as written). Still planning only. What changed:
   - **More than one membership is allowed,** behind a warning the buyer must tick that names what they already pay for (OQ-1, D2, 2.2). A second membership doesn't give the buyer its first seat, since it's usually for someone else.
   - **Production is reinstalled from the seed** at the final release, not migrated (OQ-6, D8, Phase 13). The testers register again. Every "production edit" step is gone, along with the migrations that only fixed data or wording. 2.8's clean-up of the testers' extra memberships is gone too (OQ-5).
@@ -418,6 +428,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 | P10 | Registration drops `returnUrl` | 4.5 |
 | P11 | The browser sends one request at a time | 7.6 |
 | P12 | The seat card's sharing link goes nowhere (`/my/account#sharing`) | 4.6 |
+| P13 | Subscribing "for this month" charges the whole month, whatever the date | 2.3 |
 
 ---
 
@@ -441,7 +452,14 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
    - `CreateSubscription` inserts the `active` row with the saved card and next billing date (`subscription_helper.cpp:141`) *before* charging (`:183`).
    - On a decline it returns (`:185-189`). The endpoint answers 400 but returns normally from its transaction (`endpoints/subscriptions.cpp:439-442`), which commits.
    - The billing run picks the row up later. Each retry adds one.
-4. **A future start month is free.** With a later month chosen, no charge is made: the "no entitlement yet" path makes a $0, pre-credited entitlement for that month (`subscription_helper.cpp:289-314`), and the first bill is at its *end* (`:132-133`). The page promises a charge on the 1st (`subscription-signup.component.html:104`).
+4. **Start months: a later one is free, and this one isn't prorated.** The member's **Subscribe** page offers this month and the next five.
+   - **A later month is free.** No charge is made: the "no entitlement yet" path makes a $0, pre-credited entitlement for that month (`subscription_helper.cpp:289-314`), and the first bill is at its *end* (`:132-133`). The page promises a charge on the 1st (`subscription-signup.component.html:104`).
+   - **This month costs the whole month, whatever the date (P13).** The endpoint sends the full calendar month (`endpoints/subscriptions.cpp:423-424`), so `CalculateProratedCharge` finds nothing to prorate (`subscription_helper.cpp:51-67`). The button reads **Subscribe & Pay $160** on the 28th too.
+   - **The staff page already does more** (**Manage Products** ▸ **Subscriptions** ▸ **Create Subscription**). It works out the dates in the browser and sends them (`create-subscription.component.ts:271-309`):
+     - this month, with **Prorate for remaining days** (on by default)
+     - next month, with **Include this month free**: the rest of this month is free, and the first charge is on the 1st, not today
+     - a later month, as on the member page
+   - The billing run always charges the period that starts where the current one ends (`subscription_helper.cpp:597`), at `next_billing_us`. A membership can therefore wait for its start with an empty current period and nothing granted.
 5. **Nothing checks for an existing membership.** There's no guard in the server or the page. `Subscriptions::GetActiveByPersonId` exists, but only its own test calls it. The Memberships page and tier cards don't know who is signed in (`membership-tier-cards.component.ts:13-21`).
 6. **Changing a membership works on the server, but members can't reach it.**
    - `POST /api/subscriptions/<id>/change_product` exists (`endpoints/subscriptions.cpp:657-744`), but only the admin page calls it.
@@ -612,12 +630,57 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
   - expired → allowed without the flag, and the buyer seated
 - [ ] Today a site has one database connection, so one person's two requests can't overlap (F13). 7.6 raises that, so this item adds a row lock on the person (`SELECT … FOR UPDATE`) inside `CreateSubscription`. Concurrency test: two simultaneous first subscribes make one subscription and one 409.
 
-### 2.3 A later start month is no longer free *(business_logic/payment; OQ-27, still open)*
-- [ ] **Default (OQ-27's option A):** subscribing for a future month makes no entitlement and no charge now. `next_billing_us` is that month's start, and the billing run charges it on the 1st, as the page says.
-- [ ] Tests:
-  - the billing run on the 1st charges and creates the entitlement
-  - nothing is granted before then
-  - `GetCurrentPaidByPerson` already counts it, so Back hits the 2.2 warning
+### 2.3 Start today or on the 1st *(business_logic/payment + endpoints + ui; OQ-27)*
+Fixes F4 and P13. The server works out the dates and the amount from a named **start choice**, so the page no longer sends dates. Examples are for a $160 membership bought on November 17.
+
+| Choice | Who | Charged now | Access from | Next charge |
+|---|---|---|---|---|
+| **Start today** (`today`) | members and staff | the rest of this month, by the day: 14 of 30 days, **$74.67** | today | $160 on December 1 |
+| **Start on December 1** (`next_month`) | members and staff | nothing | December 1 | $160 on December 1, by the billing run |
+| **Start today, rest of November free** (`today_rest_free`) | staff only | December's full **$160** | today | $160 on January 1 |
+| **Start on the 1st of a later month** (`later_month`, with the month) | staff only | nothing | that month's 1st | on that 1st |
+
+- [ ] **`SubscriptionStartPlanner`** (business_logic/payment): given a choice, a product and "now", it returns the period, the amount to charge now, the access start and the next billing date. It is the only place these are worked out. The checkout and the preview both call it, so they can't disagree.
+  - "By the day" counts today, so the proration rule is the one `CalculateProratedCharge` and 3.1's upgrades already use. On the 1st, **Start today** costs the full month. On the last day it costs one day.
+  - Unit tests for each choice on the 1st, the 17th and the last day, across a year end (December → January), and for February.
+- [ ] **`CreateSubscription` follows the plan** (on top of 2.1's charge-first order):
+  - **Start today:** the prorated charge now, and the period runs to the 1st. This is what the staff page's prorate path already does; the server now does it for members too.
+  - **Start on December 1 / a later month:** no purchase, no entitlement, no charge. The current period runs from now to the start, with nothing granted, and `next_billing_us` is the start. On the 1st, the billing run charges and grants the month like any renewal (F4's last point). The $0 entitlement path at `subscription_helper.cpp:289-314` goes, and with it the free month.
+  - **Rest of this month free:** one charge of the full price now, with access and the period from today to the end of next month. `next_billing_us` is the 1st of the month after. The charge record and the receipt say "includes 14 free days of November".
+  - A declined card on the 1st makes the membership past due, as a failed renewal does. Cancelling before the 1st costs nothing.
+- [ ] **Endpoints:**
+  - `POST /api/subscriptions` takes `start: "today" | "next_month"`. Anything else gets 400, so a member can't send a staff-only choice.
+  - The admin create takes all four choices (with `start_month` for the later one), behind `manage_subscriptions`.
+  - The old date fields go from both (`start_year`/`start_month`/`charge_now`, and `period_start_us`/`period_end_us`/`charge_now`/`complimentary_period`). The page and the server ship together in sandbox.15.
+  - **New `GET /api/subscriptions/start_options?product_id=`** answers signed out too. For each member choice it returns the amount today, the first full charge with its date, and the access start. It's a GET, so it needs no CSRF bootstrap. The signed-out subscribe page (5.2, OQ-14) shows these numbers.
+- [ ] **The welcome email (2.4) says what happened with the money:**
+  - "You've been charged $74.67 for November 17–30. Your next charge is $160 on December 1."
+  - "Nothing has been charged yet. Your membership starts on December 1, with a charge of $160."
+  - "You've been charged $160 for December. The rest of November is on us."
+- [ ] **Pages:**
+  - **Subscribe** (member): the **Start month** list becomes two choices, each with its numbers from `start_options`:
+    - **Start today:** "$74.67 today for the rest of November, then $160 on the 1st of each month."
+    - **Start on December 1:** "Nothing today. $160 on December 1, then on the 1st of each month."
+
+    The button reads **Subscribe & pay $74.67** or **Subscribe**. Later months go from the member page, since you described two choices. Say if members should keep them.
+  - **Create Subscription** (staff): the month list and its two checkboxes become the table's four choices. Each line says what's charged now and when the next charge is, and **a later month** opens the month list.
+    - The unticked **Prorate for remaining days** (full price for a part month) goes. Say if staff use it.
+- [ ] **Tests** (server):
+  - **Start today** on the 17th: 14/30 of the price charged, access from today, and the billing run on December 1 charges the full price
+  - **Start on December 1:**
+    - nothing is charged, and `GetCurrentMembership` is empty until the 1st
+    - the billing run on the 1st charges and grants December; a decline makes it past due
+    - cancelling before the 1st means nothing is ever charged
+  - **Rest of November free:** the full price is charged now, and access runs to December 31. The billing run on December 1 charges nothing; on January 1 it charges.
+  - a member sending `today_rest_free` or `later_month` → 400; staff sending either → created
+  - `start_options` signed out answers the same amounts that checkout then charges
+  - `GetCurrentPaidByPerson` counts a membership waiting to start, so Back hits the 2.2 warning
+  - the three email texts, against the mail double
+- [ ] **Specs:**
+  - each page's choices and their text
+  - what each choice sends
+  - the button's amount
+  - the staff page's month list appearing only for a later month
 
 ### 2.4 One email per signup *(business_logic/payment)*
 - [ ] A subscription's first charge sends one email: "Welcome to Gold", with the receipt (amount, card, period) folded in. `PayWithCard` gets a `suppressConfirmationEmail` flag that only `CreateSubscription` sets.
@@ -646,6 +709,7 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
     - **Subscribe** stays disabled until they tick **I want an additional membership**
     - **Change my membership instead** goes to **My Membership**
     - a 409 `ALREADY_HAS_A_MEMBERSHIP` (bought in another tab) shows the same warning
+  - the start choice, with its amounts, is 2.3's
   - the idempotency key is made once per visit and kept with the order, so a retry reuses it
   - success → `replaceUrl`
 - [ ] **Cart**: the same as checkout.
@@ -678,6 +742,7 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
 - [ ] Mutation check:
   - subscription inserted before the charge
   - the `ALREADY_HAS_A_MEMBERSHIP` guard removed, and the buyer seated on a second membership
+  - **Start on December 1** granting the waiting days; **Start today** charging the full month; a member allowed `today_rest_free`
   - the duplicate window set to zero
   - the email flag ignored
   - `replaceUrl` dropped
@@ -820,7 +885,7 @@ T1–T4, T27, G1, G7 and G13–G16.
 ### 5.2 Memberships *(business_logic/payment + endpoints + ui)*
 - [ ] **What each tier includes, from the data:** `CatalogHelper` lists, for each membership product, the classes its granted permission opens. The data is the classes' requirement groups (the `ClassAccessHelper` rules), with "needs instructor approval" when a skill is also required. It goes on the catalog response.
   - Tests through `ClassAccessHelper::CheckAccess`, against the seeded rules: Silver lists only Beginner Knotty Yoga; Gold lists all six, three marked approval.
-- [ ] **One / Two / Family** (T2; OQ-15, still open, with sketches): by default, two cards, **Silver** and **Gold**, with the size choice inside each card.
+- [ ] **One / Two / Family** (T2; OQ-15, option A): two cards, **Silver** and **Gold**, with the size choice as radio buttons inside each card (the sketch in OQ-15).
   - The sizes come from the products, grouped by the permission they grant and by `seats_default`, so a new size needs no code.
   - Each size shows its price and saving: "Couple — $300/month ($150 each, save $50 a person)".
   - Silver has no Family size, so its card shows two.
@@ -830,13 +895,13 @@ T1–T4, T27, G1, G7 and G13–G16.
   - **Silver:** "Our introductory membership, with a selection of our most beginner-friendly and accessible classes. Start here until your instructors suggest moving on to Gold and you feel ready. Part of acrobatics is learning the terminology and body positions, and learning to move and organize yourself in a new way. These classes are the foundation for aerial, partner acro and handstand training."
   - **Gold:** "More advanced classes that also bring in elements of circus acrobatics, plus our specialty classes in handstands, aerial and partner acrobatics."
   - Seed test through the catalog reader.
-  - Edited lightly from your answer, for punctuation. Say if you want them word for word.
+  - Approved as written here (OQ-9).
 - [ ] **"Browse bookable services →"** comes off Memberships (G13).
-- [ ] **Look before you sign up** (G14; OQ-14, still open; this is the default): the subscribe page opens signed out.
-  - It shows the tier, the price, the start month and the first charge.
-  - **Subscribe** reads **Sign in or create an account to continue**, and returns here (4.5).
-  - Whatever the page asks the server for its price must answer signed out; to verify.
-- [ ] Specs: the size choice with its prices and savings, Silver without Family, the comparison, the signed-out subscribe page, and the return.
+- [ ] **Look before you sign up** (G14; OQ-14, option A): the subscribe page opens signed out.
+  - The route's sign-in guard comes off (`shop.routes.ts:20`).
+  - Signed out, the page shows the tier, the size and both start choices with their amounts, from 2.3's `start_options` (which answers signed out).
+  - Where the card form would be, it says **Sign in or create an account to continue**. Either one returns to this page with the size and start choice kept (4.5).
+- [ ] Specs: the size choice with its prices and savings, Silver without Family, the comparison, the signed-out subscribe page with its amounts, and the return with the choices kept.
 
 ### 5.3 Getting Started: look first, commit last *(seed + Page Content + ui)*
 - [ ] **New step order** (seed; OQ-8, decided):
@@ -851,7 +916,7 @@ T1–T4, T27, G1, G7 and G13–G16.
 - [ ] **What to expect** is the new-student FAQ (G7), from Mason's text (OQ-9).
   - Each class's own requirements stay on its class page; this step links to **All Classes** for them.
   - It is a step body in Markdown; to verify that the steps render Markdown. **Contact us** is a `mailto:` link to the studio's address (5.1).
-  - The page text, a **DRAFT** for your approval: your wording, split under three headings.
+  - The page text, approved (OQ-9): your wording, split under three headings.
 
   > **Is Knotty Yoga right for me?**
   > Knotty Yoga is physically rigorous. You'll keep up best if you're reasonably fit and free of significant injuries; carrying a lot of extra weight makes classes hard to keep up with. If that describes you, **contact us** about one-on-one training to get started.
