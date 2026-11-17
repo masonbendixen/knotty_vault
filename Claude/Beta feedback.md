@@ -1483,7 +1483,7 @@ T30, T31, T41 and G18.
     - The card is tested while the person is still on the page.
     - But they pay two weeks before they can use it, and cancelling before December means a refund.
   - Either way December stops being free. **Recommendation: A.**
-  - Mason- I'd like a way to be able to have the option to have staff create a membership
+  - Mason- I'd like a way to be able to have the option to have staff create a membership that they pay now for the next month but the rest of the current month is thrown in for free. But this is something that needs to be done by staff. For users, I would like them to be able to sign up for a membership and have the option to have the billing and membership become active the next month but also have the option to make a pro rated payment for the current month and then have full month billing start for the next month.
 
 **OQ-30 — Database connections per site** *(7.6)*
 - **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
@@ -1498,6 +1498,7 @@ T30, T31, T41 and G18.
     - *Later, with many studios on one database,* the count is per site. That's why it's set in the app config, where it can come down.
   - **2 vs 4.** With 2, a page's main call and one background call overlap, but the calendar's three calls still queue. With 4, the busiest page's three calls all run at once, with one to spare. The memory difference is a few MB per extra connection.
   - **Recommendation: 4,** read from the app config so changing it is one line.
+  - Mason- I'll go with your recommendation.
 
 ### Resolved
 
