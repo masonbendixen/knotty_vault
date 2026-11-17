@@ -1465,7 +1465,7 @@ T30, T31, T41 and G18.
     - Pro: one source of truth, and a font change in **Site Theme** is the only download.
     - Con: on a first visit the fonts start only after the app has booted and fetched the site config. 7.3 caches the config, so repeat visits are quicker, but they still wait for the JavaScript. Text appears in a fallback font and then swaps: the flash Thomas noticed.
   - **Recommendation: A.** Fonts change rarely, and first paint happens on every visit.
-  - Mason- I'm on the fence about this. I want this to be a generic server
+  - Mason- I'm on the fence about this. I want this to be a generic server and want this to be configurable. Is there a way to let users change these fonts in the database but have something get updated so that first paint is fast? Maybe index.html could be generated based on something that gets updated by the timer process?
 
 **OQ-27 — Subscribing for a later month** *(2.3)*
 - Today it's free that month (F4).
@@ -1483,6 +1483,7 @@ T30, T31, T41 and G18.
     - The card is tested while the person is still on the page.
     - But they pay two weeks before they can use it, and cancelling before December means a refund.
   - Either way December stops being free. **Recommendation: A.**
+  - Mason- I'd like a way to be able to have the option to have staff create a membership
 
 **OQ-30 — Database connections per site** *(7.6)*
 - **Default:** 4, so four requests run at once. The t3.small and the RDS instance have room; to confirm against RDS's connection limit.
