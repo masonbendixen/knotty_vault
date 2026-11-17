@@ -1447,6 +1447,7 @@ T30, T31, T41 and G18.
     - If the public photos (home page, gallery, classes, instructors) get an address that changes whenever the photo changes, CloudFront can keep them at its edge for a year. The server never sees a repeat request, and a replaced photo shows at once because its address is new. People's own photos stay uncached. That's new item **7.8**.
     - An in-memory LRU cache in the server would save only the database read, and each server would have its own copy. It's the fallback if 7.1 shows that first views are slow.
   - **Default:** 11.1 and 7.8 now, with server rendering as its own plan later. Say if you want that plan written now instead.
+  - Mason- Let's go with the default. Is the cloudfront image cache thing going to get a work item?
 
 **OQ-22 — One font address** *(7.4, D7)*
 - The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
@@ -1464,6 +1465,7 @@ T30, T31, T41 and G18.
     - Pro: one source of truth, and a font change in **Site Theme** is the only download.
     - Con: on a first visit the fonts start only after the app has booted and fetched the site config. 7.3 caches the config, so repeat visits are quicker, but they still wait for the JavaScript. Text appears in a fallback font and then swaps: the flash Thomas noticed.
   - **Recommendation: A.** Fonts change rarely, and first paint happens on every visit.
+  - Mason- I'm on the fence about this. I want this to be a generic server
 
 **OQ-27 — Subscribing for a later month** *(2.3)*
 - Today it's free that month (F4).
