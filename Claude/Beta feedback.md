@@ -305,6 +305,7 @@ Please create a plan with phases of implementation. Within each phase, please re
     - Staff get a third choice: **rest of this month free**, with next month charged now.
     - The server works out the dates and amounts from the choice, and one preview endpoint shows the same numbers on the page, signed in or not.
   - **Found while checking OQ-27 (P13):** a member who subscribes "for this month" pays the **whole** month's price, even on the 28th. The page sends the full calendar month, so nothing is prorated (F4). 2.3 fixes it.
+  - **Also found (P14): every monthly renewal drops the shared seats.** The billing run makes a new entitlement each month and seats only the payer, so whoever shares a couple's or family membership loses access on the 1st (F22). 2.2 now carries the seats over. That's urgent for Phase 4, since sharing is what it makes easy.
   - **OQ-22 has a new option, and it's now the default:** the server fills in the page's `<head>` from the database, so a font change in **Site Theme** reaches first paint without a deploy. That rewrites 7.4. No timer is needed: the server builds the head when asked and caches it, and a Site Theme save clears the cache.
   - **A correction to v0.2.** I wrote that 11.1's per-page titles and preview tags would fix link previews. They wouldn't on their own. The page is a static file from S3, and Angular adds those tags only once JavaScript runs, which link previews never do. They work once the server fills them into the served page, the same mechanism as the new 7.4. 11.1 and 11.2 now say so.
 - **v0.2 (11/16/2026)** — Mason's answers folded in (see *Open questions*; his answers are kept as written). Still planning only. What changed:
@@ -603,7 +604,7 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 
 # Phase 2 — Pay once *(Thomas: "the most critical issue")*
 
-T7, T8, T22 and T23, plus F3, F4 and F7.
+T7, T8, T22 and T23, plus F3, F4, F7 and F22.
 
 ### 2.1 A failed first charge leaves nothing behind *(business_logic/payment)*
 - [ ] `CreateSubscription` charges **before** it writes the subscription:
@@ -613,7 +614,7 @@ T7, T8, T22 and T23, plus F3, F4 and F7.
   4. Only on success, insert the subscription and its charge record.
 
   On a decline, the pending purchase is cancelled. No subscription row, no entitlement and no next-billing date are left.
-- [ ] The complimentary and admin no-card paths keep their behaviour.
+- [ ] The admin no-card path keeps its behaviour. The complimentary path (**Include this month free**) is replaced by 2.3's **rest of this month free**.
 - [ ] Tests, through the billing run's due-row reader and `GetActiveByPersonId`:
   - declined card → no subscription, nothing due for billing, the purchase cancelled
   - `RunBilling` afterwards charges nothing
@@ -661,7 +662,7 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - Unit tests for each choice on the 1st, the 17th and the last day, across a year end (December → January), and for February.
 - [ ] **`CreateSubscription` follows the plan** (on top of 2.1's charge-first order):
   - **Start today:** the prorated charge now, and the period runs to the 1st. This is what the staff page's prorate path already does; the server now does it for members too.
-  - **Start on December 1 / a later month:** no purchase, no entitlement, no charge. The current period runs from now to the start, with nothing granted, and `next_billing_us` is the start. On the 1st, the billing run charges and grants the month like any renewal (F4's last point). The $0 entitlement path at `subscription_helper.cpp:289-314` goes, and with it the free month.
+  - **Start on December 1 / a later month:** no purchase, no entitlement, no charge. The current period runs from now to the start, with nothing granted, and `next_billing_us` is the start. On the 1st, the billing run charges and grants the month like any renewal (F4's last point). The $0 entitlement path at `subscription_helper.cpp:289-314` no longer runs for a later start, which ends the free month. It stays only for the admin no-card path (2.1).
   - **Rest of this month free:** one charge of the full price now, with access and the period from today to the end of next month. `next_billing_us` is the 1st of the month after. The charge record and the receipt say "includes 14 free days of November".
   - A declined card on the 1st makes the membership past due, as a failed renewal does. Cancelling before the 1st costs nothing.
 - [ ] **Endpoints:**
@@ -1089,7 +1090,7 @@ T18, T43, T45, T46, G10 and P11.
   - **Fonts:** the `preconnect`s and stylesheet links from the site's font rows. They're the addresses `SiteConfigService` applies after start-up, so that link becomes a cache hit.
   - **The site's own tags:** title, description and theme colour, from `site_info` (7.2's cache).
   - **Per-page tags from an app hook** *(knottyyoga)*: one for the class, instructor and event pages that looks up the page's title, description and photo (11.1). Any other address gets the site's defaults. A request for `/` arrives as `/index.html` (the distribution's default root object) and gets the home page's tags.
-  - **Caching:** kept per site and address for at most 60 s, and cleared by the writes that clear 7.2's cache, so a Site Theme or font save shows on the next visit. No timer is needed.
+  - **Caching:** kept per site and address for at most 60 s, and cleared by the writes that clear 7.2's cache. With CloudFront's 60 s on top, a Site Theme or font save shows within a minute. No timer is needed.
   - `Cache-Control: public, s-maxage=60, stale-if-error=86400`. CloudFront then answers most visits itself, and keeps serving the last good page if the server is down.
 - [ ] **CloudFront** *(Mason, in the console, from steps written here when the item is built; Deploying to AWS records it)*:
   - The default behaviour (page addresses) goes to the server.
@@ -1389,6 +1390,7 @@ T30, T31, T41 and G18.
   - a second membership refused without the tick, allowed with it
   - a declined card leaves nothing
   - an invitation with a link registers and takes the seat
+  - that seat is still there after the billing run renews the membership (P14)
   - `site_info` with a cache hit and a 304
   - a public photo with its long-lived cache header
   - a page address served with the site's font links and a class page's own tags (7.4)
@@ -1467,7 +1469,7 @@ T30, T31, T41 and G18.
     - Con: there's one `index.html` for the whole distribution, so two studios on one deployment can't each have their own.
   - **Option D (new default): the C++ server fills in the page head when a page is requested,** and caches it (7.4).
     - The UI build's `index.html` becomes a template with one marked block in its head. The server keeps a copy, refreshed within a minute of a UI deploy.
-    - For each page address, it fills in the site's font links, title, description and theme colour from the database. Its cache lasts 60 seconds and is cleared when Site Theme saves, so a font change shows on the next visit with no deploy and no timer.
+    - For each page address, it fills in the site's font links, title, description and theme colour from the database. Its cache lasts 60 seconds and is cleared when Site Theme saves. With CloudFront's own minute (next point), a font change shows within a minute, with no deploy and no timer.
     - CloudFront keeps each filled-in page for 60 seconds too, so most visits never reach the server. If the server is down, CloudFront keeps serving the last good copy for a day.
     - Pros:
       - fully configurable from the database
