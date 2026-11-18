@@ -729,8 +729,9 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 
 #### Testing Phase 1 locally, before it ships
 **Setting up**
-1. **Server build.** The Phase 1 framework changes are in your `server_components` working tree, not in the pinned honuware. In Visual Studio, pick the configuration **x64-Debug (local honuware checkout)**. I left the tree configured that way. **x64-Debug** builds the pinned honuware, which doesn't have Phase 1.
-   - To go back once the pin is bumped, run `cmake --preset x64-Debug -DFETCHCONTENT_SOURCE_DIR_HONUWARE=` from `server\knottyyoga_server`, or pick **x64-Debug** and use **Delete Cache and Reconfigure**. Both presets share one build folder, so switching the dropdown alone keeps the local checkout.
+1. **Server build.** The Phase 1 framework changes are in your `server_components` working tree, not in the pinned honuware. I configured `out\build\x64-Debug` with **x64-Debug (local honuware checkout)**, so it builds your local checkout. It keeps doing that whichever of the two configurations Visual Studio shows: both share that folder, and the local path stays in its CMake cache.
+   - To go back to the pinned honuware once the pin is bumped, run `cmake --preset x64-Debug -DFETCHCONTENT_SOURCE_DIR_HONUWARE=` from `server\knottyyoga_server`. Or, in Visual Studio, pick **x64-Debug** and use **Delete Cache and Reconfigure**. Switching the dropdown alone isn't enough.
+   - CommunityFinder's Windows tree is still pinned. It won't see Phase 1 until the pin bump.
 2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings already pass `--recreate_database`.
    - `--migrate` on your current database would apply `app/0013`, but it wouldn't add 1.1's new `manage_products` grants. They're seed-only (1.1), so Part C needs the recreated database.
 3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`. The site needs no `@honuware/ui` install: its pages use the app's own `ServerAccessNetwork`, which already sends the delete as POST.
