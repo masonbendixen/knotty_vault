@@ -290,7 +290,28 @@ Also, when navigating to a different page from the Get Started page and hit the 
 END JENN FEEDBACK
 
 
+START ASHLEY FEEDBACK
 
+The site looks great!  I clicked around as a basic member and had a few notes (mostly on content and links, though I did find one cart issue).  I was logged in as another.rainy.night@gmail.com for almost everything - I also made another.rainy.night+bonus@gmail.com for testing.
+
+Schedule list (home page top, and https://dv1tgxa9ok30f.cloudfront.net/my/my-schedule ) – I got confused by the statuses – there’s a small checkbox to show I’m going, and a big button that says “I can’t make it”, so at first glance I assume that I’m going to class on Monday & Weds and can’t go on Tues & Thurs, because the buttons are large in their own column.  The display at https://dv1tgxa9ok30f.cloudfront.net/classes  with the buttons with checkboxes is great.  Though I did rsvp no for Weds Nov 4th and it’s showing up with my note on the home & my schedule, but as un-rsvp’d on the Classes page. 
+
+Could the My Schedule view at https://dv1tgxa9ok30f.cloudfront.net/calendar?view=month have an option to show just the classes I've opted in to?  I picked just weds & thurs as my weekly options, but I still see all the classes on Sun & Mon in the calendar (though the checkboxes are unchecked).  
+ 
+Maybe a way to upgrade your membership mid-month?
+ 
+The Browse Services link at https://dv1tgxa9ok30f.cloudfront.net/my/events goes to the membership shop at https://dv1tgxa9ok30f.cloudfront.net/shop instead of Bookable Services at https://dv1tgxa9ok30f.cloudfront.net/shop/services. 
+
+Feature request - I don't think anyone is going to have tons of linked accounts.  Could it be a dropdown on the subscription sharing page at https://dv1tgxa9ok30f.cloudfront.net/my/subscriptions/5 that shows your available linked accounts, instead of having to search for them?
+ 
+Would you link the cancellation policy from the cancellation warning on https://dv1tgxa9ok30f.cloudfront.net/my/events (I’m looking in Upcoming Bookings). 
+ 
+I put two massage things (a one-hour and a two-hour) in my cart & paid for them together.  Then, I cancelled the one-hour massage and the site gave credit for the full cart amount instead of the $160 for the one-hour massage.  It let me book things using the full credit afterwards.  I like the gift card setup - it's great
+  
+The schedule link from the class detail page (https://dv1tgxa9ok30f.cloudfront.net/classes/2) goes to the monthly calendar at https://dv1tgxa9ok30f.cloudfront.net/calendar?view=month, but that calendar is auto-filtered by your classes, so if you’re not in it then it won’t show up and you don’t know when it happens.  It’s also the only page for me that takes a while to load for me.  Could you have the weekly info directly on the detail page, e.g Monday & Weds 6-7; Sat 10 – 12?   (It’s also tricky to find the list of all classes.)
+What about a ‘Book with Caleb’ link from his card on https://dv1tgxa9ok30f.cloudfront.net/providers? 
+
+END ASHLEY FEEDBACK
 
 
 Please create a plan with phases of implementation. Within each phase, please respect the layering of the system and start with the work in lower layers first. Please create checkboxes by work items and then check them off as you implement them. Within the subsections of each phase, please number each such subsection. Please stick to your internal tools to inspect the filesystem and avoid external tools like grep, sed, and awk that you need to prompt me to run. I will build the C++ server and run tests myself. I will also commit and push to GIT myself so please don't use GIT commands unless you really need to understand the history of the files. Please don't prompt me if you can and run prompt requests to completion. Please always add tests for anything you chance for which testing is possible. When building this plan, please create an open questions section for things you need to ask me instead of asking me questions at the prompt.
