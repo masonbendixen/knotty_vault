@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 11/17/2026
-Version: 0.4
+Version: 0.5
 tags: 
 ---
 # Overview
@@ -318,6 +318,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.5 (11/17/2026)**: OQ-31 is answered and confirmed: no hardcoded policy, and the three seeded policies as proposed. Still planning only. What changed:
+  - **Policies are data, and the seed only writes the starting rows.** Which policy a product uses is already picked on its product page. 8.13's **Cancellation Policies** page edits the policies themselves.
+  - **The one hardcoded rule goes.** Class bookings' no-refund rule (P-6) was code (`booking_helper.cpp:900-911`). It becomes a seeded **Class bookings** policy on the class and series products. The fixed sentences about classes, series and services on the booking and My Bookings pages are built from the rows instead (8.13).
+  - **Two rules stay in code:** a cancellation by the studio, and leaving a waitlist, both refund in full.
+  - **Still open:** OQ-7, the bios.
 - **v0.4 (11/17/2026)**: OQ-22 is decided, and Ashley's feedback is folded in. This is still planning only. What changed:
   - **Fonts: option D** (OQ-22). The server fills in the page head, as 7.4 describes. 7.4 is no longer marked as a default, and option A's fallback lines are gone from 7.4, 7.7 and 11.1.
   - **Ashley's eleven points are mapped** in *Where each piece of feedback goes* (A1–A11), and nothing is dropped. Five of them add work:
@@ -1375,24 +1380,45 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1, J2, A5, A
   - every notification template's output contains the link
   - the test lists the templates, so a new one has to be added to it
 
-### 8.13 The cancellation policy, written down and linked *(seed + business_logic/payment + endpoints + ui; A7, P16; OQ-31)*
-F24: no policy exists, so every cancellation refunds in full. The cancel warning names a policy that isn't there.
-- [ ] **The policies in the seed** (D8): yours from OQ-31, attached to the service and workshop products. Class bookings stay non-refundable (P-6).
-  - Seed tests through `CalculateRefundPercent`, the reader the cancel uses: a massage booked 48 hours, 23 hours and 1 hour away.
-- [ ] **Cancellation Policies** under **Manage Products** (the **Memberships & sales** group, 9.2): edit each policy's name, description and refund windows. Today only Manage Data can, and that becomes developer-only (10.1). Specs.
+### 8.13 The cancellation policy, written down and linked *(seed + business_logic/scheduling + business_logic/payment + endpoints + ui; A7, P16; OQ-31)*
+F24: no policy exists, so every cancellation refunds in full. The cancel warning names a policy that isn't there. **Decided: OQ-31.** Every policy is data: rows that staff edit, never rules in code.
+- [ ] **The policies in the seed** (D8), OQ-31's three, as starting rows only. The seed writes them once at install; `--migrate` never rewrites them, so staff edits stay.
+  - **Massage and other services**, attached to the service products.
+  - **Workshops and events**, attached to the workshop and event products.
+  - **Class bookings**: one window, no refund at any time. Attached to every class drop-in and series product. Description: "Class bookings aren't refunded. If something comes up, contact the studio; staff may give a voucher."
+  - Seed tests through `CalculateRefundPercent`, the reader the cancel uses: a massage booked 48, 23 and 1 hours away; a workshop 8 days, 3 days and 1 day away; a class 48 hours away.
+- [ ] **The class rule becomes that row** (business_logic/scheduling). Today P-6 is code: `booking_helper.cpp:900-911` skips the refund for any session with a class. That branch goes, and every user cancel reads its product's policy.
+  - Two rules stay in code, because they aren't policy: a cancel by the studio refunds in full (`hasFreeCancelOverride`, `:926-927`), and so does leaving a waitlist, where there was never a seat (`:985-986`).
+  - The cancel's `refund.reason` stays `non_refundable` whenever the policy gives nothing, for any product, and the response adds the policy's name.
+  - Tests:
+    - a class drop-in cancelled 48 hours ahead refunds nothing, through the seeded policy
+    - the same class with its product switched to **No policy** refunds in full, which proves the rule is data
+    - a series booking follows its product's policy the same way
+    - a studio cancel of a class still refunds in full
+    - the existing P-6 tests attach the Class bookings policy in their setup, so they still pass for the right reason
+- [ ] **Cancellation Policies** under **Manage Products** (the **Memberships & sales** group, 9.2): add, rename and edit each policy's description and refund windows. Today only Manage Data can, and that becomes developer-only (10.1).
+  - Each policy lists the products that use it.
+  - Which policy a product uses is already chosen on the product's page (**Cancellation Policy**, `product-detail.component.html:105`). A new product starts on **No policy (full refund always)**, as today.
+  - Specs.
 - [ ] **A Cancellation Policy page** (`/cancellation-policy`, signed out too). It is built from the policy rows, so the page and the refund can't disagree:
   - each policy's name, its description, and its windows in words: "Full refund up to 24 hours before. No refund after that."
-  - the class rule: class bookings aren't refunded, and staff may give a voucher
+  - The class rule is simply the Class bookings row; the page has no fixed text about classes.
   - The footer links to it.
   - `GET /api/cancellation_policies` answers signed out. Endpoint test: signed out, with the windows in order.
+- [ ] **The booking pages say the product's own policy,** built from its windows, instead of fixed sentences:
+  - service booking: "Cancellation policy applies. See your booking confirmation for details." (`service-booking.component.ts:422-426`)
+  - event booking (`event-booking.component.ts:177`); event sessions already carry their windows (`event_session_helper.cpp:316-340`)
+  - "Series purchases are non-refundable…" on the series booking and class pages (`series-booking.component.html:76`, `class-detail.component.html:151`)
+  - The shop's product response gains its policy's name and windows, as event sessions have. Endpoint test.
+  - Specs: a product with a policy and one with none, on each page.
 - [ ] **A cancel preview:** `GET /api/bookings/<id>/cancel_preview` returns what cancelling now gives back: the amount (2.9's share), the percent, and the policy's name. It writes nothing. Only the booking's owner or payer may call it, as with the cancel; anyone else gets 404.
   - Tests: the preview equals what the cancel then refunds, for a single booking and for one item of a cart; 401; 404 for someone else's booking.
 - [ ] **The warning on My Bookings,** and on Purchase History's cancel (`purchase_history.component.html:99`), gives the number and links the policy:
 
   > Cancel now and you get **$160** back (full refund until 24 hours before). **Cancellation policy**
 
-  The generic service text goes (`my-events.component.ts:235`). Events use the preview too, so a cart's event shows its own share.
-- [ ] Specs: the warning for a full, a partial and no refund; the link; the page.
+  The generic service text goes (`my-events.component.ts:235`), and so do the class-only sentences (`:248-253` before the cancel, `:358-361` after it). A class says "No refund under the **Class bookings** policy", with the same link. Events use the preview too, so a cart's event shows its own share.
+- [ ] Specs: the warning for a full, a partial and no refund, including a class; the message after a cancel that refunded nothing; the link; the page.
 
 ---
 
@@ -1615,6 +1641,10 @@ T30, T31, T41 and G18.
 - → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
 - → v0.3: still waiting, as you said. Nothing else depends on them.
 
+### Resolved 11/17/2026, fourth round
+
+*Your answer to v0.4.*
+
 **OQ-31 — The cancellation policy** *(8.13, Ashley)*
 - Ashley asked for a link to the cancellation policy from the cancel warning. There's nothing to link to yet:
   - No policy exists, so every cancellation refunds in full, even an hour before a massage (F24).
@@ -1628,6 +1658,23 @@ T30, T31, T41 and G18.
   - The refund goes back to the card, or to store credit if the person ticks it, as today.
 - **Say "use the default", or write your windows and descriptions here.** Nothing ships with a policy you haven't seen.
 - Mason- These are just the initial things populated in the data, correct? It isn't hardcoded and I can go into product definitions for any of these and alter them in the products page, correct? I don't want hardcoded policy.
+- → Explained: yes, with one exception in today's code, which the plan now removes.
+  - **The policies are database rows.** A policy is a `cancellation_policies` row (name, description) with `cancellation_policy_windows` rows (hours before, refund percent). The cancel reads them when it happens (`refund_helper.cpp:51-85`). The seed writes the starting rows once at install (D8), and `--migrate` never rewrites them, so your edits stay.
+  - **Which policy a product uses:** you can change it today, on the product's page in **Manage Products**, in the **Cancellation Policy** dropdown (`product-detail.component.html:105`). Its first choice is "No policy (full refund always)".
+  - **A policy's own windows and wording:** today only Manage Data can edit them. 8.13 adds a **Cancellation Policies** page under Manage Products.
+  - **A change applies to the next cancellation,** including bookings made before you changed it, because the cancel reads the windows at that moment.
+  - **The exception: class bookings.** Their no-refund rule (P-6) is code, not data: `booking_helper.cpp:900-911` skips the refund for any session that belongs to a class, whatever its product's policy says. The pages also carry fixed sentences about it:
+    - "Class bookings are non-refundable…" (`my-events.component.ts:248-253`, `:358-361`)
+    - "Series purchases are non-refundable…" (`series-booking.component.html:76`, `class-detail.component.html:151`)
+    - "Cancellation policy applies…" on the service booking page (`service-booking.component.ts:422-426`)
+  - **Two rules stay in code, because they aren't policy:** a cancellation by the studio refunds in full, and so does leaving a waitlist, since there was never a seat.
+- → Plan: 8.13 now makes every policy data.
+  - The seed writes the two defaults above, plus a third, **Class bookings**: no refund at any time, with a description that points to the studio and its vouchers.
+  - The P-6 branch is deleted. Classes refund nothing because their products use that row. Switch a class product to another policy and it refunds by that one; a test proves it.
+  - Every page that describes a policy builds its text from the rows.
+  - To start with different numbers, write them here before Phase 13's reinstall. After that, change them on the **Cancellation Policies** page.
+  - Mason- Okay, this plan sounds good to me then.
+- → Plan: confirmed. 8.13 is marked decided, and the seed writes the three policies above.
 
 ### Resolved 11/17/2026, third round
 
