@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 11/17/2026
-Version: 0.5
+Last Updated: 11/18/2026
+Version: 0.6
 tags: 
 ---
 # Overview
@@ -318,6 +318,15 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.6 (11/18/2026)**: Phase 1 is built and tested but not shipped. Mason is holding it to ship with later phases. What changed:
+  - **1.1–1.5 are done, with tests.** The 1.6 gates passed on both platforms, and the mutation check caught every mutation. The release steps (push, pin bump, `@honuware/ui` release, `sandbox.14`, the production probe) wait for ship time.
+  - **1.2's expectations, corrected to what's true:**
+    - `manage_products` is *allowed* on `classes` (1.1's grant), not refused.
+    - GET `delete_item` answers 405, not "not found".
+    - The existing CRUD tests had to sign in: they all wrote signed out.
+  - **New: *Testing Phase 1 locally*** under 1.6, a click-by-click walkthrough. It covers an admin's saves and deletes, Manage Data's delete, and a non-admin with `manage_products` on Class Schedules. It also lists what only the automated tests can check.
+  - **OQ-32 grew a point:** on `manage_products` alone, Class Schedules saves the class but can't load its instances or set its tags, which need `manage_class_schedule`.
+  - **10.2 gained *Carried from Phase 1*:** three items found during the inventory and census.
 - **v0.5 (11/17/2026)**: OQ-31 is answered and confirmed: no hardcoded policy, and the three seeded policies as proposed. Still planning only. What changed:
   - **Policies are data, and the seed only writes the starting rows.** Which policy a product uses is already picked on its product page. 8.13's **Cancellation Policies** page edits the policies themselves.
   - **The one hardcoded rule goes.** Class bookings' no-refund rule (P-6) was code (`booking_helper.cpp:900-911`). It becomes a seeded **Class bookings** policy on the class and series products. The fixed sentences about classes, series and services on the booking and My Bookings pages are built from the rows instead (8.13).
@@ -720,12 +729,61 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 - [ ] `@honuware/ui` patch release; `npm install @honuware/ui@X.Y.Z --save-exact` in `ui/`. *(Mason, at ship time. knottyyoga works without it; CommunityFinder's admin delete needs it.)*
 
 ### 1.6 Ship it
-- [ ] Gates: server_components (Windows + Linux); knottyyoga against the local checkout (Linux); Angular (Windows + Linux).
-- [ ] Mutation check: put `IsTableAllowed` back on each write, and GET back on delete. The new tests must catch every one.
+- [x] Gates: server_components (Windows + Linux); knottyyoga against the local checkout (Linux); Angular (Windows + Linux).
+- [x] Mutation check: put `IsTableAllowed` back on each write, and GET back on delete. The new tests must catch every one.
 - [ ] **Mason** pushes server_components; CI; Claude bumps the pin in knottyyoga and CommunityFinder and reruns both pinned gates.
 - [ ] `@honuware/ui` release (Mason tags), install, Angular gates.
 - [ ] Release as **`v1.0.0-sandbox.14`**: server and UI together. The new server refuses the old UI's GET delete, so they must ship as a pair.
 - [ ] After deploy, Claude probes production signed out (`curl -m 10`, read-only and write attempts on a throwaway `products` row name). Every write must answer 401. Results recorded here.
+
+*The last four wait for ship time. Mason is holding Phase 1 to ship with later phases (11/18).*
+
+**Gate results (11/18, all against the local, unpushed honuware):**
+
+| Suite | Windows | Linux |
+|---|---|---|
+| honuware (`server_components`) | 1949 | 1949 |
+| knottyyoga | 5475 | 5475 |
+| CommunityFinder | not run: its Windows tree is pinned | 2523; both programs built |
+| knottyyoga `ui/` (Angular) | 4050 | 4050 |
+| `@honuware/ui` | 514 | 514 |
+
+- The knottyyoga Linux run also built the database helper and the server.
+- **One compile fix along the way.** `create_database_test.cpp` used `DbSchema::kPermissionManageClassSchedule` without including `db_schema/permissions.h`, and failed on both platforms. The include is added.
+- **One unrelated failure on Windows, cleared on rerun.** The first Windows honuware run failed four `TenantPhysicalIsolationTest` tests: "database `test_honuware_tenant_b_windows` is being accessed by other users". Nothing held that database when I checked afterwards, and a full rerun passed all 1949. Phase 1 doesn't touch those tests.
+
+**Mutation results (11/18).** Each mutation undid one change and rebuilt, and at least one new test failed every time.
+- honuware:
+  - The write check turned off in `add_item` → `AddItemTest.AddItemSignedOutIsRefused`, `…WithoutGrantIsRefused` and `…GrantIsPerTable` fail.
+  - The same in `add_item_fetch_primary_key` → `…SignedOutIsRefused` and `…WithoutGrantIsRefused`.
+  - The same in `update_item` → `…SignedOutIsRefused` and `…WithoutGrantIsRefused`.
+  - The same in `delete_item` → `DeleteItemTest.SignedOutIsRefused`, `WithoutGrantIsRefused` and `GrantIsPerTable`.
+  - `delete_item` back on GET → `DeleteItemTest.GetIsNotAllowed`, and every POST delete test.
+  - `display_templates` unfiltered → `DbSchemaTest.GetDbSchemaDisplayTemplatesOnlyForAllowedTables` and `DatabaseRestHelperTest.DatabaseMetadataWithDisplayTemplates`.
+  - My script restored files with their old timestamps, so later mutations still built against earlier mutants. Each mutation's own tests were measured correctly, because sed always gives the mutated file a new timestamp. To clear the mutants, I touched the five files afterwards and reran the full gate: 1949 passed.
+- knottyyoga:
+  - The five private tables back on the public list → `CreateDatabaseTest.SignedOutVisitorsCannotReadMembersPrivateTables` and `StudioManagersStillReadAttendanceTemplatesOnly` fail.
+  - Each of the three `manage_products` grants removed, one at a time → `ManageProductsCanEditAClassAndItsRequirements`.
+  - The Studio Manager's grant on `attendance_templates` removed → `StudioManagersStillReadAttendanceTemplatesOnly`.
+  - `app/0013` made a no-op → `AppMigrationsTest.PrivateTablesNotPublicTakesThemOffTheListAndIsIdempotent`.
+  - After the restore, the same 13 tests pass, and the full gates above ran afterwards.
+
+**What to commit, by repository:**
+- `server_components`: the four write endpoints, `database_rest_helper.cpp`, and their tests (`add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item`, `db_schema` and `database_rest_helper` tests).
+- `honuware-web-components`: `crud-http-access.ts` and its spec.
+- knottyyoga:
+  - `app_migrations.h`, `app_migrations.cpp` and `app_migrations_test.cpp`
+  - `create_database.h`, `create_database.cpp` and `create_database_test.cpp`
+  - `ui/…/ServerAccessNetwork.ts` and the new `server-access-network-crud.spec.ts`
+- CommunityFinder: `crud_test.cpp` and `roles_permissions_test.cpp`.
+  - That working tree also has other uncommitted work that isn't Phase 1: the "CM3 OQ10" photo-cap override, in `app_secret_values.*`, `create_app_tables.*`, `create_database.cpp`, `register_app_services_test.cpp` and `test/src/main.cpp`.
+  - The 2523 above ran with it in place.
+
+**Ship order when the time comes:**
+1. Push `server_components`.
+2. Bump the pin in both apps, then rerun both pinned gates.
+3. Release `@honuware/ui`; CommunityFinder needs it.
+4. Ship knottyyoga's server and UI in one release. An old UI's delete is refused by the new server.
 
 #### Testing Phase 1 locally, before it ships
 **Setting up**
