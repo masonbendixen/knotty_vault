@@ -4,7 +4,7 @@ Category: Claude
 Status: Active
 Authors: Mason Bendixen
 Last Updated: 11/17/2026
-Version: 0.3
+Version: 0.4
 tags: 
 ---
 # Overview
@@ -318,6 +318,21 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.4 (11/17/2026)**: OQ-22 is decided, and Ashley's feedback is folded in. This is still planning only. What changed:
+  - **Fonts: option D** (OQ-22). The server fills in the page head, as 7.4 describes. 7.4 is no longer marked as a default, and option A's fallback lines are gone from 7.4, 7.7 and 11.1.
+  - **Ashley's eleven points are mapped** in *Where each piece of feedback goes* (A1–A11), and nothing is dropped. Five of them add work:
+    - **Cancelling one item of a cart refunds the whole cart** (A8, F23). Her one-hour massage credited her for both massages. Checking it turned up the same fault when the studio cancels a session (P15). New **2.9** refunds only that booking's item. It ships with Phase 2, since it's money.
+    - **No cancellation policy exists, so every cancellation refunds in full, at any time** (P16, F24). New **8.13** seeds your policy, shows it on a page, and links it from the cancel warning together with the exact amount. It needs your policy (OQ-31).
+    - **One attendance control with three states** (A1, A2, F25; new **6.6**): *going*, *can't make it* (with the note) and *not planned*. It looks the same on the home page, My Weekly Plan, Our Classes and the calendar. Today a skipped class looks unplanned on Our Classes, and the big **I can't make it** button reads as a status.
+    - **An On my plan view** on Our Classes and the calendar (A3, 6.3).
+    - **The class page lists its weekly times,** and its calendar link shows that class (A9, F26, 6.5). **Book with Caleb** from the Providers page (A11, 8.6).
+  - **Her other points were already in the plan:**
+    - an upgrade mid-month (Phase 3, prorated by OQ-2)
+    - Browse Services going to Memberships (8.8, as Jennifer found)
+    - picking a linked account instead of searching (4.6)
+    - the slow calendar (7.5)
+    - finding All Classes (8.4 adds a link and keeps your OQ-13 menu call)
+  - **New open question:** OQ-31, the cancellation policy itself.
 - **v0.3 (11/17/2026)** — Mason's second round of answers folded in. Still planning only. Eight questions are now resolved; two stay open (OQ-7 bios, OQ-22 fonts). What changed:
   - **Approved as written:** the FAQ and the Silver and Gold text (OQ-9), the subscribe page before sign-in (OQ-14), sizes inside each card (OQ-15), no products regrouping (OQ-19), CloudFront for public photos (OQ-21, 7.8) and 4 database connections (OQ-30).
   - **Manage Data: the Developer role, and no rollback** (OQ-20). You asked for my view: the role is the right call, and rollback isn't worth building now. RDS already keeps seven days of point-in-time backups, and you'll be the only person using the page. Phase 10 is no longer a default.
@@ -371,7 +386,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Where each piece of feedback goes
 
-**T** = Thomas, **G** = Gifford, **J** = Jennifer, **P** = found while planning.
+**T** = Thomas, **G** = Gifford, **J** = Jennifer, **A** = Ashley, **P** = found while planning.
 
 | # | Feedback | Plan |
 |---|---|---|
@@ -438,6 +453,17 @@ Please create a plan with phases of implementation. Within each phase, please re
 | G19 | Categorize products | 9.2 (OQ-19) |
 | J1 | My Bookings' "Browse services" goes to Memberships | 8.8 |
 | J2 | Back from a Get Started link doesn't return to the step | 8.1 |
+| A1 | Schedule list: the big **I can't make it** button reads as the class's status | 6.6 |
+| A2 | A class marked "can't make it" shows as unplanned on Our Classes | 6.6 |
+| A3 | The calendar's My Schedule should show only the classes I've planned | 6.3 |
+| A4 | Upgrade a membership mid-month | Phase 3 |
+| A5 | My Bookings' Browse Services goes to Memberships | 8.8 (as J1) |
+| A6 | Pick from my linked accounts instead of searching | 4.6 (as G17) |
+| A7 | Link the cancellation policy from the cancel warning | 8.13 (OQ-31) |
+| A8 | Cancelling one massage of a two-massage cart credited the whole cart | 2.9 |
+| A9 | The class page's schedule link hides a class I'm not in; put the weekly times on the page; the calendar is slow | 6.5, 7.5 |
+| A10 | Hard to find the list of all classes | 8.4 |
+| A11 | **Book with Caleb** from his card on Providers | 8.6 |
 | P1 | Generic writes need no sign-in | Phase 1 |
 | P2 | Declined card leaves an active membership | 2.1 |
 | P3 | A future start month is free | 2.3 |
@@ -452,6 +478,8 @@ Please create a plan with phases of implementation. Within each phase, please re
 | P12 | The seat card's sharing link goes nowhere (`/my/account#sharing`) | 4.6 |
 | P13 | Subscribing "for this month" charges the whole month, whatever the date | 2.3 |
 | P14 | A monthly renewal drops shared seats and seats the payer again | 2.2 |
+| P15 | The studio cancelling a session also refunds the booking's whole cart | 2.9 |
+| P16 | No cancellation policy is seeded, so every cancellation refunds in full | 8.13 (OQ-31) |
 
 ---
 
@@ -521,6 +549,31 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
     - Nothing copies last month's seats across. `EntitlementHelper::TransferAssignments` does exactly that, but only a change of membership calls it (`subscription_helper.cpp:1136`).
     - So on the 1st, Bri's seat on a couple's membership is gone, and the seat card reads "1/2" again. A membership bought for a friend seats its payer again, too.
     - No test renews a shared membership. `GetCurrentEntitlementForSubscriptionAfterBilling` (`subscription_helper_test.cpp:599`) only checks that the entitlement is new.
+23. **Cancelling one booking from a cart refunds the whole cart (A8, P15; found in v0.4).**
+    - A cart checkout makes one purchase and one payment. Each booking keeps its own line, `purchase_item_id` (`cart_checkout_helper.cpp:327-352`).
+    - Every cancel refunds a percentage of the **whole payment**: `RefundHelper::ProcessRefund` takes the payment's amount × the percent (`refund_helper.cpp:123-126`). The callers are:
+      - a member's cancel (`booking_helper.cpp:819`, `:872`, `:930`, `:985`)
+      - the studio cancelling a session (`session_cancellation_helper.cpp:142`, `:154`)
+    - The purchase is then marked `refunded` while the other booking stays confirmed (`refund_helper.cpp:331-332`). So Ashley's $160 cancellation credited her for the whole cart.
+    - Cancelling the second booking refunds nothing, because the newest payment row is now the negative refund (`:107-115`).
+    - A refund by amount already exists for series occurrences, `ProcessPartialRefundCents` (`:137-202`). It is capped at what the purchase still has paid.
+24. **No cancellation policy exists, so every cancellation refunds in full (P16; found in v0.4).**
+    - `CalculateRefundPercent` returns 100% when a product has no policy (`refund_helper.cpp:56-58`). The seed creates no `cancellation_policies` rows, only their admin metadata.
+    - For a service, My Bookings' warning says only "Cancellation policy applies. Refund will be calculated based on the cancellation policy." (`my-events.component.ts:235`).
+    - No page shows a policy. Manage Products can attach one to a product (`product-detail.component.html:105`) but has no page for editing policies.
+25. **The attendance controls disagree (A1–A3).**
+    - The home page's class list and My Weekly Plan's **Upcoming** tab are one component (`upcoming-classes.component.html:83-93`). **Today's Classes** works the same way.
+      - The status is a small check mark by the class name.
+      - The big button beside it is the *action*: **I can't make it** on a class you're going to, **I'll be there** on one you're not. At a glance the button reads as the status.
+    - Our Classes and the calendar use a check box with two states, **I'll be there** or **Tap to plan attendance** (`calendar-event.component.html:32-34`, `:100-102`).
+      - A skipped class, with its note, shows as the second, the same as a class never planned.
+      - The skip is already in the data those pages load (`attendance-map.ts:19-41`).
+    - The calendar has the same **My Schedule** / **Full Schedule** toggle as Our Classes (`calendar-home.component.html:9-10`). It too filters by access (F19), so a member who plans two days a week still sees every class they can take.
+26. **The class page doesn't say when the class runs (A9, A10).**
+    - A recurring class's **When it runs** card says it "runs on a weekly schedule" and links to `/calendar` with no filter (`class-detail.component.html:268-285`).
+      - The calendar opens on the eligible-only view, so a class the viewer can't take isn't there.
+      - The class detail response has no weekly times.
+    - Signed in, All Classes isn't in the menu. **My Classes** opens the weekly page, which links to All Classes through **Browse all classes** (`mockHeaderResponse.ts:64-79`, `our-classes.component.html:5-10`).
 
 ---
 
@@ -625,7 +678,7 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 
 # Phase 2 — Pay once *(Thomas: "the most critical issue")*
 
-T7, T8, T22 and T23, plus F3, F4, F7 and F22.
+T7, T8, T22, T23 and A8, plus F3, F4, F7, F22 and F23.
 
 ### 2.1 A failed first charge leaves nothing behind *(business_logic/payment)*
 - [ ] `CreateSubscription` charges **before** it writes the subscription:
@@ -776,23 +829,49 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
 - [ ] **Studio Settings** under **Manage Products** (a tile in the **Website** group, 9.2). Each setting is one field with a sentence saying what it does, for example: "**Ask before charging for the same order again within** [10] minutes. 0 turns this off." Specs.
 - [ ] The testers' duplicate memberships on the live site are left alone. They're Square sandbox charges, and the Phase 13 reinstall removes them (OQ-5).
 
-### 2.9 Ship it
+### 2.9 Cancelling one item refunds only that item *(business_logic/payment + business_logic/scheduling; A8, P15)*
+F23: one booking cancelled from a cart refunds the whole cart.
+- [ ] **`RefundHelper::RefundBookingShare(purchaseId, purchaseItemId, percent, reason, asCredit)`** refunds one booking's share of what was paid:
+  - **The share** is its line's `line_total_cents`, less the line's pro-rata part of any cart discount or coupon, divided by the bookings on that line. A guest pair (two bookings on one line, cancelled together) therefore refunds the line once. To verify: which purchase columns hold the discount.
+  - **The amount** is the share × the policy's percent. It goes through `ProcessPartialRefundCents`, which is capped at what the purchase still has paid, so repeated cancels can never refund more than was charged.
+  - The purchase reads `partially_refunded` until every line is refunded, then `refunded`.
+  - To verify: a cart paid partly with store credit and partly by card. It should refund the store credit first, as credit, and then the card.
+- [ ] **Who calls it:**
+  - the four member-cancel calls in `BookingHelper::CancelBooking` (`booking_helper.cpp:819`, `:872`, `:930`, `:985`)
+  - both studio-cancel calls (`session_cancellation_helper.cpp:142`, `:154`)
+
+  `ProcessRefund` (a percent of the whole purchase) stays only where the whole purchase is meant, as in the subscription refund (`subscription_helper.cpp:446`). Series occurrences keep their own per-occurrence path (`class_series_helper.cpp:742`).
+- [ ] The cancel result and its banner name the amount: "Booking cancelled. **$160** was added to your store credit."
+- [ ] Tests, read back through the voucher balance reader and the purchase reader:
+  - **Ashley's case:** a cart with a $160 and a $320 massage, paid together.
+    - Cancel the $160 one: $160 of credit, the purchase `partially_refunded` with $320 still paid, and the other booking still confirmed.
+    - Then cancel the $320 one: $320 more, and the purchase `refunded`.
+  - the same by card: the test Square client sees one refund of $160, not $480
+  - a cart with a coupon: each refund is its line's discounted share, and the two refunds add up to what was charged
+  - the studio cancels one session of a cart: only that line is refunded
+  - a guest pair: both seats cancelled, the line refunded once
+  - a single-booking purchase refunds exactly as before
+  - a 50% policy window on one line refunds half of that line only
+- [ ] The testers' existing over-credits are sandbox money. The Phase 13 reinstall removes them (D8).
+
+### 2.10 Ship it
 - [ ] Mutation check:
   - subscription inserted before the charge
   - the `ALREADY_HAS_A_MEMBERSHIP` guard removed, and the buyer seated on a second membership
   - **Start on December 1** granting the waiting days; **Start today** charging the full month; a member allowed `today_rest_free`
   - the renewal's seat copy removed
+  - the booking cancel back on the whole-purchase refund
   - the duplicate window set to zero
   - the email flag ignored
   - `replaceUrl` dropped
-- [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1.
+- [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
 - [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
 
 ---
 
 # Phase 3 — My Membership: see it, change it
 
-T5, T6, T8, T13 and T24, plus F6.
+T5, T6, T8, T13, T24 and A4, plus F6.
 
 ### 3.1 Changing a membership charges first *(business_logic/payment)*
 - [ ] **Upgrade order:**
@@ -841,7 +920,7 @@ T5, T6, T8, T13 and T24, plus F6.
 
 # Phase 4 — Share a membership in one step
 
-T9–T12 and G17, plus F8–F11.
+T9–T12, G17 and A6, plus F8–F11.
 
 ### 4.1 Schema: an invitation remembers the seat *(db_schema + migration)*
 - [ ] `gift_permissions.entitlement_id` and `gift_permission_invitations.entitlement_id`: nullable foreign keys to `entitlements`.
@@ -895,7 +974,7 @@ T9–T12 and G17, plus F8–F11.
 - [ ] **The seat card** (after Subscribe and on My Membership):
   - Seat 1 reads "**You**" (the `[assignments]` bug fixed), and **Assign to myself** never shows to someone already seated.
   - When no seat is taken yet (a second membership, 2.2), the card asks "**Who is this membership for?**" It offers **Me**, the people you already share with, and the invite field.
-  - Each empty seat shows the people you already share with as buttons, then "Or invite someone new" with an email field and an **Invite** button. Enter works too.
+  - Each empty seat shows the people you already share with as buttons, then "Or invite someone new" with an email field and an **Invite** button. Enter works too. That is Gifford's and Ashley's "pick from the people I already share with" (G17, A6). With a handful of people, buttons save the extra tap a dropdown needs.
   - "No one by that name" shows when a search matches nobody (G17).
   - The sharing link goes to `/my/sharing`.
 - [ ] **The banner** (D5): signed in with a request waiting, the home page and My Account show "**Thomas Potthast** wants to share his **Gold Couple's** membership with you", with **Accept** and **Decline**.
@@ -997,7 +1076,7 @@ T1–T4, T27, G1, G7 and G13–G16.
 
 # Phase 6 — Planning the week
 
-T14–T17.
+T14–T17, A1–A3 and A9.
 
 ### 6.1 A tap changes one class *(business_logic/scheduling + ui)*
 - [ ] `AddTemplateEntry` checks the one slot (`IsSlotEligible`) instead of rebuilding the whole eligible list.
@@ -1037,13 +1116,18 @@ T14–T17.
   - signed in **with** a current membership or seat → the eligible-only view, as today
   - signed in **without** one, or signed out → **Full Schedule**. Each members' class shows the existing lock and "**Requires a membership**", linking to **Memberships**.
   - the page knows which from the membership summary (2.2), loaded with the schedule
-- [ ] The **My Schedule** toggle becomes **Classes I can take**. It filters by access, and "My Schedule" was also the weekly-plan page's tile, which is likely what confused Thomas (OQ-29).
+- [ ] **The toggle, on Our Classes and on the calendar,** gets three choices: **On my plan**, **Classes I can take** and **Full schedule**.
+  - **Classes I can take** is today's **My Schedule**, renamed. It filters by access, and "My Schedule" was also the weekly-plan page's tile, which is likely what confused Thomas (OQ-29). Ashley read it on the calendar as "the classes I opted in to" (A3, F25).
+  - **On my plan** is what Ashley asked for. It shows only the classes on your plan: your weekly plan, one-off plans and bookings. A class you can't make stays in the view, marked **Can't make it** (6.6), so your note is still there.
+  - Members still start on **Classes I can take**. Each page remembers the last choice in the browser, and every read and write is wrapped so private mode works. Say if members with a plan should start on **On my plan** instead.
 - [ ] A class on your weekly plan shows **On your weekly plan** and no sign-up control. A one-off plan shows **Planned**.
 - [ ] A failed plan lookup shows "Couldn't load your plan", instead of silently treating nothing as planned (`our-classes.component.ts:219-222`).
 - [ ] Specs:
   - the starting view for a member, a non-member and a visitor
   - the lock and its link
-  - the rename
+  - the rename, on both pages
+  - **On my plan** for a member with two weekly days: only those days' classes, plus a one-off and a booking, with a skipped one shown as **Can't make it**
+  - the remembered choice, and the page still working when the browser's storage throws
   - both planned states
   - the error
 
@@ -1065,14 +1149,53 @@ T14–T17.
 - [ ] No new description copy (OQ-9). The **Leads to** line says it on every class that prepares for another, and Beginner Partner Acro's description already says it leads to Intermediate.
 - [ ] Tests: the migration; the order through the catalog reader; specs for the badge and section.
 
-### 6.5 From a class to its schedule *(ui)*
-- [ ] **See this class on the calendar** opens the calendar filtered to that class (`?class=<id>`). Spec.
+### 6.5 From a class to when it runs *(business_logic/scheduling + endpoints + ui; A9)*
+F26: the class page doesn't say when a class runs, and its calendar link can land on a calendar without it.
+- [ ] **Weekly times on the class page.** The class detail response gains `weekly_times`, built in `ClassCatalogHelper` from the class's current schedule slots and grouped by time, for example:
+
+  > Mondays & Wednesdays, 6:00–7:00 PM · Saturdays, 10:00 AM–12:00 PM
+
+  - The times are in the studio's time zone. The location is added when a class runs in more than one.
+  - A slot whose date range has ended is left out.
+  - `class_schedule_slots` counts days 0 = Sunday … 6 = Saturday, unlike the weekly templates' ISO days.
+  - It reads the slots, not derived sessions, so it adds nothing to the class page's load (7.5).
+- [ ] The **When it runs** card shows the times above its calendar link.
+- [ ] **See this class on the calendar** opens the calendar filtered to that class (`?class=<id>`) in every view. A class you can't take shows with its lock instead of on an empty calendar.
+- [ ] Tests:
+  - through the class detail endpoint, on the seeded schedule
+  - a class with slots on two days at one time and on a third day at another, which groups as in the example
+  - an ended slot left out
+  - a Sunday slot comes out as Sunday
+- [ ] Specs: the card's times, the link's address, and the filtered calendar showing a locked class.
+
+### 6.6 Going, can't make it, or not planned *(ui: shared attendance control; A1, A2)*
+F25: the class list's big button reads as the status, and a skipped class looks unplanned on Our Classes and the calendar.
+- [ ] **A shared attendance control:** one check box with three states, from the attendance data every page already loads (`attendance-map.ts`):
+  - ☑ **Going**
+  - ☒ **Can't make it**, with the class name struck through and the note under it
+  - ☐ **Not planned**, with "Tap to plan"
+- [ ] **Tapping it:**
+  - Not planned → Going.
+  - Going → the existing **Can't make it?** dialog, for an optional note.
+  - Can't make it → Going.
+  - Each class keeps its own busy state, as in 6.1.
+- [ ] **Where it goes:**
+  - the home page's class list, My Weekly Plan's **Upcoming** tab and **Today's Classes**, in place of the **I can't make it** / **I'll be there** buttons (`upcoming-classes`, `today-classes`)
+  - Our Classes and the calendar, in place of the two-state row (`calendar-event`)
+
+  The status sits next to the class name, so it can't be taken for an answer about another row.
+- [ ] Specs:
+  - each state on each page
+  - **Ashley's Wednesday:** a class skipped with a note on the home page reads **Can't make it**, with the note, on Our Classes and on the calendar
+  - unticking opens the dialog
+  - a failed save puts the box back
+  - a layout spec at 320 and 1280 px: the control and the class name share a line
 
 ---
 
 # Phase 7 — Speed
 
-T18, T43, T45, T46, G10 and P11.
+T18, T43, T45, T46, G10, A9 (the slow calendar) and P11.
 
 ### 7.1 Measure first *(server_components: testing; knottyyoga)*
 - [ ] A **query-counting transaction provider** for tests: it wraps the test provider and counts statements. Its own test.
@@ -1095,8 +1218,8 @@ T18, T43, T45, T46, G10 and P11.
 - [ ] `PreloadAllModules` gives way to preloading the routes linked from the current page, so the lazy chunks stop competing with the first page.
 - [ ] Specs: cached, uncached, and a changed config; and the boot order.
 
-### 7.4 Fonts at first paint: the server fills in the page head *(server_components: platform; knottyyoga; ui; ui/package; OQ-22, still open)*
-**Default: OQ-22's option D.** The fonts stay a database setting, and the first byte of the page already names them. This is the biggest item in Phase 7: about twice the size of 7.8, plus a CloudFront change to how page addresses are served. If OQ-22 goes to option A instead, the last item replaces the rest.
+### 7.4 Fonts at first paint: the server fills in the page head *(server_components: platform; knottyyoga; ui; ui/package; OQ-22, decided)*
+**Decided: OQ-22's option D.** The fonts stay a database setting, and the first byte of the page already names them. This is the biggest item in Phase 7: about twice the size of 7.8, plus a CloudFront change to how page addresses are served.
 
 - [ ] **The template** *(ui, ui/package)*:
   - The built `index.html` gets one marked block in its head, `<!-- site-head -->` … `<!-- /site-head -->`. The block holds the defaults (the seed's font address and the site's name), so `ng serve` and a direct S3 read still work.
@@ -1126,7 +1249,6 @@ T18, T43, T45, T46, G10 and P11.
   - the template is fetched again when its ETag changes, and the old copy is kept when a fetch fails (test HTTP client)
   - the cache header
 - [ ] The leftover D-DIN `@font-face` rules go (`mixins/_fonts.scss`).
-- [ ] **Only if OQ-22 goes to option A,** this replaces everything above: `index.html` and the seeded font rows use the same Google Fonts address, with a test that they match, and a `preload` next to the `preconnect`s.
 
 ### 7.5 The schedule pages *(business_logic/scheduling + catalog)*
 - [ ] **Calendar and upcoming classes:**
@@ -1146,7 +1268,7 @@ T18, T43, T45, T46, G10 and P11.
 - [ ] Tests: the concurrency test; the proxy spec (4 in flight, the 5th waits).
 
 ### 7.7 The page shell and the CDN *(ui/package)*
-- [ ] With 7.4, the page comes from the server with `s-maxage=60`, so CloudFront stops checking on every visit. Under option A, S3's `index.html` moves from `max-age=0` to `s-maxage=60` instead. The deploy already invalidates it; to confirm in `deploy_ui.sh`.
+- [ ] With 7.4, the page comes from the server with `s-maxage=60`, so CloudFront stops checking on every visit. S3's `index.html` is then only the template behind `shell/index.html`, which the server re-reads with `If-None-Match`. To confirm in `deploy_ui.sh` that the deploy still invalidates both.
 - [ ] Critical CSS stays inlined (D7). After 7.4, check the served page no longer carries the font CSS twice.
 - [ ] After numbers for first paint, next to 7.1's.
 
@@ -1170,7 +1292,7 @@ T18, T43, T45, T46, G10 and P11.
 
 # Phase 8 — Polish and the site's navigation
 
-T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
+T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1, J2, A5, A7, A10, A11 and P16.
 
 ### 8.1 Scrolling, Back, and the Android footer *(ui: app shell)*
 - [ ] `h-screen` → `h-dvh` on the shell, so its bottom is the visible bottom on Android. The footer and the checkout bar show without scrolling (T20).
@@ -1200,6 +1322,10 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
 - [ ] **"Our":** menu labels drop it, and each page's title matches the label that opened it (OQ-10, decided):
   - Classes / All Classes, Services, Instructors, Location, Providers
   - "My Classes" and "Our Classes" stop swapping titles
+- [ ] **Finding All Classes** (A10, F26). Signed in, **Classes** opens the weekly page, and All Classes is only a button on it. Ashley is the third tester to look for it. The menu stays as you decided (OQ-13), and two links are added:
+  - every class page starts with **← All classes**
+  - the home page's **Upcoming classes** row adds **All classes →** next to its **Plan your weekly schedule →** link
+- [ ] Specs: the back link on a class page, and the home row's link.
 - [ ] Specs: the menu for signed out, member, staff and admin, desktop and mobile. The mobile-audit route list gains any new route.
 
 ### 8.5 "Show me how" under the headline *(seed + ui: home hero)*
@@ -1207,13 +1333,19 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
 
 ### 8.6 Services name their providers *(endpoints + ui)*
 - [ ] Each service card lists who provides it ("Massage with **Caleb Ault**"), linking to the provider's bio. The data is from the providers directory reader, on the service catalog response. Endpoint test; spec.
+- [ ] **Book with a provider** (A11). Each card on **Providers**, and each provider's own page, gets **Book with Caleb**.
+  - It opens the service booking page showing only that provider's times (`/shop/service/<id>?provider=<personId>`), with **Show every provider** to widen it.
+  - Someone who offers more than one service gets a short list of them first.
+  - Today the cards have only **View profile** (`providers.component.html:46-50`). The booking page already groups times by provider (`service-booking.component.html:102-106`), but its address can't name one.
+  - The providers response gains each provider's bookable services. To verify where that link lives: the provider's types or their shifts.
+  - Endpoint test. Specs for the button, the one-service and several-service cases, and the filtered booking page.
 - [ ] The name **Services** stays, since more services than massage are coming (OQ-11, decided).
 
 ### 8.7 Link colour *(ui: tokens)*
 - [ ] A `--theme-link` token (default: the brand's primary). `.back-link`, prose links and the 15 `text-blue-600` templates use it. `design-tokens.spec.ts` covers it.
 
 ### 8.8 "Browse services" goes to Services *(ui)*
-- [ ] My Bookings (both links), the cart and the service booking page go to **Services**, not Memberships (J1). Specs pin each target.
+- [ ] My Bookings (both links), the cart and the service booking page go to **Services**, not Memberships. Jennifer and Ashley both hit it (J1, A5). Specs pin each target.
 
 ### 8.9 Leftover "decision history" wording *(ui + seed + migration)*
 - [ ] **Site Theme:**
@@ -1242,6 +1374,25 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1 and J2.
 - [ ] Tests:
   - every notification template's output contains the link
   - the test lists the templates, so a new one has to be added to it
+
+### 8.13 The cancellation policy, written down and linked *(seed + business_logic/payment + endpoints + ui; A7, P16; OQ-31)*
+F24: no policy exists, so every cancellation refunds in full. The cancel warning names a policy that isn't there.
+- [ ] **The policies in the seed** (D8): yours from OQ-31, attached to the service and workshop products. Class bookings stay non-refundable (P-6).
+  - Seed tests through `CalculateRefundPercent`, the reader the cancel uses: a massage booked 48 hours, 23 hours and 1 hour away.
+- [ ] **Cancellation Policies** under **Manage Products** (the **Memberships & sales** group, 9.2): edit each policy's name, description and refund windows. Today only Manage Data can, and that becomes developer-only (10.1). Specs.
+- [ ] **A Cancellation Policy page** (`/cancellation-policy`, signed out too). It is built from the policy rows, so the page and the refund can't disagree:
+  - each policy's name, its description, and its windows in words: "Full refund up to 24 hours before. No refund after that."
+  - the class rule: class bookings aren't refunded, and staff may give a voucher
+  - The footer links to it.
+  - `GET /api/cancellation_policies` answers signed out. Endpoint test: signed out, with the windows in order.
+- [ ] **A cancel preview:** `GET /api/bookings/<id>/cancel_preview` returns what cancelling now gives back: the amount (2.9's share), the percent, and the policy's name. It writes nothing. Only the booking's owner or payer may call it, as with the cancel; anyone else gets 404.
+  - Tests: the preview equals what the cancel then refunds, for a single booking and for one item of a cart; 401; 404 for someone else's booking.
+- [ ] **The warning on My Bookings,** and on Purchase History's cancel (`purchase_history.component.html:99`), gives the number and links the policy:
+
+  > Cancel now and you get **$160** back (full refund until 24 hours before). **Cancellation policy**
+
+  The generic service text goes (`my-events.component.ts:235`). Events use the preview too, so a cart's event shows its own share.
+- [ ] Specs: the warning for a full, a partial and no refund; the link; the page.
 
 ---
 
@@ -1272,7 +1423,7 @@ T29, T32–T37, G19, and P6–P8.
   |---|---|
   | **Classes & scheduling** | Class Schedules, Schedule Grid, Close Classes, Scheduling Exceptions, Attendance Templates, Skills, Class Tags, Locations, Room Schedules |
   | **Staff** | Instructors, Who's Teaching What, Shift Requests, Time Off Requests, Service Providers, Roles |
-  | **Memberships & sales** | Products, Pricing Overview, Price Schedules, Membership Tiers, Subscriptions, Entitlements, Event Sessions, Bundles, New Workshop |
+  | **Memberships & sales** | Products, Pricing Overview, Price Schedules, Membership Tiers, Subscriptions, Entitlements, Event Sessions, Bundles, New Workshop, Cancellation Policies (8.13) |
   | **Discounts & credits** | Vouchers, Coupons, Comps, Refund Effectiveness |
   | **Reports** | Enrollment Trends, Open-Seat Heatmap, Room Occupancy, Subscription Revenue |
   | **Website** | Site Theme, Fonts, Page Content, Studio Settings (2.8) |
@@ -1381,7 +1532,6 @@ T30, T31, T41 and G18.
 - [ ] Each public page has its own `<title>` and `<meta name="description">`, plus Open Graph tags for links shared in messages.
   - **They must be in the served HTML** for link previews and most crawlers, which don't run JavaScript. 7.4's page route puts them there, through the app hook for the class, instructor and event pages and the site's defaults elsewhere.
   - Angular sets the same tags as the visitor moves between pages, for Google and for the browser tab.
-  - Under OQ-22's option A, only the second half happens, so link previews still show the site's defaults.
 - [ ] `robots.txt` and a `sitemap.xml`:
   - the public pages, every class and every instructor
   - generated by a server endpoint that CloudFront serves at `/sitemap.xml`
@@ -1402,7 +1552,7 @@ T30, T31, T41 and G18.
 - [ ] knottyyoga: Windows, Linux, pinned; same test names on both.
 - [ ] CommunityFinder at the new pin: Windows, Linux.
 - [ ] Angular: Windows, Linux (`ng test` as CI runs it); `ng build`; lint.
-- [ ] Playwright: layout specs at all sizes, the mobile audit with the hand-started :4300 server, 2.6's double-pay spec, 8.11's Back/Forward spec.
+- [ ] Playwright: layout specs at all sizes (including 6.6's attendance control), the mobile audit with the hand-started :4300 server, 2.6's double-pay spec, 8.11's Back/Forward spec.
 - [ ] `@honuware/ui`: specs, lint, build.
 
 ### 12.2 End to end
@@ -1416,6 +1566,7 @@ T30, T31, T41 and G18.
   - a public photo with its long-lived cache header
   - a page address served with the site's font links and a class page's own tags (7.4)
   - each start choice's charge and dates, with the billing run driven forward to the 1st (2.3)
+  - one booking cancelled from a two-item cart refunds only its share, and matches the cancel preview (2.9, 8.13)
 - [ ] A throwaway database with `--install_schema --force` followed by the `set_secret` block, exactly as Phase 13 runs it.
 - [ ] A copy of a sandbox.15-era database with `--migrate`: app migrations 0014–0016 and honuware 0004–0005. A second run changes nothing. Production is reinstalled, but Mason's local databases and CommunityFinder migrate.
 
@@ -1435,7 +1586,7 @@ T30, T31, T41 and G18.
   3. 7.4's change, sending page addresses to the server, only once the server answers them
 
   To undo step 3, point the default behaviour back at S3 and restore the error-page fallback.
-- [ ] Afterwards: Claude probes production signed out, and the testers are asked to retry their journeys. A short list for Thomas, Gifford and Jennifer of what changed against each of their points.
+- [ ] Afterwards: Claude probes production signed out, and the testers are asked to retry their journeys. A short list for Thomas, Gifford, Jennifer and Ashley of what changed against each of their points.
 
 ---
 
@@ -1463,6 +1614,23 @@ T30, T31, T41 and G18.
 - Paste them here when ready.
 - → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
 - → v0.3: still waiting, as you said. Nothing else depends on them.
+
+**OQ-31 — The cancellation policy** *(8.13, Ashley)*
+- Ashley asked for a link to the cancellation policy from the cancel warning. There's nothing to link to yet:
+  - No policy exists, so every cancellation refunds in full, even an hour before a massage (F24).
+  - The warning says "Cancellation policy applies" anyway.
+- **What a policy is in the data:** a name, a description, and refund windows such as "100% if cancelled 24 or more hours before, 0% after". Each product names its policy. Class bookings are already non-refundable (P-6), and a cancellation by the studio always refunds in full.
+- **Default:** my proposal below. These are your business terms, so edit them freely.
+  - **Massage and other services:** a full refund up to 24 hours before, and none after.
+    - Description: "Your provider sets this time aside for you. Cancel at least 24 hours ahead for a full refund."
+  - **Workshops and events:** a full refund up to 7 days before, half up to 48 hours before, and none after.
+    - Description: "Workshops are planned around who's coming. Cancel a week ahead for a full refund."
+  - The refund goes back to the card, or to store credit if the person ticks it, as today.
+- **Say "use the default", or write your windows and descriptions here.** Nothing ships with a policy you haven't seen.
+
+### Resolved 11/17/2026, third round
+
+*Your answer to v0.3.*
 
 **OQ-22 — One font address** *(7.4, D7)*
 - The fonts are fetched twice: the fixed weights in `index.html`, then the seeded variable weights (`wght@100..900`) after start-up.
@@ -1505,8 +1673,9 @@ T30, T31, T41 and G18.
   - **Recommendation: D.** It's the only option that is generic, per site and fast all at once, and it does 11.1's job too. The plan is written against it (7.4, 7.7, 11.1, Phase 13), and option A stays in 7.4 as a one-item fallback.
   - **Say D, A, or the middle way.**
   - Mason- Let's go with D.
+- → Plan: 7.4 as written, now marked decided. Option A's fallback lines are gone from 7.4, 7.7 and 11.1. 7.4 keeps its order of release with the CloudFront change (Phase 13), and its own undo: point the default behaviour back at S3.
 
-### Resolved 11/17/2026
+### Resolved 11/17/2026, second round
 
 *Your second round, in number order.*
 
