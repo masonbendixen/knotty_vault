@@ -727,6 +727,57 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 - [ ] Release as **`v1.0.0-sandbox.14`**: server and UI together. The new server refuses the old UI's GET delete, so they must ship as a pair.
 - [ ] After deploy, Claude probes production signed out (`curl -m 10`, read-only and write attempts on a throwaway `products` row name). Every write must answer 401. Results recorded here.
 
+#### Testing Phase 1 locally, before it ships
+**Setting up**
+1. **Server build.** The Phase 1 framework changes are in your `server_components` working tree, not in the pinned honuware. In Visual Studio, pick the configuration **x64-Debug (local honuware checkout)**. I left the tree configured that way. **x64-Debug** builds the pinned honuware, which doesn't have Phase 1.
+   - To go back once the pin is bumped, run `cmake --preset x64-Debug -DFETCHCONTENT_SOURCE_DIR_HONUWARE=` from `server\knottyyoga_server`, or pick **x64-Debug** and use **Delete Cache and Reconfigure**. Both presets share one build folder, so switching the dropdown alone keeps the local checkout.
+2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings already pass `--recreate_database`.
+   - `--migrate` on your current database would apply `app/0013`, but it wouldn't add 1.1's new `manage_products` grants. They're seed-only (1.1), so Part C needs the recreated database.
+3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`. The site needs no `@honuware/ui` install: its pages use the app's own `ServerAccessNetwork`, which already sends the delete as POST.
+
+**Part A: an admin's saves and deletes still work.** This also proves the server and UI pair up: with the old UI, every delete in this part fails.
+1. Click **Sign In** at the top of the page. On **Log In**, enter Email `masonbendixen@gmail.com` and Password `pass`, then click **Sign in**.
+2. Go to **Admin ▸ Manage Products** and open the **Class Schedules** card.
+3. Click **Add class**. In the **Add class** dialog, enter Name `Phase 1 test class` and Default capacity `10`, choose Kind **Recurring**, and click **Save**.
+   - Expect: `Phase 1 test class` is selected in **Class**, with no red banner.
+4. Click **Edit class**. Change Name to `Phase 1 test class edited`, and click **Save**.
+   - Expect: **Class** shows the new name.
+5. In the **Requirements** card, type `Members` in **New group label** and click **Add group**.
+   - Expect: a `Members` group appears.
+6. In that group's **Add a permission**, type `platinum` and pick **platinum_fitness — Knotty Yoga Platinum Fitness Membership.**
+   - Expect: a `platinum_fitness` chip.
+7. Click the chip's **✕**.
+   - Expect: the chip is gone.
+8. Click the group's **Delete group** icon.
+   - Expect: the card says **Open to everyone — no requirements.**
+9. Click **Delete class**.
+   - Expect: `Deleted class "Phase 1 test class edited".`, and the class is gone from **Class**.
+   - With the old UI, this fails with **Could not delete class. Remove its class instances first.**
+10. Go to **Admin ▸ Manage Data**. In **Select Table**, choose **Roles**. Click **New Item**, enter Name `Products Only` and Description `Phase 1 test`, and click **Create**.
+11. In **Select Table**, choose **Role Permissions**. Click **New Item**, pick Role **Products Only** and Permission **manage_products**, and click **Create**. Keep this row: Part C uses it.
+
+**Part B: Manage Data's delete.**
+1. Still in **Manage Data**, choose **Roles** again and click **New Item**. Enter Name `Throwaway` and Description `delete me`, and click **Create**.
+2. On the `Throwaway` row, click the **Delete** icon. In **Confirm Delete**, click **Delete**.
+   - Expect: the row is gone, and no **Failed to delete row**.
+
+**Part C: someone with `manage_products` who isn't an admin (1.1's new grants).**
+1. Go to **Admin ▸ Manage Products** and open the **Roles** card. Under **Find a person**, type `Kit` and click **Kit Williams**. In **Add a role**, choose **Products Only** and click **Add**.
+2. Open the menu under your name and click **Sign Out**. Sign in as `kiteagle@gmail.com` with password `kit`.
+3. Go to **Admin ▸ Manage Products ▸ Class Schedules**. Click **Add class**, enter Name `Kit's class`, choose Kind **Recurring**, and click **Save**.
+   - Expect: `Kit's class` appears in **Class**. That's the new grant on `classes`. Without it, the banner reads **Could not create class (the name may already be in use)** and no class appears.
+   - Also expected, and not Phase 1: a red banner such as **Class saved, but updating its tags failed.** or **Failed to load class instances**. The tags, instances and schedules need `manage_class_schedule`, which this role doesn't have (OQ-32).
+4. Click **Delete class**.
+   - Expect: `Deleted class "Kit's class".`
+
+**Not checkable by hand, so covered by the automated tests.** No page sends these requests, and the hand tests don't use curl:
+- a signed-out visitor's or a member's add, update or delete (401 or 403)
+- reading the five private tables signed out
+- GET on `delete_item` (405)
+- CommunityFinder's public tables
+
+The tests are listed under 1.2 and 1.4.
+
 ---
 
 # Phase 2 — Pay once *(Thomas: "the most critical issue")*
