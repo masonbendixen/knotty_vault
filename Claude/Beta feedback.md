@@ -731,12 +731,28 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 ### 1.6 Ship it
 - [x] Gates: server_components (Windows + Linux); knottyyoga against the local checkout (Linux); Angular (Windows + Linux).
 - [x] Mutation check: put `IsTableAllowed` back on each write, and GET back on delete. The new tests must catch every one.
-- [ ] **Mason** pushes server_components; CI; Claude bumps the pin in knottyyoga and CommunityFinder and reruns both pinned gates.
-- [ ] `@honuware/ui` release (Mason tags), install, Angular gates.
+- [x] **Mason** pushes server_components; CI; Claude bumps the pin in knottyyoga and CommunityFinder and reruns both pinned gates.
+- [x] `@honuware/ui` release (Mason tags), install, Angular gates.
 - [ ] Release as **`v1.0.0-sandbox.14`**: server and UI together. The new server refuses the old UI's GET delete, so they must ship as a pair.
 - [ ] After deploy, Claude probes production signed out (`curl -m 10`, read-only and write attempts on a throwaway `products` row name). Every write must answer 401. Results recorded here.
 
-*The last four wait for ship time. Mason is holding Phase 1 to ship with later phases (11/18).*
+*The last two wait for ship time. Mason is holding Phase 1 to ship with later phases (11/18).*
+
+**Pin bump and library release (11/18):**
+- **The pin.** honuware pushed as `838045f`. The commit message reads "Bucket CM3 — Event photos & video", but its diff against the old pin `f445a49` is exactly the 15 Phase 1 files. Both apps' `CMakeLists.txt` `GIT_TAG` now point at it.
+- **The library release.** `@honuware/ui` **0.3.1** is published. Its first publish failed with npm's `E404` on the upload, which means an expired `NPM_TOKEN`. Mason renewed the token and reran the job.
+- **Installed:** `npm install @honuware/ui@0.3.1 --save-exact` in knottyyoga `ui/` (from 0.3.0) and CommunityFinder `ui/` (from **0.1.2**).
+- **CommunityFinder's UI went from 0.1.2 to 0.3.1 with no code changes.** 0.2 and 0.3 add the check-your-email, forgot-password and reset-password pages, but only behind *optional* `AuthRoutes` paths. CommunityFinder's `AUTH_ROUTES` sets none of them, so registration still goes to the login page and there is no **Forgot password?** link. Turning those pages on for CommunityFinder is separate work: routes, its paths, and its mail.
+- **The knottyyoga Windows tree is back on the pinned honuware** (`FETCHCONTENT_SOURCE_DIR_HONUWARE` empty, `_deps\honuware-src` at `838045f`).
+
+| Pinned gate | Windows | Linux |
+|---|---|---|
+| knottyyoga | 5475 | 5475; both programs built |
+| CommunityFinder | 2523 | 2523; both programs built |
+| knottyyoga `ui/` (0.3.1) | 4050 | 4050 |
+| CommunityFinder `ui/` (0.3.1) | 487; `ng build` OK | 487 |
+
+CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial against a 500 kB budget. It isn't an error, and I haven't checked whether it predates 0.3.1.
 
 **Gate results (11/18, all against the local, unpushed honuware):**
 
@@ -769,13 +785,15 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
   - After the restore, the same 13 tests pass, and the full gates above ran afterwards.
 
 **What to commit, by repository:**
-- `server_components`: the four write endpoints, `database_rest_helper.cpp`, and their tests (`add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item`, `db_schema` and `database_rest_helper` tests).
-- `honuware-web-components`: `crud-http-access.ts` and its spec.
+- `server_components`: the four write endpoints, `database_rest_helper.cpp`, and their tests (`add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item`, `db_schema` and `database_rest_helper` tests). *Committed and pushed, 11/18: `838045f`.*
+- `honuware-web-components`: `crud-http-access.ts` and its spec. *Committed and tagged, 11/18: `v0.3.1`, published.*
 - knottyyoga:
   - `app_migrations.h`, `app_migrations.cpp` and `app_migrations_test.cpp`
   - `create_database.h`, `create_database.cpp` and `create_database_test.cpp`
   - `ui/…/ServerAccessNetwork.ts` and the new `server-access-network-crud.spec.ts`
+  - added with the pin bump (11/18): `server/knottyyoga_server/CMakeLists.txt` (the `GIT_TAG`), and `ui/package.json` with `ui/package-lock.json` (0.3.1)
 - CommunityFinder: `crud_test.cpp` and `roles_permissions_test.cpp`.
+  - added with the pin bump (11/18): `server/communityfinder_server/CMakeLists.txt` (the `GIT_TAG`), and `ui/package.json` with `ui/package-lock.json` (0.3.1)
   - That working tree also has other uncommitted work that isn't Phase 1: the "CM3 OQ10" photo-cap override, in `app_secret_values.*`, `create_app_tables.*`, `create_database.cpp`, `register_app_services_test.cpp` and `test/src/main.cpp`.
   - The 2523 above ran with it in place.
 
