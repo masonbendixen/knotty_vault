@@ -1696,6 +1696,7 @@ T30, T31, T41 and G18.
 **OQ-32 — Manage Products for someone who isn't an admin** *(1.1)*
 - Building Phase 1 turned up about fifteen tables that Manage Products pages save but no permission grants. Among them are booking windows, instructors, the home page and About sections, and provider availability. 1.1 has the list.
 - They work for admins, and today only admins use Manage Products. A non-admin given `manage_products`, such as a future Studio Manager, would see those pages refuse to save. Phase 1 didn't cause this, and it fixed the one page it would have broken (Class Schedules).
+- Class Schedules is itself only half usable on `manage_products` alone. It lists a class's instances, schedules and slots through endpoints that require `manage_class_schedule` (`admin_class_instances_list.cpp:69`), so it shows "Failed to load class instances". The class and its requirements do save. The seeded Studio Manager role holds `manage_class_schedule` and not `manage_products`, so it never reaches the page through the Admin menu.
 - **Default:** leave it until someone who isn't an admin needs Manage Products. Then grant every page's tables in one pass, with a test per page that signs in with only that permission and saves.
 - The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
 - Do you expect to give anyone `manage_products` without making them an admin before the final release?
