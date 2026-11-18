@@ -1483,6 +1483,7 @@ T30, T31, T41 and G18.
   - **A middle way, if D is more than you want now:** A, plus a few lines of script in `index.html` that remember the last font address in the browser and apply it before anything else loads. Repeat visitors then get a changed font at first paint. Only a first visit after a change sees the swap. Link previews stay generic.
   - **Recommendation: D.** It's the only option that is generic, per site and fast all at once, and it does 11.1's job too. The plan is written against it (7.4, 7.7, 11.1, Phase 13), and option A stays in 7.4 as a one-item fallback.
   - **Say D, A, or the middle way.**
+  - Mason- Let's go with D.
 
 ### Resolved 11/17/2026
 
