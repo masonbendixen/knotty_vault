@@ -623,15 +623,32 @@ Production runs `v1.0.0-sandbox.13` (10/30) on the Square sandbox. Commit `777e5
 F1: anyone can write to `products` and `classes` through the generic API, and a GET can delete as an admin. This is outside the testers' feedback, but it is the most urgent item in the plan, and the start of Thomas's red-team request (T41).
 
 ### 1.1 Inventory *(read-only, recorded here)*
-- [ ] Every caller of the generic API in `ui/` and `@honuware/ui`:
+- [x] Every caller of the generic API in `ui/` and `@honuware/ui`:
   - the writes `addItem`, `addItemFetchPrimaryKey`, `updateItem`, `deleteItem`
   - the reads `getTableRows`, `getRow`, `getFilteredTableRows`, `getDbSchema`
 
   For each: the table, and who reaches it (signed out, member, staff, `manage_products`, `manage_class_schedule`, admin).
-- [ ] Any **member** page that writes through the generic API gets a dedicated endpoint first (in 1.4), so 1.2 doesn't break it.
+- [x] Any **member** page that writes through the generic API gets a dedicated endpoint first (in 1.4), so 1.2 doesn't break it.
   - **Checked 11/16:** none do. The shop pages' `addItem` calls go to the cart service, not the generic API.
   - The generic writes come from about twenty Manage Products pages and two shared editors (`event-session-card`, `event-session-price-override-editor`). Each of their tables needs a grant to the permission that opens the page; the inventory lists any that are missing.
-- [ ] The same inventory for CommunityFinder's UI, which takes the same pin.
+- [x] The same inventory for CommunityFinder's UI, which takes the same pin.
+
+**Result (11/18):**
+- **No signed-out or member page writes through the generic API,** in either app. Every write comes from a staff or admin page. All of CommunityFinder's are behind its admin guard.
+- **One page 1.2 would have broken, now fixed.** Manage Products ▸ Class Schedules is opened by `manage_products`. It saves `classes`, `class_requirement_groups` and `class_requirement_group_literals`. Only `manage_class_schedule` had grants on those three. Their writes passed because the tables are on the public list, which 1.2 stops counting for writes.
+  - `PopulateAdminTablePermissions` now grants all three to `manage_products`. That's a seed change only, with no migration: no seeded non-admin holds `manage_products`, so nobody's access changes on an existing database.
+  - Test: `CreateDatabaseTest.ManageProductsCanEditAClassAndItsRequirements`.
+- **Already broken for a non-admin before this phase, and not changed by it.** A non-admin holder of the opening permission is refused on the tables below today, because nothing grants them. Admins are unaffected, and today only admins use these pages. OQ-32 asks when to fix them.
+  - `product_booking_windows`, which is nested-only and has no grant
+  - `instructors`
+  - `skill_levels`, for a `manage_products` holder without `manage_skills`
+  - `provider_type_assignments`, `provider_availability`, `schedule_templates`
+  - `home_sections`, `getting_started_steps`, `about_sections`, `announcements`, `image_carousels`, `image_carousel_photos`
+  - the Staff ▸ Sessions card (`event_session_staffing`, `bookings`, `event_session_price_overrides`), for someone who holds only Instructor
+- **Two side notes:**
+  - The server doesn't expand `permission_implications` when checking a grant. Only the permission itself counts.
+  - The `manage_products` grant on `permissions` lets its holder edit any permission row, including `admin_portal`. Admin-only would be safer. Carried to the red-team pass (10.2).
+- **knottyyoga's UI doesn't use the library's `deleteItem`.** `app.config.ts:73` points the library's CRUD access at the app's own `ServerAccessNetwork`, so the app-side change in 1.5 is what knottyyoga runs. The `@honuware/ui` release matters for CommunityFinder, whose admin pages use the library's `CrudHttpAccess`.
 
 ### 1.2 Writes need a grant *(server_components: platform/endpoints)*
 - [ ] `add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item` call `RequireTableWriteAccess` instead of `IsTableAllowed`:
@@ -649,8 +666,20 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
   - the existing CRUD tests pass unchanged
 
 ### 1.3 No GET that writes *(server_components + knottyyoga)*
-- [ ] A census of every `CROW_ROUTE` registered for GET whose handler writes. Each becomes POST, with a test that the GET is gone. `delete_item` is the known one; the census says whether there are others.
-- [ ] Record the census here.
+- [x] A census of every `CROW_ROUTE` registered for GET whose handler writes. Each becomes POST, with a test that the GET is gone. `delete_item` is the known one; the census says whether there are others.
+- [x] Record the census here.
+
+**Census (11/18):** 17 framework GET routes and 109 app GET routes (out of 245 live app routes). Every live app route names its method. Six framework routes had no `.methods()`, which Crow treats as GET. `delete_item` was one of them and is now POST. The other five are reads.
+- **Writes something the user would call a change:**
+  - `delete_item`: now POST. Test: `DeleteItemTest.GetIsNotAllowed` (405, row still there).
+  - `/api/account_activation/<email>/<token>` marks the email verified and deletes the verification row. **It stays GET.** It's the link in the activation email, so it has to work when clicked. It reads no session, and only the secret token from the email works, so a cross-site link gains an attacker nothing. Anyone with the token can already call it directly.
+- **Bookkeeping writes, left as GET:**
+  - `/api/get_scaled_photo/…` stores a resized copy on a cache miss and touches its last-used time on a hit. Not a CSRF risk. A signed-out caller can, though, ask for any size up to the cap on public tables, and each new size stores another copy. Carried to 10.2.
+  - `GET /api/me/notification_preferences` creates the default row on first read.
+  - `/api/me/ical_feed.ics` updates the feed token's last-used time. It authenticates by the token in the URL, not the cookie.
+- **Found on the way:**
+  - When an activation token is wrong, the attempt counter and the admin alert are both written and then rolled back: the endpoint throws, and the transaction commits only on a normal return. So the attempt limit probably never builds up through this route. Carried to 10.2, with a test first.
+  - `src/main.cpp.bak` carries ten old method-less routes (`/addclass`, `/removeclassbyid`, …). It's in no CMakeLists and isn't built. Deleting it is safe.
 
 ### 1.4 Private tables off the public list *(knottyyoga: database_helper + migration)*
 - [ ] `PopulateAllowedTables` stops listing these tables:
@@ -1540,6 +1569,10 @@ T30, T31, T41 and G18.
   - CSRF, IDOR, mass assignment through `update_item` (writing `person_id` or `status`), rate limits, and what `get_db_schema` reveals
 
   Findings are recorded here and each one is fixed with a test.
+- [ ] **Carried from Phase 1** (1.1 and 1.3), each with a test first:
+  - `manage_products`' grant on `permissions` lets its holder edit any permission row, `admin_portal` included
+  - a wrong activation token's attempt count and admin alert are rolled back with the error, so the limit may never trip
+  - `get_scaled_photo` stores a new copy for every size a signed-out caller asks for
 
 ### 10.3 Deferred (OQ-20)
 - Help text: a description under each table and field, written for every table and column.
@@ -1640,6 +1673,13 @@ T30, T31, T41 and G18.
 - Paste them here when ready.
 - → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
 - → v0.3: still waiting, as you said. Nothing else depends on them.
+
+**OQ-32 — Manage Products for someone who isn't an admin** *(1.1)*
+- Building Phase 1 turned up about fifteen tables that Manage Products pages save but no permission grants. Among them are booking windows, instructors, the home page and About sections, and provider availability. 1.1 has the list.
+- They work for admins, and today only admins use Manage Products. A non-admin given `manage_products`, such as a future Studio Manager, would see those pages refuse to save. Phase 1 didn't cause this, and it fixed the one page it would have broken (Class Schedules).
+- **Default:** leave it until someone who isn't an admin needs Manage Products. Then grant every page's tables in one pass, with a test per page that signs in with only that permission and saves.
+- The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
+- Do you expect to give anyone `manage_products` without making them an admin before the final release?
 
 ### Resolved 11/17/2026, fourth round
 
