@@ -651,19 +651,26 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 - **knottyyoga's UI doesn't use the library's `deleteItem`.** `app.config.ts:73` points the library's CRUD access at the app's own `ServerAccessNetwork`, so the app-side change in 1.5 is what knottyyoga runs. The `@honuware/ui` release matters for CommunityFinder, whose admin pages use the library's `CrudHttpAccess`.
 
 ### 1.2 Writes need a grant *(server_components: platform/endpoints)*
-- [ ] `add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item` call `RequireTableWriteAccess` instead of `IsTableAllowed`:
+- [x] `add_item`, `add_item_fetch_primary_key`, `update_item`, `delete_item` call `RequireTableWriteAccess` instead of `IsTableAllowed`:
   - 401 signed out
   - 403 without a grant
   - admins, and the tables a person's permissions grant, as today
-- [ ] `delete_item` becomes **POST**, and the GET route goes, so the CSRF guard covers it.
-- [ ] `get_db_schema`: `display_templates` are filtered to the caller's allowed tables, as the column data already is.
-- [ ] Tests, all through `handle_full`, reading the row back afterwards to prove nothing changed:
+- [x] `delete_item` becomes **POST**, and the GET route goes, so the CSRF guard covers it.
+- [x] `get_db_schema`: `display_templates` are filtered to the caller's allowed tables, as the column data already is.
+- [x] Tests, all through `handle_full`, reading the row back afterwards to prove nothing changed:
   - signed out, each of the four writes on `products` → 401, and the row unchanged
   - a member with no grants → 403
   - `manage_products` → allowed on `products`, 403 on `classes`
   - admin → allowed
   - GET `delete_item` → not found
   - the existing CRUD tests pass unchanged
+
+**As built (11/18):**
+- **The order of the checks.** The missing-field checks come first (400), as before. Then `RequireTableWriteAccess` (401 or 403). Then `IsTableAllowed` still applies, so an admin can't write to a table that's on no list at all (400 "not an allowed table"). Reading a table never gives the right to change it.
+- **The framework tests use honuware's own tables.** Each of the four write tests now has `SignedOutIsRefused` (401), `WithoutGrantIsRefused` (403) and `WithGrantIsAllowed`, and `add_item` and `delete_item` also have `GrantIsPerTable`. They run on `people` with a test permission that grants it, and every refusal reads the table back to show nothing changed. `products` and `manage_products` are app tables, so the app's half is `CreateDatabaseTest.ManageProductsCanEditAClassAndItsRequirements`, run against the real seed. One line of the list changed with 1.1: `manage_products` is now **allowed** on `classes`, because the Class Schedules page it opens saves classes.
+- **GET `delete_item` answers 405**, Crow's "method not allowed", not 404. `DeleteItemTest.GetIsNotAllowed` checks that, and that the row is still there.
+- **The existing CRUD tests did not pass unchanged.** Every one of them wrote signed out, which is exactly what 1.2 forbids. They now sign in as an admin, and their row comparisons leave out the caller's own `people` row. CommunityFinder's `crud_test.cpp` and `roles_permissions_test.cpp` needed the same changes: their delete uses POST, and the non-admin self-assignment now expects 403 instead of 400. A new CommunityFinder test, `AnonymousCannotChangeAPublicTable`, shows a signed-out delete and update on its public `categories` are refused and change nothing.
+- **`display_templates`:** `DbSchemaTest.GetDbSchemaDisplayTemplatesOnlyForAllowedTables`, signed out with a template for `people` (allowed) and `roles` (not). `DatabaseRestHelperTest.DatabaseMetadataWithDisplayTemplates` now expects the same filtering.
 
 ### 1.3 No GET that writes *(server_components + knottyyoga)*
 - [x] A census of every `CROW_ROUTE` registered for GET whose handler writes. Each becomes POST, with a test that the GET is gone. `delete_item` is the known one; the census says whether there are others.
@@ -682,23 +689,35 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
   - `src/main.cpp.bak` carries ten old method-less routes (`/addclass`, `/removeclassbyid`, …). It's in no CMakeLists and isn't built. Deleting it is safe.
 
 ### 1.4 Private tables off the public list *(knottyyoga: database_helper + migration)*
-- [ ] `PopulateAllowedTables` stops listing these tables:
+- [x] `PopulateAllowedTables` stops listing these tables:
   - `attendance_templates`, `attendance_template_entries`, `attendance_template_exceptions`
   - `user_notification_preferences`
   - `ical_feed_tokens`
 
   Admins still reach them through the admin top-level and nested lists, and `manage_class_schedule` through its table grant. To verify against `PopulateAdminTablePermissions`.
-- [ ] Migration **`app/0013_private_tables_not_public`**: deletes those five `allowed_tables` rows. It is idempotent, and a second run changes nothing.
-- [ ] Tests, through `IsTableAllowed` (the reader every generic endpoint uses):
+- [x] Migration **`app/0013_private_tables_not_public`**: deletes those five `allowed_tables` rows. It is idempotent, and a second run changes nothing.
+- [x] Tests, through `IsTableAllowed` (the reader every generic endpoint uses):
   - signed out, refused on all five
   - admin, allowed
   - `manage_class_schedule`, allowed on the template tables
   - the migration clears the rows on a database that has them, and running it twice is harmless
-- [ ] Any member write that 1.1 found moves to a dedicated endpoint here, with tests.
+- [x] Any member write that 1.1 found moves to a dedicated endpoint here, with tests. *(1.1 found none.)*
+
+**As built (11/18):**
+- **Verified against `PopulateAdminTablePermissions`:** `manage_class_schedule` grants the three attendance-template tables. Nothing grants `user_notification_preferences` or `ical_feed_tokens`, so only admins reach those two now. No UI reads any of the five through the generic API (1.1), so no page changes.
+- **The five names are in one place,** `Migration::kPrivateTablesRemovedFromPublicList` in `app_migrations.h`, which the migration and the tests share.
+- **`PopulateAllowedTables` and `PopulateAdminTablePermissions` are now declared in `create_database.h`,** like `PopulateAdminMetadata`, so a test can seed them.
+- **The tests ask the real endpoint** (`/api/get_table_rows`, which calls `IsTableAllowed`) over the real seed:
+  - `CreateDatabaseTest.SignedOutVisitorsCannotReadMembersPrivateTables`: all five refused, and `classes` still readable as the control
+  - `AdminsStillReadMembersPrivateTables`
+  - `StudioManagersStillReadAttendanceTemplatesOnly`: the three templates allowed, and the other two refused
+  - `AppMigrationsTest.PrivateTablesNotPublicTakesThemOffTheListAndIsIdempotent`, through `AllowedTables::IsTableAllowed`, with `products` surviving both runs
 
 ### 1.5 The browser side *(@honuware/ui: access; knottyyoga: ServerAccessNetwork)*
-- [ ] `deleteItem` sends POST in `crud-http-access.ts` and in any app-side copy. A spec pins the verb and path.
-- [ ] `@honuware/ui` patch release; `npm install @honuware/ui@X.Y.Z --save-exact` in `ui/`.
+- [x] `deleteItem` sends POST in `crud-http-access.ts` and in any app-side copy. A spec pins the verb and path.
+  - `@honuware/ui`: `crud-http-access.spec.ts` now says "deleteItem POSTs the delete_item path, never GET".
+  - knottyyoga: `ServerAccessNetwork.ts`, pinned by the new `server-access-network-crud.spec.ts`. This is the copy knottyyoga's pages actually use (1.1).
+- [ ] `@honuware/ui` patch release; `npm install @honuware/ui@X.Y.Z --save-exact` in `ui/`. *(Mason, at ship time. knottyyoga works without it; CommunityFinder's admin delete needs it.)*
 
 ### 1.6 Ship it
 - [ ] Gates: server_components (Windows + Linux); knottyyoga against the local checkout (Linux); Angular (Windows + Linux).
