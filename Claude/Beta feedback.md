@@ -1627,6 +1627,7 @@ T30, T31, T41 and G18.
     - Description: "Workshops are planned around who's coming. Cancel a week ahead for a full refund."
   - The refund goes back to the card, or to store credit if the person ticks it, as today.
 - **Say "use the default", or write your windows and descriptions here.** Nothing ships with a policy you haven't seen.
+- Mason- These are just the initial things populated in the data, correct? It isn't hardcoded and I can go into product definitions for any of these and alter them in the products page, correct? I don't want hardcoded policy.
 
 ### Resolved 11/17/2026, third round
 
