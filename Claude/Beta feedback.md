@@ -727,7 +727,7 @@ F1: anyone can write to `products` and `classes` through the generic API, and a 
 - [x] `deleteItem` sends POST in `crud-http-access.ts` and in any app-side copy. A spec pins the verb and path.
   - `@honuware/ui`: `crud-http-access.spec.ts` now says "deleteItem POSTs the delete_item path, never GET".
   - knottyyoga: `ServerAccessNetwork.ts`, pinned by the new `server-access-network-crud.spec.ts`. This is the copy knottyyoga's pages actually use (1.1).
-- [ ] `@honuware/ui` patch release; `npm install @honuware/ui@X.Y.Z --save-exact` in `ui/`. *(Mason, at ship time. knottyyoga works without it; CommunityFinder's admin delete needs it.)*
+- [x] `@honuware/ui` patch release; `npm install @honuware/ui@X.Y.Z --save-exact` in `ui/`. *(Mason, at ship time. knottyyoga works without it; CommunityFinder's admin delete needs it.)* ✅ 2026-11-19
 
 ### 1.6 Ship it
 - [x] Gates: server_components (Windows + Linux); knottyyoga against the local checkout (Linux); Angular (Windows + Linux).
