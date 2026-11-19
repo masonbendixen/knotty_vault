@@ -318,7 +318,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's **Name** first; before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump.
+- **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's **Name** first; before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump. Part C now also expects **Failed to load requirements** for Kit. The Requirements card's read needs `manage_class_schedule`, which predates Phase 1; OQ-32 records it.
 - **v0.6 (11/18/2026)**: Phase 1 is built and tested but not shipped. Mason is holding it to ship with later phases. What changed:
   - **1.1–1.5 are done, with tests.** The 1.6 gates passed on both platforms, and the mutation check caught every mutation. The release steps (push, pin bump, `@honuware/ui` release, `sandbox.14`, the production probe) wait for ship time.
   - **1.2's expectations, corrected to what's true:**
@@ -844,7 +844,11 @@ CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial agai
 2. Open the menu under your name and click **Sign Out**. Sign in as `kiteagle@gmail.com` with password `kit`.
 3. Go to **Admin ▸ Manage Products ▸ Class Schedules**. Click **Add class**, enter Name `Kit's class`, choose Kind **Recurring**, and click **Save**.
    - Expect: `Kit's class` appears in **Class**. That's the new grant on `classes`. Without it, the banner reads **Could not create class (the name may already be in use)** and no class appears.
-   - Also expected, and not Phase 1: a red banner such as **Class saved, but updating its tags failed.** or **Failed to load class instances**. The tags, instances and schedules need `manage_class_schedule`, which this role doesn't have (OQ-32).
+   - Also expected, and not Phase 1:
+     - a red banner at the top, such as **Class saved, but updating its tags failed.** or **Failed to load class instances**
+     - **Failed to load requirements** inside the **Requirements** card
+   - The tags, instances, schedules, and the Requirements card's list need `manage_class_schedule`, which this role doesn't have (OQ-32). The Requirements card's read has wanted it since July (`admin_class_requirements_list.cpp:64`); Phase 1 didn't change it.
+   - Don't add a requirement group as Kit. It saves, because 1.1 granted the table, but the card can't load it back, so it never appears.
 4. Click **Delete class**.
    - Expect: `Deleted class "Kit's class".`
 
@@ -1825,7 +1829,7 @@ T30, T31, T41 and G18.
 **OQ-32 — Manage Products for someone who isn't an admin** *(1.1)*
 - Building Phase 1 turned up about fifteen tables that Manage Products pages save but no permission grants. Among them are booking windows, instructors, the home page and About sections, and provider availability. 1.1 has the list.
 - They work for admins, and today only admins use Manage Products. A non-admin given `manage_products`, such as a future Studio Manager, would see those pages refuse to save. Phase 1 didn't cause this, and it fixed the one page it would have broken (Class Schedules).
-- Class Schedules is itself only half usable on `manage_products` alone. It lists a class's instances, schedules and slots through endpoints that require `manage_class_schedule` (`admin_class_instances_list.cpp:69`), so it shows "Failed to load class instances". The class and its requirements do save. The seeded Studio Manager role holds `manage_class_schedule` and not `manage_products`, so it never reaches the page through the Admin menu.
+- Class Schedules is itself only half usable on `manage_products` alone. It lists a class's instances, schedules and slots through endpoints that require `manage_class_schedule` (`admin_class_instances_list.cpp:69`), so it shows "Failed to load class instances". The class and its requirements do save. But the Requirements card reads them through `GET /api/admin/class/<id>/requirements`, which also requires `manage_class_schedule` (`admin_class_requirements_list.cpp:64`). So the card shows "Failed to load requirements", and a group added there saves without ever appearing. Mason saw both banners on 11/19 while hand-testing Part C. The seeded Studio Manager role holds `manage_class_schedule` and not `manage_products`, so it never reaches the page through the Admin menu.
 - **Default:** leave it until someone who isn't an admin needs Manage Products. Then grant every page's tables in one pass, with a test per page that signs in with only that permission and saves.
 - The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
 - Do you expect to give anyone `manage_products` without making them an admin before the final release?
