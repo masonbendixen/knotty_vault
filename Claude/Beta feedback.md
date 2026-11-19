@@ -318,6 +318,26 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.7 (11/19/2026)**: Phase 2 is built and tested, and not shipped. What changed:
+  - **2.1–2.9 are done, with tests.** 2.10's gates: GATE_RESULTS_PENDING
+  - **New: *Testing Phase 2 locally*** and the **`sandbox.15` release notes**, both under 2.10. The walkthrough runs from a blank database: Square's decline card for 2.1, Ashley's two-massage cart for 2.9, and Studio Settings in a second window.
+  - **Where the build differs from the plan.** Each is noted in its item as *As built*:
+    - The duplicate check is in `purchase_pay_card` only, which every card payment goes through (OQ-38). The check-in desk and the provider's upgrade charge skip it (OQ-40).
+    - `RefundBookingShare` takes the booking's id and finds its line itself.
+    - The two-at-once signup test checks the row lock on one connection. The true race test waits for 7.6 (OQ-46).
+    - The Studio Settings tile sorts with the others, two after **Site Theme**, until 9.2's Website group.
+    - Idempotency keys: kept after a lost answer or a 5xx, renewed after a 4xx (Square refuses a reused key with another card).
+    - A saved card must be the subscriber's own and active, for every start choice (`CARD_NOT_USABLE`).
+    - The admin create checks `manage_subscriptions` before it reads the body.
+    - The event, service and series booking pages also ask "Buy it again?". Six pages, not four, keep **Processing...** on one line.
+    - The cancel banner names the amount and no longer shows the credit's voucher code.
+  - **Found while building, and fixed:**
+    - The header's **Memberships** opens `/shop`, which had no "You're a **Gold** member" line. The line is now shared by both Memberships pages (2.7).
+    - The membership warnings printed the whole product name ("a **Knotty Yoga Gold Membership** membership"). They now say "a **Gold** membership". The specs' data had used short names, which hid it.
+    - **My Purchases** printed the raw `partially_refunded`. It now reads **Partially Refunded**, and such an order reopens as a receipt.
+    - The server sends true/false flags as the strings `"true"`/`"false"`, and `"false"` is truthy. The subscribe pages now compare the string, so a staff-only start choice never shows to a member.
+  - **New open questions:** OQ-33 to OQ-47, each built to its default. OQ-47 grew: an unpaid cart keeps its booked times, and opening the cart again makes a second order.
+  - **10.2 gained *Carried from Phase 2*:** two server answers found while testing.
 - **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's name as its heading, laid out as Mason asked: photo left; name; facts on one line; description underneath (*Class Schedules: the class card*, under 1.6). Before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump. Part C now also expects **Failed to load requirements** for Kit. The Requirements card's read needs `manage_class_schedule`, which predates Phase 1; OQ-32 records it.
 - **v0.6 (11/18/2026)**: Phase 1 is built and tested but not shipped. Mason is holding it to ship with later phases. What changed:
   - **1.1–1.5 are done, with tests.** The 1.6 gates passed on both platforms, and the mutation check caught every mutation. The release steps (push, pin bump, `@honuware/ui` release, `sandbox.14`, the production probe) wait for ship time.
