@@ -318,7 +318,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
-- **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's **Name** first; before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump. Part C now also expects **Failed to load requirements** for Kit. The Requirements card's read needs `manage_class_schedule`, which predates Phase 1; OQ-32 records it.
+- **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's name as its heading, laid out as Mason asked: photo left; name; facts on one line; description underneath (*Class Schedules: the class card*, under 1.6). Before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump. Part C now also expects **Failed to load requirements** for Kit. The Requirements card's read needs `manage_class_schedule`, which predates Phase 1; OQ-32 records it.
 - **v0.6 (11/18/2026)**: Phase 1 is built and tested but not shipped. Mason is holding it to ship with later phases. What changed:
   - **1.1–1.5 are done, with tests.** The 1.6 gates passed on both platforms, and the mutation check caught every mutation. The release steps (push, pin bump, `@honuware/ui` release, `sandbox.14`, the production probe) wait for ship time.
   - **1.2's expectations, corrected to what's true:**
@@ -816,10 +816,10 @@ CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial agai
 1. Click **Sign In** at the top of the page. On **Log In**, enter Email `masonbendixen@gmail.com` and Password `pass`, then click **Sign in**.
 2. Go to **Admin ▸ Manage Products** and open the **Class Schedules** card.
 3. Click **Add class**. In the **Add class** dialog, enter Name `Phase 1 test class` and Default capacity `10`, choose Kind **Recurring**, and click **Save**.
-   - Expect: `Phase 1 test class` is selected in **Class**, with no red banner. The details card under it starts with **Name** `Phase 1 test class`.
+   - Expect: `Phase 1 test class` is selected in **Class**, with no red banner. The details card under it shows `Phase 1 test class` as its heading, beside the photo.
 4. Click **Edit class**. Change Name to `Phase 1 test class edited`, and click **Save**.
-   - Expect: **Class** and the details card's **Name** both show the new name.
-   - The details card had no **Name** until 11/19. Mason noticed while running this walkthrough, and it was added then (`class-schedule-manage.component.html`, with two tests in its spec).
+   - Expect: **Class** and the details card's heading both show the new name.
+   - The details card had no name until 11/19. Mason noticed while running this walkthrough. The card was then laid out as he asked: see *Class Schedules: the class card* below Part C.
 5. In the **Requirements** card, type `Members` in **New group label** and click **Add group**.
    - Expect: a `Members` group appears.
 6. In that group's **Add a permission**, type `platinum` and pick **platinum_fitness — Knotty Yoga Platinum Fitness Membership.**
@@ -851,6 +851,18 @@ CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial agai
    - Don't add a requirement group as Kit. It saves, because 1.1 granted the table, but the card can't load it back, so it never appears.
 4. Click **Delete class**.
    - Expect: `Deleted class "Kit's class".`
+
+**Class Schedules: the class card** *(found while hand-testing, 11/19; ui only)*
+- [x] The card had no name: it showed only in the **Class** picker. Then, with Description as one of five equal columns, a long description ran down a narrow strip.
+- [x] As Mason asked:
+  - the photo on the left, now 240 px instead of 160, fetched at three times that size so it stays sharp
+  - on the right, the name as a heading in a larger font, on its own line
+  - **Default capacity**, **Kind** and **Active** sharing the next line
+  - **Description** underneath, across the rest of the card
+  - a card too narrow for the photo beside the details (a phone) puts the photo on top. On the narrowest phones a label wraps ("Default / capacity") so the three facts stay on one line.
+- [x] Tests:
+  - `class-schedule-manage.component.spec.ts`: the order of the pieces, the photo URL, a rename, and a sweep of the card at 320–1200 px wide
+  - `e2e/mobile-audit/layout/class-properties.spec.ts`: the same checks on the real page at every audit size, and at 1680 and 2560 px
 
 **Not checkable by hand, so covered by the automated tests.** No page sends these requests, and the hand tests don't use curl:
 - a signed-out visitor's or a member's add, update or delete (401 or 403)
