@@ -879,29 +879,30 @@ The tests are listed under 1.2 and 1.4.
 T7, T8, T22, T23 and A8, plus F3, F4, F7, F22 and F23.
 
 ### 2.1 A failed first charge leaves nothing behind *(business_logic/payment)*
-- [ ] `CreateSubscription` charges **before** it writes the subscription:
+- [x] `CreateSubscription` charges **before** it writes the subscription:
   1. Validate.
   2. Create the purchase.
   3. Charge.
   4. Only on success, insert the subscription and its charge record.
 
   On a decline, the pending purchase is cancelled. No subscription row, no entitlement and no next-billing date are left.
-- [ ] The admin no-card path keeps its behaviour. The complimentary path (**Include this month free**) is replaced by 2.3's **rest of this month free**.
-- [ ] Tests, through the billing run's due-row reader and `GetActiveByPersonId`:
+- [x] The admin no-card path keeps its behaviour. The complimentary path (**Include this month free**) is replaced by 2.3's **rest of this month free**.
+  - *As built:* without a card, only **Start today** is allowed (OQ-37). A saved card must be one of this person's active cards, for every start choice: someone else's card, or a removed one, is refused with `CARD_NOT_USABLE` before anything is charged.
+- [x] Tests, through the billing run's due-row reader and `GetActiveByPersonId`:
   - declined card → no subscription, nothing due for billing, the purchase cancelled
   - `RunBilling` afterwards charges nothing
   - retrying three times with a declined card leaves zero subscriptions, then one after a good card
   - the success path is unchanged: one subscription, one entitlement, the buyer seated
 
 ### 2.2 A second membership needs a yes *(table helpers + business_logic/payment + endpoints; OQ-1)*
-- [ ] `TableHelpers::Subscriptions::GetCurrentPaidByPerson(personId, nowUs)`: the D2 definition, in one query. Tests for each of its four cases, plus expired (not current).
-- [ ] `TableHelpers::EntitlementAssignments::GetCurrentMembershipSeatsForPerson(personId, nowUs)`: the seats a person holds on current memberships, with each payer's name. Tests.
-- [ ] `SubscriptionHelper::GetMembershipSummary(personId)`:
+- [x] `TableHelpers::Subscriptions::GetCurrentPaidByPerson(personId, nowUs)`: the D2 definition, in one query. Tests for each of its four cases, plus expired (not current).
+- [x] `TableHelpers::EntitlementAssignments::GetCurrentMembershipSeatsForPerson(personId, nowUs)`: the seats a person holds on current memberships, with each payer's name. Tests.
+- [x] `SubscriptionHelper::GetMembershipSummary(personId)`:
   - the memberships they pay for: the product, and who holds each seat
   - the memberships they hold a seat on: the product, and the payer
-- [ ] `CreateSubscription` refuses with **`ALREADY_HAS_A_MEMBERSHIP`** when the summary isn't empty and the request doesn't say `confirm_additional_membership: true`. With the flag, the membership is created.
-- [ ] **Seating the buyer.** Today the buyer always takes seat 1 (`subscription_helper.cpp:316-326`). That stays for a first membership. A buyer who already holds a seat on a current membership gets a new one with every seat empty.
-- [ ] **Seats carry over at renewal (P14, F22).**
+- [x] `CreateSubscription` refuses with **`ALREADY_HAS_A_MEMBERSHIP`** when the summary isn't empty and the request doesn't say `confirm_additional_membership: true`. With the flag, the membership is created.
+- [x] **Seating the buyer.** Today the buyer always takes seat 1 (`subscription_helper.cpp:316-326`). That stays for a first membership. A buyer who already holds a seat on a current membership gets a new one with every seat empty.
+- [x] **Seats carry over at renewal (P14, F22).**
   - The billing run and the past-due retry copy the current seats onto the new month's entitlement with `TransferAssignments`, which already exists.
   - `PayWithCard` gets a flag, set only by membership charges, that skips its automatic payer seat. A payer who had no seat last month then has none this month either.
   - A membership waiting for its 1st (2.3) has no seats to copy, so its first charge seats by the rule above.
@@ -911,13 +912,15 @@ T7, T8, T22, T23 and A8, plus F3, F4, F7, F22 and F23.
     - a seat removed before the 1st stays removed
     - the past-due retry does the same
     - one-off purchases still seat their payer
-- [ ] `POST /api/subscriptions` and the admin create both take `confirm_additional_membership` and answer 409 `{code, summary}`. The admin Subscriptions page gets the same warning.
-- [ ] Tests:
+- [x] `POST /api/subscriptions` and the admin create both take `confirm_additional_membership` and answer 409 `{code, summary}`. The admin Subscriptions page gets the same warning.
+  - *As built:* the admin create now checks `manage_subscriptions` before it reads the body, so someone without it gets 403 whatever they send.
+- [x] Tests:
   - a second subscribe without the flag → 409 with the summary, and still exactly one subscription
   - the same for each "current" case (cancelled-but-running, past due, a pending downgrade) and for a seat holder
   - with the flag → two subscriptions, the second with nobody seated
   - expired → allowed without the flag, and the buyer seated
-- [ ] Today a site has one database connection, so one person's two requests can't overlap (F13). 7.6 raises that, so this item adds a row lock on the person (`SELECT … FOR UPDATE`) inside `CreateSubscription`. Concurrency test: two simultaneous first subscribes make one subscription and one 409.
+- [x] Today a site has one database connection, so one person's two requests can't overlap (F13). 7.6 raises that, so this item adds a row lock on the person (`SELECT … FOR UPDATE`) inside `CreateSubscription`. Concurrency test: two simultaneous first subscribes make one subscription and one 409.
+  - *As built:* the lock is in. Its test checks that the person's row is held `FOR UPDATE` during a signup. The true two-connection test waits for 7.6 (OQ-46).
 
 ### 2.3 Start today or on the 1st *(business_logic/payment + endpoints + ui; OQ-27)*
 Fixes F4 and P13. The server works out the dates and the amount from a named **start choice**, so the page no longer sends dates. Examples are for a $160 membership bought on November 17.
@@ -929,24 +932,24 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
 | **Start today, rest of November free** (`today_rest_free`) | staff only | December's full **$160** | today | $160 on January 1 |
 | **Start on the 1st of a later month** (`later_month`, with the month) | staff only | nothing | that month's 1st | on that 1st |
 
-- [ ] **`SubscriptionStartPlanner`** (business_logic/payment): given a choice, a product and "now", it returns the period, the amount to charge now, the access start and the next billing date. It is the only place these are worked out. The checkout and the preview both call it, so they can't disagree.
+- [x] **`SubscriptionStartPlanner`** (business_logic/payment): given a choice, a product and "now", it returns the period, the amount to charge now, the access start and the next billing date. It is the only place these are worked out. The checkout and the preview both call it, so they can't disagree.
   - "By the day" counts today, so the proration rule is the one `CalculateProratedCharge` and 3.1's upgrades already use. On the 1st, **Start today** costs the full month. On the last day it costs one day.
   - Unit tests for each choice on the 1st, the 17th and the last day, across a year end (December → January), and for February.
-- [ ] **`CreateSubscription` follows the plan** (on top of 2.1's charge-first order):
+- [x] **`CreateSubscription` follows the plan** (on top of 2.1's charge-first order):
   - **Start today:** the prorated charge now, and the period runs to the 1st. This is what the staff page's prorate path already does; the server now does it for members too.
   - **Start on December 1 / a later month:** no purchase, no entitlement, no charge. The current period runs from now to the start, with nothing granted, and `next_billing_us` is the start. On the 1st, the billing run charges and grants the month like any renewal (F4's last point). The $0 entitlement path at `subscription_helper.cpp:289-314` no longer runs for a later start, which ends the free month. It stays only for the admin no-card path (2.1).
   - **Rest of this month free:** one charge of the full price now, with access and the period from today to the end of next month. `next_billing_us` is the 1st of the month after. The charge record and the receipt say "includes 14 free days of November".
   - A declined card on the 1st makes the membership past due, as a failed renewal does. Cancelling before the 1st costs nothing.
-- [ ] **Endpoints:**
+- [x] **Endpoints:**
   - `POST /api/subscriptions` takes `start: "today" | "next_month"`. Anything else gets 400, so a member can't send a staff-only choice.
   - The admin create takes all four choices (with `start_month` for the later one), behind `manage_subscriptions`.
   - The old date fields go from both (`start_year`/`start_month`/`charge_now`, and `period_start_us`/`period_end_us`/`charge_now`/`complimentary_period`). The page and the server ship together in sandbox.15.
   - **New `GET /api/subscriptions/start_options?product_id=`** answers signed out too. For each member choice it returns the amount today, the first full charge with its date, and the access start. It's a GET, so it needs no CSRF bootstrap. The signed-out subscribe page (5.2, OQ-14) shows these numbers.
-- [ ] **The welcome email (2.4) says what happened with the money:**
+- [x] **The welcome email (2.4) says what happened with the money:**
   - "You've been charged $74.67 for November 17–30. Your next charge is $160 on December 1."
   - "Nothing has been charged yet. Your membership starts on December 1, with a charge of $160."
   - "You've been charged $160 for December. The rest of November is on us."
-- [ ] **Pages:**
+- [x] **Pages:**
   - **Subscribe** (member): the **Start month** list becomes two choices, each with its numbers from `start_options`:
     - **Start today:** "$74.67 today for the rest of November, then $160 on the 1st of each month."
     - **Start on December 1:** "Nothing today. $160 on December 1, then on the 1st of each month."
@@ -954,7 +957,7 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
     The button reads **Subscribe & pay $74.67** or **Subscribe**. Later months go from the member page, since you described two choices. Say if members should keep them.
   - **Create Subscription** (staff): the month list and its two checkboxes become the table's four choices. Each line says what's charged now and when the next charge is, and **a later month** opens the month list.
     - The unticked **Prorate for remaining days** (full price for a part month) goes. Say if staff use it.
-- [ ] **Tests** (server):
+- [x] **Tests** (server):
   - **Start today** on the 17th: 14/30 of the price charged, access from today, and the billing run on December 1 charges the full price
   - **Start on December 1:**
     - nothing is charged, and `GetCurrentMembership` is empty until the 1st
@@ -965,35 +968,37 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - `start_options` signed out answers the same amounts that checkout then charges
   - `GetCurrentPaidByPerson` counts a membership waiting to start, so Back hits the 2.2 warning
   - the three email texts, against the mail double
-- [ ] **Specs:**
+- [x] **Specs:**
   - each page's choices and their text
   - what each choice sends
   - the button's amount
   - the staff page's month list appearing only for a later month
 
 ### 2.4 One email per signup *(business_logic/payment)*
-- [ ] A subscription's first charge sends one email: "Welcome to Gold", with the receipt (amount, card, period) folded in. `PayWithCard` gets a `suppressConfirmationEmail` flag that only `CreateSubscription` sets.
-- [ ] Tests against the mail double: exactly one email per signup, containing the amount and the period. One-off purchases still send their confirmation.
+- [x] A subscription's first charge sends one email: "Welcome to Gold", with the receipt (amount, card, period) folded in. `PayWithCard` gets a `suppressConfirmationEmail` flag that only `CreateSubscription` sets.
+- [x] Tests against the mail double: exactly one email per signup, containing the amount and the period. One-off purchases still send their confirmation.
 
 ### 2.5 The same order twice in a row asks first *(services + table helpers + business_logic/payment + endpoints)*
-- [ ] **The window is a setting** (OQ-4):
+- [x] **The window is a setting** (OQ-4):
   - `duplicate_purchase_window_minutes` in `config_secrets`. The default is **10**, and `0` turns the check off.
   - `StudioSettings` (business_logic) reads it, using the default when the row is missing, and validates writes: whole minutes, 0–1440.
   - Tests: the default, a stored value, a bad value refused.
-- [ ] `TableHelpers::Purchases::FindRecentPaidMatch(payerId, items, sinceUs)`: a paid purchase by the same payer, with the same products and quantities, since the window began.
-- [ ] `purchase_pay_card` and `cart_checkout` refuse with 409 **`RECENT_DUPLICATE`** (name, paid at) unless `confirm_duplicate: true`.
-- [ ] Tests:
+- [x] `TableHelpers::Purchases::FindRecentPaidMatch(payerId, items, sinceUs)`: a paid purchase by the same payer, with the same products and quantities, since the window began.
+  - *As built:* it compares variants too, and takes the new order's id instead of its items. It doesn't compare booked times (OQ-39).
+- [x] `purchase_pay_card` and `cart_checkout` refuse with 409 **`RECENT_DUPLICATE`** (name, paid at) unless `confirm_duplicate: true`.
+  - *As built:* only `purchase_pay_card` checks. The cart, checkout and the three booking pages all pay through it (OQ-38). The check-in desk and the provider's upgrade charge send `confirm_duplicate: true` (OQ-40).
+- [x] Tests:
   - a second identical order inside the window → 409, and Square isn't called
   - with the flag → charged
   - a different item, or outside the window → charged without asking
   - the window set to 0 → never asks
 
 ### 2.6 The checkout pages follow the order *(ui: pages/shop)*
-- [ ] **Checkout** (`checkout`):
+- [x] **Checkout** (`checkout`):
   - after `createPurchase`, the URL gains `?purchase=<id>` (`replaceUrl`)
   - opening with that parameter loads the purchase: paid → the receipt view with no **Pay** button; pending → the same order
   - success → `replaceUrl` to the receipt view
-- [ ] **Subscribe** (`subscription-signup`):
+- [x] **Subscribe** (`subscription-signup`):
   - someone who already pays for or holds a membership sees the D2 warning above the card form:
     - **Subscribe** stays disabled until they tick **I want an additional membership**
     - **Change my membership instead** goes to **My Membership**
@@ -1001,18 +1006,23 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - the start choice, with its amounts, is 2.3's
   - the idempotency key is made once per visit and kept with the order, so a retry reuses it
   - success → `replaceUrl`
-- [ ] **Cart**: the same as checkout.
-- [ ] `RECENT_DUPLICATE` opens a dialog: "You bought **Drop-in Class** at 3:42 PM. Buy it again?" with **Buy again** and **Cancel**.
-- [ ] **"Processing…" stays on one line** (T23):
+- [x] **Cart**: the same as checkout.
+  - *As built:* once the cart's order exists, the page shows that fixed order instead of the editable cart, without the coupons and "book for someone else". Both pages got a receipt view (Order #, lines, amount paid, a refunded note).
+- [x] `RECENT_DUPLICATE` opens a dialog: "You bought **Drop-in Class** at 3:42 PM. Buy it again?" with **Buy again** and **Cancel**.
+  - *As built:* the event, service and series booking pages open it too. There, **Cancel** leaves the booking unpaid and says "Nothing was charged. Your earlier order is in My Purchases." On checkout and the cart, **Cancel** shows the earlier order's receipt. The new order stays **Pending**, since the server has no cancel route (OQ-47).
+  - *As built:* a resend after a lost answer or a 5xx keeps its idempotency key. A 4xx refusal gets a new one: Square refuses a reused key with a different card.
+- [x] **"Processing…" stays on one line** (T23):
   - `.inline-spinner` beats Material's `display:block`: a selector of two classes, in `_patterns.scss`, with a comment saying why
   - a layout spec checks the spinner and the word share a line, at 320 and 1280 px, on all four pages that use it
-- [ ] Specs:
+  - *As built:* six pages use it (checkout, cart, subscribe, and the event, service and series booking pages), and `processing-on-one-line.spec.ts` checks all six. With the old one-class selector, all six fail.
+- [x] Specs:
   - each page's resume, receipt and redirect paths
   - the duplicate dialog
   - the membership warning: shown, the tick required, the flag sent
   - the key reused on retry
   - `replaceUrl` on success
-- [ ] A Playwright spec for Thomas's exact path: pay, Back, Pay again. It must not reach the server's pay call a second time.
+- [x] A Playwright spec for Thomas's exact path: pay, Back, Pay again. It must not reach the server's pay call a second time.
+  - `e2e/mobile-audit/layout/pay-once.spec.ts`, in mock mode: pay, Back, Pay asks first, and **Cancel** shows the first receipt (one order **Paid**, the other **Cancelled**). Back then Forward reopens the receipt with no **Pay**. Both pass against a hand-started :4300 server.
 
 ### 2.7 Memberships knows who's signed in *(ui: shop catalog, membership-tier-cards)*
 - [x] Signed in with a membership, the page opens with a line naming it: "You're a **Gold** member · **Change membership**". A seat holder sees "You're on **Thomas's Gold Couple's** membership".
@@ -1021,26 +1031,34 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - the others read **Switch to this** (Phase 3's change flow, or **My Membership** until Phase 3 lands)
   - every card keeps a smaller **Buy another membership** link, which opens the subscribe page with the D2 warning (2.6)
 - [x] The catalog loads the summary when signed in. Specs: signed out, a member, a seat holder, and someone paying for two.
+- [x] *Found while writing the walkthrough:* the header's **Memberships** opens `/shop`, not the subscriptions page that had the line. The line is now one shared component (`app-membership-line`), on both pages, and `/shop`'s tier cards take the summary too. Specs: `membership-line.component.spec.ts`, plus `/shop` signed out, as a member, after a failed read, and after signing out.
+- [x] *Also found:* the subscribe page's warning printed the whole product name: "You already have a **Knotty Yoga Gold Membership** membership." It now says "a **Gold** membership", as the line does, and so does the staff page's warning. The specs had used short names in their data, which hid it; they now use the seed's names.
 
 ### 2.8 Studio Settings *(endpoint + ui)*
-- [ ] `GET` and `PUT /api/manage/studio_settings` (`manage_products`). The settings are the duplicate-purchase window (2.5) and, from Phase 6, the late sign-up window (6.2). Endpoint tests: 401, 403, a read, a write, and a bad value → 400.
+- [x] `GET` and `PUT /api/manage/studio_settings` (`manage_products`). The settings are the duplicate-purchase window (2.5) and, from Phase 6, the late sign-up window (6.2). Endpoint tests: 401, 403, a read, a write, and a bad value → 400.
 - [x] **Studio Settings** under **Manage Products** (a tile in the **Website** group, 9.2; until 9.2 the tile sits beside **Site Theme**). Each setting is one field with a sentence saying what it does, for example: "**Ask before charging for the same order again within** [10] minutes. 0 turns this off." Specs.
-- [ ] The testers' duplicate memberships on the live site are left alone. They're Square sandbox charges, and the Phase 13 reinstall removes them (OQ-5).
+- [x] The testers' duplicate memberships on the live site are left alone. They're Square sandbox charges, and the Phase 13 reinstall removes them (OQ-5). Nothing to build.
+  - *As built:* the tile sorts alphabetically with the others, two tiles after **Site Theme** (Skills sits between them), until 9.2's Website group. The setting is stored in `config_secrets`; a missing row reads as 10, so no migration is needed.
 
 ### 2.9 Cancelling one item refunds only that item *(business_logic/payment + business_logic/scheduling; A8, P15)*
 F23: one booking cancelled from a cart refunds the whole cart.
-- [ ] **`RefundHelper::RefundBookingShare(purchaseId, purchaseItemId, percent, reason, asCredit)`** refunds one booking's share of what was paid:
+- [x] **`RefundHelper::RefundBookingShare(purchaseId, purchaseItemId, percent, reason, asCredit)`** refunds one booking's share of what was paid:
+  - *As built:* it takes the booking's id and finds its purchase and line itself (`RefundBookingShare(bookingId, percent, reason, asCredit)`). `CalculateBookingShareCents(bookingId)` works out the share. Shares are cut from running totals, so they add up to the cent.
+  - *As built:* no discount column is needed. A line's share is the purchase's `total_cents`, after every discount and coupon, in proportion to its `line_total_cents`.
+  - *As built:* a cart paid partly by store credit refunds against its first payment only (OQ-44). A booking from before bookings named their line shares the whole purchase evenly (OQ-45).
   - **The share** is its line's `line_total_cents`, less the line's pro-rata part of any cart discount or coupon, divided by the bookings on that line. A guest pair (two bookings on one line, cancelled together) therefore refunds the line once. To verify: which purchase columns hold the discount.
   - **The amount** is the share × the policy's percent. It goes through `ProcessPartialRefundCents`, which is capped at what the purchase still has paid, so repeated cancels can never refund more than was charged.
   - The purchase reads `partially_refunded` until every line is refunded, then `refunded`.
   - To verify: a cart paid partly with store credit and partly by card. It should refund the store credit first, as credit, and then the card.
-- [ ] **Who calls it:**
+- [x] **Who calls it:**
   - the four member-cancel calls in `BookingHelper::CancelBooking` (`booking_helper.cpp:819`, `:872`, `:930`, `:985`)
   - both studio-cancel calls (`session_cancellation_helper.cpp:142`, `:154`)
 
   `ProcessRefund` (a percent of the whole purchase) stays only where the whole purchase is meant, as in the subscription refund (`subscription_helper.cpp:446`). Series occurrences keep their own per-occurrence path (`class_series_helper.cpp:742`).
-- [ ] The cancel result and its banner name the amount: "Booking cancelled. **$160** was added to your store credit."
-- [ ] Tests, read back through the voucher balance reader and the purchase reader:
+- [x] The cancel result and its banner name the amount: "Booking cancelled. **$160** was added to your store credit."
+  - *As built:* the banner names the amount and no longer shows the credit's voucher code. A card refund reads "… will be refunded to your card."
+  - *Found while writing the walkthrough:* **My Purchases** and the purchase page printed the raw `partially_refunded`. They now read **Partially Refunded**. Reopening such an order on checkout or the cart shows its receipt, never a **Pay** button.
+- [x] Tests, read back through the voucher balance reader and the purchase reader:
   - **Ashley's case:** a cart with a $160 and a $320 massage, paid together.
     - Cancel the $160 one: $160 of credit, the purchase `partially_refunded` with $320 still paid, and the other booking still confirmed.
     - Then cancel the $320 one: $320 more, and the purchase `refunded`.
@@ -1050,7 +1068,7 @@ F23: one booking cancelled from a cart refunds the whole cart.
   - a guest pair: both seats cancelled, the line refunded once
   - a single-booking purchase refunds exactly as before
   - a 50% policy window on one line refunds half of that line only
-- [ ] The testers' existing over-credits are sandbox money. The Phase 13 reinstall removes them (D8).
+- [x] The testers' existing over-credits are sandbox money. The Phase 13 reinstall removes them (D8). Nothing to build.
 
 ### 2.10 Ship it
 - [ ] Mutation check:
@@ -1064,6 +1082,32 @@ F23: one booking cancelled from a cart refunds the whole cart.
   - `replaceUrl` dropped
 - [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
 - [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
+
+#### Release notes: `v1.0.0-sandbox.15`
+**What changes for members**
+- A declined card on a new membership leaves nothing behind: no membership, no access, no bill on the 1st (2.1).
+- Someone who already has a membership is asked before buying another (2.2). The Memberships pages say which one you have (2.7).
+- **Start today** charges only for the rest of the month, by the day. **Start on the 1st** charges nothing until then (2.3).
+- One welcome email per signup, with the receipt in it (2.4).
+- Paying for the same thing again within 10 minutes asks "Buy it again?" first (2.5, 2.6). Back, Forward or a reload on a finished checkout shows the receipt, never a second **Pay**.
+- **Processing...** stays on one line inside the Pay button (T23).
+- Cancelling one booking of a cart refunds only that booking's share, and the banner names the amount (2.9).
+- Shared seats on a couple's or family membership carry over at each monthly renewal (P14).
+
+**What changes for staff**
+- **Manage Products ▸ Studio Settings** sets the duplicate-order window (2.8). It starts at 10 minutes. 0 turns it off.
+- **Create Subscription** offers the four start choices instead of dates and two checkboxes (2.3). The unticked **Prorate for remaining days** is gone (OQ-34).
+
+**Deploying**
+- **Database:** `--migrate`. Phase 2 adds no table, column or migration. The new setting lives in `config_secrets`, and a missing row reads as 10.
+- **Ship the server and the UI together.** The new server refuses the old subscribe page's date fields (400), and the new page needs `GET /api/subscriptions/start_options`, which the old server doesn't have.
+- **Ship after, or with, `sandbox.14`** (Phase 1). Phase 2 was built and tested on top of it.
+- **No new environment variables,** and no honuware change: the pin stays `838045f`.
+- **Existing memberships:** nothing is rewritten. From the next 1st, renewals copy their seats forward. Memberships the testers bought twice stay as they are (2.8, OQ-5).
+
+**After deploying**
+- On production (Square sandbox), sign in as a test member with no membership and walk Parts A, B, C and E of *Testing Phase 2 locally*. Production uses the same Square sandbox, so the same test cards apply.
+- Check **Studio Settings** reads 10.
 
 #### Testing Phase 2 locally, before it ships
 Every payment goes to Square's sandbox: a local Debug database is seeded with the sandbox keys, so no real money moves. Use two windows: an ordinary one for Kit, and a private one for Mason (Part D).
