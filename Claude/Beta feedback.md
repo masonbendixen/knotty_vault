@@ -1931,8 +1931,9 @@ T30, T31, T41 and G18.
 **OQ-47 — Cancel in "Buy it again?" leaves the new order pending** *(2.6)*
 - On checkout and the cart, **Cancel** asks the server to cancel the new, unpaid order. There's no such endpoint: `cancelPurchase` in the UI calls `/api/purchase_cancel`, which the server has never had. The order stays **Pending** in **My Purchases**, with nothing charged.
 - On the booking pages, **Cancel** leaves the booking unpaid, as a declined card does, and says "Nothing was charged".
-- **Default:** leave it. A pending order costs nothing, and the Phase 13 reinstall clears the testers'.
-- The other way is a member-side cancel endpoint for an unpaid order of your own, releasing any booking on it (about half a day, with tests). Should I add it?
+- A cart that holds a booking is worse off. `cart_checkout` writes its bookings as confirmed, and its service sessions as scheduled, before anything is paid. `PurchaseHelper::CancelPurchase` only changes the order's status. So even with a cancel route, a cancelled cart would keep its time slots, and an unpaid one keeps them today. Opening **Shopping Cart** again without the order in the URL (after a decline, say) makes a second unpaid order with its own bookings.
+- **Default:** leave it until 8.13, which reworks cancels and refunds. A pending order charges nothing, and the Phase 13 reinstall clears the testers'.
+- The other way is now: a member-side cancel for your own unpaid order that also releases its bookings and sessions, and a cart that finds your unpaid order before making another (about a day, with tests). Now, or with 8.13?
 
 ### Resolved 11/17/2026, fourth round
 
