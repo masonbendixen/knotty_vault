@@ -1065,6 +1065,110 @@ F23: one booking cancelled from a cart refunds the whole cart.
 - [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
 - [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
 
+#### Testing Phase 2 locally, before it ships
+Every payment goes to Square's sandbox: a local Debug database is seeded with the sandbox keys, so no real money moves. Use two windows: an ordinary one for Kit, and a private one for Mason (Part D).
+
+**Setting up**
+1. **Server build.** A normal **x64-Debug** build. Phase 2 changes only knottyyoga, so the pinned honuware (`838045f`) is fine.
+2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings pass `--recreate_database`. Phase 2 changes no tables, but a blank database starts Kit with no membership, no saved card and no store credit.
+3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`.
+
+**The amounts are for a test on November 19.** **Start today** charges by the day, today included, in UTC months (OQ-35). On the 19th that's 12 of November's 30 days of the $200.00 Gold price, so **$80.00**. After 4 PM Pacific the server's day is already the 20th, which is 11 days, **$73.33**.
+
+**Part A: a declined card leaves nothing behind (2.1, 2.3, 2.4)**
+1. Click **Sign In**, and sign in as `kiteagle@gmail.com` with password `kit`.
+2. Click **Memberships** in the header.
+   - Expect: the membership cards, each with **Subscribe**, and no "You're a … member" line above them.
+3. On **Knotty Yoga Gold Membership**, click **Subscribe**.
+   - Expect, under **When to Start**, two choices, and no **Start month** list:
+     - **Start today**: "$80.00 today for the rest of November, then $200.00 on the 1st of each month."
+     - **Start on December 1**: "Nothing today. $200.00 on December 1, then on the 1st of each month."
+4. Under **Payment Method**, **Card** shows **Add new card...**. Enter Square's decline card `4000 0000 0000 0002`, any future expiry date, any CVV and any ZIP. Type `Decline` in **Card nickname (optional)** and click **Save Card**.
+   - The sandbox may refuse to save this card. If it does, write down its message here and go on to step 7. The page charges only saved cards, so 2.1 then rests on its server tests.
+5. Leave **Start today** chosen and click **Subscribe & pay $80.00**.
+   - Expect: while it works, the button shows its spinner and **Processing...** on one line (T23).
+   - Then a red message that the card was declined, with the form still there.
+6. Click **Subscribe & pay $80.00** twice more, as the testers did.
+   - Expect: the same message each time.
+   - Open the menu under your name and click **My Subscriptions**. Expect: no subscription.
+   - Click **Memberships**. Expect: still no "You're a … member" line.
+7. Open the Gold **Subscribe** page again. In **Card**, choose **Add new card...**, enter `4111 1111 1111 1111`, type `Good` as the nickname, and click **Save Card**. Click **Subscribe & pay $80.00**.
+   - Expect: **Subscription Created!**
+   - If mail is set up locally, expect exactly one email to Kit, **Welcome to Knotty Yoga Gold Membership!** It says "You've been charged $80.00 for November 19–30. Your next charge is $200.00 on December 1." There's no separate payment receipt (2.4).
+8. Press the browser's **Back**, then **Forward**.
+   - Expect: **Subscription Created!** again, not a fresh form.
+
+**Part B: a second membership needs a yes (2.2, 2.6, 2.7).** Still Kit.
+1. Click **Memberships**.
+   - Expect, above the cards: "You're a **Gold** member", with **Change membership**.
+   - **Knotty Yoga Gold Membership** reads **Your membership**, with **Manage**.
+   - The other cards read **Switch to this**.
+   - Every card has a smaller **Buy another membership**.
+2. On **Knotty Yoga Silver Membership**, click **Buy another membership**.
+   - Expect, above **Payment Method**: "You already have a **Gold** membership. Subscribing adds another membership, billed separately."
+   - **Subscribe & pay** is greyed out.
+3. Tick **I want an additional membership**.
+   - Expect: the button turns on. Don't click it.
+4. Click **Change my membership instead**.
+   - Expect: **My Subscriptions**, listing Kit's Gold.
+
+**Part C: the same order twice asks first (2.5, 2.6).** Still Kit.
+1. Click **Services**. On **Our Services**, under **Massage**, click **Book Now**.
+2. Click a day that has times, click an hour to open it, and click **60-Minute Massage $160.00** beside one of its times.
+3. Under **Payment Details**, choose **Card on File** and pick `Good`. Click **Book and Pay $160.00**.
+   - Expect: **Booking Confirmed!**
+4. Press the browser's **Back** to return to **Our Services**. Click **Book Now** under **Massage**, and pick a different time with **60-Minute Massage $160.00**. Pay with `Good` again: click **Book and Pay $160.00**.
+   - Expect: a dialog, **Already bought**: "You bought **Massage** at 3:42 PM. Buy it again?", showing the time of step 3's payment, with **Cancel** and **Buy again**.
+   - This asks even though the time is different (OQ-39).
+5. Click **Cancel**.
+   - Expect: the dialog closes, and a blue note reads "Nothing was charged. Your earlier order is in My Purchases." The page still has its **Book and Pay** button.
+   - Menu ▸ **My Purchases**: step 3's order reads **Paid**. This one reads **Pending**, with nothing charged (OQ-47).
+6. Click **Book and Pay $160.00** again, and this time click **Buy again**.
+   - Expect: **Booking Confirmed!**
+
+**Part D: Studio Settings (2.8).** Mason, in a private window.
+1. Sign in as `masonbendixen@gmail.com` with password `pass`.
+2. Go to **Admin ▸ Manage Products** and open the **Studio Settings** card.
+   - Expect: **Duplicate orders**, and "Ask before charging for the same order again within **10** minutes." with "0 turns this off." under it.
+3. Type `1441` and click **Save**.
+   - Expect: "The duplicate-order window must be a whole number of minutes, from 0 to 1440". Nothing is saved.
+4. Type `0` and click **Save**.
+   - Expect: "Saved. The shop is using this now."
+5. In Kit's window, book one more **60-Minute Massage $160.00** with `Good`.
+   - Expect: no dialog, straight to **Booking Confirmed!**
+6. In Mason's window, set it back to `10` and click **Save**.
+
+**Part E: cancelling one massage refunds only that one (2.9, Ashley's cart).** Kit.
+1. Click **Services**, then **Book Now** under **Massage**. Pick a time and click **60-Minute Massage $160.00**. Under **Booking Summary**, click **Add to Cart**.
+   - Expect: **Shopping Cart**, with the 60-minute massage.
+2. Click **Services**, then **Book Now** under **Massage** again. Pick another time, click **120-Minute Massage $300.00**, and click **Add to Cart**.
+   - Expect: both massages in **Shopping Cart**.
+3. Under **Payment Details**, choose **Credit Card**, enter `4111 1111 1111 1111`, and click **Pay $460.00**.
+   - Expect: no dialog, since this order isn't the same as Part C's.
+   - Expect: **Payment Complete!** with both lines, and **Purchase Details**.
+4. Press the browser's **Back**, then **Forward**.
+   - Expect: **Payment Complete!** again, with no **Pay** button (2.6).
+5. Open the menu under your name and click **My Bookings**. Under **Upcoming Bookings**, find step 1's 60-minute massage and click **Cancel Booking**. Tick **Refund as store credit instead of card refund**, and click **Yes, Cancel**.
+   - Expect: "Booking cancelled. **$160.00** was added to your store credit."
+   - The 120-minute massage still reads **Confirmed**.
+   - Before 2.9, this cancel credited the whole $460.00 (F23).
+6. Menu ▸ **Profile** ▸ **Vouchers & Credits**.
+   - Expect: one active credit of **$160.00**.
+7. Menu ▸ **My Purchases**.
+   - Expect: the cart's order reads **Partially Refunded**.
+   - Opened: **Total** $460.00 and **Paid** $300.00.
+8. Back on **My Bookings**, cancel the 120-minute massage, this time without ticking the box.
+   - Expect: "Booking cancelled. **$300.00** will be refunded to your card."
+   - **My Purchases**: the order reads **Refunded**.
+   - **Vouchers & Credits**: still only the $160.00.
+
+**Not checkable by hand, so covered by the automated tests:**
+- the billing run on the 1st: a December 1 start charged and granted, and seats carried over at renewal
+- a member sending a staff-only start choice (400)
+- two first signups at the same moment (the row lock, OQ-46)
+- coupon-discounted shares, guest pairs, a 50% policy window, and the studio cancelling one session of a cart
+- the pay-twice path on Checkout, which no seeded product reaches. The Playwright spec `e2e/mobile-audit/layout/pay-once.spec.ts` runs Thomas's exact pay, Back, Pay in mock mode.
+
 ---
 
 # Phase 3 — My Membership: see it, change it
