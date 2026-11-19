@@ -1015,16 +1015,16 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
 - [ ] A Playwright spec for Thomas's exact path: pay, Back, Pay again. It must not reach the server's pay call a second time.
 
 ### 2.7 Memberships knows who's signed in *(ui: shop catalog, membership-tier-cards)*
-- [ ] Signed in with a membership, the page opens with a line naming it: "You're a **Gold** member · **Change membership**". A seat holder sees "You're on **Thomas's Gold Couple's** membership".
-- [ ] The tier cards take the membership summary (2.2):
+- [x] Signed in with a membership, the page opens with a line naming it: "You're a **Gold** member · **Change membership**". A seat holder sees "You're on **Thomas's Gold Couple's** membership".
+- [x] The tier cards take the membership summary (2.2):
   - the card you have reads **Your membership**, with **Manage**, which goes to My Membership
   - the others read **Switch to this** (Phase 3's change flow, or **My Membership** until Phase 3 lands)
   - every card keeps a smaller **Buy another membership** link, which opens the subscribe page with the D2 warning (2.6)
-- [ ] The catalog loads the summary when signed in. Specs: signed out, a member, a seat holder, and someone paying for two.
+- [x] The catalog loads the summary when signed in. Specs: signed out, a member, a seat holder, and someone paying for two.
 
 ### 2.8 Studio Settings *(endpoint + ui)*
 - [ ] `GET` and `PUT /api/manage/studio_settings` (`manage_products`). The settings are the duplicate-purchase window (2.5) and, from Phase 6, the late sign-up window (6.2). Endpoint tests: 401, 403, a read, a write, and a bad value → 400.
-- [ ] **Studio Settings** under **Manage Products** (a tile in the **Website** group, 9.2). Each setting is one field with a sentence saying what it does, for example: "**Ask before charging for the same order again within** [10] minutes. 0 turns this off." Specs.
+- [x] **Studio Settings** under **Manage Products** (a tile in the **Website** group, 9.2; until 9.2 the tile sits beside **Site Theme**). Each setting is one field with a sentence saying what it does, for example: "**Ask before charging for the same order again within** [10] minutes. 0 turns this off." Specs.
 - [ ] The testers' duplicate memberships on the live site are left alone. They're Square sandbox charges, and the Phase 13 reinstall removes them (OQ-5).
 
 ### 2.9 Cancelling one item refunds only that item *(business_logic/payment + business_logic/scheduling; A8, P15)*
