@@ -1737,6 +1737,9 @@ T30, T31, T41 and G18.
   - `manage_products`' grant on `permissions` lets its holder edit any permission row, `admin_portal` included
   - a wrong activation token's attempt count and admin alert are rolled back with the error, so the limit may never trip
   - `get_scaled_photo` stores a new copy for every size a signed-out caller asks for
+- [ ] **Carried from Phase 2** (found while porting its tests), each with a test first:
+  - a body field of the wrong JSON type (`"product_id": "abc"`) answers 500, not 400. Every endpoint that reads `Json::Value::Get<T>()` straight off the body does this, the two subscribe endpoints among them.
+  - a refused signup (declined card, unknown product) answers a bare 400 with the message and no `code`, so a page can only show the text
 
 ### 10.3 Deferred (OQ-20)
 - Help text: a description under each table and field, written for every table and column.
@@ -1845,6 +1848,91 @@ T30, T31, T41 and G18.
 - **Default:** leave it until someone who isn't an admin needs Manage Products. Then grant every page's tables in one pass, with a test per page that signs in with only that permission and saves.
 - The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
 - Do you expect to give anyone `manage_products` without making them an admin before the final release?
+
+*OQ-33 to OQ-47 came out of building Phase 2 (v0.7). Each one is built to its default.*
+
+**OQ-33 — Members can't start in a later month** *(2.3)*
+- A member's **Subscribe** page offers **Start today** and **Start on December 1**. Later months are staff-only, on **Create Subscription**.
+- **Default:** as built, since you described two choices (OQ-27).
+- Should members keep a later-month choice?
+
+**OQ-34 — Staff lost the unticked "Prorate for remaining days"** *(2.3)*
+- Before, unticking it charged the full price for a part month. **Start today** now always charges by the day. The nearest choice is **rest of this month free**, which charges a full month and runs to the end of next month.
+- **Default:** gone.
+- Do staff ever charge the full price for a part month?
+
+**OQ-35 — Months are UTC months** *(2.3)*
+- The planner, and the billing run before it, count months in UTC. In Pacific time, a month starts at 4 PM (5 PM in winter) on the last day of the month before. Bought at 6 PM on November 30, **Start today** charges December's full price. A membership "starting December 1" opens at 4 PM on November 30.
+- The pages show their dates in UTC so they read "December 1", not "November 30".
+- **Default:** leave it until the studio's time zone is a setting. The cost is a few evening hours of free access at each month's turn.
+- Is that acceptable for now?
+
+**OQ-36 — Renewals still send two emails** *(2.4)*
+- 2.4 made a signup send one email. A monthly renewal still sends the payment confirmation and the renewal notice.
+- **Default:** leave it for Phase 3, which reworks the membership emails anyway.
+- Fold the renewal into one email too, now or with Phase 3?
+
+**OQ-37 — A membership without a card can only start today** *(2.1, 2.3)*
+- Staff can still create a membership with no card (cash, a comp), but only with **Start today**. Without a card, the other three choices are refused, since nothing could charge it on the 1st.
+- **Default:** as built.
+- Do staff set up cash-paid memberships that start later?
+
+**OQ-38 — Where "the same order twice" is checked** *(2.5)*
+- The plan named `purchase_pay_card` and `cart_checkout`. The check is in `purchase_pay_card` only. The cart, checkout and the three booking pages all pay through it, so it covers every card payment.
+- Orders paid entirely with store credit or a voucher aren't checked. Memberships use 2.2's warning instead.
+- **Default:** as built.
+- Should an order paid wholly with store credit ask too?
+
+**OQ-39 — Two separate bookings of the same service look like the same order** *(2.5)*
+- The check compares products, variants and quantities, not the booked times. Booking a 60-minute massage for Tuesday, then another for Thursday ten minutes later, asks "Buy it again?". **Buy again** books it.
+- **Default:** keep it. It costs one extra click in a rare case.
+- The other way is to compare the booked times too (about an hour). Which do you prefer?
+
+**OQ-40 — Staff payments skip the check** *(2.5)*
+- Check-in walk-ins and the provider's upgrade charge send `confirm_duplicate: true`. At the desk, two charges in a row are usually two people, and a dialog would get in the way.
+- **Default:** staff are never asked.
+- Should staff be asked too?
+
+**OQ-41 — Changing a membership waits for Phase 3** *(2.2, 3.1)*
+- Porting Phase 2's tests turned up four things in the change-membership path. Phase 2 doesn't touch that path, and none of the four is verified yet:
+  - an upgrade credits the old tier's full price, whatever was paid. A prorated first month is over-credited.
+  - a failed upgrade charge can shorten the member's access
+  - the first month after a downgrade may never be billed
+  - after a downgrade, the membership summary (2.2) lists the old and the new membership until the old one ends. So the D2 warning shows "Gold and Silver".
+- **Default:** 3.1 verifies each with a test first, then fixes it.
+- OK to leave them until Phase 3?
+
+**OQ-42 — Cancelling a membership that hasn't started** *(2.3)*
+- A **Start on December 1** membership cancelled before the 1st ends at once, and nothing is ever charged. It has no paid time to run out, so it doesn't read "ends December 1".
+- **Default:** as built.
+- Say if it should stay listed until the 1st.
+
+**OQ-43 — Prices show cents** *(2.3, 2.6)*
+- The plan's examples say "$160". The pages use the app's usual money format, so they show "$160.00" and "$74.67".
+- **Default:** cents everywhere, matching the rest of the site.
+- Should whole dollars drop the cents?
+
+**OQ-44 — A cart paid partly by store credit, partly by card** *(2.9)*
+- The plan wanted a cancel to refund the store credit first, as credit, and then the card. `RefundBookingShare` refunds the booking's share against the purchase's first payment only. The total is still capped at what was paid, so it can never refund too much.
+- **Default:** leave it. The testers' carts were all paid by card. 8.13 reworks refunds next.
+- Fix it now, or with 8.13?
+
+**OQ-45 — Bookings from before carts named their line** *(2.9)*
+- A booking made before bookings recorded their cart line shares the whole purchase with the other bookings on it, evenly. The Phase 13 reinstall removes every such booking.
+- **Default:** as built.
+- Nothing to decide unless you want those old bookings fixed by hand.
+
+**OQ-46 — The two-at-once signup test** *(2.2)*
+- The plan asked for a test with two simultaneous first signups. Each test runs inside one transaction that's rolled back at the end, on one connection, so a second connection can't see its rows.
+- The test checks the lock instead: during a signup, the person's row is held `FOR UPDATE`. A true two-connection test needs committed rows in a scratch database (about half a day).
+- **Default:** write it with 7.6, which raises the connection count and makes the race possible.
+- OK to wait for 7.6?
+
+**OQ-47 — Cancel in "Buy it again?" leaves the new order pending** *(2.6)*
+- On checkout and the cart, **Cancel** asks the server to cancel the new, unpaid order. There's no such endpoint: `cancelPurchase` in the UI calls `/api/purchase_cancel`, which the server has never had. The order stays **Pending** in **My Purchases**, with nothing charged.
+- On the booking pages, **Cancel** leaves the booking unpaid, as a declined card does, and says "Nothing was charged".
+- **Default:** leave it. A pending order costs nothing, and the Phase 13 reinstall clears the testers'.
+- The other way is a member-side cancel endpoint for an unpaid order of your own, releasing any booking on it (about half a day, with tests). Should I add it?
 
 ### Resolved 11/17/2026, fourth round
 
