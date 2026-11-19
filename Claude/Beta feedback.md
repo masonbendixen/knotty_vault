@@ -3,8 +3,8 @@ fileClass: Project
 Category: Claude
 Status: Active
 Authors: Mason Bendixen
-Last Updated: 11/18/2026
-Version: 0.6
+Last Updated: 11/19/2026
+Version: 0.6.1
 tags: 
 ---
 # Overview
@@ -318,6 +318,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's **Name** first; before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump.
 - **v0.6 (11/18/2026)**: Phase 1 is built and tested but not shipped. Mason is holding it to ship with later phases. What changed:
   - **1.1–1.5 are done, with tests.** The 1.6 gates passed on both platforms, and the mutation check caught every mutation. The release steps (push, pin bump, `@honuware/ui` release, `sandbox.14`, the production probe) wait for ship time.
   - **1.2's expectations, corrected to what's true:**
@@ -805,9 +806,8 @@ CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial agai
 
 #### Testing Phase 1 locally, before it ships
 **Setting up**
-1. **Server build.** The Phase 1 framework changes are in your `server_components` working tree, not in the pinned honuware. I configured `out\build\x64-Debug` with **x64-Debug (local honuware checkout)**, so it builds your local checkout. It keeps doing that whichever of the two configurations Visual Studio shows: both share that folder, and the local path stays in its CMake cache.
-   - To go back to the pinned honuware once the pin is bumped, run `cmake --preset x64-Debug -DFETCHCONTENT_SOURCE_DIR_HONUWARE=` from `server\knottyyoga_server`. Or, in Visual Studio, pick **x64-Debug** and use **Delete Cache and Reconfigure**. Switching the dropdown alone isn't enough.
-   - CommunityFinder's Windows tree is still pinned. It won't see Phase 1 until the pin bump.
+1. **Server build.** Since the 11/18 pin bump, the pinned honuware (`838045f`) includes Phase 1. `out\build\x64-Debug` is back on that pin, so a normal **x64-Debug** build has everything. CommunityFinder's Windows tree is on the same pin.
+   - If you go back to building a local `server_components` checkout (**x64-Debug (local honuware checkout)**), the local path stays in the CMake cache of that shared folder. To return to the pin, run `cmake --preset x64-Debug -DFETCHCONTENT_SOURCE_DIR_HONUWARE=` from `server\knottyyoga_server`, or pick **x64-Debug** in Visual Studio and use **Delete Cache and Reconfigure**. Switching the dropdown alone isn't enough.
 2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings already pass `--recreate_database`.
    - `--migrate` on your current database would apply `app/0013`, but it wouldn't add 1.1's new `manage_products` grants. They're seed-only (1.1), so Part C needs the recreated database.
 3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`. The site needs no `@honuware/ui` install: its pages use the app's own `ServerAccessNetwork`, which already sends the delete as POST.
@@ -816,9 +816,10 @@ CommunityFinder's `ng build` prints a bundle-size *warning*: 918 kB initial agai
 1. Click **Sign In** at the top of the page. On **Log In**, enter Email `masonbendixen@gmail.com` and Password `pass`, then click **Sign in**.
 2. Go to **Admin ▸ Manage Products** and open the **Class Schedules** card.
 3. Click **Add class**. In the **Add class** dialog, enter Name `Phase 1 test class` and Default capacity `10`, choose Kind **Recurring**, and click **Save**.
-   - Expect: `Phase 1 test class` is selected in **Class**, with no red banner.
+   - Expect: `Phase 1 test class` is selected in **Class**, with no red banner. The details card under it starts with **Name** `Phase 1 test class`.
 4. Click **Edit class**. Change Name to `Phase 1 test class edited`, and click **Save**.
-   - Expect: **Class** shows the new name.
+   - Expect: **Class** and the details card's **Name** both show the new name.
+   - The details card had no **Name** until 11/19. Mason noticed while running this walkthrough, and it was added then (`class-schedule-manage.component.html`, with two tests in its spec).
 5. In the **Requirements** card, type `Members` in **New group label** and click **Add group**.
    - Expect: a `Members` group appears.
 6. In that group's **Add a permission**, type `platinum` and pick **platinum_fitness — Knotty Yoga Platinum Fitness Membership.**
