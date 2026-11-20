@@ -1009,13 +1009,14 @@ Fixes F4 and P13. The server works out the dates and the amount from a named **s
   - `StudioSettings` (business_logic) reads it, using the default when the row is missing, and validates writes: whole minutes, 0–1440.
   - Tests: the default, a stored value, a bad value refused.
 - [x] `TableHelpers::Purchases::FindRecentPaidMatch(payerId, items, sinceUs)`: a paid purchase by the same payer, with the same products and quantities, since the window began.
-  - *As built:* it compares variants too, and takes the new order's id instead of its items. It doesn't compare booked times (OQ-39).
+  - *As built:* it compares variants too, and takes the new order's id instead of its items. It also compares the booked times: each booking's session and person. A massage at another time is another order and goes straight through (OQ-39).
 - [x] `purchase_pay_card` and `cart_checkout` refuse with 409 **`RECENT_DUPLICATE`** (name, paid at) unless `confirm_duplicate: true`.
   - *As built:* only `purchase_pay_card` checks. The cart, checkout and the three booking pages all pay through it (OQ-38). The check-in desk and the provider's upgrade charge send `confirm_duplicate: true` (OQ-40).
 - [x] Tests:
   - a second identical order inside the window → 409, and Square isn't called
   - with the flag → charged
   - a different item, or outside the window → charged without asking
+  - the same massage or class at another time → charged without asking; the same time again → asks (`PurchasesTest.FindRecentPaidMatchTellsMassageTimesApart` and `…TellsClassDatesApart`, added 11/20)
   - the window set to 0 → never asks
 
 ### 2.6 The checkout pages follow the order *(ui: pages/shop)*
@@ -2090,10 +2091,12 @@ T30, T31, T41 and G18.
 - **Default:** as built.
 - Should an order paid wholly with store credit ask too?
 
-**OQ-39 — Two separate bookings of the same service look like the same order** *(2.5)*
-- The check compares products, variants and quantities, not the booked times. Booking a 60-minute massage for Tuesday, then another for Thursday ten minutes later, asks "Buy it again?". **Buy again** books it.
-- **Default:** keep it. It costs one extra click in a rare case.
-- The other way is to compare the booked times too (about an hour). Which do you prefer?
+**OQ-39 — Two separate bookings of the same service** *(2.5)* — *settled 11/20*
+- **This OQ was wrong when written.** It said the check ignores booked times. The build compares them: each booking's session and person, as well as the products, variants and quantities. Booking a 60-minute massage, then another an hour earlier, goes straight through with no question.
+- Mason found it hand-testing Part C, 11/20, and that's what he wants: "when I book massages I frequently book the next N".
+- **What this means for the booking pages:** the question can't come up there. A taken massage time is no longer offered, and booking yourself into a class you're already in is refused as an overlap. The check matters for **Checkout** and **Shopping Cart**, for one-off products. The seed has none, so no hand test reaches it (*Testing Phase 2 locally*, Part C).
+- Two tests added 11/20 pin it, one for a massage and one for a class. Before them, only "the same class for a friend" would have noticed the times being dropped from the check.
+- Nothing to decide.
 
 **OQ-40 — Staff payments skip the check** *(2.5)*
 - Check-in walk-ins and the provider's upgrade charge send `confirm_duplicate: true`. At the desk, two charges in a row are usually two people, and a dialog would get in the way.
