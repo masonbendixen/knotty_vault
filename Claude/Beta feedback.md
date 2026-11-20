@@ -322,7 +322,7 @@ Please create a plan with phases of implementation. Within each phase, please re
   - 2.5's *As built* note and OQ-39 now say so. OQ-39 is settled.
   - Two tests pin it: `PurchasesTest.FindRecentPaidMatchTellsMassageTimesApart` and `…TellsClassDatesApart`. Removing the booked times from the check now fails three tests (2.10's mutation table).
   - Part C now expects no dialog. Part D checks the setting saves, not its effect on a massage. The dialog itself joins the automated-tests list, since no seeded product can be ordered the same way twice.
-  - Tests after the change: *(filled in below once the gates finish)*.
+  - Tests after the change, C++ on pin `838045f`: Windows 5,593 passed, Linux 5,593 passed (pinned volume; both shipped programs built). That's the 5,591 plus the two new tests. Angular is unchanged at 4,231, since nothing in `ui/` changed.
 - **v0.7 (11/19/2026)**: Phase 2 is built and tested, and not shipped. What changed:
   - **2.1–2.9 are done, with tests.** 2.10's mutation check and gates are done; only the release is left, for Mason.
     - C++ on pin `838045f`: Windows 5,591 passed, Linux 5,591 passed.
