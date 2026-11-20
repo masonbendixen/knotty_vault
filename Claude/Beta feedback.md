@@ -318,6 +318,11 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.7.1 (11/20/2026)**: found while hand-testing Phase 2. In Part C, Mason booked a massage, then another an hour earlier, and got no **Already bought** dialog. The walkthrough expected one. The code was right and the plan was wrong: the check compares booked times as well as items (2.5). A new time is a new order, which suits members who book the next few massages at once. What changed:
+  - 2.5's *As built* note and OQ-39 now say so. OQ-39 is settled.
+  - Two tests pin it: `PurchasesTest.FindRecentPaidMatchTellsMassageTimesApart` and `…TellsClassDatesApart`. Removing the booked times from the check now fails three tests (2.10's mutation table).
+  - Part C now expects no dialog. Part D checks the setting saves, not its effect on a massage. The dialog itself joins the automated-tests list, since no seeded product can be ordered the same way twice.
+  - Tests after the change: *(filled in below once the gates finish)*.
 - **v0.7 (11/19/2026)**: Phase 2 is built and tested, and not shipped. What changed:
   - **2.1–2.9 are done, with tests.** 2.10's mutation check and gates are done; only the release is left, for Mason.
     - C++ on pin `838045f`: Windows 5,591 passed, Linux 5,591 passed.
@@ -1125,6 +1130,7 @@ F23: one booking cancelled from a cart refunds the whole cart.
   | A new site seeded with a window of 0 | 5, including `SameOrderAgainAsksFirstAndSquareIsNotCalled` |
   | The "no confirmation email" flag ignored | 3 |
   | `replaceUrl` dropped (Checkout, Cart, Subscribe) | 16 Karma tests across the three pages |
+  | *Added 11/20:* the booked times dropped from the "same order" check | 3: the two new `PurchasesTest.FindRecentPaidMatchTells…Apart` tests, and `…IgnoresADifferentOrder` (the friend case). Before 11/20 only that third test would have caught it. |
 
   The two waitlisted-cancel calls (`RefundBookingShare` at 100%) have no cart test. A waitlisted booking in a cart is rare, and the share code they reach is the one tested above.
 - [x] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
@@ -1149,7 +1155,7 @@ F23: one booking cancelled from a cart refunds the whole cart.
 - Someone who already has a membership is asked before buying another (2.2). The Memberships pages say which one you have (2.7).
 - **Start today** charges only for the rest of the month, by the day. **Start on the 1st** charges nothing until then (2.3).
 - One welcome email per signup, with the receipt in it (2.4).
-- Paying for the same thing again within 10 minutes asks "Buy it again?" first (2.5, 2.6). Back, Forward or a reload on a finished checkout shows the receipt, never a second **Pay**.
+- Paying for the same order again within 10 minutes asks "Buy it again?" first (2.5, 2.6). The same order means the same items and, for a booking, the same time: booking the next massage doesn't ask. Back, Forward or a reload on a finished checkout shows the receipt, never a second **Pay**.
 - **Processing...** stays on one line inside the Pay button (T23).
 - Cancelling one booking of a cart refunds only that booking's share, and the banner names the amount (2.9).
 - Shared seats on a couple's or family membership carry over at each monthly renewal (P14).
@@ -1216,19 +1222,19 @@ Every payment goes to Square's sandbox: a local Debug database is seeded with th
 4. Click **Change my membership instead**.
    - Expect: **My Subscriptions**, listing Kit's Gold.
 
-**Part C: the same order twice asks first (2.5, 2.6).** Still Kit.
+**Part C: booking the next massage doesn't ask (2.5).** Still Kit.
+
+*Corrected 11/20.* This part used to expect an **Already bought** dialog for a second massage at another time. That was wrong: the check compares booked times, so a new time is a new order (OQ-39). Mason saw no dialog, which is right.
+
+The dialog is for the same order again: same items, same quantities, and the same booked times for the same people. On the booking pages that can't happen, because the time Kit just booked is taken. It matters on **Checkout** and **Shopping Cart**, for one-off products, and the seed has none. So it's in the automated list at the end.
 1. Click **Services**. On **Our Services**, under **Massage**, click **Book Now**.
 2. Click a day that has times, click an hour to open it, and click **60-Minute Massage $160.00** beside one of its times.
 3. Under **Payment Details**, choose **Card on File** and pick `Good`. Click **Book and Pay $160.00**.
    - Expect: **Booking Confirmed!**
-4. Press the browser's **Back** to return to **Our Services**. Click **Book Now** under **Massage**, and pick a different time with **60-Minute Massage $160.00**. Pay with `Good` again: click **Book and Pay $160.00**.
-   - Expect: a dialog, **Already bought**: "You bought **Massage** at 3:42 PM. Buy it again?", showing the time of step 3's payment, with **Cancel** and **Buy again**.
-   - This asks even though the time is different (OQ-39).
-5. Click **Cancel**.
-   - Expect: the dialog closes, and a blue note reads "Nothing was charged. Your earlier order is in My Purchases." The page still has its **Book and Pay** button.
-   - Menu ▸ **My Purchases**: step 3's order reads **Paid**. This one reads **Pending**, with nothing charged (OQ-47).
-6. Click **Book and Pay $160.00** again, and this time click **Buy again**.
-   - Expect: **Booking Confirmed!**
+4. Press the browser's **Back** to return to **Our Services**. Click **Book Now** under **Massage**, and pick another time with **60-Minute Massage $160.00**, such as the hour before step 3's. Pay with `Good` again: click **Book and Pay $160.00**.
+   - Expect: no dialog, straight to **Booking Confirmed!**
+5. Open the menu under your name and click **My Bookings**.
+   - Expect: both massages under **Upcoming Bookings**, each **Confirmed**.
 
 **Part D: Studio Settings (2.8).** Mason, in a private window.
 1. Sign in as `masonbendixen@gmail.com` with password `pass`.
@@ -1238,9 +1244,10 @@ Every payment goes to Square's sandbox: a local Debug database is seeded with th
    - Expect: "The duplicate-order window must be a whole number of minutes, from 0 to 1440". Nothing is saved.
 4. Type `0` and click **Save**.
    - Expect: "Saved. The shop is using this now."
-5. In Kit's window, book one more **60-Minute Massage $160.00** with `Good`.
-   - Expect: no dialog, straight to **Booking Confirmed!**
-6. In Mason's window, set it back to `10` and click **Save**.
+5. Reload the page.
+   - Expect: the field still reads `0`.
+6. Set it back to `10` and click **Save**.
+   - What 0 does at the till (never asks) is in the automated list: no seeded product reaches the question (Part C).
 
 **Part E: cancelling one massage refunds only that one (2.9, Ashley's cart).** Kit.
 1. Click **Services**, then **Book Now** under **Massage**. Pick a time and click **60-Minute Massage $160.00**. Under **Booking Summary**, click **Add to Cart**.
@@ -1272,6 +1279,7 @@ Every payment goes to Square's sandbox: a local Debug database is seeded with th
 - two first signups at the same moment (the row lock, OQ-46)
 - coupon-discounted shares, guest pairs, a 50% policy window, and the studio cancelling one session of a cart
 - the pay-twice path on Checkout, which no seeded product reaches. The Playwright spec `e2e/mobile-audit/layout/pay-once.spec.ts` runs Thomas's exact pay, Back, Pay in mock mode.
+- the **Already bought** dialog (2.5, 2.6): the same order again within the window asks first and Square isn't called; **Buy again** charges; **Cancel** charges nothing; a window of 0 never asks. Server: `PurchasePayCardTest.SameOrderAgain…` and `…DuplicateWindowZeroNeverAsks`. Pages: the checkout, cart and three booking-page specs.
 
 ---
 
