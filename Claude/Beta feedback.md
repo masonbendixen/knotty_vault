@@ -1091,7 +1091,7 @@ F23: one booking cancelled from a cart refunds the whole cart.
 - [x] The testers' existing over-credits are sandbox money. The Phase 13 reinstall removes them (D8). Nothing to build.
 
 ### 2.10 Ship it
-- [ ] Mutation check:
+- [x] Mutation check:
   - subscription inserted before the charge
   - the `ALREADY_HAS_A_MEMBERSHIP` guard removed, and the buyer seated on a second membership
   - **Start on December 1** granting the waiting days; **Start today** charging the full month; a member allowed `today_rest_free`
@@ -1100,6 +1100,27 @@ F23: one booking cancelled from a cart refunds the whole cart.
   - the duplicate window set to zero
   - the email flag ignored
   - `replaceUrl` dropped
+
+  *As run (11/19, Windows; one mutant at a time, each restored before the next).* 13 mutants. All are caught, two of them only after new tests:
+
+  | Mutant | Caught by |
+  |---|---|
+  | A declined first charge leaves a membership row behind | 2 tests (`CreateSubscriptionDeclinedCardLeavesNothingBehind`, `…RetryAfterDeclinesCreatesOneMembership`) |
+  | The `ALREADY_HAS_A_MEMBERSHIP` guard removed | 6, including both endpoints' 409 tests |
+  | A confirmed second membership seats the buyer | 1 (`…ConfirmedSecondMembershipLeavesTheBuyerUnseated`) |
+  | **Start on December 1** grants the waiting days | 10, including the welcome email's wording |
+  | **Start today** charges the full month | 6, including the admin endpoint |
+  | A member's `today_rest_free` accepted | 1 (`PostRejectsAStaffOnlyStart`) |
+  | The renewal's seat copy removed | 4, including the past-due retry |
+  | The cart share skipped inside `RefundBookingShare` | 5 |
+  | **The member's service cancel back on `ProcessRefund`** | **Survived at first.** No `BookingHelper` test cancelled one booking out of a cart. Added `CancelOneServiceBookingOfACartRefundsOnlyItsShare` (Ashley's $160 + $300, as credit). It catches it now. |
+  | The member's event cancel back on `ProcessRefund` | Added `CancelOneEventBookingOfACartRefundsOnlyItsShareToTheCard`; it catches it |
+  | The window's fallback set to 0 | **Would have survived.** Two tests compared the fallback against the constant itself. They now expect 10, and both catch it. |
+  | A new site seeded with a window of 0 | 5, including `SameOrderAgainAsksFirstAndSquareIsNotCalled` |
+  | The "no confirmation email" flag ignored | 3 |
+  | `replaceUrl` dropped (Checkout, Cart, Subscribe) | 16 Karma tests across the three pages |
+
+  The two waitlisted-cancel calls (`RefundBookingShare` at 100%) have no cart test. A waitlisted booking in a cart is rare, and the share code they reach is the one tested above.
 - [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
 - [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
 
