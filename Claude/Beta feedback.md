@@ -319,7 +319,10 @@ Please create a plan with phases of implementation. Within each phase, please re
 # Revision notes and working agreement
 
 - **v0.7 (11/19/2026)**: Phase 2 is built and tested, and not shipped. What changed:
-  - **2.1–2.9 are done, with tests.** 2.10's gates: GATE_RESULTS_PENDING
+  - **2.1–2.9 are done, with tests.** 2.10's mutation check and gates are done; only the release is left, for Mason.
+    - C++ on pin `838045f`: Windows 5,591 passed, Linux 5,591 passed.
+    - Angular: 4,231 passed on Windows and on Linux.
+    - All 13 mutants are caught. Two needed new or fixed tests: a member's cancel of one cart booking (2 new `BookingHelper` tests), and the window's fallback (2 tests now expect 10, not the constant).
   - **New: *Testing Phase 2 locally*** and the **`sandbox.15` release notes**, both under 2.10. The walkthrough runs from a blank database: Square's decline card for 2.1, Ashley's two-massage cart for 2.9, and Studio Settings in a second window.
   - **Where the build differs from the plan.** Each is noted in its item as *As built*:
     - The duplicate check is in `purchase_pay_card` only, which every card payment goes through (OQ-38). The check-in desk and the provider's upgrade charge skip it (OQ-40).
@@ -336,6 +339,8 @@ Please create a plan with phases of implementation. Within each phase, please re
     - The membership warnings printed the whole product name ("a **Knotty Yoga Gold Membership** membership"). They now say "a **Gold** membership". The specs' data had used short names, which hid it.
     - **My Purchases** printed the raw `partially_refunded`. It now reads **Partially Refunded**, and such an order reopens as a receipt.
     - The server sends true/false flags as the strings `"true"`/`"false"`, and `"false"` is truthy. The subscribe pages now compare the string, so a staff-only start choice never shows to a member.
+    - The mutation check found that no `BookingHelper` test cancelled one booking out of a cart. A member's own cancel could have gone back to refunding the whole order and every test would still pass. There are now two such tests (service as credit, event to the card).
+    - The new **Studio Settings** page was missing from the mobile audit's route list. It's added, and the audit passes.
   - **New open questions:** OQ-33 to OQ-47, each built to its default. OQ-47 grew: an unpaid cart keeps its booked times, and opening the cart again makes a second order.
   - **10.2 gained *Carried from Phase 2*:** two server answers found while testing.
 - **v0.6.1 (11/19/2026)**: found while hand-testing Phase 1. The Class Schedules details card now shows the class's name as its heading, laid out as Mason asked: photo left; name; facts on one line; description underneath (*Class Schedules: the class card*, under 1.6). Before, the name appeared only in the **Class** picker. *Testing Phase 1 locally* now expects it, and its build setup reflects the 11/18 pin bump. Part C now also expects **Failed to load requirements** for Kit. The Requirements card's read needs `manage_class_schedule`, which predates Phase 1; OQ-32 records it.
@@ -1121,7 +1126,20 @@ F23: one booking cancelled from a cart refunds the whole cart.
   | `replaceUrl` dropped (Checkout, Cart, Subscribe) | 16 Karma tests across the three pages |
 
   The two waitlisted-cancel calls (`RefundBookingShare` at 100%) have no cart test. A waitlisted booking in a cart is rare, and the share code they reach is the one tested above.
-- [ ] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
+- [x] Gates on both platforms; hand-testing walkthrough (written when built, blank database, exact labels). It uses Square's sandbox decline card for 2.1, and Ashley's two-massage cart for 2.9.
+
+  *As run (11/19), on the final tree after the mutation check:*
+
+  | Gate | Windows | Linux |
+  |---|---|---|
+  | knottyyoga C++, on pin `838045f` | 5,591 passed | 5,591 passed (pinned volume; both shipped binaries built) |
+  | Angular `ui/` (Karma) | 4,231 passed | 4,231 passed (CI's `node:22-bookworm` + chromium run) |
+  | Playwright `layout/pay-once.spec.ts` | 2 passed (12 skip by viewport) | — |
+  | Mobile audit, `/manage/studio-settings`, strict | 7 of 7 viewports | — |
+
+  - The co-dev Linux gate (mounting the local `server_components`) shows 5,611. The extra 20 are honuware tests in that working tree and not in `838045f` (`SchemaCheck`, `ImageUploadLimit`, `CsrfGuard`). They aren't Phase 2's, and the app's own tests match.
+  - The first full Karma run caught one miss: the new **Studio Settings** page wasn't in the mobile audit's route list (`e2e/mobile-audit/routes.ts`). It's added, and the strict audit of it passes at every size.
+  - The walkthrough is *Testing Phase 2 locally*, below.
 - [ ] Release as **`v1.0.0-sandbox.15`**, by `--migrate` (D8).
 
 #### Release notes: `v1.0.0-sandbox.15`
