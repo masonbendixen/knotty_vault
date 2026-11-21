@@ -318,6 +318,22 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.9 (11/20/2026)**: Mason answered OQ-32 to OQ-54. What changed:
+  - **Built now: one email per renewal** (OQ-36, new **3.5**). A monthly renewal, and a retry after a failed one, now send only the billing confirmation, which carries the receipt. Before, `PayWithCard` sent its own payment confirmation as well.
+    - *Found while building, and fixed:* that email gave the period as "December 1, 2026 – January 1, 2027". It now ends on the period's last day, December 31. Both billing subjects (paid and failed) also hard-coded "Knotty Yoga". They now take the studio's name from its settings, as the change emails do.
+    - C++: Windows COUNT_PENDING passed, Linux COUNT_PENDING passed: the two new tests. Angular is unchanged at 4,290, since nothing in `ui/` changed.
+    - *Testing Phase 3 locally* gains **Part H**, a renewal run from the test helper. The cancel moves to **Part I**.
+  - **Planned, not built: months in the studio's time zone** (OQ-35, new **3.6**). The setting already exists: `default_studio_timezone`, seeded as Pacific, which the instructor digests already use. Only the membership code ignores it. OQ-35 stays open on when to build it. My recommendation is before Phases 2 and 3 ship.
+  - **OQ-51 is resolved.** It never needed a decision. 5.1's list of intro-workshop links now names My Membership's.
+  - **Your defaults are recorded where the work lands:**
+    - OQ-44 and OQ-47 → 8.13: a refund puts store credit back first, and a member can cancel their own unpaid order.
+    - OQ-46 → 7.6: the two-at-once signup test.
+    - OQ-48 → 4.3 and 4.6: no new seat while a switch to fewer seats waits.
+    - OQ-52 → 4.6: other shared purchases are listed on **Sharing**.
+    - OQ-53 → 8.12: the seat email names the last day.
+    - OQ-54 → new **9.9**: staff get the member's **Change membership** panel.
+    - OQ-32, 33, 34, 37, 38, 40, 42, 43, 45, 49 and 50 stay as built, with nothing to change.
+  - **Open questions:** OQ-7 (the bios) and OQ-35 (when to build 3.6). Everything else is under *Resolved 11/20/2026*.
 - **v0.8 (11/20/2026)**: Phase 3 is built and tested, and not shipped. What changed:
   - **3.1–3.3 are done, with tests.** 3.4 has the gates and the walkthrough; the release is left for Mason. Phase 3 changes only knottyyoga, so the pin is unchanged.
     - C++: Windows 5,634 passed, Linux 5,634 passed. That's 41 more than v0.7.1's 5,593.
@@ -1412,14 +1428,15 @@ T5, T6, T8, T13, T24 and A4, plus F6.
 
   - The first Windows Karma run failed one new spec, which read the seat list's text and got the person icon's ligature ("personMason Bendixen"). The spec now reads the names. The page was right.
   - No mutation check was run: Phase 3's plan didn't ask for one. The decline, the proration, the carry-over and the choose-who rules each have tests that assert the exact outcome, but none has been proved to fail with the rule broken. Say if you want 2.10's treatment before it ships.
+  - v0.9 reran the C++ gate with 3.5 in the tree. Its numbers are under 3.5.
 - [x] Hand-testing walkthrough: *Testing Phase 3 locally*, below.
-- [ ] Release with Phase 4 or on its own, by `--migrate` (D8). `0014_membership_changes` adds two nullable columns. Ship the server and the UI together: the new page needs `change_preview`, and the old admin page sends the `immediate` flag the server no longer reads.
+- [ ] Release with Phase 4 or on its own, by `--migrate` (D8), together with 3.5. `0014_membership_changes` adds two nullable columns. Ship the server and the UI together: the new page needs `change_preview`, and the old admin page sends the `immediate` flag the server no longer reads.
 
 #### Testing Phase 3 locally
 Every charge goes to Square's sandbox, so no real money moves. Use two windows: an ordinary one for Kit, and a private one for Mason2 (Parts E and F).
 
 **Setting up**
-1. **Server build.** A normal **x64-Debug** build. Phase 3 changes only knottyyoga, so the pinned honuware is fine.
+1. **Server build.** A normal **x64-Debug** build. Phase 3 changes only knottyyoga, so the pinned honuware is fine. Part H also uses **knottyyoga_test_helper.exe** from the same build.
 2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings pass `--recreate_database`. That creates Phase 3's two new columns, and starts Kit with no membership, no saved card and no sharing.
 3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`.
 
