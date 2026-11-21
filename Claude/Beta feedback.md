@@ -1397,7 +1397,21 @@ T5, T6, T8, T13, T24 and A4, plus F6.
   - *As built:* `my-subscriptions.component.spec.ts` (rewritten for the new page) and `my-membership.spec.ts` for every sentence the page builds. The pipe, the menu, the My Account tile, the tier cards' **Switch to this** link and both detail pages have specs, as do the mock's preview and change (`ServerAccess.mock.spec.ts`, with the same refusals as the server).
 
 ### 3.4 Verify *(added in v0.8)*
-- [ ] Gates on both platforms (table below).
+- [x] Gates on both platforms.
+
+  *As run (11/20), on the final tree:*
+
+  | Gate | Windows | Linux |
+  |---|---|---|
+  | knottyyoga C++, on pin `838045f` | 5,634 passed | 5,634 passed |
+  | Angular `ui/` (Karma) | 4,290 passed | 4,290 passed (CI's `node:22-bookworm` + chromium run) |
+  | `ng build` (production) and `eslint` on the changed areas | clean | — |
+  | Mobile audit, `/my/subscriptions` and `/my/subscriptions/1`, strict | 14 of 14 (7 sizes each) | — |
+  | Playwright `layout/pagination.spec.ts`, My Membership (10 a page; **Shared with you** 5 a page) | 2 passed (390 and 1280 px; the other sizes skip) | — |
+  | Playwright `layout/sticky-action-bar.spec.ts` and `layout/pay-once.spec.ts` (the subscribe page) | 38 passed (53 skip by viewport) | — |
+
+  - The first Windows Karma run failed one new spec, which read the seat list's text and got the person icon's ligature ("personMason Bendixen"). The spec now reads the names. The page was right.
+  - No mutation check was run: Phase 3's plan didn't ask for one. The decline, the proration, the carry-over and the choose-who rules each have tests that assert the exact outcome, but none has been proved to fail with the rule broken. Say if you want 2.10's treatment before it ships.
 - [x] Hand-testing walkthrough: *Testing Phase 3 locally*, below.
 - [ ] Release with Phase 4 or on its own, by `--migrate` (D8). `0014_membership_changes` adds two nullable columns. Ship the server and the UI together: the new page needs `change_preview`, and the old admin page sends the `immediate` flag the server no longer reads.
 
