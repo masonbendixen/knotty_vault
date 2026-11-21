@@ -2323,23 +2323,26 @@ T30, T31, T41 and G18.
 - The pages show their dates in UTC so they read "December 1", not "November 30".
 - **Default:** leave it until the studio's time zone is a setting. The cost is a few evening hours of free access at each month's turn.
 - Is that acceptable for now?
-- 
+- Mason- This is probably acceptable but I also like the idea of a studio timezone that defaults to Pacific. Should we tackle that in a phase now?
 
 **OQ-36 — Renewals still send two emails** *(2.4)*
 - 2.4 made a signup send one email. A monthly renewal still sends the payment confirmation and the renewal notice.
 - **Default:** leave it for Phase 3, which reworks the membership emails anyway.
 - Fold the renewal into one email too, now or with Phase 3?
+- Mason- Let's do it in phase 3. Which we are doing now since I didn't see this question until now...
 
 **OQ-37 — A membership without a card can only start today** *(2.1, 2.3)*
 - Staff can still create a membership with no card (cash, a comp), but only with **Start today**. Without a card, the other three choices are refused, since nothing could charge it on the 1st.
 - **Default:** as built.
 - Do staff set up cash-paid memberships that start later?
+- Mason- I really don't want to deal with cash so I think that this is fine.
 
 **OQ-38 — Where "the same order twice" is checked** *(2.5)*
 - The plan named `purchase_pay_card` and `cart_checkout`. The check is in `purchase_pay_card` only. The cart, checkout and the three booking pages all pay through it, so it covers every card payment.
 - Orders paid entirely with store credit or a voucher aren't checked. Memberships use 2.2's warning instead.
 - **Default:** as built.
 - Should an order paid wholly with store credit ask too?
+- Mason- Default is fine.
 
 **OQ-39 — Two separate bookings of the same service** *(2.5)* — *settled 11/20*
 - **This OQ was wrong when written.** It said the check ignores booked times. The build compares them: each booking's session and person, as well as the products, variants and quantities. Booking a 60-minute massage, then another an hour earlier, goes straight through with no question.
@@ -2352,6 +2355,7 @@ T30, T31, T41 and G18.
 - Check-in walk-ins and the provider's upgrade charge send `confirm_duplicate: true`. At the desk, two charges in a row are usually two people, and a dialog would get in the way.
 - **Default:** staff are never asked.
 - Should staff be asked too?
+- Mason- Default is good.
 
 **OQ-41 — Changing a membership waits for Phase 3** *(2.2, 3.1)* — *settled 11/20 by Phase 3*
 - Porting Phase 2's tests turned up four things in the change-membership path. Phase 2 doesn't touch that path, and none of the four is verified yet:
@@ -2372,16 +2376,19 @@ T30, T31, T41 and G18.
 - A **Start on December 1** membership cancelled before the 1st ends at once, and nothing is ever charged. It has no paid time to run out, so it doesn't read "ends December 1".
 - **Default:** as built.
 - Say if it should stay listed until the 1st.
+- Mason- Default is fine.
 
 **OQ-43 — Prices show cents** *(2.3, 2.6)*
 - The plan's examples say "$160". The pages use the app's usual money format, so they show "$160.00" and "$74.67".
 - **Default:** cents everywhere, matching the rest of the site.
 - Should whole dollars drop the cents?
+- Mason- Default is good.
 
 **OQ-44 — A cart paid partly by store credit, partly by card** *(2.9)*
 - The plan wanted a cancel to refund the store credit first, as credit, and then the card. `RefundBookingShare` refunds the booking's share against the purchase's first payment only. The total is still capped at what was paid, so it can never refund too much.
 - **Default:** leave it. The testers' carts were all paid by card. 8.13 reworks refunds next.
 - Fix it now, or with 8.13?
+- Mason- We can wait until 8.13
 
 **OQ-45 — Bookings from before carts named their line** *(2.9)*
 - A booking made before bookings recorded their cart line shares the whole purchase with the other bookings on it, evenly. The Phase 13 reinstall removes every such booking.
