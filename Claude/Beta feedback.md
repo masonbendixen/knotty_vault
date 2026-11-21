@@ -1333,7 +1333,7 @@ T5, T6, T8, T13, T24 and A4, plus F6.
   - *As built:* the purchase is the new tier less a discount, so its total is the prorated difference. A decline cancels that purchase and returns `Upgrade charge failed: <Square's reason>`. The old membership, its entitlement, its seats and any scheduled change are untouched (`ChangeProductDeclinedUpgradeLeavesEverythingIntact`).
   - The change email carries the receipt, so the upgrade sends one email, not two (as 2.4).
 - [x] **What an upgrade costs:** the price difference, prorated over the days left in the period (OQ-2, decided).
-  - *As built:* a new `PlanUpgradeCharge` in `subscription_start_planner`, not `CalculateProratedCharge`. It counts the days the way **Start today** does: today included, UTC months (OQ-35). So a member who started mid-month and upgrades pays for the same days twice over at the two prices, never more. That fixes OQ-41's first bug: the old code credited the old tier's full price.
+  - *As built:* a new `PlanUpgradeCharge` in `subscription_start_planner`, not `CalculateProratedCharge`. It counts the days the way **Start today** does: today included, UTC months until 3.6 (OQ-35). So a member who started mid-month and upgrades pays for the same days twice over at the two prices, never more. That fixes OQ-41's first bug: the old code credited the old tier's full price.
   - The whole month on the 1st, 16 days on the 15th of a 30-day month, one day on the last day, and February's 28 (`SubscriptionStartPlannerTest.Upgrade…`).
 - [x] **Downgrades** stay at period end. The new subscription's first entitlement carries the seat holders over.
   - **Fewer seats** (OQ-3, decided): the change must name who comes off (`remove_person_ids`), exactly enough to fit. Without that, the server refuses with **`CHOOSE_WHO_TO_REMOVE`** and lists the seat holders. The payer may name themselves.
@@ -1440,7 +1440,7 @@ Every charge goes to Square's sandbox, so no real money moves. Use two windows: 
 2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings pass `--recreate_database`. That creates Phase 3's two new columns, and starts Kit with no membership, no saved card and no sharing.
 3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`.
 
-**The amounts are for a test on November 20.** Like **Start today**, an upgrade charges by the day, today included, in UTC months (OQ-35): the price difference × the days left ÷ the days in the month. On the 20th that's 11 of November's 30 days. After 4 PM Pacific the server's day is already the 21st, 10 days. On another day, work it out the same way and expect it to the cent.
+**The amounts are for a test on November 20.** Like **Start today**, an upgrade charges by the day, today included, in UTC months until 3.6 (OQ-35): the price difference × the days left ÷ the days in the month. On the 20th that's 11 of November's 30 days. After 4 PM Pacific the server's day is already the 21st, 10 days. On another day, work it out the same way and expect it to the cent.
 
 | On the… | Silver, **Start today** | Silver to Gold Couple's | Silver to Gold | Gold Couple's to Gold Family |
 |---|---|---|---|---|
@@ -1569,9 +1569,31 @@ The dates below are for November too. In December, read "Dec 1, 2026" as January
    - No "Changing to" line. **Next charge**: Dec 1, 2026 · $300.00. Mason2 has no **until** mark.
    - **Past memberships** still lists only Silver. The called-off Gold never ran, so it isn't there.
 
-**Part H: cancelling (3.3's "Ends" badge).** Kit. Do this last, since it ends the membership.
+**Part H: the next month's charge, one email (3.5; OQ-36).** The test helper, then Kit. Leave the site running.
+1. Run **knottyyoga_test_helper.exe**. Its launch settings pass nothing, so it opens on **Knotty Yoga Test Helper**'s menu and sends real email.
+2. With **Subscriptions** highlighted, press Enter.
+   - Expect three rows, newest first. The product names are cut off at 15 letters, so go by **status**: the called-off Gold (`cancelled`), Kit's Gold Couple's (`active`), and Silver (`cancelled`).
+3. Press the down arrow once to highlight the `active` row, then press **a**.
+   - Expect: **Command mode.** with `advance_subscription_billing --subscription_id=` and that row's id already typed. Press Enter.
+   - Expect: "Subscription *N* next_billing set to 1 hour ago."
+4. Type `run_billing` and press Enter.
+   - Expect: **Billing complete.**, **Total due: 1**, **Charged: 1**, and "Sub *N*: charged". Square's sandbox has charged VISA ••••1111 $300.00 for December.
+5. Type `quit` and press Enter.
+6. Kit: reload **My Membership**.
+   - Expect: **Knotty Yoga Gold Couple's Membership**, **Active**, **Gold member**.
+     - **This period**: Dec 1, 2026 – Dec 31, 2026
+     - **Next charge**: Jan 1, 2027 · $300.00
+     - **Seats (2 of 2)**: Kit Williams, Mason2 Bendixen. Both seats carried over to December.
+7. If mail is set up locally: **exactly one** new email to Kit, "Knotty Yoga — Knotty Yoga Gold Couple's Membership Subscription Payment Confirmation". Before 3.5 a second one, "Knotty Yoga - Payment Confirmation", came with it.
+   - **Subscription:** Knotty Yoga Gold Couple's Membership
+   - **Amount:** $300.00
+   - **Billing Period:** December 1, 2026 – December 31, 2026. Before 3.5 it read "– January 1, 2027".
+   - **Card:** VISA ending 1111
+   - **Next Billing Date:** January 1, 2027
+
+**Part I: cancelling (3.3's "Ends" badge).** Kit. Do this last, since it ends the membership.
 1. Click **Details** ▸ **Cancel Subscription** ▸ **Confirm Cancellation**, then **Back to My Membership**.
-   - Expect: the badge reads **Ends Nov 30, 2026**, grey. **Next charge**: None. No **Change membership**; **Details** is still there.
+   - Expect: the badge reads **Ends Dec 31, 2026**, grey: Part H paid for December. (Skip Part H, and it reads **Ends Nov 30, 2026**.) **Next charge**: None. No **Change membership**; **Details** is still there.
 
 **Not checkable by hand, so covered by the automated tests:**
 - the billing run on the 1st: the waiting tier charged and granted, its seats carried over, and the person who came off left behind (`ChangeProductSwitchCarriesSeatsThroughTheBillingRun`, `ChangeProductToFewerSeatsNamesExactlyWhoComesOff`)
@@ -1580,10 +1602,47 @@ The dates below are for November too. In December, read "Dec 1, 2026" as January
 - the seats changing between opening the confirm and pressing **Confirm**: the 409 and "Who holds a seat has changed. Choose again."
 - naming the wrong people, too many or too few (the server's 409; the page only lets you tick the right number)
 - the **Past due** badge, which needs a failed renewal
+- a failed renewal's one email ("… — Payment Failed for …"), and a retry's one receipt (`FailedRenewalThenRetrySendsOneEmailEach`). Part H shows only the paid path.
 - a **Start on December 1** membership changing tier in place
 - someone else's membership (404), and the waiting membership itself refused
 - cancelling a membership with a switch waiting, which calls the switch off
 - **Shared with you** paging past five, and My Membership paging past ten (`pagination.spec.ts`)
+
+### 3.5 One email per renewal *(business_logic/payment; OQ-36, added in v0.9)*
+- [x] A monthly renewal, and a retry after a failed one, send one email: the billing confirmation, which carries the receipt (amount, card, period, next billing date).
+  - *As built:* `ProcessBillingForSubscription` and `RetryBilling` set `PayCardRequest::suppressConfirmationEmail`, as signup (2.4) and an upgrade (3.1) already did. Before, `PayWithCard` sent its own "… - Payment Confirmation" as well.
+- [x] *Found while building, fixed:* the billing period ended on the wrong day. The stored end is the next 1st, so the email read "December 1, 2026 – January 1, 2027". It now gives the last day, December 31, as the welcome email and My Membership do.
+- [x] *Found while building, fixed:* both billing subjects hard-coded "Knotty Yoga". They now take the studio's name from its settings (`mail_sender_name`), as the change emails do:
+  - "Knotty Yoga — Knotty Yoga Gold Couple's Membership Subscription Payment Confirmation"
+  - "Knotty Yoga — Payment Failed for Knotty Yoga Gold Couple's Membership"
+- [x] Tests (`SubscriptionHelperTest`), each under another studio's name:
+  - `RenewalSendsOneEmailWithTheReceipt`: exactly one email, to the payer, with that name in the subject, the amount, the card, the period ending on its last day, and the next billing date.
+  - `FailedRenewalThenRetrySendsOneEmailEach`: a declined renewal sends one "Payment Failed" email, and a successful retry sends one confirmation.
+  - The one-off purchase receipt ("Knotty Yoga - Payment Confirmation", pinned in `PurchasePayCardTest`) is unchanged.
+- [x] Gates, on the same pin `838045f`. Nothing in `ui/` changed, so Angular stays at 4,290.
+
+  | Gate | Windows | Linux |
+  |---|---|---|
+  | knottyyoga C++ | COUNT_PENDING | COUNT_PENDING |
+- [x] Hand test: *Testing Phase 3 locally*, **Part H**.
+
+### 3.6 Months in the studio's time zone *(business_logic/payment + migration + endpoints + ui; OQ-35, planned in v0.9, not built)*
+A membership month runs midnight to midnight **UTC**. In Pacific time, the 1st begins at 4 PM on the last day of the month (5 PM in summer). Someone who chooses **Start today** at 6 PM on November 30 is charged as if it were December 1: the whole of December now, instead of one day of November now and December on the 1st. An upgrade that evening is priced by December's days too. The studio's time zone already exists as a setting: `default_studio_timezone`, seeded `America/Los_Angeles`, which the instructor digests read. Only the membership code ignores it.
+
+Lower layers first:
+- [ ] **One studio-month helper** *(business_logic/payment)*. It gives an instant's month start and the next month start in a zone, by date token: `LocalDateTokenUs` → `StartOfContainingMonthUs` / `EndOfContainingMonthUs` on the token → `CalendarDateWallClockToUs(token, 0, zone)`. It also gives a period's last day as a date, never "the end minus 24 hours", which is a DST bug in any zone whose clocks change on a month's last day (see the wall-clock gotcha). App-side for now, so no honuware pin bump. Unit tests: across both DST changes, a zone east of UTC, and `UTC` itself.
+- [ ] **The planner takes the zone** *(subscription_start_planner)*. It covers **Start today**'s days, **Start on the 1st**'s date, and the upgrade's days. The existing tests pass `UTC` and keep their numbers. New Pacific tests:
+  - 6 PM on November 30 is still November: one day charged.
+  - 12:30 AM on December 1 is December.
+  - An upgrade at 6 PM on the 30th pays for November's last day, not December's 31.
+- [ ] **Signup and the billing run** use the helper for each new period's end, and for the entitlement's dates (`SubscriptionHelper`). `GetDueForBilling` compares instants, so it needs no change.
+- [ ] **Existing memberships** *(migration, the next free number when built)*. A live membership's period end, next billing date and current entitlement end move from UTC midnight to the studio's midnight on the same date. Until they move, the billing run would read a Pacific "December 1" that starts at 4 PM on November 30 as November, and give it an eight-hour month. It must be idempotent, as the others are. Its test seeds UTC-midnight rows, runs it twice, and reads the result through `GetSubscription`.
+- [ ] **Emails** format their dates in the studio's zone (`FormatDateFromMicroseconds(us, zone)`): the welcome, renewal, change, seat and failed-payment emails.
+- [ ] **Endpoints**: subscription and change-preview responses carry the studio's zone, as events already carry their facility's.
+- [ ] **UI**: My Membership, the detail page, the subscribe page and the admin pages format membership dates in that zone. Today they use UTC on purpose (`subscription-signup.component.ts`). Specs at 6 PM Pacific on the 30th.
+- [ ] Walkthrough: *Testing Phase 3 locally*'s note "after 4 PM Pacific the server's day is already the 21st" goes, and the amounts table loses its second row.
+
+When to build it is OQ-35. My recommendation is next, before Phases 2 and 3 ship, so the period dates, **Start today** amounts and upgrade prices testers see are right from the first release that has them.
 
 ---
 
@@ -1610,6 +1669,9 @@ T9–T12, G17 and A6, plus F8–F11.
   - **`NoFreeSeat`**, **`NotYourMembership`**, **`AlreadySeated`**, **`Yourself`**.
 - [ ] **Accepting** (the existing `AcceptRequest`): when the request names a seat and one is free, the seat is assigned in the same transaction. If the membership is now full, the permission is still accepted, and the payer gets an email saying the seat is full.
 - [ ] **Registering** (`ProcessInvitationsForNewUser`) carries the seat onto the request it makes.
+- [ ] **No new seat while a switch to fewer seats waits** (OQ-48, added in v0.9). With a switch to fewer seats waiting (3.1), assigning or inviting anyone to that membership's seat is refused with **`SWITCH_WAITING`**. **Seat Assignments**' existing assign gets the same refusal. Otherwise someone seated after the switch was chosen, and not named to come off, is dropped on the 1st with no email.
+  - Calling the switch off (**Keep**, 3.1) lifts the refusal. Removing a person is still allowed.
+  - Tests: the refusal from both paths, and the assign working again after **Keep**.
 - [ ] **Emails, with links** built from `branding.websiteUrl` (D5), the address URL-encoded as the reset link does:
   - **Request:** "Thomas Potthast wants to share his Gold Couple's membership with you." **Accept or decline** → the Sharing page.
   - **Invitation:** the same sentence. **Create your account** → registration with the email filled in and a return to Sharing. **Already have an account? Sign in** → sign-in with the same return.
@@ -1646,6 +1708,8 @@ T9–T12, G17 and A6, plus F8–F11.
   - Each empty seat shows the people you already share with as buttons, then "Or invite someone new" with an email field and an **Invite** button. Enter works too. That is Gifford's and Ashley's "pick from the people I already share with" (G17, A6). With a handful of people, buttons save the extra tap a dropdown needs.
   - "No one by that name" shows when a search matches nobody (G17).
   - The sharing link goes to `/my/sharing`.
+  - While a switch to fewer seats waits, the empty seat says why it can't be filled: "You're switching to Gold on Jan 1, 2027, which has 1 seat." It offers no invite field (OQ-48, 4.3).
+- [ ] **Shared with you, everything** (OQ-52, added in v0.9). My Membership's **Shared with you** lists memberships only (3.3). **Sharing** also lists what else is shared with you, such as class packs, each with the payer's name, so they're findable in one place again.
 - [ ] **The banner** (D5): signed in with a request waiting, the home page and My Account show "**Thomas Potthast** wants to share his **Gold Couple's** membership with you", with **Accept** and **Decline**.
 - [ ] Specs: each section, each outcome's message, the banner, the redirect, Enter on the field, and the seated state. Mock and network methods, with `ServerAccess.mock.spec.ts` cases.
 
@@ -1667,6 +1731,7 @@ T1–T4, T27, G1, G7 and G13–G16.
   - Getting Started's first step
   - the About block that says "Please come to our next intro workshop"
   - the new home call to action for visitors who aren't members: "**New here? Start with an intro workshop**"
+  - My Membership's "Not sure yet? **Try an intro workshop**" (3.3), which opens all of **Upcoming Events** until this lands
 - [ ] Specs: the filter, both empty states, and each link's target.
 
 ### 5.2 Memberships *(business_logic/payment + endpoints + ui)*
@@ -1935,6 +2000,7 @@ T18, T43, T45, T46, G10, A9 (the slow calendar) and P11.
 - [ ] The fixed tenant's pool size comes from the app config, default 4 (OQ-30).
 - [ ] The browser allows 4 requests in flight instead of 1.
 - [ ] Tests: the concurrency test; the proxy spec (4 in flight, the 5th waits).
+- [ ] **Two first signups at once** (OQ-46, added in v0.9; 2.2's test). Two connections each start the same person's first membership at the same moment, on committed rows in a scratch database, since a test's rolled-back transaction can't be seen from a second connection. Exactly one succeeds. The other gets 2.2's "you already have a membership" question, not a second membership. 2.2's lock test (`FOR UPDATE` on the person's row) stays.
 
 ### 7.7 The page shell and the CDN *(ui/package)*
 - [ ] With 7.4, the page comes from the server with `s-maxage=60`, so CloudFront stops checking on every visit. S3's `index.html` is then only the template behind `shell/index.html`, which the server re-reads with `If-None-Match`. To confirm in `deploy_ui.sh` that the deploy still invalidates both.
@@ -2040,9 +2106,11 @@ T19–T21, T25, T26, T28, T38, T40, G2, G4–G6, G8, G9, G11, G12, J1, J2, A5, A
 - [ ] Each notification email (the weekly digest, reminders, sharing, class changes) ends with "**Change which emails you get**", linking to **Notifications**. The link is built from the site address.
 - [ ] Emails that must always go (verify, password reset, receipts) explain instead: "You're getting this because…".
 - [ ] The notification emails share one footer template, so a new email can't leave it out.
+- [ ] **The seat email names the last day** (OQ-53, added in v0.9). "Your seat on Knotty Yoga Gold Couple's Membership ends December 1, 2026" becomes "… ends after November 30, 2026", the date My Membership shows ("until Nov 30, 2026"). The payer's "Coming off on December 1, 2026" stays, since it matches the confirm's "Choose who comes off on Dec 1, 2026".
 - [ ] Tests:
   - every notification template's output contains the link
   - the test lists the templates, so a new one has to be added to it
+  - the seat email's subject and body give the last day (`SubscriptionChangeMailTest`)
 
 ### 8.13 The cancellation policy, written down and linked *(seed + business_logic/scheduling + business_logic/payment + endpoints + ui; A7, P16; OQ-31)*
 F24: no policy exists, so every cancellation refunds in full. The cancel warning names a policy that isn't there. **Decided: OQ-31.** Every policy is data: rows that staff edit, never rules in code.
@@ -2060,6 +2128,12 @@ F24: no policy exists, so every cancellation refunds in full. The cancel warning
     - a series booking follows its product's policy the same way
     - a studio cancel of a class still refunds in full
     - the existing P-6 tests attach the Class bookings policy in their setup, so they still pass for the right reason
+- [ ] **A cart paid partly by store credit refunds the credit first** (OQ-44, added in v0.9; business_logic/payment). `RefundBookingShare` refunds the booking's share against the purchase's first payment only. It now refunds the store-credit part first, back as store credit, then the card, never more than each paid.
+  - Tests: a cart paid $50 by credit and $110 by card, one booking cancelled for $80 back: $50 to credit, $30 to the card. The same cart's second cancel takes all of it from the card. A card-only cart is unchanged.
+- [ ] **Cancel your own unpaid order** (OQ-47, added in v0.9; business_logic/payment + endpoints + ui). Today **Cancel** in "Buy it again?" leaves the order **Pending**, because `cancelPurchase` calls `/api/purchase_cancel`, which the server has never had.
+  - `POST /api/purchase_cancel/<id>`: the payer may cancel their own order while nothing is paid. It also releases the order's bookings and service sessions, which `cart_checkout` writes as confirmed before payment. 404 for anyone else's order, and a refusal once anything is paid.
+  - **Shopping Cart** finds your unpaid order and pays that one, instead of making a second unpaid order with its own bookings.
+  - Tests: the cancel releases each booking and its time slot, read through the booking and session readers; 401, 404, and the paid refusal; a cart opened twice makes one order. Specs: **Cancel** on checkout and the cart.
 - [ ] **Cancellation Policies** under **Manage Products** (the **Memberships & sales** group, 9.2): add, rename and edit each policy's description and refund windows. Today only Manage Data can, and that becomes developer-only (10.1).
   - Each policy lists the products that use it.
   - Which policy a product uses is already chosen on the product's page (**Cancellation Policy**, `product-detail.component.html:105`). A new product starts on **No policy (full refund always)**, as today.
@@ -2175,6 +2249,11 @@ T29, T32–T37, G19, and P6–P8.
 - [ ] **Subscription Revenue:** totals by month, and counts labelled as counts (P8).
 - [ ] Each report links to the others in a **Reports** row, so they're found together (T37).
 - [ ] Tests through each helper on a fixed clock; specs.
+
+### 9.9 Staff change a member's membership as the member does *(ui: manage subscriptions; OQ-54, added in v0.9)*
+- [ ] The admin subscription page's **Upgrade Subscription** becomes the member's **Change membership** panel (3.3): every tier with its preview, the confirm in words, and "choose who comes off" for fewer seats. The server already takes any tier from there (3.2), and a cheaper one waits for the period end. Today the page offers only the dearer tiers, and a change to fewer seats gets the server's refusal, since the page can't ask.
+  - The panel is shared, not copied, so the member's page and the staff page can't drift apart. The confirm names the member ("We'll charge $51.33 to Kit's VISA ••••1111…").
+- [ ] Specs: the panel on the admin page, an upgrade, a switch, and fewer seats choosing who comes off.
 
 ---
 
@@ -2312,6 +2391,21 @@ T30, T31, T41 and G18.
 - → Plan: still waiting. They're seed text (8.10), so they can arrive any time before Phase 13's reinstall.
 - → v0.3: still waiting, as you said. Nothing else depends on them.
 
+**OQ-35 — Months are UTC months** *(2.3)*
+- The planner, and the billing run before it, count months in UTC. In Pacific time, a month starts at 4 PM (5 PM in winter) on the last day of the month before. Bought at 6 PM on November 30, **Start today** charges December's full price. A membership "starting December 1" opens at 4 PM on November 30.
+- The pages show their dates in UTC so they read "December 1", not "November 30".
+- **Default:** leave it until the studio's time zone is a setting. The cost is a few evening hours of free access at each month's turn.
+- Is that acceptable for now?
+- Mason- This is probably acceptable but I also like the idea of a studio timezone that defaults to Pacific. Should we tackle that in a phase now?
+- → Explained: the setting already exists. `default_studio_timezone` is seeded `America/Los_Angeles`, and the instructor digests read it. Only the membership code still counts UTC months, and the membership pages show their dates in UTC to match.
+- → Plan: yes, as its own item: **3.6**, *Months in the studio's time zone*. It's written up, not built. It reaches the planner, signup, the billing run, five emails, the pages, and a migration that moves live memberships onto the studio's midnight. That's too much to fold into 3.5's email fix without asking.
+- **Default:** build 3.6 next, before Phases 2 and 3 ship, so the first release with **Start today** and upgrades counts the studio's days (one to two days, with tests). Phase 4 starts after it.
+- Build 3.6 next, or ship Phases 2 and 3 first and do it after?
+
+### Resolved 11/20/2026
+
+*Your answers to v0.7 and v0.8. OQ-33 to OQ-47 came out of building Phase 2, and OQ-48 to OQ-54 out of Phase 3. OQ-35 is still open, above.*
+
 **OQ-32 — Manage Products for someone who isn't an admin** *(1.1)*
 - Building Phase 1 turned up about fifteen tables that Manage Products pages save but no permission grants. Among them are booking windows, instructors, the home page and About sections, and provider availability. 1.1 has the list.
 - They work for admins, and today only admins use Manage Products. A non-admin given `manage_products`, such as a future Studio Manager, would see those pages refuse to save. Phase 1 didn't cause this, and it fixed the one page it would have broken (Class Schedules).
@@ -2320,39 +2414,35 @@ T30, T31, T41 and G18.
 - The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
 - Do you expect to give anyone `manage_products` without making them an admin before the final release?
 - Mason- I'm not sure. Admin seems like a pretty big hammer though so we might need more granularity at some point but I think this is something we might want to tackle as needed and have a reason versus opening security holes theoretically.
-
-*OQ-33 to OQ-47 came out of building Phase 2 (v0.7). Each one is built to its default.*
+- → Plan: as you say, grants when there's a reason. No pass now. When someone who isn't an admin needs Manage Products, each page's tables get their grants then, with a test per page that signs in with only that permission and saves.
 
 **OQ-33 — Members can't start in a later month** *(2.3)*
 - A member's **Subscribe** page offers **Start today** and **Start on December 1**. Later months are staff-only, on **Create Subscription**.
 - **Default:** as built, since you described two choices (OQ-27).
 - Should members keep a later-month choice?
 - Mason- For users, I think that this is the right level of functionality.
+- → Plan: as built. Nothing changes.
 
 **OQ-34 — Staff lost the unticked "Prorate for remaining days"** *(2.3)*
 - Before, unticking it charged the full price for a part month. **Start today** now always charges by the day. The nearest choice is **rest of this month free**, which charges a full month and runs to the end of next month.
 - **Default:** gone.
 - Do staff ever charge the full price for a part month?
 - Mason- I can't think of a reason why this would be needed.
-
-**OQ-35 — Months are UTC months** *(2.3)*
-- The planner, and the billing run before it, count months in UTC. In Pacific time, a month starts at 4 PM (5 PM in winter) on the last day of the month before. Bought at 6 PM on November 30, **Start today** charges December's full price. A membership "starting December 1" opens at 4 PM on November 30.
-- The pages show their dates in UTC so they read "December 1", not "November 30".
-- **Default:** leave it until the studio's time zone is a setting. The cost is a few evening hours of free access at each month's turn.
-- Is that acceptable for now?
-- Mason- This is probably acceptable but I also like the idea of a studio timezone that defaults to Pacific. Should we tackle that in a phase now?
+- → Plan: as built. Nothing changes.
 
 **OQ-36 — Renewals still send two emails** *(2.4)*
 - 2.4 made a signup send one email. A monthly renewal still sends the payment confirmation and the renewal notice.
 - **Default:** leave it for Phase 3, which reworks the membership emails anyway.
 - Fold the renewal into one email too, now or with Phase 3?
 - Mason- Let's do it in phase 3. Which we are doing now since I didn't see this question until now...
+- → Built in v0.9 as **3.5**: a renewal and a retry each send one email, the billing confirmation with the receipt. Building it also fixed the period's last day ("– December 31", not "– January 1") and the studio's name in both billing subjects. *Testing Phase 3 locally*, Part H, shows it.
 
 **OQ-37 — A membership without a card can only start today** *(2.1, 2.3)*
 - Staff can still create a membership with no card (cash, a comp), but only with **Start today**. Without a card, the other three choices are refused, since nothing could charge it on the 1st.
 - **Default:** as built.
 - Do staff set up cash-paid memberships that start later?
 - Mason- I really don't want to deal with cash so I think that this is fine.
+- → Plan: as built. Nothing changes.
 
 **OQ-38 — Where "the same order twice" is checked** *(2.5)*
 - The plan named `purchase_pay_card` and `cart_checkout`. The check is in `purchase_pay_card` only. The cart, checkout and the three booking pages all pay through it, so it covers every card payment.
@@ -2360,6 +2450,7 @@ T30, T31, T41 and G18.
 - **Default:** as built.
 - Should an order paid wholly with store credit ask too?
 - Mason- Default is fine.
+- → Plan: as built. An order paid wholly with store credit isn't asked.
 
 **OQ-39 — Two separate bookings of the same service** *(2.5)* — *settled 11/20*
 - **This OQ was wrong when written.** It said the check ignores booked times. The build compares them: each booking's session and person, as well as the products, variants and quantities. Booking a 60-minute massage, then another an hour earlier, goes straight through with no question.
@@ -2373,6 +2464,7 @@ T30, T31, T41 and G18.
 - **Default:** staff are never asked.
 - Should staff be asked too?
 - Mason- Default is good.
+- → Plan: as built. Staff are never asked.
 
 **OQ-41 — Changing a membership waits for Phase 3** *(2.2, 3.1)* — *settled 11/20 by Phase 3*
 - Porting Phase 2's tests turned up four things in the change-membership path. Phase 2 doesn't touch that path, and none of the four is verified yet:
@@ -2394,24 +2486,28 @@ T30, T31, T41 and G18.
 - **Default:** as built.
 - Say if it should stay listed until the 1st.
 - Mason- Default is fine.
+- → Plan: as built.
 
 **OQ-43 — Prices show cents** *(2.3, 2.6)*
 - The plan's examples say "$160". The pages use the app's usual money format, so they show "$160.00" and "$74.67".
 - **Default:** cents everywhere, matching the rest of the site.
 - Should whole dollars drop the cents?
 - Mason- Default is good.
+- → Plan: as built.
 
 **OQ-44 — A cart paid partly by store credit, partly by card** *(2.9)*
 - The plan wanted a cancel to refund the store credit first, as credit, and then the card. `RefundBookingShare` refunds the booking's share against the purchase's first payment only. The total is still capped at what was paid, so it can never refund too much.
 - **Default:** leave it. The testers' carts were all paid by card. 8.13 reworks refunds next.
 - Fix it now, or with 8.13?
 - Mason- We can wait until 8.13
+- → Plan: 8.13 gains the item: a cancel refunds a cart's store-credit part first, as credit, then the card.
 
 **OQ-45 — Bookings from before carts named their line** *(2.9)*
 - A booking made before bookings recorded their cart line shares the whole purchase with the other bookings on it, evenly. The Phase 13 reinstall removes every such booking.
 - **Default:** as built.
 - Nothing to decide unless you want those old bookings fixed by hand.
 - Mason- Default is fine.
+- → Plan: as built.
 
 **OQ-46 — The two-at-once signup test** *(2.2)*
 - The plan asked for a test with two simultaneous first signups. Each test runs inside one transaction that's rolled back at the end, on one connection, so a second connection can't see its rows.
@@ -2419,6 +2515,7 @@ T30, T31, T41 and G18.
 - **Default:** write it with 7.6, which raises the connection count and makes the race possible.
 - OK to wait for 7.6?
 - Mason- Let's wait until 7.6
+- → Plan: 7.6 gains the item: the two-connection signup test, on committed rows in a scratch database.
 
 **OQ-47 — Cancel in "Buy it again?" leaves the new order pending** *(2.6)*
 - On checkout and the cart, **Cancel** asks the server to cancel the new, unpaid order. There's no such endpoint: `cancelPurchase` in the UI calls `/api/purchase_cancel`, which the server has never had. The order stays **Pending** in **My Purchases**, with nothing charged.
@@ -2427,31 +2524,34 @@ T30, T31, T41 and G18.
 - **Default:** leave it until 8.13, which reworks cancels and refunds. A pending order charges nothing, and the Phase 13 reinstall clears the testers'.
 - The other way is now: a member-side cancel for your own unpaid order that also releases its bookings and sessions, and a cart that finds your unpaid order before making another (about a day, with tests). Now, or with 8.13?
 - Mason- Let's go with the default.
-
-*OQ-48 to OQ-54 came out of building Phase 3 (v0.8). Each one is built to its default.*
+- → Plan: 8.13 gains the item: cancelling your own unpaid order, which releases its bookings and time slots, and a cart that pays your unpaid order instead of making another.
 
 **OQ-48 — Someone seated after a switch to fewer seats is booked** *(3.1)*
 - Kit switches Gold Couple's to Gold on the 1st and names Ann to come off. Before the 1st, Kit takes Ann's seat away on **Seat Assignments** and gives it to Bri. Bri wasn't named, so on the 1st the carry-over seats Kit first, then fills what's left in order. Gold has one seat, so Bri is dropped, with no email.
 - **Default:** leave it. It takes changing your mind twice inside one month. Phase 4 reworks the seat card and can refuse a new seat while a switch to fewer seats waits.
 - Should that refusal come now?
 - Mason- Go with default.
+- → Plan: 4.3 gains the item: no new seat while a switch to fewer seats waits (`SWITCH_WAITING`), and 4.6's seat card says why.
 
 **OQ-49 — Staff can't refund a membership while a change waits** *(3.1)*
 - A membership with a switch waiting reads `cancelled` (it ends at period end), and **Cancel with Prorated Refund** on the admin page accepts only active or past-due ones. Staff can still refund the payment itself, or the member can call the switch off first.
 - **Default:** leave it until someone needs it.
 - Should the admin refund call off the waiting change itself, as the member's cancel does?
 - Mason- Default
+- → Plan: as built. Staff refund the payment, or the member calls the switch off first.
 
 **OQ-50 — The first charge of a switch is declined** *(3.1)*
 - On the 1st the waiting tier is charged like a renewal. If it's declined, it goes past due and gets the usual grace days, and the old month's seats keep their access through them. That includes the person who was named to come off.
 - **Default:** as built (`ChangeProductSwitchFirstChargeDeclinedKeepsTheOldMonthThroughGrace`). Taking them off on the 1st, paid or not, would need its own rule in the billing run.
 - Is a few days' grace for them acceptable?
 - Mason- Default
+- → Plan: as built.
 
 **OQ-51 — "Try an intro workshop" opens every event** *(3.3, 5.1)*
 - The link on My Membership opens **Upcoming Events**, since there's no intro-only view yet. 5.1 adds it, and the link then points there.
 - **Default:** 5.1 fixes it. Nothing to decide.
 - Mason- Why are you asking me something already decided. Please resolve this.
+- → Resolved: you're right, it was already decided and shouldn't have been asked. 5.1's list of intro-workshop links now names My Membership's, so it's a checkbox there, not a question here.
 
 **OQ-52 — Other shared purchases left My Membership** *(3.3)*
 - The old page listed everything shared with you: memberships, and also class packs and the like, under **Shared With Me**. The new **Shared with you** lists memberships only, with the payer's name, since this page is about membership.
@@ -2459,6 +2559,7 @@ T30, T31, T41 and G18.
 - **Default:** as built. Phase 4's **Sharing** page is the natural home for the rest.
 - Should the others come back here meanwhile?
 - Mason- Default
+- → Plan: 4.6 gains the item: **Sharing** lists everything shared with you, class packs included, with the payer's name.
 
 **OQ-53 — The seat email and the page date the same end differently** *(3.1, 3.3)*
 - The page marks a seat coming off with its **last day**: "until Nov 30, 2026". The email to that person gives the **first day without it**: "Your seat on … ends December 1, 2026". The payer's email says "Coming off on December 1, 2026", matching the confirm's "Choose who comes off on Dec 1, 2026".
@@ -2466,12 +2567,14 @@ T30, T31, T41 and G18.
 - **Default:** leave it until 8.12 reworks the emails. Then the seat email says "Your seat ends after November 30".
 - Or fix the wording now (a small server change)?
 - Mason- Default
+- → Plan: 8.12 gains the item: the seat email says "ends after November 30, 2026".
 
 **OQ-54 — Staff can only upgrade from the admin page** *(3.2)*
 - The admin subscription page's **Upgrade Subscription** still lists only the dearer tiers. The server takes any tier now, and a cheaper one waits for the period end, as for members. A change to fewer seats from there gets the server's "choose who comes off" message, since the page can't ask.
 - **Default:** leave it for Phase 9, which reworks Manage Products. Staff can change a member's tier by signing in as them, or the member can.
 - Should staff get the member's full **Change membership** panel now?
 - Mason- Default
+- → Plan: new **9.9**: the admin page gets the member's **Change membership** panel, shared rather than copied.
 
 ### Resolved 11/17/2026, fourth round
 
