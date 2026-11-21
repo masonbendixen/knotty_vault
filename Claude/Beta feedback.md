@@ -318,6 +318,26 @@ Please create a plan with phases of implementation. Within each phase, please re
 
 # Revision notes and working agreement
 
+- **v0.8 (11/20/2026)**: Phase 3 is built and tested, and not shipped. What changed:
+  - **3.1–3.3 are done, with tests.** 3.4 has the gates and the walkthrough; the release is left for Mason. Phase 3 changes only knottyyoga, so the pin is unchanged.
+    - C++: Windows 5,634 passed, Linux 5,634 passed. That's 41 more than v0.7.1's 5,593.
+    - Angular: 4,290 passed on Windows and on Linux. That's 59 more than v0.7's 4,231.
+  - **New: *Testing Phase 3 locally*** under 3.4. It runs from a blank database and walks Kit through Silver, a declined upgrade, an upgrade from **Switch to this**, a second seat for Mason2, a switch to one seat naming who comes off, changing their mind, and a cancel.
+  - **OQ-41 is settled.** All four bugs were real. Each is fixed, with a test.
+  - **Where the build differs from the plan.** Each is noted in its item as *As built*:
+    - Upgrades are priced by a new `PlanUpgradeCharge`, not `CalculateProratedCharge`. It counts days as **Start today** does (OQ-35).
+    - A change at period end is a waiting membership of its own (`replaces_subscription_id`). The people coming off are marked on their seat (`leaves_us`). Migration `app/0014_membership_changes` adds both, so Phase 4.1's migration is now `0015`, and 6.4's are `0016` and `0017`.
+    - Choosing the current tier while a switch waits calls the switch off, instead of being refused.
+    - A membership that hasn't started changes tier in place, and one with no card can't change.
+    - My Membership keeps a **Past memberships** list, so ended memberships and their billing history stay reachable.
+    - **Shared with you** lists memberships only (OQ-52).
+    - **Switch to this** on the Memberships pages opens the change at that tier.
+    - The admin change lost its `immediate` flag and shows the server's reason when it's refused.
+  - **Found while building, and fixed:**
+    - A `?change=` link for the tier you're already on opened an empty panel. It now shows the card alone.
+    - A seat coming off read "leaves Dec 1", the first day without it. It now reads "until Nov 30", the last day with it, like the period and the **Ends** badge.
+    - The mock's many-rows seed (for the paging specs) needed 23 memberships shared with you, since **Shared with you** now reads the membership summary.
+  - **New open questions:** OQ-48 to OQ-54, each built to its default.
 - **v0.7.1 (11/20/2026)**: found while hand-testing Phase 2. In Part C, Mason booked a massage, then another an hour earlier, and got no **Already bought** dialog. The walkthrough expected one. The code was right and the plan was wrong: the check compares booked times as well as items (2.5). A new time is a new order, which suits members who book the next few massages at once. What changed:
   - 2.5's *As built* note and OQ-39 now say so. OQ-39 is settled.
   - Two tests pin it: `PurchasesTest.FindRecentPaidMatchTellsMassageTimesApart` and `…TellsClassDatesApart`. Removing the booked times from the check now fails three tests (2.10's mutation table).
@@ -1544,7 +1564,7 @@ T9–T12, G17 and A6, plus F8–F11.
 - [ ] `gift_permissions.entitlement_id` and `gift_permission_invitations.entitlement_id`: nullable foreign keys to `entitlements`.
 - [ ] `gift_permission_invitations.invited_email` is stored lower-cased. Lookups lower-case too (P9).
 - [ ] The CLAUDE.md new-column checklist: admin column data info, friendly names, and the display template.
-- [ ] Migration **`app/0014_sharing_invites_name_a_seat`**: adds both columns if missing. It is idempotent. Existing invitations aren't lower-cased, because production is reinstalled (D8).
+- [ ] Migration **`app/0015_sharing_invites_name_a_seat`** (renumbered in v0.8: Phase 3 took `0014_membership_changes`): adds both columns if missing. It is idempotent. Existing invitations aren't lower-cased, because production is reinstalled (D8).
 - [ ] Tests: the columns exist on a new database and after the migration; a mixed-case invitation is found by the registration lookup.
 
 ### 4.2 Table helpers *(sql_util/table_helpers)*
@@ -1750,11 +1770,11 @@ T14–T17, A1–A3 and A9.
   - the error
 
 ### 6.4 Which class is right for me *(db_schema + table helpers + seed + ui)*
-- [ ] `classes.sort_order` (`INT NOT NULL DEFAULT 0`), with migration **`app/0015_classes_sort_order`** and the admin metadata checklist.
+- [ ] `classes.sort_order` (`INT NOT NULL DEFAULT 0`), with migration **`app/0016_classes_sort_order`** (renumbered in v0.8) and the admin metadata checklist.
   - `TableHelpers::Classes` orders by `sort_order`, then name.
   - Seed order: Beginner Knotty Yoga, Beginner Partner Acro, Knotty Yoga, Handstands, Aerial Rope, Intermediate Partner Acro.
   - A **Sort order** field in Class Schedules' class dialog.
-- [ ] **Prepares you for** (OQ-23): a `class_prepares_for` table (`class_id`, `prepares_class_id`, unique pair), with migration **`app/0016_class_prepares_for`**, the admin metadata checklist, and a table helper with tests. It is edited in the Class Schedules class dialog. Seed, from Mason's pairs (OQ-23):
+- [ ] **Prepares you for** (OQ-23): a `class_prepares_for` table (`class_id`, `prepares_class_id`, unique pair), with migration **`app/0017_class_prepares_for`** (renumbered in v0.8), the admin metadata checklist, and a table helper with tests. It is edited in the Class Schedules class dialog. Seed, from Mason's pairs (OQ-23):
   - Beginner Knotty Yoga → Knotty Yoga, Beginner Partner Acro
   - Knotty Yoga → Handstands, Aerial Rope, Beginner Partner Acro
   - Beginner Partner Acro → Intermediate Partner Acro
@@ -2214,7 +2234,7 @@ T30, T31, T41 and G18.
   - each start choice's charge and dates, with the billing run driven forward to the 1st (2.3)
   - one booking cancelled from a two-item cart refunds only its share, and matches the cancel preview (2.9, 8.13)
 - [ ] A throwaway database with `--install_schema --force` followed by the `set_secret` block, exactly as Phase 13 runs it.
-- [ ] A copy of a sandbox.15-era database with `--migrate`: app migrations 0014–0016 and honuware 0004–0005. A second run changes nothing. Production is reinstalled, but Mason's local databases and CommunityFinder migrate.
+- [ ] A copy of a sandbox.15-era database with `--migrate`: app migrations 0014–0017 and honuware 0004–0005. A second run changes nothing. Production is reinstalled, but Mason's local databases and CommunityFinder migrate.
 
 ### 12.3 Hand-testing walkthrough
 - [ ] One walkthrough across all phases, from a blank database, with exact menu and field labels, no URLs. Each phase's own walkthrough is folded in.
@@ -2315,7 +2335,7 @@ T30, T31, T41 and G18.
 - **Default:** staff are never asked.
 - Should staff be asked too?
 
-**OQ-41 — Changing a membership waits for Phase 3** *(2.2, 3.1)*
+**OQ-41 — Changing a membership waits for Phase 3** *(2.2, 3.1)* — *settled 11/20 by Phase 3*
 - Porting Phase 2's tests turned up four things in the change-membership path. Phase 2 doesn't touch that path, and none of the four is verified yet:
   - an upgrade credits the old tier's full price, whatever was paid. A prorated first month is over-credited.
   - a failed upgrade charge can shorten the member's access
@@ -2323,6 +2343,12 @@ T30, T31, T41 and G18.
   - after a downgrade, the membership summary (2.2) lists the old and the new membership until the old one ends. So the D2 warning shows "Gold and Silver".
 - **Default:** 3.1 verifies each with a test first, then fixes it.
 - OK to leave them until Phase 3?
+- → Phase 3: all four were real, and all four are fixed, each with a test (3.1's *As built*):
+  - **Over-credit:** an upgrade now charges the price difference for the days left, by the same day count as **Start today**. Nothing is credited, so nothing can be over-credited (`ChangeProductUpgradeChargesTheProratedDifferenceFirst`, `…ProratesOnThe1stThe15thAndTheLastDay`).
+  - **A failed charge:** the charge comes first, and a decline changes nothing (`ChangeProductDeclinedUpgradeLeavesEverythingIntact`, and the endpoint's `ChangeProductDeclinedUpgradeChangesNothing`).
+  - **The skipped first month:** a downgrade's new tier waits as its own membership, and the billing run charges it on the 1st like a renewal (`ChangeProductSwitchCarriesSeatsThroughTheBillingRun`).
+  - **"Gold and Silver":** the summary folds the waiting tier into the membership it replaces (`SubscriptionsTest.GetCurrentPaidByPersonFoldsAScheduledChangeIntoTheOldOne`). A member has one membership, with "Changing to Silver from Dec 1".
+- Nothing to decide.
 
 **OQ-42 — Cancelling a membership that hasn't started** *(2.3)*
 - A **Start on December 1** membership cancelled before the 1st ends at once, and nothing is ever charged. It has no paid time to run out, so it doesn't read "ends December 1".
@@ -2356,6 +2382,44 @@ T30, T31, T41 and G18.
 - A cart that holds a booking is worse off. `cart_checkout` writes its bookings as confirmed, and its service sessions as scheduled, before anything is paid. `PurchaseHelper::CancelPurchase` only changes the order's status. So even with a cancel route, a cancelled cart would keep its time slots, and an unpaid one keeps them today. Opening **Shopping Cart** again without the order in the URL (after a decline, say) makes a second unpaid order with its own bookings.
 - **Default:** leave it until 8.13, which reworks cancels and refunds. A pending order charges nothing, and the Phase 13 reinstall clears the testers'.
 - The other way is now: a member-side cancel for your own unpaid order that also releases its bookings and sessions, and a cart that finds your unpaid order before making another (about a day, with tests). Now, or with 8.13?
+
+*OQ-48 to OQ-54 came out of building Phase 3 (v0.8). Each one is built to its default.*
+
+**OQ-48 — Someone seated after a switch to fewer seats is booked** *(3.1)*
+- Kit switches Gold Couple's to Gold on the 1st and names Ann to come off. Before the 1st, Kit takes Ann's seat away on **Seat Assignments** and gives it to Bri. Bri wasn't named, so on the 1st the carry-over seats Kit first, then fills what's left in order. Gold has one seat, so Bri is dropped, with no email.
+- **Default:** leave it. It takes changing your mind twice inside one month. Phase 4 reworks the seat card and can refuse a new seat while a switch to fewer seats waits.
+- Should that refusal come now?
+
+**OQ-49 — Staff can't refund a membership while a change waits** *(3.1)*
+- A membership with a switch waiting reads `cancelled` (it ends at period end), and **Cancel with Prorated Refund** on the admin page accepts only active or past-due ones. Staff can still refund the payment itself, or the member can call the switch off first.
+- **Default:** leave it until someone needs it.
+- Should the admin refund call off the waiting change itself, as the member's cancel does?
+
+**OQ-50 — The first charge of a switch is declined** *(3.1)*
+- On the 1st the waiting tier is charged like a renewal. If it's declined, it goes past due and gets the usual grace days, and the old month's seats keep their access through them. That includes the person who was named to come off.
+- **Default:** as built (`ChangeProductSwitchFirstChargeDeclinedKeepsTheOldMonthThroughGrace`). Taking them off on the 1st, paid or not, would need its own rule in the billing run.
+- Is a few days' grace for them acceptable?
+
+**OQ-51 — "Try an intro workshop" opens every event** *(3.3, 5.1)*
+- The link on My Membership opens **Upcoming Events**, since there's no intro-only view yet. 5.1 adds it, and the link then points there.
+- **Default:** 5.1 fixes it. Nothing to decide.
+
+**OQ-52 — Other shared purchases left My Membership** *(3.3)*
+- The old page listed everything shared with you: memberships, and also class packs and the like, under **Shared With Me**. The new **Shared with you** lists memberships only, with the payer's name, since this page is about membership.
+- A shared class pack still works, and still shows in **Purchase History**. It's just no longer on this page.
+- **Default:** as built. Phase 4's **Sharing** page is the natural home for the rest.
+- Should the others come back here meanwhile?
+
+**OQ-53 — The seat email and the page date the same end differently** *(3.1, 3.3)*
+- The page marks a seat coming off with its **last day**: "until Nov 30, 2026". The email to that person gives the **first day without it**: "Your seat on … ends December 1, 2026". The payer's email says "Coming off on December 1, 2026", matching the confirm's "Choose who comes off on Dec 1, 2026".
+- Both are true, but "ends on December 1" can read as "through December 1".
+- **Default:** leave it until 8.12 reworks the emails. Then the seat email says "Your seat ends after November 30".
+- Or fix the wording now (a small server change)?
+
+**OQ-54 — Staff can only upgrade from the admin page** *(3.2)*
+- The admin subscription page's **Upgrade Subscription** still lists only the dearer tiers. The server takes any tier now, and a cheaper one waits for the period end, as for members. A change to fewer seats from there gets the server's "choose who comes off" message, since the page can't ask.
+- **Default:** leave it for Phase 9, which reworks Manage Products. Staff can change a member's tier by signing in as them, or the member can.
+- Should staff get the member's full **Change membership** panel now?
 
 ### Resolved 11/17/2026, fourth round
 
