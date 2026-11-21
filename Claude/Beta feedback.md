@@ -1288,47 +1288,251 @@ The dialog is for the same order again: same items, same quantities, and the sam
 T5, T6, T8, T13, T24 and A4, plus F6.
 
 ### 3.1 Changing a membership charges first *(business_logic/payment)*
-- [ ] **Upgrade order:**
+- [x] **Upgrade order:**
   1. Create the purchase.
   2. Charge.
   3. Only on success: cancel the old subscription, revoke its entitlement, create the new one, and move the seats.
 
   A decline changes nothing.
-- [ ] **What an upgrade costs:** the price difference, prorated over the days left in the period with the existing `CalculateProratedCharge` (OQ-2, decided).
-- [ ] **Downgrades** stay at period end. The new subscription's first entitlement carries the seat holders over.
+  - *As built:* the purchase is the new tier less a discount, so its total is the prorated difference. A decline cancels that purchase and returns `Upgrade charge failed: <Square's reason>`. The old membership, its entitlement, its seats and any scheduled change are untouched (`ChangeProductDeclinedUpgradeLeavesEverythingIntact`).
+  - The change email carries the receipt, so the upgrade sends one email, not two (as 2.4).
+- [x] **What an upgrade costs:** the price difference, prorated over the days left in the period (OQ-2, decided).
+  - *As built:* a new `PlanUpgradeCharge` in `subscription_start_planner`, not `CalculateProratedCharge`. It counts the days the way **Start today** does: today included, UTC months (OQ-35). So a member who started mid-month and upgrades pays for the same days twice over at the two prices, never more. That fixes OQ-41's first bug: the old code credited the old tier's full price.
+  - The whole month on the 1st, 16 days on the 15th of a 30-day month, one day on the last day, and February's 28 (`SubscriptionStartPlannerTest.Upgrade…`).
+- [x] **Downgrades** stay at period end. The new subscription's first entitlement carries the seat holders over.
   - **Fewer seats** (OQ-3, decided): the change must name who comes off (`remove_person_ids`), exactly enough to fit. Without that, the server refuses with **`CHOOSE_WHO_TO_REMOVE`** and lists the seat holders. The payer may name themselves.
   - The people named keep their seat until the period ends. Each gets an email when the change is made, giving the date, and the payer gets a confirmation that names them.
-- [ ] Changing to the same product is refused. Changing while a change is already scheduled replaces the scheduled one.
-- [ ] `PreviewChange(subscriptionId, newProductId)` writes nothing. It returns:
+  - *As built:* a change at period end is a waiting replacement membership. It grants nothing and names the one it replaces (`subscriptions.replaces_subscription_id`). The old membership reads `cancelled`, effective at period end, with reason "Switching to <tier>". The billing run charges the replacement on the 1st like any renewal and carries the seats over. That fixes OQ-41's third bug: the first month after a downgrade was skipped.
+  - The people coming off are marked on their seat (`entitlement_assignments.leaves_us`). The carry-over leaves them behind.
+  - Migration **`app/0014_membership_changes`** adds both columns. It is idempotent.
+  - Duplicate names, a name that holds no seat, or the wrong number all get `CHOOSE_WHO_TO_REMOVE` (409, with the preview attached so the page can ask again).
+  - The payer's own confirmation says who comes off. The people named who aren't the payer get **"Your seat on <tier> ends <date>"**.
+- [x] Changing to the same product is refused. Changing while a change is already scheduled replaces the scheduled one.
+  - *As built:* **the current tier while a switch waits is not refused: it calls the switch off** (`keep_current`) and makes the membership active again, clearing the leaving marks. Otherwise the same tier is `SAME_PRODUCT`.
+  - The replaced or called-off change is cancelled with its reason ("Replaced by an upgrade to …", "Replaced by a change to …", "Change called off: keeping …"). Cancelling the membership calls off a waiting change too.
+  - The waiting membership itself can't be changed (`SCHEDULED_CHANGE`): change the one it replaces.
+  - A membership that hasn't started yet (a **Start on December 1**) simply changes tier, with no charge (`not_started`).
+- [x] `PreviewChange(subscriptionId, newProductId)` writes nothing. It returns:
   - immediate or at period end
   - the charge today
   - the date it takes effect
   - when the new tier has fewer seats: the seat holders, and how many must come off
-- [ ] Tests:
+  - *As built:* also the kind (`upgrade`, `switch`, `not_started`, `keep_current`), the days charged, the next charge and its amount, both tiers' names and prices, and the scheduled change it would replace. `ChangeProduct` runs the same preview first, so the two can't disagree.
+  - A membership with no card on file can't change (`NO_CARD_ON_FILE`).
+- [x] Tests:
   - a declined upgrade leaves the old subscription active, with its entitlement and seats
   - the prorated amount on the 1st, the 15th and the last day
   - a downgrade carries seats over, through the billing run and the assignment reader
   - 3 seats to 2: refused with no one named, or with the wrong number. With one person named, they keep the seat until the period ends and lose it after, read through the billing run and the assignment reader.
   - the preview equals what the change then does
 
+  *As built:* all five, in `SubscriptionHelperTest.ChangeProduct…`, plus:
+  - replacing a scheduled change, and calling one off
+  - cancelling a membership that has a change waiting
+  - a not-started membership changing in place
+  - the waiting half refused
+  - a switch whose first charge is declined (OQ-50)
+  - the summary folding a waiting change into the old membership (`SubscriptionsTest.GetCurrentPaidByPersonFoldsAScheduledChangeIntoTheOldOne`), which fixes OQ-41's fourth bug
+  - the migration
+  - both emails
+
+  OQ-41's second bug, a failed upgrade shortening access, is gone with the new order: nothing changes until the charge succeeds.
+
 ### 3.2 Endpoints *(endpoints/subscriptions)*
-- [ ] `GET /api/subscriptions/<id>/change_preview?product_id=` returns the preview. Only the subscriber may call it: 404 for anyone else's subscription.
-- [ ] `POST …/change_product` gets the same ownership test (to confirm), takes `remove_person_ids`, and returns the codes from 3.1.
-- [ ] Endpoint tests: 401, 404 for another person's subscription, the preview shape, and a decline.
+- [x] `GET /api/subscriptions/<id>/change_preview?product_id=` returns the preview. Only the subscriber may call it: 404 for anyone else's subscription.
+- [x] `POST …/change_product` gets the same ownership test (to confirm), takes `remove_person_ids`, and returns the codes from 3.1.
+  - *As built:* the response carries `change` (the preview it acted on) and, for an upgrade, `payment`. `CHOOSE_WHO_TO_REMOVE` is a 409 with the fresh preview.
+  - The admin change (`/api/admin/subscriptions/<id>/change_product`) runs the same code. Its old `immediate` flag is gone: the price decides, as for members.
+- [x] Endpoint tests: 401, 404 for another person's subscription, the preview shape, and a decline.
+  - *As built:* also a preview with no `product_id` (400), a switch, the fewer-seats 409, and the same tier. The admin endpoint's tests cover an upgrade and a cheaper tier waiting for the period end.
 
 ### 3.3 "My Membership" *(ui: pages/account/subscriptions, header menu, shared pipe)*
-- [ ] **My Subscriptions** becomes **My Membership** everywhere: the user menu item, the My Account tile, and the page title. The URL stays.
-- [ ] **With a membership:**
+- [x] **My Subscriptions** becomes **My Membership** everywhere: the user menu item, the My Account tile, and the page title. The URL stays.
+  - *As built:* also the subscribe page's **View My Membership** and the detail page's **Back to My Membership**. The tile's subtitle is "See your membership and change it".
+- [x] **With a membership:**
   - the tier and a status badge (**Active**, **Past due**, **Ends Dec 31**)
   - this period's dates and the next charge
   - the seats, with who holds each one (Phase 4 adds **Add a person**)
   - the card on file
   - **Change membership**, which opens the tier cards with each one's preview: "**Upgrade** — $42.67 today, then $X a month", or "**Switch** on Jan 1". Choosing one opens a confirm.
   - a downgrade to fewer seats asks first: "Gold Couple's has 2 seats. Choose who comes off on Jan 1:", with a check box per seat holder. **Confirm** is enabled once enough are ticked.
-- [ ] **More than one membership:** each one you pay for is its own card. Then **Shared with you** lists the memberships you hold a seat on, with the payer's name.
-- [ ] **Without a membership:** the tier cards themselves, with no "Browse Memberships" click (T6), plus "Not sure yet? Try an intro workshop" (5.1).
-- [ ] Permission names display as words: a shared `permissionDisplayName` turns `gold_member` into **Gold member**, reusing `role.types.ts`'s rule. Used on My Membership, its detail page and User Information (T24).
-- [ ] Specs: both states, the preview text, confirm and decline, the menu label, and the display names.
+  - *As built:*
+    - Dates carry the year ("Jan 1, 2027") and prices show cents (OQ-43).
+    - A membership with a switch waiting reads **Active**, with "Changing to **<tier> from <date>**." The next charge names the new tier. A seat coming off reads "until <its last day>".
+    - The tier cards are the subscription products on sale, each with its monthly price and the server's preview. One the server refuses shows the reason instead of **Choose**, for example no card on file.
+    - While a switch waits, the current tier is offered as **Keep <tier> — calls off the switch to <tier>**, and the waiting tier isn't offered.
+    - The confirm says it all in words before anything happens, for example "We'll charge $51.33 to VISA ••••1111 today for the 11 days left in this month…". **Back** returns to the tiers, and **Never mind** closes them.
+    - Once enough people are ticked, the other boxes grey out. If the seats changed in the meantime (the 409), it asks again with the server's list: "Who holds a seat has changed. Choose again."
+    - A refusal or a decline keeps the confirm open, adding "Nothing has changed." to the server's reason, and a retry is a new request. If the answer was lost, it says to reload and check, and a retry replays the same request.
+    - **Details** opens the old detail page (billing history, **Change Payment Method**, **Seat Assignments**, cancel).
+    - **Switch to this** on the Memberships pages opens My Membership straight at that tier's confirm (`?change=<id>`).
+    - The admin subscription page's change now shows the server's reason when it's refused.
+- [x] **More than one membership:** each one you pay for is its own card. Then **Shared with you** lists the memberships you hold a seat on, with the payer's name.
+  - *As built:* "Shared by Kit Williams". Below them, **Past memberships** keeps ended ones reachable, each opening its detail page and showing why it ended ("Upgraded to …"). Called-off changes aren't listed; they never ran. **Shared with you** lists memberships only (OQ-52).
+- [x] **Without a membership:** the tier cards themselves, with no "Browse Memberships" click (T6), plus "Not sure yet? Try an intro workshop" (5.1).
+  - *As built:* "You don't have a membership yet. Choose one to start:", then the Memberships page's own tier cards with **Subscribe**. The intro-workshop link opens **Upcoming Events** until 5.1 adds its filter (OQ-51).
+- [x] Permission names display as words: a shared `permissionDisplayName` turns `gold_member` into **Gold member**, reusing `role.types.ts`'s rule. Used on My Membership, its detail page and User Information (T24).
+  - *As built:* the `permissionDisplayName` pipe, `shared/pipes/permission-display-name.pipe.ts`.
+- [x] Specs: both states, the preview text, confirm and decline, the menu label, and the display names.
+  - *As built:* `my-subscriptions.component.spec.ts` (rewritten for the new page) and `my-membership.spec.ts` for every sentence the page builds. The pipe, the menu, the My Account tile, the tier cards' **Switch to this** link and both detail pages have specs, as do the mock's preview and change (`ServerAccess.mock.spec.ts`, with the same refusals as the server).
+
+### 3.4 Verify *(added in v0.8)*
+- [ ] Gates on both platforms (table below).
+- [x] Hand-testing walkthrough: *Testing Phase 3 locally*, below.
+- [ ] Release with Phase 4 or on its own, by `--migrate` (D8). `0014_membership_changes` adds two nullable columns. Ship the server and the UI together: the new page needs `change_preview`, and the old admin page sends the `immediate` flag the server no longer reads.
+
+#### Testing Phase 3 locally
+Every charge goes to Square's sandbox, so no real money moves. Use two windows: an ordinary one for Kit, and a private one for Mason2 (Parts E and F).
+
+**Setting up**
+1. **Server build.** A normal **x64-Debug** build. Phase 3 changes only knottyyoga, so the pinned honuware is fine.
+2. **Blank database.** Run **knottyyoga_database_helper.exe**. Its launch settings pass `--recreate_database`. That creates Phase 3's two new columns, and starts Kit with no membership, no saved card and no sharing.
+3. **Start the site.** Start **knottyyoga_the_server.exe**, then run `ng serve` in `ui\`.
+
+**The amounts are for a test on November 20.** Like **Start today**, an upgrade charges by the day, today included, in UTC months (OQ-35): the price difference × the days left ÷ the days in the month. On the 20th that's 11 of November's 30 days. After 4 PM Pacific the server's day is already the 21st, 10 days. On another day, work it out the same way and expect it to the cent.
+
+| On the… | Silver, **Start today** | Silver to Gold Couple's | Silver to Gold | Gold Couple's to Gold Family |
+|---|---|---|---|---|
+| 20th (11 days) | $58.67 | $51.33 | $14.67 | $36.67 |
+| 21st (10 days) | $53.33 | $46.67 | $13.33 | $33.33 |
+
+The dates below are for November too. In December, read "Dec 1, 2026" as January 1, and so on.
+
+**Part A: the new name, and the page with no membership (3.3, T6).** Kit.
+1. Click **Sign In**, and sign in as `kiteagle@gmail.com` with password `kit`.
+2. Open the menu under your name.
+   - Expect: **My Membership**, where **My Subscriptions** was.
+3. Click **Profile**.
+   - Expect: a **My Membership** tile, "See your membership and change it".
+4. Click it.
+   - Expect: the page is titled **My Membership**, with "You don't have a membership yet. Choose one to start:".
+   - Under that: the five membership cards (Silver, Silver Couple's, Gold, Gold Couple's, Gold Family), each with **Subscribe**. There's no **Browse Memberships** button.
+   - Under the cards: "Not sure yet? **Try an intro workshop**".
+5. Click **Try an intro workshop**.
+   - Expect: **Upcoming Events**. It lists every event, not only intro workshops, until 5.1 (OQ-51).
+
+**Part B: a membership, as the card shows it (3.3).** Still Kit.
+1. Menu ▸ **My Membership**. On **Knotty Yoga Silver Membership**, click **Subscribe**.
+2. Leave **Start today** chosen. Under **Payment Method**, **Card** shows **Add new card...**. Enter `4111 1111 1111 1111`, any future expiry date, any CVV and any ZIP. Type `Good` in **Card nickname (optional)** and click **Save Card**.
+3. Click **Subscribe & pay $58.67**.
+   - Expect: **Subscription Created!**, with **View My Membership**.
+4. Click **View My Membership**.
+   - Expect one card, **Knotty Yoga Silver Membership**, with a green **Active** badge and a **Silver member** badge. It says **Silver member**, not `silver_member` (T24).
+   - **This period**: Nov 20, 2026 – Nov 30, 2026
+   - **Next charge**: Dec 1, 2026 · $160.00
+   - **Card on file**: VISA ••••1111
+   - **Seats (1 of 1)**: Kit Williams
+   - Buttons **Change membership** and **Details**.
+5. Click **Details**.
+   - Expect: the membership's page, with **Silver member** in words, and a back link that reads **Back to My Membership**. Click it.
+6. Menu ▸ **Profile** ▸ **User Information**.
+   - Expect: **Memberships:** **Silver member** (T24).
+
+**Part C: a declined upgrade changes nothing (3.1).** Still Kit.
+1. Menu ▸ **Profile** ▸ **Saved Cards**. Click **Add Card**. Type `Decline` in **Friendly name (optional)**, enter Square's decline card `4000 0000 0000 0002` with any future date, CVV and ZIP, and click **Save Card**.
+   - The sandbox may refuse to save this card. If it does, write down its message here and go on to Part D. The decline then rests on its automated tests (`ChangeProductDeclinedUpgrade…`, both server and page).
+2. Menu ▸ **My Membership** ▸ **Details** ▸ **Change Payment Method**. In **Payment method**, choose **VISA ••••0002 (Decline)** and click **Save**. Click **Back to My Membership**.
+   - Expect: **Card on file** reads VISA ••••0002.
+3. Click **Change membership**.
+   - Expect: a **Change membership** panel inside the card, with the four other tiers, each with its monthly price. Silver itself isn't offered.
+     - **Knotty Yoga Silver Couple's Membership**: "**Upgrade** — $29.33 today, then $240.00 a month"
+     - **Knotty Yoga Gold Membership**: "**Upgrade** — $14.67 today, then $200.00 a month"
+     - **Knotty Yoga Gold Couple's Membership**: "**Upgrade** — $51.33 today, then $300.00 a month"
+     - **Knotty Yoga Gold Family Membership**: "**Upgrade** — $88.00 today, then $400.00 a month"
+   - Each has **Choose**, and the panel ends with **Never mind**.
+4. On Gold, click **Choose**.
+   - Expect: **Upgrade to Knotty Yoga Gold Membership**, and "We'll charge $14.67 to VISA ••••0002 today for the 11 days left in this month, and you move to Knotty Yoga Gold Membership now. From Dec 1, 2026 it's $200.00 a month."
+   - Buttons **Confirm** and **Back**. Nothing has been charged yet.
+5. Click **Confirm**.
+   - Expect: **Confirming...** with a spinner, then a red message under the text that starts "Upgrade charge failed:", gives Square's reason, and ends "Nothing has changed."
+   - The confirm stays open.
+6. Reload the page.
+   - Expect: still **Knotty Yoga Silver Membership**, **Active**, **Silver member**, with Kit's seat and the same period and next charge. No **Past memberships**.
+7. Put the good card back: **Details** ▸ **Change Payment Method**, choose **VISA ••••1111 (Good)**, click **Save**, and click **Back to My Membership**.
+
+**Part D: an upgrade, from the Memberships page (3.1, 3.3).** Still Kit.
+1. Click **Memberships** in the header.
+   - Expect: "You're a **Silver** member". The Silver card reads **Your membership**, and the others **Switch to this**.
+2. On **Knotty Yoga Gold Couple's Membership**, click **Switch to this**.
+   - Expect: **My Membership**, with the panel already open at **Upgrade to Knotty Yoga Gold Couple's Membership**: "We'll charge $51.33 to VISA ••••1111 today for the 11 days left in this month, and you move to Knotty Yoga Gold Couple's Membership now. From Dec 1, 2026 it's $300.00 a month."
+3. Click **Back**.
+   - Expect: the four tiers again. Click **Never mind**: the panel closes and **Change membership** comes back.
+4. Click **Change membership**, then **Choose** on Gold Couple's, then **Confirm**.
+   - Expect, in green at the top: "You're now on Knotty Yoga Gold Couple's Membership. We charged $51.33."
+   - The card now reads **Knotty Yoga Gold Couple's Membership**, **Active**, **Gold member**.
+     - **This period**: Nov 20, 2026 – Nov 30, 2026
+     - **Next charge**: Dec 1, 2026 · $300.00
+     - **Seats (1 of 2)**: Kit Williams. The seat moved over.
+   - Under **Past memberships**: **Knotty Yoga Silver Membership**, "Nov 20, 2026 – ended Nov 20, 2026", "Upgraded to Knotty Yoga Gold Couple's Membership".
+5. If mail is set up locally: exactly one email to Kit, "… — Your membership has been updated". It says the subscription was upgraded, gives **Previous Plan** Silver and **New Plan** Gold Couple's, **Prorated Charge: $51.33** and **Next Billing Date: December 1, 2026**. There's no separate receipt.
+
+**Part E: a second person on the membership (3.3).** Kit, then Mason2 in the private window.
+1. Kit: Menu ▸ **Profile** ▸ **Purchase Sharing**. Type `masonbendixen@hotmail.com` in **Email address** and click **Send Request**.
+   - Expect: "Sharing request sent successfully."
+2. Private window: sign in as `masonbendixen@hotmail.com` with password `mason`. Menu ▸ **Profile** ▸ **Purchase Sharing**. Under **Pending Requests for You**, click **Accept** beside Kit Williams.
+3. Kit: Menu ▸ **My Membership** ▸ **Details**. In **Seat Assignments** (1/2 seats assigned), type `Mason2` in **Search people to assign** and pick **Mason2 Bendixen**.
+   - Expect: 2/2 seats assigned.
+4. Click **Back to My Membership**.
+   - Expect: **Seats (2 of 2)**: Kit Williams, Mason2 Bendixen.
+5. Mason2: Menu ▸ **My Membership**.
+   - Expect: no membership card and no tier cards. Under **Shared with you**: **Knotty Yoga Gold Couple's Membership**, "Shared by Kit Williams".
+6. Mason2: Menu ▸ **Profile** ▸ **User Information**.
+   - Expect: **Memberships:** **Gold member**.
+
+**Part F: to fewer seats, choosing who comes off (3.1, 3.3; OQ-3).** Kit.
+1. Menu ▸ **My Membership** ▸ **Change membership**.
+   - Expect:
+     - **Knotty Yoga Silver Membership**: "**Switch** on Dec 1, 2026, then $160.00 a month"
+     - **Knotty Yoga Silver Couple's Membership**: "**Switch** on Dec 1, 2026, then $240.00 a month"
+     - **Knotty Yoga Gold Membership**: "**Switch** on Dec 1, 2026, then $200.00 a month"
+     - **Knotty Yoga Gold Family Membership**: "**Upgrade** — $36.67 today, then $400.00 a month"
+2. On Gold, click **Choose**.
+   - Expect: **Switch to Knotty Yoga Gold Membership**, and "You keep Knotty Yoga Gold Couple's Membership until Nov 30, 2026. Knotty Yoga Gold Membership starts Dec 1, 2026 at $200.00 a month. Nothing is charged today."
+   - A box: "Knotty Yoga Gold Membership has 1 seat. Choose who comes off on Dec 1, 2026:", with a check box for **Kit Williams** and one for **Mason2 Bendixen**.
+   - **Confirm** is greyed out.
+3. Tick **Mason2 Bendixen**.
+   - Expect: **Confirm** turns on, and Kit's box greys out.
+4. Untick it.
+   - Expect: **Confirm** greys out again. Tick **Mason2 Bendixen** again.
+5. Click **Confirm**.
+   - Expect, in green: "You're switching to Knotty Yoga Gold Membership on Dec 1, 2026. Mason2 Bendixen keeps a seat until then."
+   - The card still reads **Knotty Yoga Gold Couple's Membership** and **Active**. Under the title: "Changing to **Knotty Yoga Gold Membership from Dec 1, 2026**."
+   - **Next charge**: Dec 1, 2026 · $200.00 (Knotty Yoga Gold Membership)
+   - **Seats (2 of 2)**: Kit Williams; Mason2 Bendixen, marked **until Nov 30, 2026**.
+   - **Past memberships** still lists only Silver.
+6. If mail is set up locally:
+   - Kit: "… — Your membership has been updated", saying the change is scheduled, effective December 1, 2026, and "Coming off on December 1, 2026: Mason2 Bendixen."
+   - Mason2's mailbox: "… — Your seat on Knotty Yoga Gold Couple's Membership ends December 1, 2026". It says Kit Williams is changing the membership you share to Knotty Yoga Gold Membership, which has fewer seats. The email dates the end by the first day without the seat; the page shows the last day with it (OQ-53).
+7. Mason2: reload **My Membership**.
+   - Expect: **Shared with you** still lists Gold Couple's. The seat lasts until the 1st.
+
+**Part G: changing your mind (3.1).** Kit.
+1. Click **Change membership**.
+   - Expect: **Knotty Yoga Gold Couple's Membership**, "**Keep** Knotty Yoga Gold Couple's Membership — calls off the switch to Knotty Yoga Gold Membership". Gold isn't offered, since it's the switch already waiting. Silver, Silver Couple's and Gold Family are offered as in Part F.
+2. On **Knotty Yoga Silver Couple's Membership**, click **Choose**.
+   - Expect: the confirm ends "This replaces your switch to Knotty Yoga Gold Membership." Silver Couple's has 2 seats, so no one is asked to come off. Click **Back**.
+3. On Gold Couple's (**Keep**), click **Choose**.
+   - Expect: **Keep Knotty Yoga Gold Couple's Membership**, and "You stay on Knotty Yoga Gold Couple's Membership, and the switch to Knotty Yoga Gold Membership is called off."
+4. Click **Confirm**.
+   - Expect, in green: "You're staying on Knotty Yoga Gold Couple's Membership. The switch to Knotty Yoga Gold Membership is off."
+   - No "Changing to" line. **Next charge**: Dec 1, 2026 · $300.00. Mason2 has no **until** mark.
+   - **Past memberships** still lists only Silver. The called-off Gold never ran, so it isn't there.
+
+**Part H: cancelling (3.3's "Ends" badge).** Kit. Do this last, since it ends the membership.
+1. Click **Details** ▸ **Cancel Subscription** ▸ **Confirm Cancellation**, then **Back to My Membership**.
+   - Expect: the badge reads **Ends Nov 30, 2026**, grey. **Next charge**: None. No **Change membership**; **Details** is still there.
+
+**Not checkable by hand, so covered by the automated tests:**
+- the billing run on the 1st: the waiting tier charged and granted, its seats carried over, and the person who came off left behind (`ChangeProductSwitchCarriesSeatsThroughTheBillingRun`, `ChangeProductToFewerSeatsNamesExactlyWhoComesOff`)
+- the upgrade amount on the 1st, the 15th, the last day and in February
+- a switch whose first charge on the 1st is declined (OQ-50)
+- the seats changing between opening the confirm and pressing **Confirm**: the 409 and "Who holds a seat has changed. Choose again."
+- naming the wrong people, too many or too few (the server's 409; the page only lets you tick the right number)
+- the **Past due** badge, which needs a failed renewal
+- a **Start on December 1** membership changing tier in place
+- someone else's membership (404), and the waiting membership itself refused
+- cancelling a membership with a switch waiting, which calls the switch off
+- **Shared with you** paging past five, and My Membership paging past ten (`pagination.spec.ts`)
 
 ---
 
