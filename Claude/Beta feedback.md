@@ -2302,6 +2302,7 @@ T30, T31, T41 and G18.
 - **Default:** leave it until someone who isn't an admin needs Manage Products. Then grant every page's tables in one pass, with a test per page that signs in with only that permission and saves.
 - The other way is to do that pass now, as part of Phase 9, which reworks Manage Products anyway (about half a day).
 - Do you expect to give anyone `manage_products` without making them an admin before the final release?
+- Mason- I'm not sure. Admin seems like a pretty big hammer though so we might need more granularity at some point but I think this is something we might want to tackle as needed and have a reason versus opening security holes theoretically.
 
 *OQ-33 to OQ-47 came out of building Phase 2 (v0.7). Each one is built to its default.*
 
@@ -2309,17 +2310,20 @@ T30, T31, T41 and G18.
 - A member's **Subscribe** page offers **Start today** and **Start on December 1**. Later months are staff-only, on **Create Subscription**.
 - **Default:** as built, since you described two choices (OQ-27).
 - Should members keep a later-month choice?
+- Mason- For users, I think that this is the right level of functionality.
 
 **OQ-34 — Staff lost the unticked "Prorate for remaining days"** *(2.3)*
 - Before, unticking it charged the full price for a part month. **Start today** now always charges by the day. The nearest choice is **rest of this month free**, which charges a full month and runs to the end of next month.
 - **Default:** gone.
 - Do staff ever charge the full price for a part month?
+- Mason- I can't think of a reason why this would be needed.
 
 **OQ-35 — Months are UTC months** *(2.3)*
 - The planner, and the billing run before it, count months in UTC. In Pacific time, a month starts at 4 PM (5 PM in winter) on the last day of the month before. Bought at 6 PM on November 30, **Start today** charges December's full price. A membership "starting December 1" opens at 4 PM on November 30.
 - The pages show their dates in UTC so they read "December 1", not "November 30".
 - **Default:** leave it until the studio's time zone is a setting. The cost is a few evening hours of free access at each month's turn.
 - Is that acceptable for now?
+- 
 
 **OQ-36 — Renewals still send two emails** *(2.4)*
 - 2.4 made a signup send one email. A monthly renewal still sends the payment confirmation and the renewal notice.
