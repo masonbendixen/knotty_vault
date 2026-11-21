@@ -1322,11 +1322,11 @@ T5, T6, T8, T13, T24 and A4, plus F6.
 - [x] **Downgrades** stay at period end. The new subscription's first entitlement carries the seat holders over.
   - **Fewer seats** (OQ-3, decided): the change must name who comes off (`remove_person_ids`), exactly enough to fit. Without that, the server refuses with **`CHOOSE_WHO_TO_REMOVE`** and lists the seat holders. The payer may name themselves.
   - The people named keep their seat until the period ends. Each gets an email when the change is made, giving the date, and the payer gets a confirmation that names them.
-  - *As built:* a change at period end is a waiting replacement membership. It grants nothing and names the one it replaces (`subscriptions.replaces_subscription_id`). The old membership reads `cancelled`, effective at period end, with reason "Switching to <tier>". The billing run charges the replacement on the 1st like any renewal and carries the seats over. That fixes OQ-41's third bug: the first month after a downgrade was skipped.
+  - *As built:* a change at period end is a waiting replacement membership. It grants nothing and names the one it replaces (`subscriptions.replaces_subscription_id`). The old membership reads `cancelled`, effective at period end, with reason "Switching to \<tier>". The billing run charges the replacement on the 1st like any renewal and carries the seats over. That fixes OQ-41's third bug: the first month after a downgrade was skipped.
   - The people coming off are marked on their seat (`entitlement_assignments.leaves_us`). The carry-over leaves them behind.
   - Migration **`app/0014_membership_changes`** adds both columns. It is idempotent.
   - Duplicate names, a name that holds no seat, or the wrong number all get `CHOOSE_WHO_TO_REMOVE` (409, with the preview attached so the page can ask again).
-  - The payer's own confirmation says who comes off. The people named who aren't the payer get **"Your seat on <tier> ends <date>"**.
+  - The payer's own confirmation says who comes off. The people named who aren't the payer get **"Your seat on \<tier> ends \<date>"**.
 - [x] Changing to the same product is refused. Changing while a change is already scheduled replaces the scheduled one.
   - *As built:* **the current tier while a switch waits is not refused: it calls the switch off** (`keep_current`) and makes the membership active again, clearing the leaving marks. Otherwise the same tier is `SAME_PRODUCT`.
   - The replaced or called-off change is cancelled with its reason ("Replaced by an upgrade to …", "Replaced by a change to …", "Change called off: keeping …"). Cancelling the membership calls off a waiting change too.
@@ -1378,9 +1378,9 @@ T5, T6, T8, T13, T24 and A4, plus F6.
   - a downgrade to fewer seats asks first: "Gold Couple's has 2 seats. Choose who comes off on Jan 1:", with a check box per seat holder. **Confirm** is enabled once enough are ticked.
   - *As built:*
     - Dates carry the year ("Jan 1, 2027") and prices show cents (OQ-43).
-    - A membership with a switch waiting reads **Active**, with "Changing to **<tier> from <date>**." The next charge names the new tier. A seat coming off reads "until <its last day>".
+    - A membership with a switch waiting reads **Active**, with "Changing to **\<tier> from \<date>**." The next charge names the new tier. A seat coming off reads "until \<its last day>".
     - The tier cards are the subscription products on sale, each with its monthly price and the server's preview. One the server refuses shows the reason instead of **Choose**, for example no card on file.
-    - While a switch waits, the current tier is offered as **Keep <tier> — calls off the switch to <tier>**, and the waiting tier isn't offered.
+    - While a switch waits, the current tier is offered as **Keep \<tier> — calls off the switch to \<tier>**, and the waiting tier isn't offered.
     - The confirm says it all in words before anything happens, for example "We'll charge $51.33 to VISA ••••1111 today for the 11 days left in this month…". **Back** returns to the tiers, and **Never mind** closes them.
     - Once enough people are ticked, the other boxes grey out. If the seats changed in the meantime (the 409), it asks again with the server's list: "Who holds a seat has changed. Choose again."
     - A refusal or a decline keeps the confirm open, adding "Nothing has changed." to the server's reason, and a retry is a new request. If the answer was lost, it says to reload and check, and a retry replays the same request.
