@@ -2394,12 +2394,14 @@ T30, T31, T41 and G18.
 - A booking made before bookings recorded their cart line shares the whole purchase with the other bookings on it, evenly. The Phase 13 reinstall removes every such booking.
 - **Default:** as built.
 - Nothing to decide unless you want those old bookings fixed by hand.
+- Mason- Default is fine.
 
 **OQ-46 — The two-at-once signup test** *(2.2)*
 - The plan asked for a test with two simultaneous first signups. Each test runs inside one transaction that's rolled back at the end, on one connection, so a second connection can't see its rows.
 - The test checks the lock instead: during a signup, the person's row is held `FOR UPDATE`. A true two-connection test needs committed rows in a scratch database (about half a day).
 - **Default:** write it with 7.6, which raises the connection count and makes the race possible.
 - OK to wait for 7.6?
+- Mason- Let's wait until 7.6
 
 **OQ-47 — Cancel in "Buy it again?" leaves the new order pending** *(2.6)*
 - On checkout and the cart, **Cancel** asks the server to cancel the new, unpaid order. There's no such endpoint: `cancelPurchase` in the UI calls `/api/purchase_cancel`, which the server has never had. The order stays **Pending** in **My Purchases**, with nothing charged.
@@ -2407,6 +2409,7 @@ T30, T31, T41 and G18.
 - A cart that holds a booking is worse off. `cart_checkout` writes its bookings as confirmed, and its service sessions as scheduled, before anything is paid. `PurchaseHelper::CancelPurchase` only changes the order's status. So even with a cancel route, a cancelled cart would keep its time slots, and an unpaid one keeps them today. Opening **Shopping Cart** again without the order in the URL (after a decline, say) makes a second unpaid order with its own bookings.
 - **Default:** leave it until 8.13, which reworks cancels and refunds. A pending order charges nothing, and the Phase 13 reinstall clears the testers'.
 - The other way is now: a member-side cancel for your own unpaid order that also releases its bookings and sessions, and a cart that finds your unpaid order before making another (about a day, with tests). Now, or with 8.13?
+- Mason- Let's go with the default.
 
 *OQ-48 to OQ-54 came out of building Phase 3 (v0.8). Each one is built to its default.*
 
@@ -2414,37 +2417,44 @@ T30, T31, T41 and G18.
 - Kit switches Gold Couple's to Gold on the 1st and names Ann to come off. Before the 1st, Kit takes Ann's seat away on **Seat Assignments** and gives it to Bri. Bri wasn't named, so on the 1st the carry-over seats Kit first, then fills what's left in order. Gold has one seat, so Bri is dropped, with no email.
 - **Default:** leave it. It takes changing your mind twice inside one month. Phase 4 reworks the seat card and can refuse a new seat while a switch to fewer seats waits.
 - Should that refusal come now?
+- Mason- Go with default.
 
 **OQ-49 — Staff can't refund a membership while a change waits** *(3.1)*
 - A membership with a switch waiting reads `cancelled` (it ends at period end), and **Cancel with Prorated Refund** on the admin page accepts only active or past-due ones. Staff can still refund the payment itself, or the member can call the switch off first.
 - **Default:** leave it until someone needs it.
 - Should the admin refund call off the waiting change itself, as the member's cancel does?
+- Mason- Default
 
 **OQ-50 — The first charge of a switch is declined** *(3.1)*
 - On the 1st the waiting tier is charged like a renewal. If it's declined, it goes past due and gets the usual grace days, and the old month's seats keep their access through them. That includes the person who was named to come off.
 - **Default:** as built (`ChangeProductSwitchFirstChargeDeclinedKeepsTheOldMonthThroughGrace`). Taking them off on the 1st, paid or not, would need its own rule in the billing run.
 - Is a few days' grace for them acceptable?
+- Mason- Default
 
 **OQ-51 — "Try an intro workshop" opens every event** *(3.3, 5.1)*
 - The link on My Membership opens **Upcoming Events**, since there's no intro-only view yet. 5.1 adds it, and the link then points there.
 - **Default:** 5.1 fixes it. Nothing to decide.
+- Mason- Why are you asking me something already decided. Please resolve this.
 
 **OQ-52 — Other shared purchases left My Membership** *(3.3)*
 - The old page listed everything shared with you: memberships, and also class packs and the like, under **Shared With Me**. The new **Shared with you** lists memberships only, with the payer's name, since this page is about membership.
 - A shared class pack still works, and still shows in **Purchase History**. It's just no longer on this page.
 - **Default:** as built. Phase 4's **Sharing** page is the natural home for the rest.
 - Should the others come back here meanwhile?
+- Mason- Default
 
 **OQ-53 — The seat email and the page date the same end differently** *(3.1, 3.3)*
 - The page marks a seat coming off with its **last day**: "until Nov 30, 2026". The email to that person gives the **first day without it**: "Your seat on … ends December 1, 2026". The payer's email says "Coming off on December 1, 2026", matching the confirm's "Choose who comes off on Dec 1, 2026".
 - Both are true, but "ends on December 1" can read as "through December 1".
 - **Default:** leave it until 8.12 reworks the emails. Then the seat email says "Your seat ends after November 30".
 - Or fix the wording now (a small server change)?
+- Mason- Default
 
 **OQ-54 — Staff can only upgrade from the admin page** *(3.2)*
 - The admin subscription page's **Upgrade Subscription** still lists only the dearer tiers. The server takes any tier now, and a cheaper one waits for the period end, as for members. A change to fewer seats from there gets the server's "choose who comes off" message, since the page can't ask.
 - **Default:** leave it for Phase 9, which reworks Manage Products. Staff can change a member's tier by signing in as them, or the member can.
 - Should staff get the member's full **Change membership** panel now?
+- Mason- Default
 
 ### Resolved 11/17/2026, fourth round
 
