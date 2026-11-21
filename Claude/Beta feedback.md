@@ -321,7 +321,7 @@ Please create a plan with phases of implementation. Within each phase, please re
 - **v0.9 (11/20/2026)**: Mason answered OQ-32 to OQ-54. What changed:
   - **Built now: one email per renewal** (OQ-36, new **3.5**). A monthly renewal, and a retry after a failed one, now send only the billing confirmation, which carries the receipt. Before, `PayWithCard` sent its own payment confirmation as well.
     - *Found while building, and fixed:* that email gave the period as "December 1, 2026 – January 1, 2027". It now ends on the period's last day, December 31. Both billing subjects (paid and failed) also hard-coded "Knotty Yoga". They now take the studio's name from its settings, as the change emails do.
-    - C++: Windows COUNT_PENDING passed, Linux COUNT_PENDING passed: the two new tests. Angular is unchanged at 4,290, since nothing in `ui/` changed.
+    - C++: Windows 5,636 passed, Linux 5,636 passed: Phase 3's 5,634 plus the two new tests. Angular is unchanged at 4,290, since nothing in `ui/` changed.
     - *Testing Phase 3 locally* gains **Part H**, a renewal run from the test helper. The cancel moves to **Part I**.
   - **Planned, not built: months in the studio's time zone** (OQ-35, new **3.6**). The setting already exists: `default_studio_timezone`, seeded as Pacific, which the instructor digests already use. Only the membership code ignores it. OQ-35 stays open on when to build it. My recommendation is before Phases 2 and 3 ship.
   - **OQ-51 is resolved.** It never needed a decision. 5.1's list of intro-workshop links now names My Membership's.
@@ -1623,7 +1623,9 @@ The dates below are for November too. In December, read "Dec 1, 2026" as January
 
   | Gate | Windows | Linux |
   |---|---|---|
-  | knottyyoga C++ | COUNT_PENDING | 5,636 passed (the two new tests; pinned volume, both programs built) |
+  | knottyyoga C++ | 5,636 passed (all four programs built) | 5,636 passed (pinned volume, both programs built) |
+
+  That's Phase 3's 5,634 plus the two new tests.
 - [x] Hand test: *Testing Phase 3 locally*, **Part H**.
 
 ### 3.6 Months in the studio's time zone *(business_logic/payment + migration + endpoints + ui; OQ-35, planned in v0.9, not built)*
