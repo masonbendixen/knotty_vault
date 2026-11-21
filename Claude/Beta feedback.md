@@ -1623,7 +1623,7 @@ The dates below are for November too. In December, read "Dec 1, 2026" as January
 
   | Gate | Windows | Linux |
   |---|---|---|
-  | knottyyoga C++ | COUNT_PENDING | COUNT_PENDING |
+  | knottyyoga C++ | COUNT_PENDING | 5,636 passed (the two new tests; pinned volume, both programs built) |
 - [x] Hand test: *Testing Phase 3 locally*, **Part H**.
 
 ### 3.6 Months in the studio's time zone *(business_logic/payment + migration + endpoints + ui; OQ-35, planned in v0.9, not built)*
